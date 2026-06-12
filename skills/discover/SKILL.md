@@ -174,6 +174,6 @@ Topic = argomento concreto della domanda. NO generici.
 
 - **Non committare**: le modifiche restano uncommitted. Decisione dell'utente.
 - **Non invocare discover due volte senza aspettare review**: ogni chiamata al doc-writer è costosa in token.
-- **Multi-lingua**: lo scan copre workspace-level (ecosystemi). Per doc di dettaglio intra-codice (classi, metodi) di progetti TS/JS esiste `at-core/automation/explorer/extract-codebase.ts` come futuro L3 — non integrato in questa versione della skill.
+- **Multi-lingua**: lo scan copre workspace-level (ecosystemi). Per doc di dettaglio intra-codice (classi, metodi) di progetti TS/JS esiste `scripts/explorer/extract-codebase.ts` come futuro L3 — non integrato in questa versione della skill.
 - **Fallback no-repo**: la skill funziona uguale in progetti senza git. Nessun git touch richiesto.
 - **Scope split con `capture-doc`**: discover produce la **prima generazione** (scaffold + stub). capture-doc riempie i dettagli **man mano**. Non duplicare responsabilità: se l'utente chiede "documenta meglio il servizio X", rimandalo a capture-doc.

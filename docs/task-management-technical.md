@@ -99,15 +99,15 @@ start → run → checkpoint
 
 | Elemento       | Pattern               | Esempio (illustrativo)      |
 | -------------- | --------------------- | --------------------------- |
-| Worktree lane  | `{project}-{lane}`    | `{project}-l1-pulse`        |
-| Branch lane    | `feat/{lane}`         | `feat/l1-pulse`             |
+| Worktree lane  | `{project}-{lane}`    | `{project}-l1-core`         |
+| Branch lane    | `feat/{lane}`         | `feat/l1-core`              |
 | Task ID        | `T{N}`                | `T319`                      |
 
 ### Note
 
 - Il prefisso `{project}-` riflette il nome del progetto (monorepo) — ogni progetto usa il proprio nome
 - Worktree e branch prendono il nome della lane, non della task
-- I nomi delle lane sono definiti nel grafo di `docs/tasks.md` (es. `l1-pulse`, `cc-agents`, `l2-tools`)
+- I nomi delle lane sono definiti nel grafo di `docs/tasks.md` (es. `l1-core`, `l2-api`, `l3-ui`)
 - Task prefix `T` hardcoded (ID incrementali); task documentali usano `D{N}` con counter separato
 
 ---
@@ -126,7 +126,7 @@ I worktree condividono una configurazione comune posizionata a livello superiore
 └── {project}-l2/          # Lane l2
 ```
 
-> Il codice applicativo deve leggere dalla config condivisa e poi applicare eventuali override locali. Il nome della cartella config (es. `.autotrade-config/`) è specifico di ogni progetto.
+> Il codice applicativo deve leggere dalla config condivisa e poi applicare eventuali override locali. Il nome della cartella config (es. `.myproject-config/`) è specifico di ogni progetto.
 
 ---
 

@@ -79,10 +79,10 @@ Leggi il grafo lane da `${user_config.doc_folder_name}/tasks.md`. Se esiste, mos
 ```
 In quale lane inserire ${TASK_ID}?
 
-1) l1 (L1 Pipeline): ✔️T151 → ... → T155
-2) l2 (Agent Infra): ✔️T143 → ... → T159
-3) l3 (Data): ✔️T145 → ... → T150
-4) l4 (Tools): ✔️T147 → ... → T158
+1) l1 (Core): ✔️T101 → ... → T105
+2) l2 (API): ✔️T106 → ... → T109
+3) l3 (Data): ✔️T110 → ... → T113
+4) l4 (UI): ✔️T114 → ... → T117
 5) Nuova lane (specificare nome)
 6) Nessuna (task spot)
 ```
@@ -95,8 +95,8 @@ Usa euristiche: task che toccano stessi servizi/file, task nella stessa area fun
 Dipendenze cross-lane per ${TASK_ID}?
 
 Suggerite (in base all'analisi):
-  [x] T153 — L1 Market Pulse - Group Evaluator
-  [ ] T146 — A4 - Meccanismo trigger send-keys
+  [x] T102 — Core - validazione input
+  [ ] T108 — API - meccanismo trigger worker
 
 Altre (ID separati da virgola): ___
 ```
@@ -113,7 +113,7 @@ Il routing della nozione verso uno specifico file doc è una decisione che richi
 Estrai e popola la sezione `## Doc Impact` nel task file come bullet list conciso. Per ogni nozione:
 
 - **Nozione**: cosa è emerso e merita documentazione (1-2 frasi, concrete)
-- **Ancora primaria**: trigger concreto che la doc dovrebbe esporre (tag, keyword, comando, pattern). Esempio: `"interpretare tag [voice] e <<v"` è un'ancora; `"interazione con l'umano"` non lo è.
+- **Ancora primaria**: trigger concreto che la doc dovrebbe esporre (tag, keyword, comando, pattern). Esempio: `"interpretare il flag --watch del comando build"` è un'ancora; `"interazione con l'umano"` non lo è.
 
 Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emersa al create-task.*`
 

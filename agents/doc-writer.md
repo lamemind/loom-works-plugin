@@ -21,7 +21,7 @@ La doc di un progetto loom-works (quando ben inizializzato) ha due livelli:
 
 - **Offline** — in `docs/reference/`, indicizzata in `docs/reference/INDEX.md`. Letta **on-demand** quando il TLDR aggancia la query corrente.
   - Forma: **ancora primaria**. Il TLDR espone un trigger concreto (tag, keyword, comando, pattern, endpoint, parametro) che fa decidere di aprire quel file.
-  - Esempio ancora OK: `"interpretare tag [voice] e <<v"`. Antologico NO: `"interazione con l'umano"`.
+  - Esempio ancora OK: `"interpretare il flag --watch del comando build"`. Antologico NO: `"interazione con l'umano"`.
 
 Il progetto può avere struttura diversa da questa. Adattati a quello che trovi: leggi `CLAUDE.md` per capire cosa è online, leggi `docs/reference/INDEX.md` per capire cosa è offline. Se c'è un file `docs/meta/doc-management.md`, ha la parola finale sulle convenzioni.
 
@@ -178,8 +178,8 @@ Esempio:
 
 ```
 Decisione: livello per nozione "retry automatico su errori 429"
-A) ONLINE in docs/project/broker.md — è comportamento di perimetro, utile cross-sessione
-B) OFFLINE in docs/reference/broker-t212/t212-api-rate-limiting.md — dettaglio tecnico di un file già indicizzato per quel trigger
+A) ONLINE in docs/project/api-client.md — è comportamento di perimetro, utile cross-sessione
+B) OFFLINE in docs/reference/api-client/rate-limiting.md — dettaglio tecnico di un file già indicizzato per quel trigger
 ```
 
 ## Decisioni ambigue (tassonomia)
