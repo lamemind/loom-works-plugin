@@ -95,8 +95,8 @@ Usa euristiche: task che toccano stessi servizi/file, task nella stessa area fun
 Dipendenze cross-lane per ${TASK_ID}?
 
 Suggerite (in base all'analisi):
-  [x] T153 — L1 Market Pulse - Group Evaluator
-  [ ] T146 — A4 - Meccanismo trigger send-keys
+  [x] T153 — L1 Pipeline - validazione input
+  [ ] T146 — A4 - meccanismo trigger worker
 
 Altre (ID separati da virgola): ___
 ```
@@ -113,7 +113,7 @@ Il routing della nozione verso uno specifico file doc è una decisione che richi
 Estrai e popola la sezione `## Doc Impact` nel task file come bullet list conciso. Per ogni nozione:
 
 - **Nozione**: cosa è emerso e merita documentazione (1-2 frasi, concrete)
-- **Ancora primaria**: trigger concreto che la doc dovrebbe esporre (tag, keyword, comando, pattern). Esempio: `"interpretare tag [voice] e <<v"` è un'ancora; `"interazione con l'umano"` non lo è.
+- **Ancora primaria**: trigger concreto che la doc dovrebbe esporre (tag, keyword, comando, pattern). Esempio: `"interpretare il flag --watch del comando build"` è un'ancora; `"interazione con l'umano"` non lo è.
 
 Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emersa al create-task.*`
 
