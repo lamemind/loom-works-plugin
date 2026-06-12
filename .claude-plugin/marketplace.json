@@ -1,0 +1,13 @@
+{
+  "name": "lamemind",
+  "owner": {
+    "name": "lamemind"
+  },
+  "plugins": [
+    {
+      "name": "loom-works",
+      "source": "./",
+      "description": "Lane / Task management with coupled documentation lifecycle"
+    }
+  ]
+}

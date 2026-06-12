@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/task-management.md\" \"${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md\" \"${CLAUDE_PLUGIN_ROOT}/docs/caveman.md\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"CAVEMAN MODE ACTIVE (full). Drop articoli/filler/pleasantries/hedging. Frammenti OK. Layout visivo facilitatore. Codice/commit/security: scrivi normale.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}

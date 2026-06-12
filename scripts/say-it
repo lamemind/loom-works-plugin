@@ -1,0 +1,45 @@
+#!/bin/bash
+# say-it — TTS italiano via piper (default: Paola medium)
+# uso:
+#   say-it "testo da leggere"          # non-bloccante (default)
+#   say-it -w "testo"                  # bloccante (wait)
+#   echo "testo" | say-it [-w]
+#   SAY_IT_MODEL=/path/altro.onnx say-it "testo"
+#   WAIT=1 say-it "testo"              # equivalente a -w
+
+set -e
+
+MODEL="${SAY_IT_MODEL:-$HOME/.local/share/piper-voices/it_IT-paola-medium.onnx}"
+RATE="${SAY_IT_RATE:-22050}"
+LENGTH_SCALE="${SAY_IT_LENGTH_SCALE:-1.2}"
+WAIT="${WAIT:-0}"
+
+if [ "${1:-}" = "-w" ]; then
+    WAIT=1
+    shift
+fi
+
+if [ $# -gt 0 ]; then
+    text="$*"
+elif [ ! -t 0 ]; then
+    text="$(cat)"
+else
+    echo "uso: say-it [-w] <testo>   oppure   echo testo | say-it [-w]" >&2
+    exit 1
+fi
+
+[ -z "$text" ] && { echo "say-it: testo vuoto" >&2; exit 1; }
+[ -f "$MODEL" ] || { echo "say-it: modello non trovato: $MODEL" >&2; exit 1; }
+
+run() {
+    printf '%s\n' "$text" \
+        | piper -m "$MODEL" --length-scale "$LENGTH_SCALE" --output-raw 2>/dev/null \
+        | aplay -q -r "$RATE" -f S16_LE -t raw -
+}
+
+if [ "$WAIT" = "1" ]; then
+    run
+else
+    ( run ) </dev/null >/dev/null 2>&1 &
+    disown
+fi
