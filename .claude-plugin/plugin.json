@@ -6,19 +6,19 @@
     "project_mode": {
       "type": "string",
       "title": "Project mode",
-      "description": "repo | no-repo. Vuoto = auto-detect via git rev-parse.",
+      "description": "repo | no-repo. Leave empty to auto-detect via git rev-parse.",
       "sensitive": false
     },
     "doc_folder_name": {
       "type": "string",
       "title": "Docs folder name",
-      "description": "Nome cartella runtime docs (tasks.md, tasks/, reference/, current-task.md). Default: docs",
+      "description": "Folder for tasks.md, tasks/, reference/, current-task.md. Default: docs",
       "sensitive": false
     },
     "on_lane_spawned_hook": {
       "type": "string",
       "title": "On lane spawned hook",
-      "description": "Path relativo al project root dello script eseguito da spawn-lane al termine, UNA volta, sulla lane parent root ({project}-{lane}). Vuoto = noop. Se settato ma file assente/non-eseguibile: silent noop. $1 = CWD = lane root. Env: LOOM_LANE, LOOM_WORKTREE, LOOM_PROJECT_ROOT.",
+      "description": "Path relative to project root, executed once after spawn-lane on the lane worktree root. Empty = noop. $1 = CWD = lane root. Env: LOOM_LANE, LOOM_WORKTREE, LOOM_PROJECT_ROOT.",
       "sensitive": false
     }
   }
