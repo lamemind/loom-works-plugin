@@ -40,12 +40,17 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${user_confi
 
 3. **Presenta task**
    1. Leggi il file task appena attivato
-   2. Estrai e mostra (formato compatto, identico a run-task):
+   2. **Calcola stato preflight** dalla sezione `## Decisions` del task file:
+      - **✅ fatto · ${data} · ${N} decisioni** — esiste ≥1 blocco `### Preflight` con ≥1 bullet `**D{N}**`. `${data}` = data del blocco `### Preflight` più recente; `${N}` = totale bullet `**D{N}**` su tutti i blocchi Preflight.
+      - **➖ non necessario · ${data}** — esiste ≥1 blocco `### Preflight` ma zero bullet `**D{N}**` (marker "nessuna ambiguità" lasciato da preflight-task).
+      - **⚠️ da fare** — nessun blocco `### Preflight` (o sezione `## Decisions` assente).
+   3. Estrai e mostra (formato compatto, identico a run-task):
       ```
       📋 ${taskId} — ${titolo}
       📐 Size: ${size} | ⚡ ${priority}
       📝 ${prima riga della Description, troncata a ~100 char}
       📦 ${numero deliverables} deliverables
+      🛫 Preflight: ${stato preflight}
       📁 Folder: ${campo Folder se popolato, altrimenti ometti riga}
       🟡 Tracked from: ${SHA}
       🔗 Mode: ${linked|detached}
@@ -53,6 +58,8 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${user_confi
       ▶️  Usa /loom-works:run-task ${taskId se detached, altrimenti vuoto} per eseguire,
          /loom-works:checkpoint-task ${taskId se detached, altrimenti vuoto} per checkpoint.
       ```
+   4. Se preflight è **⚠️ da fare**, aggiungi sotto il footer la riga:
+      `   🛫 Preflight non eseguita → valuta /loom-works:preflight-task ${taskId se detached, altrimenti vuoto} prima di run-task.`
 
 ## Note
 

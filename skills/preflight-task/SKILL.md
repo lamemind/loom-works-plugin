@@ -99,6 +99,16 @@ Formato:
 
 Numerazione `D{N}` locale alla sezione, ripartendo da `D1` ad ogni esecuzione preflight (è la data che disambigua i giri).
 
+**Caso nessuna ambiguità (step 1 vuoto)**: scrivi comunque il blocco header datato, senza decisioni:
+
+```markdown
+### Preflight ${YYYY-MM-DD HH:mm}
+
+- _Nessuna ambiguità rilevata._ Task pronta per `run-task` senza decisioni da congelare.
+```
+
+L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `start-task` legge come "preflight verificata, nessuna decisione" (distinto da "preflight mai eseguita" = blocco assente).
+
 ## 4. Commit del task file
 
 Appena scritte le decisioni, committa **subito** il solo task file (commit dedicato, separato dall'implementazione). Usa gli helper di `lib.sh` (no-op silenzioso in no-repo mode):
@@ -106,13 +116,14 @@ Appena scritte le decisioni, committa **subito** il solo task file (commit dedic
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
 lw_git_add "${task_file}"
+# N≥1 → "...- ${N} decisioni congelate" | N=0 (nessuna ambiguità) → "...- nessuna ambiguità"
 lw_git_commit "task(${taskId}): preflight - ${N} decisioni congelate"
 lw_git_push
 ```
 
 - Committa **solo** il task file, non altri file pending nel working tree.
-- Messaggio: `task(${taskId}): preflight - ${N} decisioni congelate`.
-- `${N}` = numero decisioni di **questo** giro preflight.
+- Messaggio: `task(${taskId}): preflight - ${N} decisioni congelate` se `${N}` ≥ 1, altrimenti `task(${taskId}): preflight - nessuna ambiguità`.
+- `${N}` = numero decisioni di **questo** giro preflight (0 nel caso nessuna ambiguità).
 - Push subito dopo il commit, coerente con `create-task` / `doc-task` / `checkpoint-task` (tutte pushano). In no-repo mode add/commit/push degradano a no-op.
 
 Dopo commit+push, mostra all'utente:
@@ -127,5 +138,5 @@ Dopo commit+push, mostra all'utente:
 
 - **Non esegue codice**: preflight è solo decisioni. Implementazione resta a `run-task`.
 - **Idempotenza parziale**: ri-eseguire preflight su una task aggiunge un nuovo blocco datato. Lo storico delle decisioni resta intatto. Ogni giro produce il suo commit dedicato.
-- **Task piccole**: se l'analisi (step 1) non trova ambiguità reali, comunicalo all'utente e termina senza Q&A, **senza update e senza commit**. Pattern: `🛫 Nessuna ambiguità rilevata. Task pronta per run-task.`
+- **Task piccole / nessuna ambiguità**: se l'analisi (step 1) non trova ambiguità reali, salta il Q&A ma **scrivi comunque il marker** in `## Decisions` (step 3, caso nessuna ambiguità) e committalo (step 4, messaggio `nessuna ambiguità`). Serve a `start-task` per distinguere "preflight già passata, niente da decidere" da "preflight mai eseguita". Mostra: `🛫 Nessuna ambiguità rilevata — marker registrato. Task pronta per run-task.`
 - **Commit + push automatici**: lo step 4 committa **solo** il task file (commit dedicato) e pusha, come le altre skill task-level. Decisioni tracciate separatamente dall'implementazione. In no-repo mode gli helper degradano a no-op.
