@@ -31,6 +31,16 @@ Stampa SEMPRE un riassunto compatto prima di qualsiasi altra azione:
 📁 Folder: ${campo Folder se popolato, altrimenti ometti riga}
 ```
 
+## Artefatti e materiale di lavoro
+
+Output intermedi che non sono codice del progetto (dump, analisi, findings, script di supporto) → dentro la **task folder**, mai sparsi nel repo né sotto `${user_config.doc_folder_name}/tasks/`.
+
+- La task folder vive in **project root**, dot-prefixed; il campo `📁 Folder` la mostra root-relative (`./.YY-MM-DD-slug`). Sotto `${user_config.doc_folder_name}/tasks/` stanno **solo** i task file `.md` — **mai** una folder.
+- **Non creare folder a mano** (`mkdir`). Crearla/agganciarla solo via skill:
+  - task senza folder che ora serve → `/loom-works:set-task-folder ${taskId}` (la colloca giusta in root + popola il campo Folder)
+  - materiale fuori dal ciclo task → `/loom-works:scratch-new <slug>`
+- CWD resta sempre project root: scrivi nei file passando il path della folder, non con `cd`.
+
 ## 1. Determina modalità dal campo Size
 
 Leggi il campo **Size** dalla mappa proprietà della task.

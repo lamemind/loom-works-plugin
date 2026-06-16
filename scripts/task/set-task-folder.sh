@@ -57,6 +57,9 @@ fi
 DATE=$(date +%y-%m-%d)
 FOLDER_NAME=".${DATE}-${SLUG}"
 FOLDER_PATH="${PROJECT_ROOT}/${FOLDER_NAME}"
+# Root-relative form written into the **Folder** field: the leading ./ makes the
+# parent explicit (project root) so readers never re-derive it as docs/tasks/.
+FOLDER_FIELD="./${FOLDER_NAME}"
 
 "${SCRIPT_DIR}/../utils/folder-create.sh" "$FOLDER_PATH"
 
@@ -71,7 +74,7 @@ if ! grep -q '^- \*\*Folder\*\*:' "$TASK_FILE"; then
     echo "ERROR: campo '- **Folder**:' mancante in ${TASK_FILE}" >&2
     exit 1
 fi
-sed -i "s|^- \*\*Folder\*\*:.*\$|- **Folder**: ${FOLDER_NAME}|" "$TASK_FILE"
+sed -i "s|^- \*\*Folder\*\*:.*\$|- **Folder**: ${FOLDER_FIELD}|" "$TASK_FILE"
 echo "-> updated **Folder** field in $(basename "$TASK_FILE")"
 
 # Stage folder + task file so callers' next commit includes them.

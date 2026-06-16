@@ -28,7 +28,9 @@ Decisione binaria `CREATE_FOLDER=yes|no`:
   - **Size = L** → `CREATE_FOLDER=yes`
   - **Size = S | M** → `CREATE_FOLDER=no`
 
-Nel template file, il campo `**Folder**:` viene popolato automaticamente.
+Nel template file, il campo `**Folder**:` viene popolato automaticamente dallo script (step 3b) col path root-relative `./.YY-MM-DD-slug`.
+
+> ⚠️ La task folder vive in **project root**, **mai** sotto `${user_config.doc_folder_name}/tasks/` (lì solo i task file `.md`). Non crearla a mano: la crea `set-task-folder.sh` allo step 3b.
 
 ---
 
@@ -132,7 +134,7 @@ Se `CREATE_FOLDER=yes` (vedi §Task Folder — Policy):
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${TASK_ID} --slug ${task-name} --docs-root "${user_config.doc_folder_name}"
 ```
 
-Lo script gestisce folder canonica `${PROJECT_ROOT}/.${YYYY-MM-DD}-${task-name}` in autonomia.
+Lo script gestisce folder canonica `${PROJECT_ROOT}/.${YYYY-MM-DD}-${task-name}` in autonomia (mkdir + campo Folder + git add). **Non** anticiparlo con `mkdir` manuali, e mai sotto `${user_config.doc_folder_name}/tasks/`.
 
 ### 4. Finalizzazione
 ```bash

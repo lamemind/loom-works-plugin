@@ -23,7 +23,7 @@ Risolvi il task file:
 - Linked: `readlink -f ${user_config.doc_folder_name}/current-task.md`
 - Detached: Glob `${user_config.doc_folder_name}/tasks/${taskId}-*.md`
 
-Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni).
+Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `${user_config.doc_folder_name}/tasks/`.
 
 ## Flusso checkpoint
 

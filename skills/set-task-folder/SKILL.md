@@ -47,7 +47,7 @@ Se `--existing <path>` fornito:
 
 ### 3. Modalità canonical (default)
 
-Crea folder con naming canonico `.YY-MM-DD-slug`:
+Crea folder con naming canonico `.YY-MM-DD-slug` **in project root** (mai sotto `${user_config.doc_folder_name}/tasks/`: il nome dotted è solo il nome, il parent è la root):
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${taskId} [--slug <slug>] --docs-root "${user_config.doc_folder_name}"
@@ -56,8 +56,8 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${taskId} [--slug <slug>] 
 Lo script:
 - Calcola `DATE=$(date +%y-%m-%d)`
 - Compone `FOLDER_NAME=".${DATE}-${slug}"`
-- Chiama `${CLAUDE_PLUGIN_ROOT}/scripts/utils/folder-create.sh` per mkdir
-- Aggiorna riga `- **Folder**:` nel task file
+- Chiama `${CLAUDE_PLUGIN_ROOT}/scripts/utils/folder-create.sh` per mkdir **in project root**
+- Aggiorna riga `- **Folder**:` nel task file col path root-relative `./${FOLDER_NAME}`
 - Fa `git add` di folder + task file (commit deferito al caller)
 - Stampa `FOLDER_NAME=...` come ultima riga
 

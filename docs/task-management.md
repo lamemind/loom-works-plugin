@@ -26,7 +26,7 @@ Una singola fonte di verità: `docs/tasks.md`. Contiene:
 
 Task prefix: `T` (hardcoded). ID sono incrementali (T01, T02, …). Le task documentali usano prefix `D{N}` con counter separato.
 
-I singoli task file stanno in `docs/tasks/T{N}-{slug}.md`. Materiale di supporto (design docs, findings, analisi estemporanee) va in task folder dedicata (vedi §Task Folder) o scratch folder per attività estemporanee.
+I singoli task file stanno in `docs/tasks/T{N}-{slug}.md`. Materiale di supporto (design docs, findings, analisi estemporanee) va in **task folder dedicata** — che vive in **project root**, dot-prefixed `.YY-MM-DD-slug`, **mai** sotto `docs/tasks/` (lì stanno solo i task *file* `.md`) — vedi §Task Folder, o scratch folder per attività estemporanee.
 
 Symlink runtime: `docs/current-task.md` → task attiva (gestito da `/loom-works:start-task`). In modalità detached il symlink NON viene creato e il task ID viaggia esplicito sessione per sessione (vedi §Detached).
 
@@ -184,13 +184,16 @@ Folder dedicata per task con molto materiale (artefatti, dump, analisi, script).
 
 ```
 {project}/
-├── .26-05-22-brt-invoice-error/   ← task folder (size L)
-├── .26-04-15-granterre/           ← task folder (size L)
-├── docs/                          ← doc loom-works
+├── .26-05-22-brt-invoice-error/   ← task folder (size L)   [project ROOT]
+├── .26-04-15-granterre/           ← task folder (size L)   [project ROOT]
+├── docs/
+│   └── tasks/                     ← qui SOLO i task file .md (NO folder)
 └── ...                            ← codice progetto
 ```
 
 Naming: `.YY-MM-DD-{slug}`. Dot-prefix → sort top. Slug = task slug.
+
+> ⚠️ **Posizione = project root, sempre.** La task folder **non** va sotto `docs/tasks/`: lì vivono solo i task *file* `.md`. Il nome dotted (`.YY-MM-DD-slug`) è solo il nome — il parent è la root. Non crearla a mano (`mkdir`): usa `set-task-folder` / `scratch-new`, che la collocano giusta.
 
 ### Quando esiste
 
