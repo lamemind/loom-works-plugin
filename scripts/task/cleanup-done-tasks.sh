@@ -31,6 +31,13 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/lib.sh"
 
+# Read an OPTIONAL '- **Label**: value' field from a task file.
+# Returns empty string (exit 0) when the field is absent — safe under
+# `set -euo pipefail`, where a bare `grep` no-match (exit 1) would abort.
+read_field() {  # read_field <file> <label>
+    grep -m1 "^- \*\*$2\*\*:" "$1" 2>/dev/null | sed 's/.*: *//' | tr -d '[:space:]' || true
+}
+
 PROJECT_ROOT="$(lw_find_project_root)"
 DOCS_ROOT="$(lw_docs_root)"
 TASKS_FILE="${PROJECT_ROOT}/${DOCS_ROOT}/tasks.md"
@@ -75,15 +82,14 @@ CANDIDATES=()        # "ID|age_days|task_file|folder_path"
 SKIPPED=()           # "ID|reason"
 
 for task_id in "${DONE_IDS[@]}"; do
-    task_file=$(ls "${TASKS_DIR}/${task_id}-"*.md 2>/dev/null | head -1)
+    task_file=$(ls "${TASKS_DIR}/${task_id}-"*.md 2>/dev/null | head -1 || true)
     if [[ -z "$task_file" || ! -f "$task_file" ]]; then
         SKIPPED+=("${task_id}|task file non trovato")
         continue
     fi
 
     # Primary: Last tracked commit field
-    tracked_sha=$(grep -m1 '^- \*\*Last tracked commit\*\*:' "$task_file" \
-                  | sed 's/.*: *//' | tr -d '[:space:]')
+    tracked_sha=$(read_field "$task_file" "Last tracked commit")
 
     done_date=""
     if [[ -n "$tracked_sha" ]]; then
@@ -114,7 +120,7 @@ for task_id in "${DONE_IDS[@]}"; do
     fi
 
     # Read folder field
-    folder_field=$(grep -m1 '^- \*\*Folder\*\*:' "$task_file" | sed 's/.*: *//' | tr -d '[:space:]')
+    folder_field=$(read_field "$task_file" "Folder")
     folder_path=""
     if [[ -n "$folder_field" && "$folder_field" != "" ]]; then
         # folder_field is root-relative like ./26-06-03-T10-...
@@ -172,8 +178,7 @@ for c in "${CANDIDATES[@]}"; do
     echo "--- purge ${id} ---"
 
     # Determine Done SHA for commit body
-    tracked_sha=$(grep -m1 '^- \*\*Last tracked commit\*\*:' "$tf" \
-                  | sed 's/.*: *//' | tr -d '[:space:]')
+    tracked_sha=$(read_field "$tf" "Last tracked commit")
     done_date=""
     if [[ -n "$tracked_sha" ]]; then
         done_date=$(git -C "$PROJECT_ROOT" show -s --format="%cI" "$tracked_sha" 2>/dev/null || true)
