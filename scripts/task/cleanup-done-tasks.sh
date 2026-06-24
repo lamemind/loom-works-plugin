@@ -111,15 +111,20 @@ for task_id in "${DONE_IDS[@]}"; do
         continue
     fi
 
-    # Primary: Last tracked commit field
-    tracked_sha=$(read_field "$task_file" "Last tracked commit")
-
+    # Primary: "✔️ Done at YYYY-MM-DD" inline nel task file (sorgente deterministica)
     done_date=""
-    if [[ -n "$tracked_sha" ]]; then
+    progress_line=$(grep -m1 '^- \*\*Progress\*\*:.*Done at' "$task_file" 2>/dev/null || true)
+    if [[ -n "$progress_line" ]]; then
+        done_date=$(echo "$progress_line" | grep -oP 'Done at \K\d{4}-\d{2}-\d{2}' || true)
+    fi
+
+    # Fallback 1: Last tracked commit SHA → data git
+    tracked_sha=$(read_field "$task_file" "Last tracked commit")
+    if [[ -z "$done_date" && -n "$tracked_sha" ]]; then
         done_date=$(git -C "$PROJECT_ROOT" show -s --format=%cI "$tracked_sha" 2>/dev/null || true)
     fi
 
-    # Fallback: last commit touching the task file
+    # Fallback 2: last commit touching the task file
     if [[ -z "$done_date" ]]; then
         rel_path="${DOCS_ROOT}/tasks/$(basename "$task_file")"
         done_date=$(git -C "$PROJECT_ROOT" log -1 --format=%cI -- "$rel_path" 2>/dev/null || true)

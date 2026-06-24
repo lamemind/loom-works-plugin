@@ -68,7 +68,9 @@ fi
 # invece di "✔️ Done" (idioma percentuale ereditato da start-task). Replace secco
 # prima del commit: file committato corretto + gate TASK_DONE (più sotto) matcha.
 if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
-    sed -i 's|^\(- \*\*Progress\*\*:\) ✔️ 100%|\1 ✔️ Done|' "$TASK_FILE"
+    sed -i '0,/^- \*\*Progress\*\*:/s|^\(- \*\*Progress\*\*:\) ✔️ 100%|\1 ✔️ Done|' "$TASK_FILE"
+    DONE_DATE=$(date +%Y-%m-%d)
+    sed -i '0,/^- \*\*Progress\*\*:/s|^\(- \*\*Progress\*\*:\) ✔️ Done$|\1 ✔️ Done at '"${DONE_DATE}"'|' "$TASK_FILE"
 fi
 
 STATUS=$(lw_git_status_porcelain)

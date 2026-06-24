@@ -56,7 +56,7 @@ fi
 # Aggiorna file task: Progress e Last tracked commit
 # -----------------------------------------------------------------------------
 
-sed -i 's/^\(- \*\*Progress\*\*:\).*/\1 🟡 0%/' "$TASK_FILE"
+sed -i '0,/^- \*\*Progress\*\*:/s/^\(- \*\*Progress\*\*:\).*/\1 🟡 0%/' "$TASK_FILE"
 
 if grep -q '^\- \*\*Last tracked commit\*\*:' "$TASK_FILE"; then
     sed -i "s|^\(- \*\*Last tracked commit\*\*:\).*|\1 ${SHA_DISPLAY}|" "$TASK_FILE"
