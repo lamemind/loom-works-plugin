@@ -7,6 +7,9 @@
 #
 # Dry-run di default: elenca candidati senza modifiche.
 # Con --apply: elimina task file + folder + riga tasks.md, un commit per task.
+# Inoltre riconcilia le righe ORFANE (Done in tasks.md ma file gia' assente):
+# rimuove riga+nodo, indipendentemente dalla soglia --days. Senza questo, l'ID
+# resterebbe vivo solo come riga e verrebbe riusato dall'allocatore -> collisione.
 #
 # Filtro opzionale: se passati task-id come argomenti, opera solo su quelli.
 # =============================================================================
@@ -48,6 +51,23 @@ if [[ ! -f "$TASKS_FILE" ]]; then
     exit 1
 fi
 
+# Remove a task's Overview row + Execution Plan node from tasks.md.
+# Shared by candidate purge and orphan-row reconciliation. Leaves the file
+# staged (git add); the caller owns the commit.
+remove_task_from_tasksmd() {  # <task_id>
+    local id="$1"
+    awk -v tid="$id" '
+        /^## Tasks Overview/ { in_s=1 }
+        /^## / && !/^## Tasks Overview/ { in_s=0 }
+        in_s && $0 ~ ("^\\| *"tid" *\\|") { next }
+        { print }
+    ' "$TASKS_FILE" > "${TASKS_FILE}.tmp"
+    mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
+    # Execution Plan node: lines containing the ID as a word token
+    sed -i "/\b${id}\b/d" "$TASKS_FILE" 2>/dev/null || true
+    git -C "$PROJECT_ROOT" add "$TASKS_FILE"
+}
+
 # ---- Collect Done task IDs from tasks.md ------------------------------------
 
 mapfile -t DONE_IDS < <(
@@ -79,12 +99,15 @@ fi
 NOW_EPOCH=$(date +%s)
 
 CANDIDATES=()        # "ID|age_days|task_file|folder_path"
+ORPHANS=()           # "ID" — riga Done in tasks.md ma file gia' assente
 SKIPPED=()           # "ID|reason"
 
 for task_id in "${DONE_IDS[@]}"; do
     task_file=$(ls "${TASKS_DIR}/${task_id}-"*.md 2>/dev/null | head -1 || true)
     if [[ -z "$task_file" || ! -f "$task_file" ]]; then
-        SKIPPED+=("${task_id}|task file non trovato")
+        # Riga Done senza file: residuo da riconciliare. Nessun file da
+        # trattenere -> indipendente dalla soglia --days (rimuovi riga+nodo).
+        ORPHANS+=("${task_id}")
         continue
     fi
 
@@ -144,18 +167,28 @@ if [[ ${#SKIPPED[@]} -gt 0 ]]; then
     echo ""
 fi
 
-if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
-    echo "-> nessuna task Done oltre ${DAYS} giorni"
+if [[ ${#ORPHANS[@]} -gt 0 ]]; then
+    echo "🔧 Righe orfane (Done, file assente) — da riconciliare:"
+    for oid in "${ORPHANS[@]}"; do
+        echo "   ${oid}"
+    done
+    echo ""
+fi
+
+if [[ ${#CANDIDATES[@]} -eq 0 && ${#ORPHANS[@]} -eq 0 ]]; then
+    echo "-> nessuna task Done oltre ${DAYS} giorni, nessuna riga orfana"
     exit 0
 fi
 
-echo "Candidati (Done > ${DAYS}gg):"
-for c in "${CANDIDATES[@]}"; do
-    id="${c%%|*}"; rest="${c#*|}"; age="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; fp="${rest#*|}"
-    folder_info=""
-    [[ -n "$fp" ]] && folder_info=" + folder $(basename "$fp")"
-    echo "   ${id}  (${age}gg)  $(basename "$tf")${folder_info}"
-done
+if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
+    echo "Candidati (Done > ${DAYS}gg):"
+    for c in "${CANDIDATES[@]}"; do
+        id="${c%%|*}"; rest="${c#*|}"; age="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; fp="${rest#*|}"
+        folder_info=""
+        [[ -n "$fp" ]] && folder_info=" + folder $(basename "$fp")"
+        echo "   ${id}  (${age}gg)  $(basename "$tf")${folder_info}"
+    done
+fi
 
 if [[ $APPLY -eq 0 ]]; then
     echo ""
@@ -169,6 +202,16 @@ if ! lw_is_repo; then
     echo "ERROR: --apply richiede modalità repo" >&2
     exit 1
 fi
+
+# ---- Reconcile orphan rows (file already absent: drop the dangling row) ------
+
+for id in "${ORPHANS[@]}"; do
+    echo ""
+    echo "--- reconcile orphan ${id} ---"
+    remove_task_from_tasksmd "$id"
+    git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): reconcile orphan row %s (file already absent)' "$id")"
+    echo "-> riga orfana rimossa + commit: ${id}"
+done
 
 for c in "${CANDIDATES[@]}"; do
     id="${c%%|*}"; rest="${c#*|}"; age="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; fp="${rest#*|}"
@@ -202,21 +245,9 @@ for c in "${CANDIDATES[@]}"; do
         folder_info_body="  - ${rel_fp}/"
     fi
 
-    # Remove row from tasks.md
-    awk -v tid="$id" '
-        /^## Tasks Overview/ { in_s=1 }
-        /^## / && !/^## Tasks Overview/ { in_s=0 }
-        in_s && $0 ~ ("^\\| *"tid" *\\|") { next }
-        { print }
-    ' "$TASKS_FILE" > "${TASKS_FILE}.tmp"
-    mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
-    git -C "$PROJECT_ROOT" add "$TASKS_FILE"
+    # Remove row + Execution Plan node from tasks.md
+    remove_task_from_tasksmd "$id"
     echo "-> rimossa riga tasks.md: ${id}"
-
-    # Remove node from Execution Plan if present (lines like "T14:" or "-> T14" etc.)
-    # Only lines containing exactly the task ID as a word token
-    sed -i "/\b${id}\b/d" "$TASKS_FILE" 2>/dev/null || true
-    git -C "$PROJECT_ROOT" add "$TASKS_FILE"
 
     # Commit
     COMMIT_BODY="Purged (restore: git checkout <this-commit>~1 -- <path>):
@@ -228,4 +259,4 @@ ${folder_info_body}Done commit: ${tracked_sha:-unknown} (${done_date:-unknown})"
 done
 
 echo ""
-echo "-> purge completato: ${#CANDIDATES[@]} task eliminate"
+echo "-> completato: ${#CANDIDATES[@]} task purgate, ${#ORPHANS[@]} righe orfane riconciliate"
