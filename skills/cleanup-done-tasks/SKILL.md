@@ -1,9 +1,14 @@
 ---
 name: cleanup-done-tasks
-description: Purge Done tasks older than N days — removes task file, dot-prefixed folder, and tasks.md row. Dry-run by default, one commit per task.
+description: "[DEPRECATED → clean-tasks] Purge Done tasks older than N days — removes task file, dot-prefixed folder, and tasks.md row. Dry-run by default, one commit per task."
 allowed-tools: Bash(*), Read, AskUserQuestion
 model: haiku
 ---
+
+> ⚠️ **DEPRECATED — superseded by `clean-tasks`.**
+> `clean-tasks` assorbe questa funzione (modo "età": *"più vecchie di N giorni"*) e
+> aggiunge il purge on-demand per ID/range. Lo **script** `cleanup-done-tasks.sh`
+> resta in uso (è il backend del modo età di `clean-tasks`). Preferisci `/loom-works:clean-tasks`.
 
 Pota le task `✔️ Done` più vecchie di N giorni. Operazione **distruttiva ma recuperabile via git history**.
 
