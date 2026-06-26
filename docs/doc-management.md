@@ -13,6 +13,14 @@ Doc utente plugin (questo file + `task-management.md`) auto-inietta via hook Ses
 
 Questo file = filosofia generale. Implementazione = responsabilità progetto. `/loom-works:init` propone scaffold minimale (`docs/tasks.md`, `docs/reference/INDEX.md`, dirs).
 
+## Principi editoriali
+
+Doc = fotografia dello stato attuale, non diario dei cambiamenti.
+
+- **Solo as-is**: scrivi al presente lo stato corrente. No cronologia, no changelog, no "prima/dopo", no date/task/PR inline. La storia vive in git.
+- **Motivazioni → solo offline**: il *perché* di una scelta (trade-off, alternative scartate, contesto) sta in `docs/reference/`. Online descrive *cosa* è e *come* funziona il perimetro, mai *perché* è stato scelto.
+- **Compatta: sostituisci, non appendere**: a ogni modifica riscrivi as-is la sezione toccata, non stratificare versioni successive. Chiudendo una task (es. refactor) documenta solo l'esito + motivazioni generali, non cosa è cambiato.
+
 ## Formato file offline
 
 Header standard `docs/reference/` per generazione indice:

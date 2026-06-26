@@ -59,7 +59,10 @@ Criteri:
 | Decisione architetturale di perimetro | Workflow passo-passo, procedura |
 | Convenzione comportamentale (come lavoriamo) | Reference API, schema, mapping tabellare |
 | Scope, cosa è / cosa non è | Trigger concreto che fa aprire il file |
+| Cosa/come del perimetro (as-is) | **Perché** di una scelta: trade-off, alternative scartate, contesto |
 | Orientamento cross-sessione | Dettaglio tecnico consultato on-demand |
+
+**Motivazioni → offline.** Il *perché* di una scelta (trade-off, alternative scartate, contesto della decisione) va sempre in `reference/`, mai online. Online tiene il *cosa/come* as-is del perimetro. Se una nozione è mista (perimetro + motivazione), splitta: perimetro online, motivazione in un file reference linkato.
 
 **Dubbio → chiedi**. Usa `AskUserQuestion` nella forma descritta in [§Forma delle domande](#forma-delle-domande). Non fare guess silenziosi su casi ambigui: la collocazione è una decisione editoriale.
 
@@ -110,6 +113,9 @@ Forma per **offline**:
 
 Regole generali:
 - Token-efficient: liste > tabelle > prosa (vedi `docs/meta/doc-management.md` se c'è)
+- **Solo as-is**: documenta lo stato attuale, al presente. Mai cronologia, changelog, "prima era X → ora Y", "introdotto/rimosso in ...", riferimenti a task/PR/date. La storia vive in git, non nella doc.
+- **Input da chiusura task (refactor & co.)**: il contesto che ricevi può essere un diff o una discussione prima/dopo. Distilla **solo il dopo** (lo stato risultante) + le **motivazioni generali** del design. Non narrare cosa è cambiato.
+- **Motivazioni → solo offline**: il *perché* (trade-off, alternative, contesto della scelta) va in `reference/`, mai online. Online = cosa/come del perimetro as-is.
 - No meta-note effimere ("aggiornato il ...", "vedi task ...")
 - Path assoluti nei comandi bash
 
@@ -203,6 +209,7 @@ Per casi non tabellati, applica comunque la regola **chiusa + trade-off**.
 ## Principi
 
 - **Una nozione, un target**. Non spalmare.
+- **As-is, non cronologia**. Documenti lo stato attuale, non il percorso per arrivarci. Il *perché* delle scelte va offline (`reference/`); online resta il *cosa/come* del perimetro. Compatta: sostituisci la sezione toccata, non stratificare versioni.
 - **Editoriale, non esaustivo**. Meglio una riga chiara che tre paragrafi vaghi.
 - **Ferma e chiedi su ambiguità**. Forma sempre chiusa (vedi §Forma delle domande). È peggio mettere una nozione nel posto sbagliato che perdere 10 secondi di interazione.
 - **Strutturale prima, contenuto dopo** per modifiche di peso (two-phase, vedi §3.5). Per singola riga in sezione esistente, one-shot OK.
