@@ -1,38 +1,40 @@
 ---
 name: clean-tasks
-description: Clean tasks on demand — by ID (T15), range (T15-T20 / T15-20), or age ("older than N days"). Removes task file, dot-prefixed folder, and tasks.md row, one commit per task. Supersedes cleanup-done-tasks.
+description: Clean tasks on demand — by ID (T15), range (T15-T20 / T15-20), or age ("older than N days"). Removes task file, dot-prefixed folder, and tasks.md row, one commit per task.
 allowed-tools: Bash(*), Read, AskUserQuestion
-model: haiku
+model: sonnet
 ---
 
-Pota task **su indicazione diretta**. Operazione **distruttiva ma recuperabile via git history** (un commit per task, restore con `git checkout <commit>~1 -- <path>`).
+Pota task su indicazione diretta. Operazione distruttiva ma recuperabile via git history.
+
+Tutto il lavoro lo fa lo script: per ogni task elimina il task file, la folder dot-prefixed e la riga in `tasks.md` (Overview + nodo Execution Plan), e fa **un commit atomico per task**. Il tuo compito è solo interpretare l'input, lanciare il dry-run, chiedere conferma quando serve, eseguire `--apply`. Non fare git/rm a mano e non aggiungere commit tuoi: lo script possiede l'intero flusso, range inclusi.
 
 Input utente:
 ~~~human
 $ARGUMENTS
 ~~~
 
-## Classificazione (3 modi)
+## Modi
 
 Interpreta `$ARGUMENTS` e scegli **uno** dei modi:
 
-| Modo | Trigger | Esempi |
-|------|---------|--------|
-| **A — ID/range** | uno o più token task `Tnn`, `Tnn-Tmm`, `Tnn-mm` (anche separati da virgola/spazio) | `T15` · `T15-20` · `T15-T20` · `T03 T07` |
-| **B — età** | linguaggio naturale su anzianità Done | `più vecchie di 15 giorni` · `older than 30 days` · `--days 60` |
-| **C — vuoto/ambiguo** | nessun token riconoscibile | — |
+| Modo | Trigger | Front-end | Conferma |
+|------|---------|-----------|----------|
+| **A — ID/range** | token `Tnn`, `Tnn-Tmm`, `Tnn-mm` (virgola/spazio) | `clean-tasks.sh` | solo se ci sono NON-Done |
+| **B — età** | linguaggio naturale su anzianità Done | `cleanup-done-tasks.sh` | sempre |
+| **C — vuoto/ambiguo** | nessun token riconoscibile | — | chiedi cosa pulire |
 
-- **Modo C** → chiedi cosa pulire (inline, no AskUserQuestion): «Quali task? ID/range (es. `T15-20`) o età (es. "più vecchie di 30 giorni")».
-- Conferma policy: **A** chiede conferma *solo se* ci sono task NON-Done nel target. **B** chiede conferma *sempre*.
+**Modo C** → chiedi inline (no AskUserQuestion): «Quali task? ID/range (es. `T15-20`) o età (es. "più vecchie di 30 giorni")».
 
----
+In Modo B estrai `DAYS` dal linguaggio naturale (default `60`).
 
-## Modo A — ID / range diretto
+## Flusso — dry-run → conferma → apply
 
-Front-end: `clean-tasks.sh`. Normalizza i token in SPEC (`Tnn` / `Tnn-Tmm` / `Tnn-mm`); virgole → spazi. Il range viene espanso dallo script (ID inesistenti nel range → riportati `[missing]`, non bloccano).
+Passa l'intero SPEC/range in **una sola invocazione**: lo script espande i range da solo (gli ID inesistenti finiscono `[missing]`, non bloccano).
 
-### 1. Dry-run (sempre prima)
+### 1. Dry-run
 
+**Modo A:**
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
     --mode "${user_config.project_mode}" \
@@ -40,32 +42,40 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
     <SPEC...>
 ```
 
-Mostra l'output. Lo script elenca i target con tag `[Done]` / `[NOT Done]` / `[orphan row]` / `[missing]` ed emette una riga:
+**Modo B:**
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/task/cleanup-done-tasks.sh \
+    --mode "${user_config.project_mode}" \
+    --docs-root "${user_config.doc_folder_name}" \
+    --days ${DAYS}
+```
+
+Mostra l'output. Lo script elenca i target con tag `[Done]` / `[NOT Done]` / `[orphan row]` / `[missing]`. Il Modo A chiude con una riga riassuntiva:
 
 ```
 SUMMARY candidates=A non_done=B orphans=C missing=D
 ```
 
-Se `candidates=0 orphans=0` → niente da rimuovere, chiudi (nessuna conferma).
+Nessun candidato e nessuna riga orfana → niente da rimuovere, chiudi.
 
-### 2. Conferma — **solo se `non_done > 0`**
+### 2. Conferma
 
-- `non_done == 0` (tutti Done) → **nessuna conferma**, vai diretto all'esecuzione.
-- `non_done > 0` → TTS ping poi `AskUserQuestion`:
+- **Modo A**: salta la conferma se `non_done == 0` (tutti Done) e vai diretto all'apply. Se `non_done > 0`, conferma obbligatoria.
+- **Modo B**: conferma sempre, se ci sono candidati.
+
+Quando serve, TTS ping poi `AskUserQuestion`:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "conferma purge task non completate"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "conferma pulizia task <topic 3-7 parole>"
 ```
 
-`AskUserQuestion`:
-- Elenca i target, **evidenzia le NON-Done** (eliminazione forzata).
-- Avviso: un commit per task, recuperabile via `git checkout <commit>~1 -- <path>`.
-- Opzioni: **Procedi** / **Annulla**.
+Nell'`AskUserQuestion`: elenca i target dal dry-run (in Modo A evidenzia le NON-Done, eliminazione forzata), ricorda il restore `git checkout <commit>~1 -- <path>`, opzioni **Procedi** / **Annulla**.
 
-### 3. Esecuzione (diretta, o se confermata)
+### 3. Apply
 
-Stesso comando con `--apply`:
+Stesso comando con `--apply`. Lo script cicla i target e committa uno per uno.
 
+**Modo A:**
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
     --mode "${user_config.project_mode}" \
@@ -74,33 +84,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
     <SPEC...>
 ```
 
----
-
-## Modo B — età (assorbe cleanup-done-tasks)
-
-Front-end: `cleanup-done-tasks.sh` (Done + oltre soglia giorni). Estrai `DAYS` dal linguaggio naturale (default `60`).
-
-### 1. Dry-run (sempre prima)
-
-```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/cleanup-done-tasks.sh \
-    --mode "${user_config.project_mode}" \
-    --docs-root "${user_config.doc_folder_name}" \
-    --days ${DAYS}
-```
-
-### 2. Conferma — **sempre** (se ci sono candidati)
-
-TTS ping poi `AskUserQuestion`:
-
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "conferma pulizia task done per età"
-```
-
-Elenca i candidati (dal dry-run) + avviso restore. Opzioni **Procedi** / **Annulla**. Nessun candidato → messaggio e chiudi.
-
-### 3. Esecuzione (solo se confermata)
-
+**Modo B:**
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/cleanup-done-tasks.sh \
     --mode "${user_config.project_mode}" \
@@ -109,28 +93,21 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/cleanup-done-tasks.sh \
     --apply
 ```
 
----
+### 4. Esito
 
-## Feedback (entrambi i modi)
+Mostra l'output dello script. Atteso: un commit `chore(tasks): purge …` per ogni task rimossa (più eventuali `reconcile orphan …`), e nessun commit unico che ripulisce `tasks.md` in blocco. Se l'esito diverge, segnalalo invece di dichiarare successo.
 
-Mostra il risultato dello script. Se uno o più commit sono andati a buon fine:
+Se almeno un commit è andato a buon fine:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "pulizia task completata"
 ```
 
-## Convenzione TTS
-
-Prima di ogni `AskUserQuestion`, esegui:
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic 3-7 parole specifiche>"
-```
-
 ## Note
 
-- **Dry-run di default**: sicuro da invocare per semplice ispezione.
-- **Un commit per task**: restore granulare con `git checkout <commit>~1 -- <path>`.
-- **Modo A pota qualunque stato/età**: a differenza di `cleanup-done-tasks`, l'indicazione diretta per ID/range rimuove anche task non-Done (conferma obbligatoria) e ignora la soglia giorni.
-- **Active task**: se l'ID rimosso è la task attiva, il symlink `current-task.md` viene eliminato per non lasciarlo dangling.
-- **Righe orfane**: ID con riga in `tasks.md` ma file già assente → riconciliate (rimozione riga, commit dedicato).
+- **Dry-run di default**: sicuro da invocare per sola ispezione.
+- **Restore granulare**: ogni commit include file + folder + riga della stessa task → `git checkout <commit>~1 -- <path>`.
+- **Modo A ignora stato ed età**: rimuove anche task non-Done (con conferma) e non guarda la soglia giorni; il Modo B pota solo Done oltre `--days`.
+- **Active task**: se rimuovi la task attiva, lo script elimina il symlink `current-task.md` per non lasciarlo dangling.
+- **Righe orfane**: ID con riga in `tasks.md` ma file già assente → riconciliate con commit dedicato.
 - **Push**: nessun push automatico; manuale o via `checkpoint-task`.
