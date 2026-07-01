@@ -7,8 +7,8 @@
 # =============================================================================
 #
 # Naming canonico: .YY-MM-DD-{slug}
-# Chiama folder-create.sh per mkdir.
-# Stampa il folder name creato (relativo a PROJECT_ROOT).
+# Permissivo: se la folder canonica esiste la riusa, altrimenti la crea.
+# Stampa il folder name (relativo a PROJECT_ROOT).
 # =============================================================================
 
 set -euo pipefail
@@ -61,7 +61,12 @@ FOLDER_PATH="${PROJECT_ROOT}/${FOLDER_NAME}"
 # parent explicit (project root) so readers never re-derive it as docs/tasks/.
 FOLDER_FIELD="./${FOLDER_NAME}"
 
-"${SCRIPT_DIR}/../utils/folder-create.sh" "$FOLDER_PATH"
+# Permissive: reuse the canonical folder if it already exists, else create it.
+if [[ -d "$FOLDER_PATH" ]]; then
+    echo "-> task folder già esistente, riuso: ${FOLDER_NAME}/"
+else
+    "${SCRIPT_DIR}/../utils/folder-create.sh" "$FOLDER_PATH"
+fi
 
 # Update **Folder** field in task file (unconditional replace).
 TASK_FILE_PATTERN="${PROJECT_ROOT}/$(lw_docs_root)/tasks/${TASK_ID}-*.md"

@@ -209,8 +209,7 @@ Campo `**Folder**:` nel task file: sempre presente, vuoto se no folder.
 | Azione | Comando |
 |--------|---------|
 | Crea task con folder (auto size L) | `/loom-works:create-task` |
-| Aggiungi folder retroattiva | `/loom-works:set-task-folder {taskId}` |
-| Promuovi scratch pre-esistente | `/loom-works:set-task-folder {taskId} --existing <path>` |
+| Aggiungi folder retroattiva (riusa se esiste) | `/loom-works:set-task-folder {taskId}` |
 | Crea folder orfana (no task) | `/loom-works:scratch-new <slug>` |
 
 ### CWD invariato
