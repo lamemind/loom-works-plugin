@@ -6,8 +6,8 @@ Lista task attiva del progetto. Unico file di riferimento per pianificazione, pr
 
 Colonna `K` (Kind): ⚙️ code task, 📝 doc task.
 
-| ID  | Pri | K  | Prog | Task (max 64)                                                    |
-| --- | --- | -- | ---- | ---------------------------------------------------------------- |
+| ID  | Pri | K  | Prog | Task (max 100)                                                                                       |
+| --- | --- | -- | ---- | ---------------------------------------------------------------------------------------------------- |
 
 ## Execution Plan
 

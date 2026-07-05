@@ -114,7 +114,7 @@ Sostituisci i placeholder:
 | Placeholder | Valore |
 |---|---|
 | `{{taskId}}` | es. `D01` |
-| `{{Descrizione_breve}}` | titolo corto (≤64 char) |
+| `{{Descrizione_breve}}` | titolo corto (≤100 char) |
 | `{{data_corrente}}` | `YYYY-MM-DD HH:mm` |
 | `{{priorita_raccolta}}` | High / Med / Low |
 | `{{durata_standard}}` | es. `2h`, `1 giornata` |

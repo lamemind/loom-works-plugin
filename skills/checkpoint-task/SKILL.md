@@ -84,7 +84,7 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
 
 6. **Aggiorna ${user_config.doc_folder_name}/tasks.md**
    1. Leggi `${user_config.doc_folder_name}/tasks.md`
-   2. Nella sezione Tasks Overview (formato: `| ID | Pri | K | Prog | Task (max 64) |`), trova la riga che inizia con `| {taskId} |`
+   2. Nella sezione Tasks Overview (formato: `| ID | Pri | K | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
    3. Aggiorna la colonna Prog (solo emoji):
       - Se task completata (step 4): `✔️`
       - Altrimenti: `🟡` (emoji sola, niente percentuali)

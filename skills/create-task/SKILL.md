@@ -140,9 +140,9 @@ Lo script gestisce folder canonica `${PROJECT_ROOT}/.${YYYY-MM-DD}-${task-name}`
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" ${TASK_ID} ${task-name} "${descrizione_breve}" ${priority}
 # Priority: High | Med | Low
-# descrizione_breve: max 64 caratteri (troncata automaticamente dallo script)
+# descrizione_breve: max 100 caratteri (troncata automaticamente dallo script)
 ```
-- Aggiunge la task alla tabella Tasks Overview di `${user_config.doc_folder_name}/tasks.md` (formato: `| ID | Pri | Prog | Task (max 64) |`)
+- Aggiunge la task alla tabella Tasks Overview di `${user_config.doc_folder_name}/tasks.md` (formato: `| ID | Pri | Prog | Task (max 100) |`)
 - Committa e pusha le modifiche
 
 ### 5. Feedback finale

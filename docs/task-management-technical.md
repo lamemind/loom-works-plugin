@@ -154,10 +154,10 @@ Marcatori standard per tracking nelle task table.
 
 ## Esempio Task Table
 
-Formato standard per `docs/tasks.md` (Task max 64 caratteri).
+Formato standard per `docs/tasks.md` (Task max 100 caratteri).
 
-| ID   | Pri | Prog | Task (max 64)                |
-| ---- | --- | ---- | ---------------------------- |
+| ID   | Pri | Prog | Task (max 100)                                                                                       |
+| ---- | --- | ---- | ---------------------------------------------------------------------------------------------------- |
 | T319 | 🔥 | ✔️   | Task completata              |
 | T321 | ⚡ | 🟡   | Task in corso                |
 | T322 | ⚡ | 🔵   | Task non iniziata            |

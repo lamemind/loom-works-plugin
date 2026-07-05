@@ -52,7 +52,7 @@ case "$PRIORITY" in
     Low)  PRIORITY_EMOJI="🔹" ;;
 esac
 
-TASK_DESC_TRUNCATED=$(printf '%s' "$TASK_DESC" | cut -c1-64)
+TASK_DESC_TRUNCATED=$(printf '%s' "$TASK_DESC" | cut -c1-100)
 
 case "$TASK_ID" in
     D*) KIND_EMOJI="📝" ;;
