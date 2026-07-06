@@ -37,8 +37,13 @@ source "${SCRIPT_DIR}/../utils/lib.sh"
 # Read an OPTIONAL '- **Label**: value' field from a task file.
 # Returns empty string (exit 0) when the field is absent — safe under
 # `set -euo pipefail`, where a bare `grep` no-match (exit 1) would abort.
+# Returns ONLY the first whitespace-delimited token of the value (path / SHA):
+# an inline annotation after it — e.g. `Folder: .26-06-16-cat (condivisa con T19)`
+# — is dropped. The old `tr -d '[:space:]'` collapsed such a note INTO the path
+# (`.26-06-16-cat(condivisaconT19)`) → nonexistent dir → folder silently skipped
+# → orphaned folder with no warning. First-token extraction fixes that.
 read_field() {  # read_field <file> <label>
-    grep -m1 "^- \*\*$2\*\*:" "$1" 2>/dev/null | sed 's/.*: *//' | tr -d '[:space:]' || true
+    grep -m1 "^- \*\*$2\*\*:" "$1" 2>/dev/null | sed 's/^[^:]*: *//' | awk '{print $1; exit}' || true
 }
 
 PROJECT_ROOT="$(lw_find_project_root)"
