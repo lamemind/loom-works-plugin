@@ -5,7 +5,7 @@ Questa cartella contiene la documentazione utente del plugin loom-works: i manua
 File previsti (popolati progressivamente durante task D04):
 - `task-management.md` — struttura lane/task, ciclo di vita, grafo dipendenze, comandi
 - `doc-management.md` — livelli online/offline, formato TLDR, build-index, freshness
-- `caveman.md` — modalità comunicazione ultra-compressa
+- `caveman.md` — modalità comunicazione comprehension-first (comprimi la forma, mai la comprensione; `caveman.legacy.md` = vecchia versione token-first archiviata)
 - `task-management-technical.md` — naming convention, esempi comandi, dettaglio workflow
 
 I primi tre file vengono iniettati automaticamente nel context Claude Code via hook SessionStart (`${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` + `doc-management.md` + `caveman.md`). Il quarto è accessibile on-demand tramite `docs/reference/INDEX.md` del progetto utente.
