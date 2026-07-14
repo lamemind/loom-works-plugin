@@ -10,7 +10,10 @@
 #   {docs_root}/reference/INDEX.md    (da templates/reference-index-skeleton.md)
 #   {docs_root}/tasks/                (dir)
 #   {docs_root}/reference/            (dir)
-#   .claude/loom-works.initialized    (file sentinel: il progetto è stato inizializzato)
+#
+# NB: l'identità di progetto .claude/loom-works.json (che è anche il marker di
+# project-root per lib.sh) è creata dallo step 1b della skill init (bootstrap
+# interattivo), non da questo script.
 #
 # Idempotente: file/dir esistenti NON sono sovrascritti.
 # Opzione --force: rigenera tasks.md e INDEX.md anche se presenti (distruttivo).
@@ -76,13 +79,7 @@ create_dir "${PROJECT_ROOT}/${DOCS_ROOT}/reference"
 copy_template "${TEMPLATES}/tasks-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/tasks.md"
 copy_template "${TEMPLATES}/reference-index-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/reference/INDEX.md"
 
-# Sentinel: file dentro .claude/ (creata lazy). Config vera vive in plugin settings.json.
-SENTINEL_DIR="${PROJECT_ROOT}/.claude"
-SENTINEL="${SENTINEL_DIR}/loom-works.initialized"
-if [[ ! -f "$SENTINEL" ]]; then
-    mkdir -p "$SENTINEL_DIR"
-    date -u +"%Y-%m-%dT%H:%M:%SZ" > "$SENTINEL"
-    log "wrote sentinel: .claude/loom-works.initialized"
-fi
+# Identità di progetto + marker root: .claude/loom-works.json, creato dallo
+# step 1b della skill (bootstrap interattivo owner/emoji/surfaces). Non qui.
 
 log "done."

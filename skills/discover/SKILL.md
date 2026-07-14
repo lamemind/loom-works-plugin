@@ -23,7 +23,7 @@ Se il progetto ha già `docs/project/overview.md` o un `CLAUDE.md` corposo, segn
 
 ## Prerequisiti
 
-- `.claude/loom-works.initialized` deve esistere (scaffold creato da `/loom-works:init`). Se manca, interrompi e suggerisci l'init.
+- `.claude/loom-works.json` deve esistere (config progetto creata da `/loom-works:init`). Se manca, interrompi e suggerisci l'init.
 
 ## Flusso
 

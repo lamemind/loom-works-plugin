@@ -19,7 +19,7 @@ Solo se **assenti** (idempotente):
 - `${user_config.doc_folder_name}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
 - `${user_config.doc_folder_name}/tasks/` — directory per i file task
 - `${user_config.doc_folder_name}/reference/` — directory per doc offline
-- `.claude/loom-works.initialized` — file sentinel (la dir `.claude/` è creata lazy se assente), segnala che init è passato
+- `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`
 
 **CLAUDE.md**: init **propone** (non forza) l'aggiunta degli `@-import` base — vedi step 3. **Non tocca**: file git, config, dipendenze.
 
@@ -110,5 +110,5 @@ Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CL
 ## Note
 
 - Lo script è sicuro da rilanciare: salta file già presenti
-- Config vera vive in plugin settings.json (project level), non nel sentinel — il file `.claude/loom-works.initialized` è solo anchor per project root detection in `lib.sh`
+- Le preferenze cross-project (`project_mode`, `doc_folder_name`…) vivono in plugin settings.json; l'**identità per-progetto** vive in `.claude/loom-works.json`, che è anche l'anchor per la project-root detection in `lib.sh` (retrocompat: il vecchio sentinel `.claude/loom-works.initialized` resta riconosciuto come fallback, rimovibile a migrazione completa)
 - Nessuna rilevazione interattiva di `project_mode` per ora: la detection è automatica via `lib.sh` quando serve
