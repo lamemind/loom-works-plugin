@@ -110,5 +110,5 @@ Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CL
 ## Note
 
 - Lo script è sicuro da rilanciare: salta file già presenti
-- Le preferenze cross-project (`project_mode`, `doc_folder_name`…) vivono in plugin settings.json; l'**identità per-progetto** vive in `.claude/loom-works.json`, che è anche l'anchor per la project-root detection in `lib.sh` (retrocompat: il vecchio sentinel `.claude/loom-works.initialized` resta riconosciuto come fallback, rimovibile a migrazione completa)
+- Le preferenze cross-project (`project_mode`, `doc_folder_name`…) vivono in plugin settings.json; l'**identità per-progetto** vive in `.claude/loom-works.json` — file **obbligatorio**, unico marker di project-root per `lib.sh`. Nessun fallback: il vecchio sentinel `.claude/loom-works.initialized` non vale più e va rimosso.
 - Nessuna rilevazione interattiva di `project_mode` per ora: la detection è automatica via `lib.sh` quando serve

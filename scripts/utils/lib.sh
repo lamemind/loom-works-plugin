@@ -20,9 +20,8 @@
 # ---- Project root detection --------------------------------------------------
 #
 # Sale l'albero a partire da $PWD cercando il marker .claude/loom-works.json
-# (config progetto, scritto da /loom-works:init). Retrocompat: accetta anche il
-# vecchio sentinel .claude/loom-works.initialized e il formato folder
-# .loom-works/.initialized (fallback legacy, rimovibili a migrazione completa).
+# (config progetto OBBLIGATORIO, scritto da /loom-works:init). È l'UNICO marker:
+# nessun fallback legacy — il vecchio sentinel .initialized non vale più.
 # Se non trovato, fallback git toplevel. Final fallback: $PWD.
 # Honor PROJECT_ROOT se già settato esplicitamente.
 
@@ -33,7 +32,7 @@ lw_find_project_root() {
     fi
     local dir="$PWD"
     while [[ "$dir" != "/" && -n "$dir" ]]; do
-        if [[ -f "$dir/.claude/loom-works.json" || -f "$dir/.claude/loom-works.initialized" || -f "$dir/.loom-works/.initialized" ]]; then
+        if [[ -f "$dir/.claude/loom-works.json" ]]; then
             echo "$dir"
             return 0
         fi

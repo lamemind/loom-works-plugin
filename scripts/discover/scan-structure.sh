@@ -335,10 +335,6 @@ _lw_docs="${LOOM_DOCS_ROOT:-docs}"
 [[ -d "${_lw_docs}" ]] && kv "${_lw_docs}/" "$(find "${_lw_docs}" -maxdepth 3 -name '*.md' 2>/dev/null | wc -l) .md files" || kv "${_lw_docs}/" "(absent)"
 if [[ -f .claude/loom-works.json ]]; then
     kv ".claude/loom-works.json" "present (project config — init already run)"
-elif [[ -f .claude/loom-works.initialized ]]; then
-    kv ".claude/loom-works.initialized" "present (legacy sentinel — pre-config init)"
-elif [[ -f .loom-works/.initialized ]]; then
-    kv ".loom-works/.initialized" "present (legacy folder format)"
 else
     kv ".claude/loom-works.json" "(absent — run /loom-works:init first)"
 fi
