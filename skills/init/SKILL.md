@@ -44,6 +44,41 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/init/init.sh --docs-root "${user_config.doc_folder
 
 Se l'input contiene `--force`, passa il flag (rigenera `tasks.md` e `INDEX.md` anche se presenti — distruttivo, chiedi conferma prima).
 
+### 1b. Config progetto (`.claude/loom-works.json`) + registrazione dconf
+
+Identità del progetto per l'ecosistema loom (compass/deck). Modello: `project-config-architecture.md`. Il file `.claude/loom-works.json` è la **source of truth config** (portabile, committabile); il registry dconf `/org/lamemind/loom/` è il **runtime** (macchina-locale). La `label` (`{emoji} {owner} {name}`) e gli UUID profilo sono **derivati**, mai nel file.
+
+Controlla `<project-root>/.claude/loom-works.json`.
+
+**Se ASSENTE → bootstrap interattivo.** `id` e `name` = basename della project root (mostralo). Raccogli il resto via `AskUserQuestion`, una domanda per volta; **prima di ciascuna** esegui il ping TTS (vedi §Convenzione TTS in altre skill):
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic>"
+```
+1. **owner** — prefisso label. Opzioni: `LOCAL`, `LAMEMIND`, `COFACE`, `SHADOW`, `BBETTER` + Other (custom).
+2. **emoji** — carattere/i identificativi. Proponi 3-4 default comuni + Other (l'utente incolla l'emoji che vuole).
+3. **surfaces** — multi-select (`multiSelect: true`): `claude`, `deck`, `codium`, `idea`. Default suggerito: claude + deck + codium (idea tipicamente solo progetti Java).
+
+Poi scrivi il file con `Write` (surfaces = mappa completa dei 4 kind a bool, `true` per i selezionati):
+```json
+{
+  "id": "<basename>",
+  "emoji": "<scelto>",
+  "owner": "<scelto>",
+  "name": "<basename>",
+  "surfaces": { "claude": true, "deck": true, "codium": true, "idea": false }
+}
+```
+
+**Se PRESENTE:** salta il bootstrap (non sovrascrivere — è committato).
+
+**In entrambi i casi**, registra e materializza (idempotente; noop silenzioso su macchine senza dconf/Ptyxis):
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/config/register.sh
+${CLAUDE_PLUGIN_ROOT}/scripts/config/materialize-profiles.sh "<id>"
+```
+- `register.sh` (cwd) scrive identità + surface nel registry dconf.
+- `materialize-profiles.sh <id>` adotta i profili Ptyxis esistenti del progetto (o genera il profilo `claude` se manca) e scrive i binding UUID. La surface `deck`, se non ha già un profilo, viene skippata con log (il lancio del deck è loom-deck-specifico).
+
 ### 2. Integrazione CLAUDE.md
 
 `CLAUDE.md` è il punto di ingresso: se non referenzia `tasks.md` e `reference/INDEX.md`, le skill task-level e il doc-writer partono ciechi. Propone (non forza):
@@ -70,7 +105,7 @@ Caso C — **`CLAUDE.md` presente e già completo**: nessuna domanda, log "CLAUD
 
 ### 3. Report
 
-Riepiloga cosa ha fatto lo script (file/dir creati vs skippati) e cosa è successo a `CLAUDE.md` (creato / righe aggiunte / già completo / snippet stampato da copiare).
+Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CLAUDE.md` (creato / righe aggiunte / già completo / snippet stampato da copiare) e la **config progetto** (`.claude/loom-works.json` creato interattivamente o già presente; esito di `register`/`materialize`: registrato in dconf, profili adottati/generati, oppure noop se dconf/Ptyxis assenti).
 
 ## Note
 

@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lamemind.dev/loom-works.schema.json",
+  "title": "loom-works project config",
+  "description": "Source of truth CONFIG per-progetto (portabile, committato). Vive in <project-root>/.claude/loom-works.json. Il registry runtime (dconf /org/lamemind/loom/) e la label ({emoji} {owner} {name}) sono DERIVATI e NON stanno qui.",
+  "type": "object",
+  "required": ["id", "emoji", "owner", "name", "surfaces"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identità stabile del progetto (chiave nel registry dconf). Tipicamente basename della project root."
+    },
+    "emoji": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Emoji identificativa, primo token della label derivata."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Prefisso label. Es. LOCAL, LAMEMIND, COFACE, SHADOW, BBETTER."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nome leggibile del progetto, ultimo token della label derivata."
+    },
+    "surfaces": {
+      "type": "object",
+      "description": "Enablement per-surface. tracked: claude (multi-tab), deck (singleton). launch: codium, idea (solo voce apri-app, no match/stato).",
+      "additionalProperties": { "type": "boolean" },
+      "properties": {
+        "claude": { "type": "boolean" },
+        "deck": { "type": "boolean" },
+        "codium": { "type": "boolean" },
+        "idea": { "type": "boolean" }
+      }
+    }
+  }
+}
