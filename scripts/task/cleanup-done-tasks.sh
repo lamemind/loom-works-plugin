@@ -18,18 +18,25 @@ set -euo pipefail
 
 DAYS=60
 APPLY=0
+IGNORED_MODE=""   # "" | keep | purge — come gestire i file ignored/untracked in una task folder
 TASK_FILTER=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode)      LOOM_PROJECT_MODE="$2"; shift 2 ;;
-        --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
-        --days)      DAYS="${2:?--days requires a number}"; shift 2 ;;
-        --apply)     APPLY=1; shift ;;
-        T*|D*)       TASK_FILTER+=("$1"); shift ;;
-        *)           echo "ERROR: argomento sconosciuto: $1" >&2; exit 1 ;;
+        --mode)          LOOM_PROJECT_MODE="$2"; shift 2 ;;
+        --docs-root)     LOOM_DOCS_ROOT="$2"; shift 2 ;;
+        --days)          DAYS="${2:?--days requires a number}"; shift 2 ;;
+        --apply)         APPLY=1; shift ;;
+        --ignored-files) IGNORED_MODE="${2:?--ignored-files requires keep|purge}"; shift 2 ;;
+        T*|D*)           TASK_FILTER+=("$1"); shift ;;
+        *)               echo "ERROR: argomento sconosciuto: $1" >&2; exit 1 ;;
     esac
 done
+
+if [[ -n "$IGNORED_MODE" && "$IGNORED_MODE" != "keep" && "$IGNORED_MODE" != "purge" ]]; then
+    echo "ERROR: --ignored-files accetta 'keep' o 'purge' (dato: ${IGNORED_MODE})" >&2
+    exit 1
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/lib.sh"
@@ -195,7 +202,14 @@ if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
     for c in "${CANDIDATES[@]}"; do
         id="${c%%|*}"; rest="${c#*|}"; age="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; fp="${rest#*|}"
         folder_info=""
-        [[ -n "$fp" ]] && folder_info=" + folder $(basename "$fp")"
+        if [[ -n "$fp" ]]; then
+            folder_info=" + folder $(basename "$fp")"
+            surv="$(lw_folder_survivors "$(realpath --relative-to="$PROJECT_ROOT" "$fp")")"
+            if [[ -n "$surv" ]]; then
+                n=$(printf '%s\n' "$surv" | grep -c .)
+                folder_info="${folder_info} [⚠ ${n} ignored/untracked]"
+            fi
+        fi
         echo "   ${id}  (${age}gg)  $(basename "$tf")${folder_info}"
     done
 fi
@@ -211,6 +225,35 @@ fi
 if ! lw_is_repo; then
     echo "ERROR: --apply richiede modalità repo" >&2
     exit 1
+fi
+
+# ---- Gate: task folder con file ignored/untracked ----------------------------
+# `git rm -rf` non rimuove i file ignorati/untracked di una folder: sopravvivono
+# su disco (il .gitignore che li nascondeva sparisce → "riemergono"). Se il
+# chiamante non ha indicato come gestirli, fallisci PRIMA di qualsiasi modifica.
+if [[ -z "$IGNORED_MODE" ]]; then
+    gate_hit=0
+    for c in "${CANDIDATES[@]}"; do
+        fp="${c##*|}"
+        [[ -n "$fp" && -e "$fp" ]] || continue
+        rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
+        surv="$(lw_folder_survivors "$rel_fp")"
+        [[ -n "$surv" ]] || continue
+        if [[ $gate_hit -eq 0 ]]; then
+            echo "" >&2
+            echo "ERROR: task folder con file che 'git rm' non rimuove (ignored/untracked):" >&2
+            gate_hit=1
+        fi
+        echo "  ${rel_fp}/" >&2
+        printf '%s\n' "$surv" | sed 's#^#    - #' >&2
+    done
+    if [[ $gate_hit -eq 1 ]]; then
+        echo "" >&2
+        echo "Il chiamante deve indicare come gestirli, poi rilanciare --apply con:" >&2
+        echo "  --ignored-files keep    → secondo commit che PRESERVA quei file in git" >&2
+        echo "  --ignored-files purge   → rm secco della folder (path assoluto, guardato)" >&2
+        exit 2
+    fi
 fi
 
 # ---- Reconcile orphan rows (file already absent: drop the dangling row) ------
@@ -241,18 +284,44 @@ for c in "${CANDIDATES[@]}"; do
         done_date=$(git -C "$PROJECT_ROOT" log -1 --format=%cI -- "$rel_path" 2>/dev/null || true)
     fi
 
+    # keep: PRIMA di qualsiasi git rm, snapshotta in un commit dedicato i file che
+    # sopravviverebbero al purge (ignored/untracked). Cosi' restano recuperabili da
+    # quel commit; poi il purge sotto li elimina dal disco insieme al resto (ora
+    # tracciati). A prescindere dalla scelta, i file NON restano in locale — keep
+    # li conserva solo in git history, purge li perde.
+    if [[ "$IGNORED_MODE" == "keep" && -n "$fp" && -e "$fp" ]]; then
+        rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
+        if [[ -n "$(lw_folder_survivors "$rel_fp")" ]]; then
+            git -C "$PROJECT_ROOT" add -f -- "$rel_fp"
+            git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): keep ignored files of %s before purge (%s)' "$id" "$rel_fp")"
+            echo "-> keep: snapshot file ignored/untracked in commit dedicato (${rel_fp}/)"
+        fi
+    fi
+
     # Remove task file
     rel_tf="${DOCS_ROOT}/tasks/$(basename "$tf")"
     git -C "$PROJECT_ROOT" rm -f "$rel_tf"
     echo "-> rimosso: ${rel_tf}"
 
-    # Remove folder if present
+    # Remove folder if present — solo se ancora su disco. Task che condividono la
+    # stessa Folder si portano dietro lo STESSO $fp (risolto in blocco a monte):
+    # la prima la rimuove, la seconda la trova gia' sparita → skip pulito (evita il
+    # doppio `git rm`, exit 128 sotto `set -e`, che abortirebbe il run a meta').
     folder_info_body=""
-    if [[ -n "$fp" ]]; then
+    if [[ -n "$fp" && -e "$fp" ]]; then
         rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
         git -C "$PROJECT_ROOT" rm -rf "$rel_fp"
-        echo "-> rimossa folder: ${rel_fp}/"
+        echo "-> rimossa folder (tracked): ${rel_fp}/"
         folder_info_body="  - ${rel_fp}/"
+        # git rm NON tocca i file ignored/untracked (ne' le dir rimaste vuote):
+        # rm secco guardato per farli sparire dal disco. In keep sono gia' stati
+        # snapshottati sopra; in purge vanno persi. In ogni caso: via dal locale.
+        if [[ -e "$fp" ]]; then
+            lw_safe_rmrf "$fp"
+            echo "-> rm secco residui su disco: ${rel_fp}/"
+        fi
+    elif [[ -n "$fp" ]]; then
+        echo "-> folder gia' rimossa da una task che la condivide: $(basename "$fp")/"
     fi
 
     # Remove row + Execution Plan node from tasks.md

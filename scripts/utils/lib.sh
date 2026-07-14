@@ -129,6 +129,40 @@ lw_remote_url() {
     git -C "$(lw_find_project_root)" config --get remote.origin.url 2>/dev/null || echo ""
 }
 
+# ---- Folder purge helpers ----------------------------------------------------
+
+# Files that SURVIVE `git rm -rf <folder>`: untracked + ignored. `git rm` only
+# touches TRACKED files, so a `.gitignore` inside the folder (or a root-level rule
+# matching its content) leaves those files orphaned on disk after the purge. Lists
+# them one-per-line, repo-relative; empty when the folder purges clean. <folder>
+# is repo-relative. Note: `ls-files -o` WITHOUT `--exclude-standard` = untracked
+# AND ignored — exactly the leftover set.
+lw_folder_survivors() {  # <rel_folder>
+    lw_is_repo || { echo ""; return 0; }
+    git -C "$(lw_find_project_root)" ls-files -o -- "$1" 2>/dev/null || true
+}
+
+# Guarded recursive delete for leftover ignored/untracked files that `git rm`
+# cannot remove. Refuses anything not STRICTLY inside the canonicalized project
+# root: no '/', no the root itself, no path outside it, no empty/unresolvable.
+# Absolute-path only — "no disastri".
+lw_safe_rmrf() {  # <path>
+    local target root
+    target="$(realpath -m -- "$1" 2>/dev/null || true)"
+    root="$(realpath -m -- "$(lw_find_project_root)" 2>/dev/null || true)"
+    if [[ -z "$target" || -z "$root" ]]; then
+        echo "ERROR: lw_safe_rmrf: path non risolvibile: $1" >&2; return 1
+    fi
+    if [[ "$target" == "/" || "$target" == "$root" ]]; then
+        echo "ERROR: lw_safe_rmrf: rifiuto rm di '/' o project root: $target" >&2; return 1
+    fi
+    case "$target" in
+        "$root"/?*) : ;;   # deve stare STRETTAMENTE dentro il project root
+        *) echo "ERROR: lw_safe_rmrf: path fuori dal project root ($root): $target" >&2; return 1 ;;
+    esac
+    rm -rf -- "$target"
+}
+
 # ---- Error helpers -----------------------------------------------------------
 
 die() {
