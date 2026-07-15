@@ -15,7 +15,8 @@ set -euo pipefail
 #       deck   → skip + log (il comando di lancio è loom-deck-specifico, non
 #                generabile a livello plugin; va materializzato lato deck)
 # Scrive il binding in /org/lamemind/loom/projects/<id>/bindings/<kind>/profile.
-# Le surface LAUNCH (codium, idea) non hanno profilo → ignorate.
+# Le surface LAUNCH (lista `launch` custom, es. codium/idea) non hanno profilo Ptyxis
+# → ignorate dalla materializzazione (le lancia il consumer via command @project-root).
 # Noop silenzioso se Ptyxis/dconf assenti.
 # =============================================================================
 

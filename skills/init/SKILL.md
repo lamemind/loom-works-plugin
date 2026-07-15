@@ -55,17 +55,21 @@ Controlla `<project-root>/.claude/loom-works.json`.
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic>"
 ```
 1. **owner** — prefisso label. Opzioni: `LOCAL`, `LAMEMIND`, `COFACE`, `SHADOW`, `BBETTER` + Other (custom).
-2. **emoji** — carattere/i identificativi. Proponi 3-4 default comuni + Other (l'utente incolla l'emoji che vuole).
-3. **surfaces** — multi-select (`multiSelect: true`): `claude`, `deck`, `codium`, `idea`. Default suggerito: claude + deck + codium (idea tipicamente solo progetti Java).
+2. **emoji** — emoji del **cappello** (progetto). Proponi 3-4 default comuni + Other (l'utente incolla l'emoji che vuole).
+3. **surfaces tracked** — multi-select (`multiSelect: true`): SOLO `claude`, `deck` (surface rigide, con match finestra + stato). Default suggerito: entrambe.
+4. **launch** — surface custom (bottoni "apri app @project-root"). Chiedi se l'utente ne vuole aggiungere; proponi come default comuni `codium` (`codium .`) e, per progetti Java, `idea` (`idea .`). Per ogni voce raccogli: **emoji** della voce, **label** leggibile, **command** shell (girato con cwd=project root; può contenere una subdir come target, es. `idea ud-maven-parent`, o flag arbitrari). Nessuna voce = `launch: []`.
 
-Poi scrivi il file con `Write` (surfaces = mappa completa dei 4 kind a bool, `true` per i selezionati):
+Poi scrivi il file con `Write` — `surfaces` = solo i tracked selezionati (bool), `launch` = array delle voci custom raccolte (label opzionale, fallback = command):
 ```json
 {
   "id": "<basename>",
   "emoji": "<scelto>",
   "owner": "<scelto>",
   "name": "<basename>",
-  "surfaces": { "claude": true, "deck": true, "codium": true, "idea": false }
+  "surfaces": { "claude": true, "deck": true },
+  "launch": [
+    { "emoji": "📝", "label": "codium", "command": "codium ." }
+  ]
 }
 ```
 

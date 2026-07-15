@@ -15,7 +15,7 @@
     "emoji": {
       "type": "string",
       "minLength": 1,
-      "description": "Emoji identificativa, primo token della label derivata."
+      "description": "Emoji identificativa del CAPPELLO, primo token della label derivata."
     },
     "owner": {
       "type": "string",
@@ -29,13 +29,36 @@
     },
     "surfaces": {
       "type": "object",
-      "description": "Enablement per-surface. tracked: claude (multi-tab), deck (singleton). launch: codium, idea (solo voce apri-app, no match/stato).",
-      "additionalProperties": { "type": "boolean" },
+      "description": "Enablement delle surface TRACKED (rigide, hardcoded): claude (multi-tab, match finestra + stato) e deck (singleton). Solo bool. Le surface LAUNCH NON stanno qui — vedi 'launch'.",
+      "additionalProperties": false,
       "properties": {
         "claude": { "type": "boolean" },
-        "deck": { "type": "boolean" },
-        "codium": { "type": "boolean" },
-        "idea": { "type": "boolean" }
+        "deck": { "type": "boolean" }
+      }
+    },
+    "launch": {
+      "type": "array",
+      "description": "Surface LAUNCH custom: voci fire-once che lanciano un comando arbitrario con cwd = project root. Fanno da bottone 'apri app nel contesto del progetto', niente match finestra né stato. Ogni voce ha emoji propria, label leggibile (opzionale, fallback = command) e un command shell.",
+      "items": {
+        "type": "object",
+        "required": ["emoji", "command"],
+        "additionalProperties": false,
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Emoji della voce di menu (distinta dall'emoji del cappello)."
+          },
+          "label": {
+            "type": "string",
+            "description": "Etichetta leggibile della voce. Se assente, il consumer usa 'command' come label."
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comando shell eseguito con cwd = project root (via bash -c). Es. 'codium .', 'idea ud-maven-parent'."
+          }
+        }
       }
     }
   }

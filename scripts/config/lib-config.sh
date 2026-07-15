@@ -11,11 +11,19 @@
 #   - label DERIVATA "{emoji} {owner} {name}", mai scritta nel file
 #   - profili Ptyxis DERIVATI dal registry (materializzazione)
 #
+# Modello surface (ridisegno T32-reopen):
+#   - TRACKED (rigide): claude, deck → mappa `surfaces` bool. Match finestra + stato.
+#   - LAUNCH (custom): lista `launch` di voci {emoji, label?, command}. Comando shell
+#     arbitrario con cwd=project root; fire-once, niente match/stato. Rimpiazza il
+#     vecchio enum bool codium/idea (non più hardcoded).
+#
 # Fornisce:
-#   File:      cfg_file_path, cfg_validate, cfg_field, cfg_enabled_surfaces, cfg_label
+#   File:      cfg_file_path, cfg_validate, cfg_field, cfg_enabled_surfaces,
+#              cfg_launch_count, cfg_label
 #   GVariant:  gv_str (quote), gv_unwrap (unwrap)
 #   Registry:  reg_available, reg_project_path, reg_set, reg_get, reg_list_projects,
-#              reg_write_surfaces, reg_set_binding, reg_get_binding, reg_pull
+#              reg_write_surfaces, reg_write_launch, reg_set_binding, reg_get_binding,
+#              reg_pull
 #   Ptyxis:    ptx_available, ptx_list_uuids, ptx_label, ptx_profile_dir,
 #              ptx_find_for_surface, ptx_generate_claude
 # =============================================================================
@@ -69,12 +77,17 @@ cfg_validate() {  # <json-file> → 0 valido, 1 invalido (messaggio su stderr)
     local f="$1"
     [[ -f "$f" ]] || { echo "config non trovato: $f" >&2; return 1; }
     command -v jq >/dev/null 2>&1 || { echo "jq assente (validazione impossibile)" >&2; return 1; }
+    # surfaces = mappa TRACKED (claude/deck) → bool. launch (opzionale) = array di
+    # voci custom {emoji(req), label(opt), command(req)}. label opzionale: fallback=command.
     jq -e '
         (.id|type)=="string" and ((.id|length)>0) and
         (.emoji|type)=="string" and
         (.owner|type)=="string" and
         (.name|type)=="string" and
-        (.surfaces|type)=="object"
+        (.surfaces|type)=="object" and
+        ((.launch // []) | (type=="array") and all(.[];
+            ((.emoji|type)=="string") and ((.emoji|length)>0) and
+            ((.command|type)=="string") and ((.command|length)>0)))
     ' "$f" >/dev/null 2>&1 || { echo "config invalido (schema): $f" >&2; return 1; }
 }
 
@@ -82,8 +95,12 @@ cfg_field() {  # <json-file> <top-level-field> → valore scalare
     jq -r --arg k "$2" '.[$k] // empty' "$1"
 }
 
-cfg_enabled_surfaces() {  # <json-file> → kind abilitati, uno per riga
+cfg_enabled_surfaces() {  # <json-file> → kind TRACKED abilitati, uno per riga
     jq -r '.surfaces // {} | to_entries[] | select(.value==true) | .key' "$1"
+}
+
+cfg_launch_count() {  # <json-file> → numero di voci launch
+    jq '(.launch // []) | length' "$1"
 }
 
 cfg_label() {  # <emoji> <owner> <name> → label derivata
@@ -124,6 +141,25 @@ reg_write_surfaces() {  # <id> <kind...> → scrive array GVariant 'as' delle su
     dconf write "$path" "$arr"
 }
 
+# Scrive le surface LAUNCH nel registry come sottoalbero indicizzato launch/<i>/{emoji,label,command}.
+# Reset del sottoalbero prima di riscrivere → nessuna entry stale se il numero di voci cala.
+# label: fallback a command se assente nel file (default: la voce si chiama come il comando).
+reg_write_launch() {  # <id> <json-file>
+    local id="$1" f="$2"
+    local base; base="$(reg_project_path "$id")/launch"
+    dconf reset -f "${base}/" 2>/dev/null || true
+    local n i emoji label command
+    n="$(cfg_launch_count "$f")"
+    for (( i=0; i<n; i++ )); do
+        emoji="$(jq -r --argjson i "$i" '.launch[$i].emoji' "$f")"
+        label="$(jq -r --argjson i "$i" '.launch[$i].label // .launch[$i].command' "$f")"
+        command="$(jq -r --argjson i "$i" '.launch[$i].command' "$f")"
+        dconf write "${base}/${i}/emoji"   "$(gv_str "$emoji")"
+        dconf write "${base}/${i}/label"   "$(gv_str "$label")"
+        dconf write "${base}/${i}/command" "$(gv_str "$command")"
+    done
+}
+
 reg_set_binding() {  # <id> <kind> <uuid>
     dconf write "$(reg_project_path "$1")/bindings/$2/profile" "$(gv_str "$3")"
 }
@@ -150,6 +186,7 @@ reg_pull() {  # <project-dir> → id (o 1 su config invalido)
     local -a surfaces
     mapfile -t surfaces < <(cfg_enabled_surfaces "$f")
     reg_write_surfaces "$id" "${surfaces[@]}"
+    reg_write_launch "$id" "$f"
     echo "$id"
 }
 
