@@ -6,6 +6,10 @@
           {
             "type": "command",
             "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/task-management.md\" \"${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md\" \"${CLAUDE_PLUGIN_ROOT}/docs/caveman.md\""
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context/inject-task.sh\""
           }
         ]
       }

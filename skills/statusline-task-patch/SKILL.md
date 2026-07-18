@@ -1,10 +1,10 @@
 ---
 name: statusline-task-patch
-description: Inject the loom-works active-task widget (📌 current-task symlink) into the user's global Claude Code statusLine script. Idempotent, marker-based, lane-aware. Reversible via statusline-task-unpatch.
+description: Inject the loom-works active-task widget (📌 $LOOM_TASK → current-task symlink) into the user's global Claude Code statusLine script. Idempotent, marker-based, lane-aware. Reversible via statusline-task-unpatch.
 allowed-tools: Bash(*), Read, Edit, AskUserQuestion
 ---
 
-Aggiunge alla **statusline globale** un widget `📌 Tnn-slug` che mostra la task attiva risolvendo il symlink `current-task.md` del progetto corrente (lane-aware, perché legge `workspace.project_dir`).
+Aggiunge alla **statusline globale** un widget `📌 Tnn` che mostra la task attiva con cascata `$LOOM_TASK → symlink current-task.md`: se la sessione ha `LOOM_TASK` settata (binding per-sessione, es. spawn `deck-run`) vince quella; altrimenti fallback al symlink `current-task.md` del progetto corrente (lane-aware, perché legge `workspace.project_dir`).
 
 Il widget è **self-contained inline** (non dipende da `${CLAUDE_PLUGIN_ROOT}`, che NON espande nel contesto statusLine) e delimitato da **sentinel markers** → patch idempotente, unpatch deterministico.
 
@@ -64,12 +64,15 @@ Sostituisci `parts` con la var output reale. La riga DEVE terminare col commento
 SL_DIR=$(mktemp -d); mkdir -p "$SL_DIR/runtime/tasks"
 echo x > "$SL_DIR/runtime/tasks/T99-smoke.md"
 ln -s "$SL_DIR/runtime/tasks/T99-smoke.md" "$SL_DIR/runtime/current-task.md"
-echo "=== CON task ===";  printf '%s' '{"model":{"display_name":"X"},"workspace":{"project_dir":"'"$SL_DIR"'"},"context_window":{"context_window_size":200000,"used_percentage":10}}' | bash "$TARGET" | grep -o '📌 [^ ]*' || echo "NO 📌 (FAIL)"
-echo "=== SENZA task ==="; printf '%s' '{"model":{"display_name":"X"},"workspace":{"project_dir":"/nonexistent"},"context_window":{"context_window_size":200000,"used_percentage":10}}' | bash "$TARGET" | grep -q '📌' && echo "📌 presente (FAIL)" || echo "ok: niente 📌"
+SL_JSON='{"model":{"display_name":"X"},"workspace":{"project_dir":"'"$SL_DIR"'"},"context_window":{"context_window_size":200000,"used_percentage":10}}'
+echo "=== symlink (no env) ==="; env -u LOOM_TASK bash "$TARGET" <<<"$SL_JSON" | grep -o '📌 [^ ]*' || echo "NO 📌 (FAIL)"
+echo "=== env → slug intero (ID risolto al filename) ==="; LOOM_TASK=T99 bash "$TARGET" <<<"$SL_JSON" | grep -o '📌 [^ ]*' || echo "NO 📌 (FAIL)"
+echo "=== env → fallback ID grezzo (file assente) ==="; LOOM_TASK=T42 bash "$TARGET" <<<"$SL_JSON" | grep -o '📌 [^ ]*' || echo "NO 📌 (FAIL)"
+echo "=== SENZA task ==="; printf '%s' '{"model":{"display_name":"X"},"workspace":{"project_dir":"/nonexistent"},"context_window":{"context_window_size":200000,"used_percentage":10}}' | env -u LOOM_TASK bash "$TARGET" | grep -q '📌' && echo "📌 presente (FAIL)" || echo "ok: niente 📌"
 rm -rf "$SL_DIR"
 ```
 
-Atteso: CON task → `📌 T99-smoke`; SENZA → niente 📌, riga valida.
+Atteso: symlink → `📌 T99-smoke`; env con file → `📌 T99-smoke` (ID risolto allo slug); env senza file → `📌 T42` (fallback grezzo); SENZA → niente 📌, riga valida.
 
 ## 6. Report
 
