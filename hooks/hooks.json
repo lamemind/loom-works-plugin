@@ -5,7 +5,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/task-management.md\" \"${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md\" \"${CLAUDE_PLUGIN_ROOT}/docs/caveman.md\""
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/task-management.md\""
+          },
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md\""
+          },
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/caveman.md\""
           },
           {
             "type": "command",
@@ -19,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"CAVEMAN MODE ACTIVE (comprehension-first). Priorità NON negoziabile: CAPIRE > meno token. TIENI SEMPRE: glossa il gergo (2-4 parole inline al primo uso), tieni il perché (nesso causale) e i passaggi intermedi, chiudi con riga in soldoni: se il tema resta denso. DROPPA solo: pleasantries/hedging/filler/articoli + prosa densa → bullet/tabella. ESCALA chiarezza su security/op irreversibili/sequenze ordinate. Codice/commit: scrivi normale.\"}}'"
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/caveman-restamp.md\""
           }
         ]
       }
