@@ -187,6 +187,15 @@ reg_pull() {  # <project-dir> → id (o 1 su config invalido)
     mapfile -t surfaces < <(cfg_enabled_surfaces "$f")
     reg_write_surfaces "$id" "${surfaces[@]}"
     reg_write_launch "$id" "$f"
+    # docsRoot (opzionale): sottocartella che contiene tasks.md. Fatto PER-PROGETTO
+    # cross-membro → derivato nel registry, così deck/compass lo leggono senza toccare
+    # i settings di Claude. Presente nel file → scrive; assente → reset (no stale).
+    local docsroot; docsroot="$(cfg_field "$f" docsRoot)"
+    if [[ -n "$docsroot" ]]; then
+        reg_set "$id" docsRoot "$(gv_str "$docsroot")"
+    else
+        dconf reset "$(reg_project_path "$id")/docsRoot" 2>/dev/null || true
+    fi
     echo "$id"
 }
 

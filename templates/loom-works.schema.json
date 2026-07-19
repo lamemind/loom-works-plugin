@@ -60,6 +60,11 @@
           }
         }
       }
+    },
+    "docsRoot": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Sottocartella (relativa alla project root) che contiene tasks.md, tasks/, reference/, current-task.md. Opzionale, default 'docs'. Es. loom-works usa 'runtime'. Proprietà PER-PROGETTO e cross-membro (letta da plugin, deck, compass via registry) → vive qui, non nel userConfig globale doc_folder_name."
     }
   }
 }
