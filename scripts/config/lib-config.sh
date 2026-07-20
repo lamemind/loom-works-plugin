@@ -89,6 +89,17 @@ cfg_validate() {  # <json-file> → 0 valido, 1 invalido (messaggio su stderr)
             ((.emoji|type)=="string") and ((.emoji|length)>0) and
             ((.command|type)=="string") and ((.command|length)>0)))
     ' "$f" >/dev/null 2>&1 || { echo "config invalido (schema): $f" >&2; return 1; }
+    # defaultSurface (opzionale): enum chiuso claude|deck|terminal. Check SEPARATO dal
+    # blocco jq sopra per poter nominare il valore incriminato — un typo qui sarebbe
+    # altrimenti muto (il consumer degrada a terminal senza dire perché).
+    # NOTA: si valida solo il DOMINIO, non la coerenza con `surfaces`. Nominare una
+    # surface disabilitata NON invalida la config (disabilitarla è legittimo, e un
+    # fail qui farebbe skippare l'intero progetto in refresh.sh): degrada il consumer.
+    local ds; ds="$(jq -r '.defaultSurface // empty' "$f")"
+    case "$ds" in
+        ''|claude|deck|terminal) ;;
+        *) echo "config invalido: defaultSurface='$ds' fuori enum (claude|deck|terminal): $f" >&2; return 1 ;;
+    esac
 }
 
 cfg_field() {  # <json-file> <top-level-field> → valore scalare
@@ -195,6 +206,15 @@ reg_pull() {  # <project-dir> → id (o 1 su config invalido)
         reg_set "$id" docsRoot "$(gv_str "$docsroot")"
     else
         dconf reset "$(reg_project_path "$id")/docsRoot" 2>/dev/null || true
+    fi
+    # defaultSurface (opzionale): surface aperta dal bottone-nome in compass.
+    # Assente → reset, così il consumer applica il suo default (terminal) e non
+    # resta agganciato a un valore vecchio dopo che è stato tolto dal file.
+    local defsurface; defsurface="$(cfg_field "$f" defaultSurface)"
+    if [[ -n "$defsurface" ]]; then
+        reg_set "$id" defaultSurface "$(gv_str "$defsurface")"
+    else
+        dconf reset "$(reg_project_path "$id")/defaultSurface" 2>/dev/null || true
     fi
     echo "$id"
 }

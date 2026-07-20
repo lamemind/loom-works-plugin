@@ -37,3 +37,6 @@ echo "[register]   label:    $(cfg_label "$emoji" "$owner" "$name")"
 echo "[register]   dir:      $PROJECT_DIR"
 echo "[register]   surfaces: $(cfg_enabled_surfaces "$f" | tr '\n' ' ')"
 echo "[register]   launch:   $(cfg_launch_count "$f") voce/i"
+
+defsurface="$(cfg_field "$f" defaultSurface)"
+echo "[register]   default:  ${defsurface:-terminal (implicito)}"

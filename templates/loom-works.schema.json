@@ -61,6 +61,16 @@
         }
       }
     },
+    "defaultSurface": {
+      "type": "string",
+      "enum": ["claude", "deck", "terminal"],
+      "description": "Surface aperta dal click sul nome del progetto nella riga compass (focus-or-launch). Opzionale, default 'terminal' — l'unica surface built-in universale, sempre lanciabile e senza gate di enablement. Se nomina una surface disabilitata in 'surfaces' o priva di binding, il consumer degrada a 'terminal' invece di fallire."
+    },
+    "permissionMode": {
+      "type": "string",
+      "enum": ["acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"],
+      "description": "Permission mode con cui parte una sessione della surface tracked 'claude' (valori = choices di `claude --permission-mode`). Opzionale, default 'manual'. È una preferenza su COME si lancia una surface, non su SE è abilitata: sta qui perché portabile e committabile, non nel registry runtime."
+    },
     "docsRoot": {
       "type": "string",
       "minLength": 1,

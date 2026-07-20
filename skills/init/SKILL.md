@@ -58,8 +58,10 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <top
 2. **emoji** — emoji del **cappello** (progetto). Proponi 3-4 default comuni + Other (l'utente incolla l'emoji che vuole).
 3. **surfaces tracked** — multi-select (`multiSelect: true`): SOLO `claude`, `deck` (surface rigide, con match finestra + stato). Default suggerito: entrambe.
 4. **launch** — surface custom (bottoni "apri app @project-root"). Chiedi se l'utente ne vuole aggiungere; proponi come default comuni `codium` (`codium .`) e, per progetti Java, `idea` (`idea .`). Per ogni voce raccogli: **emoji** della voce, **label** leggibile, **command** shell (girato con cwd=project root; può contenere una subdir come target, es. `idea ud-maven-parent`, o flag arbitrari). Nessuna voce = `launch: []`.
+5. **defaultSurface** — quale surface apre il click sul **nome** del progetto nella riga compass (focus-or-launch). Opzioni: `terminal` (default suggerito, shell @project-root), `claude`, `deck`. Offri solo le tracked che l'utente ha appena abilitato al punto 3. Se sceglie `terminal`, **ometti il campo** dal file: è già il fallback, scriverlo aggiunge rumore.
+6. **permissionMode** — con quale permission mode parte una sessione della surface `claude` spawnata dal deck. Chiedilo **solo se** `claude` è fra le tracked abilitate al punto 3. Opzioni da offrire: `manual` (default suggerito — ogni azione chiede conferma), `acceptEdits` (accetta le modifiche a file senza chiedere), `auto`, `plan` (parte in planning, non esegue). Gli altri due valori del CLI — `dontAsk` e `bypassPermissions` — **non vanno proposti in lista**: restano raggiungibili via Other, perché `bypassPermissions` disattiva i controlli e non deve essere una scelta a un click. Se sceglie `manual`, **ometti il campo** (stessa regola di `defaultSurface`: è già il fallback).
 
-Poi scrivi il file con `Write` — `surfaces` = solo i tracked selezionati (bool), `launch` = array delle voci custom raccolte (label opzionale, fallback = command):
+Poi scrivi il file con `Write` — `surfaces` = solo i tracked selezionati (bool), `launch` = array delle voci custom raccolte (label opzionale, fallback = command), `defaultSurface` solo se ≠ `terminal`, `permissionMode` solo se ≠ `manual`:
 ```json
 {
   "id": "<basename>",
@@ -69,7 +71,9 @@ Poi scrivi il file con `Write` — `surfaces` = solo i tracked selezionati (bool
   "surfaces": { "claude": true, "deck": true },
   "launch": [
     { "emoji": "📝", "label": "codium", "command": "codium ." }
-  ]
+  ],
+  "defaultSurface": "claude",
+  "permissionMode": "auto"
 }
 ```
 
