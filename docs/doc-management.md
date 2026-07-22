@@ -9,7 +9,7 @@ Doc progetto = due livelli:
 
 ### Doc del plugin
 
-Doc utente plugin (questo file + `task-management.md`) auto-inietta via hook SessionStart, no `@-import`. Meccanismo: `../INTEGRATION.md` §5.4. Doc progetto utente segue convenzione standard: online → `CLAUDE.md`, offline → `INDEX.md`.
+Doc utente plugin (questo file + `task-management.md`) auto-inietta via hook SessionStart, no `@-import`. Doc progetto utente segue convenzione standard: online → `CLAUDE.md`, offline → `INDEX.md`.
 
 Questo file = filosofia generale. Implementazione = responsabilità progetto. `/loom-works:init` propone scaffold minimale (`docs/tasks.md`, `docs/reference/INDEX.md`, dirs).
 
@@ -33,7 +33,7 @@ Header standard `docs/reference/` per generazione indice:
 Contenuto dettagliato...
 ```
 
-Ancora primaria TLDR = trigger concreto (tag, comando, pattern, keyword) che decide apertura. Descrizione astratta = ancora inefficace. Riforma TLDR: `../INTEGRATION.md` §4.6.
+Ancora primaria TLDR = trigger concreto (tag, comando, pattern, keyword) che decide apertura. Descrizione astratta = ancora inefficace.
 
 ## Generazione indice
 
@@ -43,7 +43,7 @@ Ancora primaria TLDR = trigger concreto (tag, comando, pattern, keyword) che dec
 ${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh
 ```
 
-Già integrato (`[x]` in `../INTEGRATION.md` §2.3). Parametri: `--dir`, `--output`, `--exclude` (comma), `--title`.
+Già integrato negli script del plugin. Parametri: `--dir`, `--output`, `--exclude` (comma), `--title`.
 
 ## Freshness
 

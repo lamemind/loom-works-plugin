@@ -35,7 +35,7 @@ Le lane sono **design**, non emergono dagli script: definite nel grafo di `docs/
 - **Ciclo di vita**: ① `spawn-lane` crea worktree da main, avvia prima task → ② `start-task` → `run-task` → `checkpoint-task` nel worktree → ③ `merge-lane` mergia in main, aggiorna grafo, ricopia tasks nel worktree → ④ `spawn-lane` riusa worktree, crea solo nuovo branch task → ⑤ `merge-lane` chiede conferma rimozione worktree all'ultima task.
 - **Comandi** (da main): `/loom-works:spawn-lane {lane}` crea/riusa worktree e avvia task · `/loom-works:merge-lane {lane}` merge in main, aggiorna grafo.
 
-> **Stato**: `spawn-lane` e `merge-lane` pianificati (Fase 1, vedi `../INTEGRATION.md` §7).
+> **Stato**: `spawn-lane` e `merge-lane` pianificati (Fase 1).
 
 ### Grafo dipendenze
 

@@ -10,4 +10,3 @@ File previsti (popolati progressivamente durante task D04):
 
 I primi tre file vengono iniettati automaticamente nel context Claude Code via hook SessionStart (`${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` + `doc-management.md` + `caveman.md`). Il quarto è accessibile on-demand tramite `docs/reference/INDEX.md` del progetto utente.
 
-Per il meta-progetto del plugin (design, roadmap, integration progress) vedi `DESIGN.md` e `INTEGRATION.md` nella root del plugin.

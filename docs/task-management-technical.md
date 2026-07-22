@@ -2,7 +2,7 @@
 
 ---
 
-Per l'overview del sistema (struttura, grafo dipendenze, ciclo di vita lane, comandi principali) vedi [Task Management](./task-management.md). Per lo stato implementativo dei comandi vedi `../INTEGRATION.md`.
+Per l'overview del sistema (struttura, grafo dipendenze, ciclo di vita lane, comandi principali) vedi [Task Management](./task-management.md).
 
 ---
 
