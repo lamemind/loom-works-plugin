@@ -75,6 +75,10 @@
       "type": "string",
       "minLength": 1,
       "description": "Sottocartella (relativa alla project root) che contiene tasks.md, tasks/, reference/, current-task.md. Opzionale, default 'docs'. Es. loom-works usa 'runtime'. Proprietà PER-PROGETTO e cross-membro (letta da plugin, deck, compass via registry) → vive qui, non nel userConfig globale doc_folder_name."
+    },
+    "order": {
+      "type": "integer",
+      "description": "Posizione del progetto nel blocco loom di compass (ordinamento ascendente). Opzionale: i progetti senza order finiscono in coda, alfabetici per id. Convenzione gap-by-10 (10, 20, 30, …) per inserire in mezzo senza rinumerare gli altri."
     }
   }
 }

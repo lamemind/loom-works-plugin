@@ -100,6 +100,12 @@ cfg_validate() {  # <json-file> → 0 valido, 1 invalido (messaggio su stderr)
         ''|claude|deck|terminal) ;;
         *) echo "config invalido: defaultSurface='$ds' fuori enum (claude|deck|terminal): $f" >&2; return 1 ;;
     esac
+    # order (opzionale): intero (gap-by-10). Check separato per nominare il valore:
+    # un non-intero scritto in dconf produrrebbe un tipo GVariant diverso (double)
+    # e un parse ambiguo lato consumer.
+    if ! jq -e '(.order == null) or ((.order|type)=="number" and (.order == (.order|floor)))' "$f" >/dev/null 2>&1; then
+        echo "config invalido: order=$(jq -c '.order' "$f") non è un intero: $f" >&2; return 1
+    fi
 }
 
 cfg_field() {  # <json-file> <top-level-field> → valore scalare
@@ -215,6 +221,15 @@ reg_pull() {  # <project-dir> → id (o 1 su config invalido)
         reg_set "$id" defaultSurface "$(gv_str "$defsurface")"
     else
         dconf reset "$(reg_project_path "$id")/defaultSurface" 2>/dev/null || true
+    fi
+    # order (opzionale): posizione nel blocco loom di compass. Intero non quotato
+    # → dconf lo tipizza int32. Assente → reset (no stale), il consumer mette il
+    # progetto in coda alfabetica.
+    local order; order="$(cfg_field "$f" order)"
+    if [[ -n "$order" ]]; then
+        reg_set "$id" order "$order"
+    else
+        dconf reset "$(reg_project_path "$id")/order" 2>/dev/null || true
     fi
     echo "$id"
 }
