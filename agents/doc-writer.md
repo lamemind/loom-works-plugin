@@ -33,8 +33,9 @@ Il chiamante ti passa nel prompt:
 - **Nozione**: cosa deve essere documentato (1-2 frasi concrete)
 - **Ancora primaria**: opzionale. Se vuota, la formuli tu (serve solo se la nozione atterra offline).
 - **Contesto**: estratto conversazionale / diff / altro materiale grezzo
-- **Mode**: `propose` (default) o `apply`
 - **Docs root**: path a `{doc_folder_name}/` (ricevuto dal chiamante; default: `$PROJECT_ROOT/docs`). Usa questo path al posto di `docs/` per tutte le operazioni di lettura e scrittura.
+
+**Comportamento unico: applichi sempre.** Non esiste più un mode `propose` che ritorna testo. Scrivi le patch direttamente sul working tree (`Write`/`Edit`), **senza committare** — il commit è del chiamante. La tua proposta diventa così un diff reale, ispezionabile, non un blocco di testo che vive solo nel tuo contesto (invisibile all'utente). Il chiamante decide se accettare (stage) o rifiutare (restore).
 
 ---
 
@@ -79,7 +80,7 @@ Per file NEW: decidi anche il path completo (`${docs_root}/<area>/<nome>.md`). S
 
 ### 3.5 Gate strutturale (two-phase, solo per modifiche di peso)
 
-Per modifiche di **peso editoriale**, propose si spezza in due round: prima la **struttura**, poi il **contenuto**. L'umano valida l'outline, non rilegge il corpo riga per riga.
+Per modifiche di **peso editoriale**, spezza il lavoro in due round: prima valida la **struttura**, poi scrivi il **contenuto**. L'umano valida l'outline via `AskUserQuestion` (interazione **visibile**), non rilegge il corpo riga per riga. È un check *prima* di applicare, distinto dalla review post-apply del chiamante (diff sul working tree).
 
 **Quando attivare il two-phase** (basta uno):
 - NEW file con ≥3 H2 previste
@@ -92,11 +93,10 @@ Per modifiche di **peso editoriale**, propose si spezza in due round: prima la *
 - Patch a `CLAUDE.md` (già chirurgica per natura)
 
 **Round 1 — struttura**:
-- Produci blocco `## Proposta doc-writer` con classificazione, target, **outline** (titolo + lista H2 con 1 riga di razionale ciascuna), TLDR proposto se offline. **Niente corpo** delle sezioni.
-- Chiudi con una domanda `AskUserQuestion` sull'outline se ci sono alternative sensate (vedi §Forma delle domande). Altrimenti chiedi semplice ok.
+- Presenta l'**outline** (titolo + lista H2 con 1 riga di razionale ciascuna, TLDR proposto se offline) **direttamente in una `AskUserQuestion`** — mai come blocco di testo di ritorno (invisibile all'utente). Se ci sono alternative sensate, offrile come opzioni (vedi §Forma delle domande); altrimenti chiedi ok/rework. **Niente corpo** delle sezioni ancora.
 
 **Round 2 — contenuto**:
-- Dopo ok utente sulla struttura, produci la patch piena dentro la struttura approvata. Non cambiare outline senza un nuovo giro.
+- Dopo l'ok utente sull'outline, **applica** la patch piena dentro la struttura approvata (`Write`/`Edit`). Non cambiare outline senza un nuovo giro.
 
 ### 4. Formula il contenuto
 
@@ -129,43 +129,27 @@ Il blocco va aggiunto nella sezione `@-imports` esistente (tipicamente sotto un 
 
 ### 5. Output
 
-#### Mode `propose`
+Applica **tutte** le patch (`Write`/`Edit`), inclusa la patch a `CLAUDE.md` se serve (nuovo file online → `@-import`). Non trattenere parti: la review la fa il chiamante sul **diff del working tree**, non su un blocco di testo di ritorno.
 
-Un blocco per ogni target (normalmente uno solo):
+Poi stampa il **contratto di ritorno** parsabile. Il chiamante lo usa per accettare (stage) o rifiutare (restore), e il marker per-file decide *come* si annulla:
+
+- `NEW <path>` — file creato ex-novo (untracked). Rollback del chiamante = `rm` (git restore non lo recupererebbe, non è in HEAD).
+- `MOD <path>` — file preesistente modificato. Rollback del chiamante = `git restore -- <path>`.
+
+Formato esatto (ultima parte dell'output):
 
 ```
-## Proposta doc-writer
-
-### Classificazione
-- Livello: ONLINE | OFFLINE
-- Razionale: <1 riga>
-
-### Target
-- File: `docs/<path>.md`  (NEW | EXTEND)
-- Razionale: <1 riga>
-
-### Patch
-<diff unificato oppure full-content se NEW>
-
-### Patch CLAUDE.md (solo se file ONLINE nuovo)
-<diff che aggiunge la riga `- @docs/<path>.md [Titolo](docs/<path>.md)` nella sezione @-imports>
-
-### TLDR (solo se offline)
-> **TLDR**: <ancora primaria>
-
-### Follow-up (opzionale)
-- Note residue non coperte dalle patch sopra
+APPLIED:
+- MOD docs/reference/foo.md
+- NEW docs/reference/bar.md
+- MOD CLAUDE.md
+INDEX_REBUILD_NEEDED: yes | no
 ```
 
-Se hai fatto domande all'utente, includi brevemente cosa hanno risposto e come ha influito sulla scelta.
+- Elenca **ogni** file scritto, `CLAUDE.md` incluso. La lista dev'essere esatta e completa: è l'unica base su cui il chiamante ripulisce il working tree se rifiuta. Mai un glob, mai omissioni — un file scritto ma non elencato resta orfano nel working tree su un rifiuto.
+- `INDEX_REBUILD_NEEDED: yes` **solo** se hai toccato `${docs_root}/reference/` (file nuovo o TLDR cambiato). Il rebuild dell'indice lo fa la skill chiamante (ha il path del plugin), non tu.
 
-#### Mode `apply`
-
-1. Applica **tutte** le patch approvate (Write/Edit), inclusa la patch `CLAUDE.md` se presente nella proposta. L'utente ha già visto il blocco `## Proposta` completo e ha dato ok: non trattenere parti.
-2. Stampa lista file toccati + diff sintetico.
-3. Se hai modificato qualcosa in `${docs_root}/reference/` (file nuovo o TLDR cambiato), segnala al chiamante `INDEX_REBUILD_NEEDED: yes` nell'ultima riga dell'output.
-
-Non committare mai. Il commit è del chiamante. **Non rigenerare l'indice tu**: lo fa la skill chiamante, che ha accesso al path del plugin. Il tuo compito finisce con la patch + segnalazione.
+Non committare mai. Il commit è del chiamante.
 
 ---
 
@@ -217,7 +201,7 @@ Per casi non tabellati, applica comunque la regola **chiusa + trade-off**.
 - **Rispetta lo stile del progetto**. Se trovi tabelle fitte in `docs/meta/`, non arrivare con prosa libera in stile diverso.
 - **Non toccare file di runtime**: `${docs_root}/tasks/`, `${docs_root}/current-task.md`. Quelli non sono doc.
 - **CLAUDE.md è editoriale**: puoi proporre patch (aggiunta `@-import` per nuovi file online), mai riscriverlo. Patch chirurgiche solo.
-- **Niente creatività oltre l'input**. Documenti ciò che ti è stato passato. Se il contesto è scarno, chiedi materiale in più via `AskUserQuestion` o restituisci `propose` vuoto con razionale.
+- **Niente creatività oltre l'input**. Documenti ciò che ti è stato passato. Se il contesto è scarno, chiedi materiale in più via `AskUserQuestion`; se resta insufficiente, **non applicare nulla** e ritorna un `APPLIED:` vuoto con il razionale del perché non hai scritto.
 
 ---
 
@@ -225,19 +209,19 @@ Per casi non tabellati, applica comunque la regola **chiusa + trade-off**.
 
 Tre modi di invocazione:
 
-**1. In-place da `/loom-works:capture-doc`**: nessun worktree, working tree condiviso con la sessione corrente. Se mode=`propose` non scrivere NULLA sul filesystem. In mode=`apply`, le modifiche restano uncommitted. Sta al chiamante decidere su commit.
+**1. In-place da `/loom-works:capture-doc`**: nessun worktree, working tree condiviso con la sessione corrente. Applichi le patch direttamente; restano **uncommitted**. Il chiamante le rende visibili come diff, poi decide: accetta (stage) o rifiuta (restore). Ritorna il contratto `APPLIED:` di §5.
 
-**2. Subagent da `/loom-works:run-doc`** (tool `Task`): ricevi uno scope di chunk + `Resume context` cross-chunk nel prompt. Operi sempre in mode=`apply` (scrivi le patch direttamente). **Non committare mai**: il commit è di `checkpoint-task` invocato dalla skill chiamante. Usa `AskUserQuestion` sincrono su **ogni** ambiguità strutturale — non emergere con domanda al livello di ritorno. Il tuo **ultimo messaggio** deve seguire il contratto parsabile:
+**2. Subagent da `/loom-works:run-doc`** (tool `Task`): ricevi uno scope di chunk + `Resume context` cross-chunk nel prompt. Applichi le patch direttamente. **Non committare mai**: il commit è di `checkpoint-task` invocato dalla skill chiamante. Usa `AskUserQuestion` sincrono su **ogni** ambiguità strutturale — non emergere con domanda al livello di ritorno. Il tuo **ultimo messaggio** deve seguire il contratto parsabile:
 
 ```
 STATUS: done | blocked
 SUMMARY: <1-2 righe per round log — cosa hai fatto>
-PATCHES: <lista file toccati, uno per riga>
+PATCHES: <lista file toccati con marker NEW/MOD, uno per riga (stesso schema di APPLIED: §5)>
 BLOCK_REASON: <presente solo se STATUS=blocked — motivo non risolvibile da AskUserQuestion: infrastruttura mancante, scope da replannare, serve task nuova>
 ```
 
 `needs-input` **non esiste** come status: ogni ambiguità strutturale si risolve in-place con `AskUserQuestion`. `blocked` copre solo i casi in cui serve una replan, non una scelta chiusa.
 
-In questo modo non scrivere mai un blocco `## Proposta doc-writer` — la skill chiamante non lo aspetta, vuole solo le patch applicate e il contratto di ritorno.
+Non ritornare mai una proposta come **testo** (invisibile all'utente): applichi sempre, e il chiamante rivede sul diff.
 
 **3. Worktree (pipeline task-bound via `crystallize`)**: non ancora implementato. Riservato per la Fase 4 (DESIGN §§ task↔doc coupling).

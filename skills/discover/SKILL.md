@@ -76,9 +76,9 @@ Per ogni sub-progetto `core` (o per il progetto intero se single):
 
 Se l'utente non risponde o dice "non so": procedi comunque, lascia `doc-writer` fare guess su base scan, marca tutto come `draft`.
 
-### 4. Delega al doc-writer (mode propose)
+### 4. Delega al doc-writer (apply-first)
 
-Invoca `doc-writer` via `Task` con un prompt strutturato che contenga **tutto il materiale**:
+Invoca `doc-writer` via `Task` con un prompt strutturato che contenga **tutto il materiale**. Il subagent **applica** i file direttamente al working tree (niente proposta testuale); li rivedi dopo, dal diff (step 5).
 
 ```
 Nozione da documentare:
@@ -102,55 +102,53 @@ Fulcri nominati dall'utente:
 
 Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
 
-Mode: propose
+Applica i file direttamente (Write/Edit), non committare, non rigenerare l'indice. Ritorna il contratto APPLIED: (marker NEW/MOD per file) + INDEX_REBUILD_NEEDED.
 
 Istruzioni:
 1. Se già esiste `docs/project/overview.md` o un CLAUDE.md corposo, NON duplicare —
-   proponi invece un EXTEND mirato o segnala overlap.
+   fai invece un EXTEND mirato o segnala overlap.
 2. `overview.md` deve avere: paragrafo cos'è il progetto (dal tuo meglio, basato
    su nome/manifesti/struttura), tabella sub-progetti con scope 1-riga, sezione
    "Fulcri" con bullet per ogni fulcro nominato.
-3. Per ogni fulcro nominato, proponi uno stub in `${user_config.doc_folder_name}/reference/<area>/<fulcro>.md`:
+3. Per ogni fulcro nominato, crea uno stub in `${user_config.doc_folder_name}/reference/<area>/<fulcro>.md`:
    solo header + TLDR ancorato + sezione "Ruolo" (2-3 righe) + sezione
    "Da documentare" bullet list con "TODO" — è uno stub, non una doc completa.
-4. Se crei file online (overview.md), includi patch a CLAUDE.md per aggiungere
+4. Se crei file online (overview.md), applica anche la patch a CLAUDE.md per aggiungere
    l'@-import, come da tue regole standard.
 5. Se vedi incertezza su un fulcro (ruolo ambiguo, nome che non corrisponde a
    nulla di visibile nello scan), usa AskUserQuestion per disambiguare prima di
-   scrivere la patch.
+   scrivere.
 ```
 
-Il subagent produce il blocco `## Proposta` con uno o più target.
+Il subagent ha applicato i file e ritorna il contratto `APPLIED:` (lista file con marker `NEW`/`MOD`).
 
-### 5. Review utente
+### 5. Review dal diff → ok / edit / skip
 
-Mostra all'utente **tutta la proposta** del subagent. Poi esegui il ping TTS e chiedi via `AskUserQuestion`:
+**Non stampare i diff in chat** (un bootstrap tocca overview + N stub, sono centinaia di righe): è già ispezionabile, meglio, nel pannello git. Stampa solo la **lista file** dal contratto `APPLIED:`. Poi il ping TTS e `AskUserQuestion`:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su proposta overview da applicare"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su bootstrap doc da tenere o scartare"
 ```
 
-Usa `AskUserQuestion` con opzioni:
-- `ok / apply` → step 6
-- `edit` → raccogli feedback, rilancia doc-writer con le correzioni
-- `skip` → fine, nessuna modifica
+Opzioni (path assoluti, `cwd` = project root):
+- `ok` → tieni i file applicati; **stagia** il batch (`git add -- <file>...`) → step 6.
+- `edit` → **restore** del batch (annulla), poi rilancia lo step 4 con le correzioni, su base pulita. Torna a step 5.
+- `skip` → **restore** del batch, nessuna modifica persiste. Fine (salta step 6).
 
-### 6. Apply (solo su conferma esplicita)
+**Restore** = per ogni file del contratto `APPLIED:`: `MOD` → `git restore -- <file>`, `NEW` (untracked) → `rm -- <file>`. In `no-repo` (nessun git) il rollback non è offribile: stampa la lista file + avviso «no-repo: bootstrap applicato, nessun rollback automatico», niente gate ok/skip.
 
-Rilancia `doc-writer` via `Task` con **stesso input** + `Mode: apply`. Il subagent scrive i file (overview.md, stub reference, patch CLAUDE.md).
+### 6. Rebuild INDEX se serve
 
-### 7. Rebuild INDEX se serve
-
-Se l'output del subagent in mode apply contiene `INDEX_REBUILD_NEEDED: yes` (oppure sai che ha toccato `${user_config.doc_folder_name}/reference/`):
+Solo su `ok` e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${user_config.doc_folder_name}/reference/`):
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
 ```
 
-### 8. Report finale
+### 7. Report finale
 
 Lista:
-- File creati (overview.md, stub reference)
+- File creati/staged (overview.md, stub reference) — oppure scartati (restored)
 - CLAUDE.md patched sì/no
 - INDEX rigenerato sì/no
 - Fulcri ancora da approfondire (quelli con solo stub)
@@ -172,8 +170,8 @@ Topic = argomento concreto della domanda. NO generici.
 
 ## Note
 
-- **Non committare**: le modifiche restano uncommitted. Decisione dell'utente.
+- **Apply-first**: il doc-writer applica i file, la review è sul diff reale (pannello git), non su un testo di ritorno. Su `ok` i file restano **staged** (non committed); il commit è dell'utente. Su `skip`/`edit` il batch è restorato.
 - **Non invocare discover due volte senza aspettare review**: ogni chiamata al doc-writer è costosa in token.
 - **Multi-lingua**: lo scan copre workspace-level (ecosystemi). Per doc di dettaglio intra-codice (classi, metodi) di progetti TS/JS esiste `scripts/explorer/extract-codebase.ts` come futuro L3 — non integrato in questa versione della skill.
-- **Fallback no-repo**: la skill funziona uguale in progetti senza git. Nessun git touch richiesto.
+- **Fallback no-repo**: la skill funziona uguale in progetti senza git, ma il gate review degrada a informativo (nessun stage/restore, patch non reversibile automaticamente — vedi step 5).
 - **Scope split con `capture-doc`**: discover produce la **prima generazione** (scaffold + stub). capture-doc riempie i dettagli **man mano**. Non duplicare responsabilità: se l'utente chiede "documenta meglio il servizio X", rimandalo a capture-doc.

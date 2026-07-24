@@ -5,14 +5,16 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: sonnet
 ---
 
-Cattura **estemporanea** di una nozione documentale (fuori dal ciclo task). Leggi il contesto conversazionale corrente + eventuale hint dell'utente, invoca `doc-writer` per una proposta, applica dopo ok.
+Cattura **estemporanea** di una nozione documentale (fuori dal ciclo task). Leggi il contesto conversazionale corrente + eventuale hint dell'utente, invoca `doc-writer` che **applica la patch** al working tree; poi rivedi il diff e **accetti** (stage) o **rifiuti** (restore).
+
+Flusso **apply-first**: il doc-writer non ritorna più una proposta come testo (invisibile in chat) — scrive direttamente i file. La modifica diventa un diff reale, ispezionabile nel pannello git. Stage = approvazione, restore = rifiuto.
 
 Input utente:
 ~~~human
 $ARGUMENTS
 ~~~
 
-**YOLO**: se `$ARGUMENTS` contiene il token `yolo` (case-insensitive), salta proposta e applica direttamente. Strippa il token prima di passare il resto al subagent.
+**YOLO**: se `$ARGUMENTS` contiene il token `yolo` (case-insensitive), salta la review e tiene la patch applicata. Strippa il token prima di passare il resto al subagent.
 
 ## Scope
 
@@ -21,9 +23,9 @@ Questa skill è **path 3** (estemporaneo) del triple-capture di loom-works:
 2. Task-bound processing: `checkpoint-task` Doc Impact gate → invoca **questa skill** inline (opzione [1]) oppure `doc-task` (opzione [2])
 3. **Estemporaneo (questa skill)**: fuori dal ciclo task, review immediata
 
-Nessun worktree, nessun commit automatico. Le modifiche proposte/applicate restano uncommitted.
+Nessun worktree, nessun commit automatico. La patch accettata resta **staged** (non committed); quella rifiutata è restorata via git.
 
-**Invocazione da checkpoint-task gate**: il caller passa la voce Doc Impact come hint in `$ARGUMENTS` e il contesto conversazionale corrente. L'output (file doc modificati) finisce nello stesso commit di chiusura del checkpoint — atomico.
+**Invocazione da checkpoint-task gate**: il caller passa la voce Doc Impact come hint in `$ARGUMENTS` e il contesto conversazionale corrente. I file accettati restano staged → il commit doc separato del checkpoint (step 7) li raccoglie, atomico col checkpoint.
 
 ## Prerequisiti
 
@@ -51,9 +53,9 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su nozi
 ```
 Poi usa `AskUserQuestion` per far scegliere. Se è evidente, procedi senza domande.
 
-### 3. Invoca doc-writer
+### 3. Invoca doc-writer (applica la patch)
 
-Usa `Task` con `subagent_type: doc-writer`. `Mode: propose` di default, `Mode: apply` se YOLO (in YOLO salta step 4-5).
+Usa `Task` con `subagent_type: doc-writer`. Il subagent **applica** le patch al working tree (niente proposta testuale) e ritorna il contratto `APPLIED:` — lista file con marker `NEW`/`MOD` + `INDEX_REBUILD_NEEDED`.
 
 ```
 Nozione da documentare:
@@ -65,52 +67,59 @@ Contesto:
 
 Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
 
-Mode: <propose | apply>
-
-Leggi ${user_config.doc_folder_name}/reference/INDEX.md, scegli target (EXTEND file esistente o NEW).
-- propose: proponi patch + TLDR aggiornato, non applicare nulla.
-- apply: scrivi direttamente i file (incluso eventuale CLAUDE.md patch), non rigenerare l'indice.
+Applica le patch direttamente (Write/Edit), incluso l'eventuale patch a CLAUDE.md; non committare, non rigenerare l'indice. Leggi ${user_config.doc_folder_name}/reference/INDEX.md, scegli target (EXTEND file esistente o NEW). Ritorna il contratto APPLIED: (marker NEW/MOD per ogni file) + INDEX_REBUILD_NEEDED.
 ```
 
-### 4. Mostra la proposta
+**YOLO**: stesso invito, ma **salta gli step 4** (niente review): la patch resta applicata. Vai dritto a step 5.
 
-Ripeti il blocco `## Proposta` del subagent. Poi esegui il ping TTS e chiedi all'utente via `AskUserQuestion`:
+### 4. Review dal diff → ok / edit / skip
+
+**Non stampare il diff in chat** — un file reference NEW è 200+ righe e brucia contesto; è già ispezionabile, meglio, nel pannello git di VS Code. Stampa solo la **lista file** dal contratto `APPLIED:`, col marker:
+
+```
+Patch applicata (rivedi il diff nel pannello git):
+- MOD docs/reference/foo.md
+- NEW docs/reference/bar.md
+```
+
+Poi il ping TTS e `AskUserQuestion` con opzioni `ok` / `edit` / `skip`:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su proposta doc da applicare"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su patch doc da tenere o scartare"
 ```
 
-```
-Applicare la proposta?
-- ok → applica
-- edit → rilancia con feedback
-- skip → annulla
-```
+Gestione della scelta (path assoluti, `cwd` = project root):
 
-Usa `AskUserQuestion` con opzioni `ok`, `edit`, `skip`.
+- **ok** → **stage** i file: `git add -- <file>...`. Lo stage è insieme *approvazione* e *punto di ripristino*: un rifiuto successivo su un file condiviso torna a questo stato, non a HEAD. Vai a step 5.
+- **skip** → **restore** (annulla la patch, working tree pulito), per ogni file secondo il marker:
+  - `MOD` → `git restore -- <file>`
+  - `NEW` (untracked, `git restore` non lo recupera) → `rm -- <file>`
+  
+  Nessuna modifica persiste. **Salta step 5** (niente rebuild INDEX su patch scartata). Vai a step 6.
+- **edit** → restore (come skip) + **rilancia lo step 3** col feedback dell'utente, su base pulita. Poi torna a step 4.
 
-### 5. Apply
+**no-repo** (nessun git): niente stage né restore. La patch resta applicata; il gate degrada a **informativo** — stampa la lista file + avviso «no-repo: patch applicata, nessun rollback automatico», **nessuna** `AskUserQuestion` ok/skip (non c'è reversibilità da offrire). Rileva con `git rev-parse --is-inside-work-tree 2>/dev/null` prima di offrire il gate.
 
-Su ok, rilancia `doc-writer` con `Mode: apply` e stesso input. Non rigenera l'indice.
+### 5. Rigenera INDEX se serve
 
-Poi esegui il ping TTS:
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc catturata"
-```
-
-### 6. Rigenera INDEX se serve
-
-Se l'output del subagent in mode apply contiene `INDEX_REBUILD_NEEDED: yes` (oppure sai che ha toccato `${user_config.doc_folder_name}/reference/`), rigenera l'indice offline:
+Solo su patch **accettata** (ok) e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${user_config.doc_folder_name}/reference/`):
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
 ```
 
-### 7. Report finale
+Poi il ping TTS:
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc catturata"
+```
 
-Lista sintetica dei file modificati/creati e se l'INDEX è stato rigenerato. Stop.
+Se `INDEX.md` è stato rigenerato, mettilo in stage anch'esso: `git add -- ${user_config.doc_folder_name}/reference/INDEX.md`.
 
-**Non committare** e **non suggerire comandi git**: la decisione è dell'utente, che conosce il layout del repo meglio di te.
+### 6. Report finale
+
+Lista sintetica dei file accettati (staged) / scartati (restored) e se l'INDEX è stato rigenerato. Stop.
+
+**Non committare**: la patch accettata resta **staged** (non committed). Il commit è dell'utente in standalone, del `checkpoint-task` quando questa skill è invocata dal gate.
 
 ## Convenzione TTS
 
@@ -122,6 +131,7 @@ Topic = argomento concreto della domanda. NO generici.
 
 ## Note
 
-- Il subagent lavora **in-place**: nessun worktree, nessun branch. Se il progetto è `no-repo`, funziona uguale (nessun git coinvolto).
+- Il subagent lavora **in-place**: nessun worktree, nessun branch. Se il progetto è `no-repo`, funziona uguale (il gate degrada a informativo, vedi step 4).
 - Per capture **in** una task, usa `create-task` / `run-task` (path 1), non questa skill.
-- Il doc-writer opera su **tutta la doc** (online `docs/project/`, `docs/meta/`, offline `docs/reference/`) e può proporre **anche una patch a `CLAUDE.md`** (es. aggiunta `@-import` quando crea un nuovo file online). La patch su CLAUDE.md è parte della proposta: su ok dell'utente, viene applicata insieme al resto.
+- Il doc-writer opera su **tutta la doc** (online `docs/project/`, `docs/meta/`, offline `docs/reference/`) e applica **anche una patch a `CLAUDE.md`** quando serve (es. aggiunta `@-import` per un nuovo file online). Quel file compare come `MOD CLAUDE.md` nel contratto `APPLIED:` → segue la stessa sorte del resto: staged su ok, restorato su skip.
+- **Apply-first**: la review dell'utente è sul diff reale (working tree), non su un testo di ritorno del subagent. Stage = approvazione, restore = rifiuto. Lo stage-su-ok è anche il *punto di ripristino* che protegge le patch approvate da un rifiuto successivo su file condiviso.

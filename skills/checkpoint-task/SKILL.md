@@ -51,11 +51,17 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
 
    Se contiene voci non ancora consolidate (vedi marker sotto), per **ogni voce** chiedi all'utente via `AskUserQuestion`:
 
-   - `[1] capture-doc inline` → invoca skill `capture-doc` con la voce come hint, contesto = conversazione corrente. Applica subito; il file doc modificato finirà nel **commit doc separato** del checkpoint (vedi step 7, commit 2).
+   - `[1] capture-doc inline (apply-first)` → invoca skill `capture-doc` con la voce come hint, contesto = conversazione corrente. **capture-doc applica** la patch al working tree, mostra i file toccati (marker NEW/MOD) e chiede lei stessa `ok/edit/skip`:
+     - su **ok** stagia i file approvati (`git add`) → restano staged per il **commit doc separato** del checkpoint (step 7, commit 2). Solo qui appendi il marker `→ ✔️ capture` alla voce.
+     - su **skip/edit** capture-doc restora il working tree (nessun residuo). Se l'utente scarta, la voce resta **non consolidata**: **niente marker**, reentry al prossimo checkpoint.
+
+     Non ri-chiedere `ok/edit/skip` qui: quel gate è dentro capture-doc. Leggi il suo esito (accettata/scartata) per decidere il marker.
    - `[2] D-task` → invoca skill `doc-task` con `Parent Task: ${taskId}` e la voce come Description seed. Append in `## Acceptance Criteria` del task corrente la riga: `- [ ] D{N} chiusa` (sostituisci `D{N}` con l'ID restituito). Il gate "task non chiudibile" è gratis: la checkbox in Acceptance impedisce il done finché la D non viene chiusa (chiusura della D flagga la checkbox — vedi step 4).
    - `[3] skip` → lascia la voce non consolidata. Niente enforcement. Reentry al prossimo checkpoint.
 
-   **Marker di consolidamento**: a fine handling, in coda alla voce processata appendi `→ ✔️ capture` oppure `→ ✔️ D{N}`. Voci con marker `→ ✔️` sono saltate ai checkpoint successivi.
+   **Marker di consolidamento**: a fine handling, in coda alla voce processata appendi `→ ✔️ capture` (solo se capture-doc ha **accettato**) oppure `→ ✔️ D{N}`. Voci con marker `→ ✔️` sono saltate ai checkpoint successivi. Voce scartata dentro capture-doc = nessun marker.
+
+   **Multi-voce, ordine e restore**: processa le voci **in sequenza**, non in parallelo. Lo stage-su-ok di capture-doc è il *punto di ripristino* condiviso: se una voce successiva tocca un file già approvato da una precedente e viene scartata, il `git restore` di capture-doc torna allo stato **staged** (l'approvato), non a HEAD → l'approvazione precedente è protetta. Vale solo se le voci non si sovrappongono in parallelo.
 
    **Doc task (K=📝)**: questo step viene **saltato** — le doc task non hanno Doc Impact (la doc è l'obiettivo).
 
@@ -110,7 +116,7 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
    Lo script: `git add -A` → split staged → commit 1 + commit 2 → push (unico) + aggiorna Last tracked commit (HEAD finale) + mostra link compare.
 
    **Detached**:
-   1. Stage selettivo: `git add <file1> <file2> ...` solo per i file della task corrente (identificati al punto 1)
+   1. Stage selettivo: `git add <file1> <file2> ...` solo per i file **codice** della task corrente (identificati al punto 1). I file doc approvati al gate (step 3, opzione [1]) sono **già staged** da capture-doc → non serve ri-aggiungerli (e un file scartato è già stato restorato, quindi non va in stage).
    2. Esegui:
       ```bash
       ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): ${descrizione}"
@@ -142,3 +148,4 @@ Topic = argomento concreto della domanda. NO generici.
 - **Link compare**: Generato automaticamente dallo script commit (spanna entrambi i commit: TRACKED_SHA…HEAD)
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
 - **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / D-task / skip), ma se sceglie D-task la checkbox `- [ ] D{N} chiusa` in Acceptance impedisce il done finché la D non passa done — quando la D passa done, il suo checkpoint flagga indietro la checkbox usando il campo `**Parent Task**: T{N}` del D-file. Voci marcate `→ ✔️` saltano i checkpoint successivi.
+- **Apply-first (opzione [1])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree, la review è sul diff reale (pannello git). Stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). I file approvati arrivano al commit **già staged**; lo split path-based del commit script li isola comunque nel commit 2 `docs(...)`.
