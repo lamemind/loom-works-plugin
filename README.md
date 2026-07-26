@@ -56,6 +56,7 @@ Then bootstrap the project structure:
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |
 | `/loom-works:set-task-folder` | Attach a task folder to an existing task |
 | `/loom-works:reconcile-tasks` | Reconcile git conflicts in tasks.md during lane merge |
+| `/loom-works:feedback` | Capture the current conversation into the loom-works feedback inbox |
 
 ## Configuration
 
