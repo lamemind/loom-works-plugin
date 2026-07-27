@@ -2,7 +2,6 @@
 name: feedback
 description: Capture the current conversation as a feedback payload and drop it into loom-works for later analysis.
 allowed-tools: Bash(*)
-model: haiku
 ---
 
 Cattura la conversazione corrente e la deposita in **loom-works**, dove viene analizzata a mente fresca. Si usa quando l'output dell'IA è incapibile, fuorviante o comunque sbagliato *nella forma*.
