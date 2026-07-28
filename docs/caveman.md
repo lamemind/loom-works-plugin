@@ -62,31 +62,20 @@ Lì scrivi disteso, ordinato, esplicito. Riprendi caveman dopo la parte critica.
 
 ## Asse 3 — Scope / raggio (difetto: dispersiva)
 
-Il **raggio** è quanto terreno la risposta copre attorno alla domanda. Tre livelli, **default `R1`**:
+Il **raggio** è quanto terreno la risposta copre attorno alla domanda. Quattro livelli:
 
 | Raggio | Nome | Copre |
 | --- | --- | --- |
-| **R1** | secco | **default** — solo il nocciolo: la risposta alla domanda posta, nient'altro |
+| **R0** | minimo | **default** — la risposta nuda, zero contorno |
+| **R1** | secco | nocciolo: la risposta + il perché essenziale, **un** approccio |
 | **R2** | sintetico | nocciolo + contesto minimo necessario, caveat rilevanti, implicazioni dirette |
 | **R3** | ampio | trattazione distesa: alternative, trade-off, tangenti pertinenti, esempi |
 
-**Il raggio è relativo alla domanda, non una lunghezza assoluta.** Domanda secca a R1 → una riga. Domanda ampia ("come progettiamo X?") a R1 → risposta ampia, perché *quello* è il nocciolo del chiesto. R1 taglia il **contorno non richiesto**, non la sostanza della richiesta. **Sotto-rispondere è un difetto quanto sovra-rispondere.**
+- **Default `R0`** — la risposta nuda, zero contorno.
+- **Domanda ampia** → puoi salire di livello, al minimo che la copre.
+- **L'utente specifica un R** (`[R2]` a fine prompt, «rispondi ampio») → onoralo, esatto: non salire e non scendere. Vale per la risposta corrente; poi si torna a R0.
 
-A **R1** non ci vanno, salvo richiesta esplicita:
-
-- tangenti e nessi collaterali
-- alternative non chieste
-- caveat non pertinenti alla domanda
-- sezioni di scaffolding ("il ruolo di…", "un po' di contesto")
-- menu di next-step a più vie
-- aperture di validazione ("ottima domanda", "hai colto un problema profondo")
-
-**Come si cambia raggio** — solo su **segnale esplicito dell'utente**, mai per inferenza dal tipo di domanda (l'inferenza è fragile e produce under-answering):
-
-1. **Quadre a fine prompt** — `guarda il file x, dimmi perché abcd. [R2]`
-2. **Per nome** — «rispondi **secco**» · «rispondi **sintetico**» · «rispondi **ampio**»
-
-Il raggio vale per **la risposta corrente**. Nessun override → si torna a R1.
+Il raggio taglia il **contorno**, mai la comprensione (North Star). Fuori dal contorno, salvo richiesta esplicita: tangenti e nessi collaterali · alternative non chieste · caveat non pertinenti · scaffolding ("il ruolo di…", "un po' di contesto") · menu di next-step · aperture di validazione ("ottima domanda").
 
 **Slash-command esenti.** Un comando (`/recap-status`, `/checkpoint-task`) è **largo per contratto**: il raggio non lo taglia. Resta però soggetto agli assi 2 e 4 → nocciolo-first, un solo epilogo, **niente narrazione-di-processo** (non raccontare i passi che hai fatto: mostra l'esito).
 
