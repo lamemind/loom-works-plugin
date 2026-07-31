@@ -29,11 +29,10 @@ cfg_validate "$f" || die "config non valido o assente: $f"
 
 id="$(reg_pull "$PROJECT_DIR")"
 emoji="$(cfg_field "$f" emoji)"
-owner="$(cfg_field "$f" owner)"
 name="$(cfg_field "$f" name)"
 
 echo "[register] '$id' → registry ($(reg_project_path "$id"))"
-echo "[register]   label:    $(cfg_label "$emoji" "$owner" "$name")"
+echo "[register]   label:    $(cfg_label "$emoji" "$name")"
 echo "[register]   dir:      $PROJECT_DIR"
 echo "[register]   surfaces: $(cfg_enabled_surfaces "$f" | tr '\n' ' ')"
 echo "[register]   launch:   $(cfg_launch_count "$f") voce/i"

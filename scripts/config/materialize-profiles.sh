@@ -33,14 +33,23 @@ if ! ptx_available; then
     exit 0
 fi
 
+# Un profilo claude già materializzato porta la label congelata nel proprio
+# custom-command: senza questo passaggio resterebbe alla formula con cui è stato
+# generato anche dopo un cambio del contratto-label, uscendo dal match di compass.
+sync_claude_label() {  # <id> <kind> <uuid> <label>
+    [[ "$2" == "claude" ]] || return 0
+    if ptx_sync_claude_label "$3" "$4"; then
+        echo "[materialize] $1/$2: label riallineata → $4"
+    fi
+}
+
 process_project() {
     local id="$1"
-    local dir emoji owner name label surfaces_raw kind bound uuid
+    local dir emoji name label surfaces_raw kind bound uuid
     dir="$(reg_get "$id" dir)"
     emoji="$(reg_get "$id" emoji)"
-    owner="$(reg_get "$id" owner)"
     name="$(reg_get "$id" name)"
-    label="$(cfg_label "$emoji" "$owner" "$name")"
+    label="$(cfg_label "$emoji" "$name")"
     surfaces_raw="$(dconf read "$(reg_project_path "$id")/surfaces" 2>/dev/null || echo '')"
 
     if [[ -z "$dir" ]]; then
@@ -54,7 +63,8 @@ process_project() {
 
         bound="$(reg_get_binding "$id" "$kind")"
         if [[ -n "$bound" ]]; then
-            echo "[materialize] $id/$kind: già bound ($bound) → skip"
+            echo "[materialize] $id/$kind: già bound ($bound)"
+            sync_claude_label "$id" "$kind" "$bound" "$label"
             continue
         fi
 
@@ -62,6 +72,7 @@ process_project() {
         if [[ -n "$uuid" ]]; then
             reg_set_binding "$id" "$kind" "$uuid"
             echo "[materialize] $id/$kind: adottato profilo esistente $uuid"
+            sync_claude_label "$id" "$kind" "$uuid" "$label"
             continue
         fi
 

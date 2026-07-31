@@ -46,7 +46,7 @@ Se l'input contiene `--force`, passa il flag (rigenera `tasks.md` e `INDEX.md` a
 
 ### 1b. Config progetto (`.claude/loom-works.json`) + registrazione dconf
 
-Identità del progetto per l'ecosistema loom (compass/deck). Modello: `project-config-architecture.md`. Il file `.claude/loom-works.json` è la **source of truth config** (portabile, committabile); il registry dconf `/org/lamemind/loom/` è il **runtime** (macchina-locale). La `label` (`{emoji} {owner} {name}`) e gli UUID profilo sono **derivati**, mai nel file.
+Identità del progetto per l'ecosistema loom (compass/deck). Modello: `project-config-architecture.md`. Il file `.claude/loom-works.json` è la **source of truth config** (portabile, committabile); il registry dconf `/org/lamemind/loom/` è il **runtime** (macchina-locale). La `label` (`{emoji} {name}`) e gli UUID profilo sono **derivati**, mai nel file.
 
 Controlla `<project-root>/.claude/loom-works.json`.
 
@@ -54,7 +54,7 @@ Controlla `<project-root>/.claude/loom-works.json`.
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic>"
 ```
-1. **owner** — prefisso label. Opzioni: `LOCAL`, `LAMEMIND`, `COFACE`, `SHADOW`, `BBETTER` + Other (custom).
+1. **owner** — metadato organizzativo (a chi appartiene il progetto). Non entra nella label né nei titoli di tab: nessun consumer lo legge, resta come classificazione. Opzioni: `LOCAL`, `LAMEMIND`, `COFACE`, `SHADOW`, `BBETTER` + Other (custom).
 2. **emoji** — emoji del **cappello** (progetto). Proponi 3-4 default comuni + Other (l'utente incolla l'emoji che vuole).
 3. **surfaces tracked** — multi-select (`multiSelect: true`): SOLO `claude`, `deck` (surface rigide, con match finestra + stato). Default suggerito: entrambe.
 4. **launch** — surface custom (bottoni "apri app @project-root"). Chiedi se l'utente ne vuole aggiungere; proponi come default comuni `codium` (`codium .`) e, per progetti Java, `idea` (`idea .`). Per ogni voce raccogli: **emoji** della voce, **label** leggibile, **command** shell (girato con cwd=project root; può contenere una subdir come target, es. `idea ud-maven-parent`, o flag arbitrari). Nessuna voce = `launch: []`.

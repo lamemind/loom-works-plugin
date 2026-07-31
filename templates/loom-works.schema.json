@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://lamemind.dev/loom-works.schema.json",
   "title": "loom-works project config",
-  "description": "Source of truth CONFIG per-progetto (portabile, committato). Vive in <project-root>/.claude/loom-works.json. Il registry runtime (dconf /org/lamemind/loom/) e la label ({emoji} {owner} {name}) sono DERIVATI e NON stanno qui.",
+  "description": "Source of truth CONFIG per-progetto (portabile, committato). Vive in <project-root>/.claude/loom-works.json. Il registry runtime (dconf /org/lamemind/loom/) e la label ({emoji} {name}) sono DERIVATI e NON stanno qui.",
   "type": "object",
   "required": ["id", "emoji", "owner", "name", "surfaces"],
   "additionalProperties": false,
@@ -20,7 +20,7 @@
     "owner": {
       "type": "string",
       "minLength": 1,
-      "description": "Prefisso label. Es. LOCAL, LAMEMIND, COFACE, SHADOW, BBETTER."
+      "description": "Metadato organizzativo (a chi appartiene il progetto). Non entra nella label derivata né nei titoli di tab: nessun consumer lo legge. Es. LOCAL, LAMEMIND, COFACE, SHADOW, BBETTER."
     },
     "name": {
       "type": "string",

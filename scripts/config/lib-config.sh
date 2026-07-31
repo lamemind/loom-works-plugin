@@ -8,7 +8,8 @@
 # Modello: runtime/project/project-config-architecture.md
 #   - File config .claude/loom-works.json  = source of truth CONFIG (portabile)
 #   - Registry dconf /org/lamemind/loom/    = source of truth RUNTIME (macchina-locale)
-#   - label DERIVATA "{emoji} {owner} {name}", mai scritta nel file
+#   - label DERIVATA "{emoji} {name}", mai scritta nel file. `owner` resta nel
+#     file e nel registry come metadato organizzativo, ma nessun consumer lo legge.
 #   - profili Ptyxis DERIVATI dal registry (materializzazione)
 #
 # Modello surface (ridisegno T32-reopen):
@@ -25,7 +26,7 @@
 #              reg_write_surfaces, reg_write_launch, reg_set_binding, reg_get_binding,
 #              reg_pull
 #   Ptyxis:    ptx_available, ptx_list_uuids, ptx_label, ptx_profile_dir,
-#              ptx_find_for_surface, ptx_generate_claude
+#              ptx_find_for_surface, ptx_generate_claude, ptx_sync_claude_label
 # =============================================================================
 
 _LIBCFG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,12 +58,19 @@ gv_str() {  # <raw-string> → literal GVariant quotato
     fi
 }
 
-gv_unwrap() {  # <dconf-read-output> → raw string (rimuove uno strato di quote)
+gv_unwrap() {  # <dconf-read-output> → raw string (inverso esatto di gv_str)
     local v="$1"
     if [[ "$v" == \'*\' ]]; then
         v="${v#\'}"; v="${v%\'}"
     elif [[ "$v" == \"*\" ]]; then
         v="${v#\"}"; v="${v%\"}"
+        # Ordine inverso a gv_str, altrimenti un `gv_str "$(gv_unwrap …)"` (ciclo
+        # read-modify-write, es. il riallineamento della label in un
+        # custom-command) ri-escaperebbe ciò che è già escapato e i backslash
+        # raddoppierebbero a ogni passaggio. Solo il ramo double-quote: quello
+        # single-quote non escapa nulla neanche in scrittura.
+        v="${v//\\\"/\"}"
+        v="${v//\\\\/\\}"
     fi
     printf '%s' "$v"
 }
@@ -120,8 +128,8 @@ cfg_launch_count() {  # <json-file> → numero di voci launch
     jq '(.launch // []) | length' "$1"
 }
 
-cfg_label() {  # <emoji> <owner> <name> → label derivata
-    printf '%s %s %s' "$1" "$2" "$3"
+cfg_label() {  # <emoji> <name> → label derivata
+    printf '%s %s' "$1" "$2"
 }
 
 # ---- Registry dconf /org/lamemind/loom/ -------------------------------------
@@ -305,4 +313,29 @@ ptx_generate_claude() {  # <dir> <label> → uuid
     dconf write "${d}/use-custom-command" "true"
     ptx_append_uuid "$uuid"
     echo "$uuid"
+}
+
+# La label di una tab claude è congelata dentro il `custom-command` del profilo
+# (`claude --name '<label>'`), e l'adozione di un profilo esistente non lo
+# riscrive mai. Ogni cambio della formula-label lascia quindi dietro profili già
+# materializzati che titolano con la formula vecchia: il matcher window-level di
+# compass non li riconosce più e il coalescing manda le loro tab in una finestra
+# nuova. Qui si riallinea il solo argomento `--name`, non l'intero comando, per
+# non calpestare eventuali personalizzazioni del resto della riga.
+# Ritorna 0 se ha riscritto, 1 se era già allineato o non è un profilo claude.
+ptx_sync_claude_label() {  # <uuid> <label>
+    local uuid="$1" label="$2" cmd cur old_arg new_arg
+    cmd="$(gv_unwrap "$(ptx_cmd "$uuid")")"
+    [[ "$cmd" == *"claude --name '"* ]] || return 1
+    cur="$(sed -nE "s/.*claude --name '([^']*)'.*/\1/p" <<<"$cmd")"
+    [[ -n "$cur" && "$cur" != "$label" ]] || return 1
+    old_arg="claude --name '${cur}'"
+    new_arg="claude --name '${label}'"
+    dconf write "${PTX_ROOT}/Profiles/${uuid}/custom-command" \
+        "$(gv_str "${cmd//"$old_arg"/"$new_arg"}")"
+    # Il `label` del profilo è cosmetico (nome nel picker Ptyxis) e non entra nel
+    # match: si riallinea solo se era la label derivata, mai se l'utente l'ha
+    # ribattezzato a mano.
+    [[ "$(ptx_label "$uuid")" == "$cur" ]] && dconf write "${PTX_ROOT}/Profiles/${uuid}/label" "$(gv_str "$label")"
+    return 0
 }

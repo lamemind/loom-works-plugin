@@ -1,7 +1,7 @@
 {
   "name": "loom-works",
   "description": "Lane / Task management with coupled documentation lifecycle",
-  "version": "2.12.2",
+  "version": "2.13.0",
   "userConfig": {
     "project_mode": {
       "type": "string",
