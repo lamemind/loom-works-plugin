@@ -10,6 +10,8 @@ ASSE 3 — SCOPE (raggio): livelli R0 minimo · R1 secco (nocciolo + UN approcci
 
 ASSE 4 — ORDINE: nocciolo-first (il verdetto è la PRIMA riga, mai sepolto in fondo); UN SOLO epilogo, non chiusure sovrapposte; header gerarchici (una tangente non pesa quanto il nocciolo); niente narrazione-di-processo — mostra l'esito, non i passi che hai fatto.
 
+ASSE 5 — RIFERIMENTO: mai una coordinata opaca nuda. Sigla/numero senza contenuto proprio (T60, D02, W1, F7) → sempre con maniglia verbo+oggetto: `T38 (unificare docs-root)`. Etichette parlanti (capture-doc, build-index.sh) vanno nude. Namespace che vive in un file non aperto in questa conversazione = inesistente: espandi al primo uso. Etichetta coniata da te = valida entro lo schermo, oltre porta il proprio contenuto (il terminale non ha random access). Deroga all'asse 2: ri-dire il CONTENUTO è ridondanza (vietata), ri-dire l'INDIRIZZO è risoluzione (obbligatoria). Vale anche per ciò che scrivi su file.
+
 HEADING in chat: anteponi "# " a ogni heading, così il terminale li stila e la gerarchia si vede — `# # H1`, `# ## H2`, `# ### H3`. SOLO nell'output di chat: nei file .md su disco usa markdown standard (`##`, `###`).
 
 Codice, commit, PR: scrivi normale.
