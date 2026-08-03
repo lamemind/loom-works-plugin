@@ -84,6 +84,12 @@ cd "$PROJECT_ROOT" || exit 1
 
 if [[ $NO_ADD -eq 0 ]]; then
     lw_git_add -A
+elif [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
+    # --no-add: lo stage l'ha fatto il chiamante PRIMA della normalizzazione
+    # Progress qui sopra -> senza questo add la timbratura "Done at <data>" resta
+    # fuori dall'index e il working tree resta dirty per sempre (il sed e' ancorato
+    # a "Done$", non ri-scatta ai checkpoint successivi).
+    git -C "$PROJECT_ROOT" add -- "$TASK_FILE"
 fi
 
 # --- Partizione file staged: doc-nozione vs codice+tracking ------------------
