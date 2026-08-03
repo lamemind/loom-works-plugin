@@ -79,6 +79,11 @@
     "order": {
       "type": "integer",
       "description": "Posizione del progetto nel blocco loom di compass (ordinamento ascendente). Opzionale: i progetti senza order finiscono in coda, alfabetici per id. Convenzione gap-by-10 (10, 20, 30, …) per inserire in mezzo senza rinumerare gli altri."
+    },
+    "archivableDays": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Soglia in giorni oltre la quale una task Done è contata come 'archiviabile' nell'header del deck. Opzionale, default 30 — metà del default di purge di cleanup-done-tasks.sh (60), così il contatore fa da preavviso e non da predizione di cosa poterebbe la skill. Solo informativo: il deck non pota nulla. Letto DIRETTAMENTE dal file dal deck (nessun passaggio dal registry dconf), come permissionMode."
     }
   }
 }
