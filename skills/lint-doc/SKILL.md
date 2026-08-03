@@ -1,0 +1,135 @@
+---
+name: lint-doc
+description: Misura la doc di progetto contro il contratto editoriale — file sopra soglia, TLDR-riassunto, residui storici, costo online, coordinate opache. Misure numeriche via doc-metrics.sh, giudizio via doc-auditor read-only, patch via doc-writer sulle voci approvate.
+allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
+model: sonnet
+---
+
+Confronta la doc di progetto col **contratto editoriale** (`${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md`) e trova le **violazioni**.
+
+Input utente (perimetro doc: file, cartella, oppure vuoto = tutta la doc):
+~~~human
+$ARGUMENTS
+~~~
+
+## Cosa NON fa
+
+**Non apre i sorgenti del progetto.** Mai. Per sapere che un file da 47.000 char è sopra soglia, che un TLDR racconta invece di agganciare, o che una sezione dice «prima era X, ora Y», il codice non serve.
+
+È il taglio con la gemella `align-doc`, che misura la stessa doc contro il **codice** e deve aprirli tutti. Fondere le due farebbe leggere decine di KB di sorgenti a un agent che deve contare caratteri e riconoscere un changelog travestito.
+
+## Numeri prima, giudizio dopo
+
+Le soglie sono **numeri nel contratto**, non valutazioni: due esecuzioni sullo stesso albero devono dare lo stesso esito. Quindi il conteggio lo fa uno script, e all'agent resta solo ciò che un numero non cattura — se un TLDR *aggancia*, se una sezione è cronologia, dove passa il taglio di uno split.
+
+### 1. Passo numerico
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --docs-root "${user_config.doc_folder_name}" --online
+```
+
+Restituisce per ogni file: char, char del TLDR, flag (`SPLIT`, `TLDR>600`, `NOTLDR`, `ONLINE`, `GEN`) e il **footprint per-sessione** — `@-import` di `CLAUDE.md` **più** le entry hook `SessionStart`. Le due voci vanno lette insieme: gli `@-import` da soli sono circa il 70% del costo reale, e ottimizzare solo quelli lascia un terzo del problema sul tavolo.
+
+Con `--format tsv` l'output è passabile tale e quale agli auditor: sono misure già fatte, non vanno ricontate.
+
+Registra il totale **prima** dell'intervento: senza baseline il "dopo" non dice niente.
+
+### 2. Fan-out doc-auditor
+
+Un `Task` con `subagent_type: doc-auditor` per **gruppo di file** (per cartella, o i file grossi uno per uno), tutti nello stesso messaggio → parallelo. Read-only ⇒ nessun conflitto sul working tree. Massimo 4 auditor per esecuzione.
+
+```
+Perimetro:
+- Doc: <file o cartella>
+
+Fonte di verità: contratto
+
+Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
+Prefisso ID: <sigla corta, es. LINT-DECK>
+
+Misure pre-calcolate (fidati di queste, non ricontare):
+<righe TSV di doc-metrics.sh per i file di questo perimetro>
+
+Non aprire i sorgenti del progetto. Cerca: residui storici, TLDR-riassunto,
+file sopra soglia (col taglio proposto), motivazioni finite online, costo online
+ingiustificato, coordinate opache, formato. Ritorna solo il registro.
+```
+
+### 3. Consolida il registro
+
+Un unico file ordinato per severità. Colloca:
+
+- task attiva con `**Folder**:` popolato → `<task folder>/lint-doc-findings.md`;
+- altrimenti `AskUserQuestion`: nuova scratch folder (`/loom-works:scratch-new`) oppure registro solo in chat.
+
+Mai dentro `{docs_root}/`: è materiale di lavoro, non doc di progetto.
+
+In chat va la **sintesi** — una riga per finding (`ID · severità · file · violazione · verdetto proposto`) — più il footprint misurato. Il dettaglio resta nel file.
+
+### 4. Gate dei verdetti — in blocco
+
+Come in `align-doc`: i verdetti si raccolgono **una volta sola sul registro completo**. `AskUserQuestion` (prima il ping TTS) con: conferma tutti · conferma tranne alcuni ID · solo severità alta · nessuno.
+
+Annota il verdetto finale su ogni voce del registro.
+
+### 5. Applica
+
+Raggruppa per **file doc target**, un `doc-writer` per gruppo, sequenziali (scrivono davvero; due writer sullo stesso file si sovrascrivono).
+
+Le violazioni non-split (residui storici, TLDR da riscrivere, motivazioni da spostare offline, formato) passano come una normale nozione → patch.
+
+```
+Nozione da documentare:
+- **Nozione**: bonifica <file> secondo il contratto doc. Violazioni: <elenco sintetico>.
+- **Ancora primaria**: riscrivi il TLDR come ancora se il registro lo segnala
+
+Contesto:
+<le voci del registro per questo file: violazione / evidenza / FIX>
+
+Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
+
+Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'indice.
+Sostituisci la sezione toccata, non stratificare. Ritorna APPLIED: + INDEX_REBUILD_NEEDED.
+```
+
+### 6. Split — l'unico fix che non è "nozione → patch"
+
+Uno `split` riscrive la topologia della doc, non una sezione. Tre vincoli:
+
+- **Taglio per perimetro, mai per byte.** Frammenti da 7.500 char ottenuti tagliando a metà sono peggio dell'originale: nessuno dei due è cercabile.
+- **Ogni frammento nasce col proprio TLDR-ancora.** Un file splittato in N perde l'unica ancora che aveva: senza un TLDR per frammento lo split *peggiora* la reperibilità invece di migliorarla.
+- **Outline validata prima della scrittura.** Il `doc-writer` ha già il gate two-phase (§3.5 del suo contratto): passa lo split con `NEW file con ≥3 H2` e lascia che chieda conferma dell'outline via `AskUserQuestion` prima di scrivere i corpi.
+
+Dopo uno split, **i riferimenti al file vecchio restano appesi**. Prima di chiudere:
+
+```bash
+grep -rn "<vecchio-path>" --include='*.md' <PROJECT_ROOT> | grep -v "<task folder>"
+```
+
+Aggiorna quelli che trovi: altri file doc, `CLAUDE.md` (se il file era `ONLINE`, l'`@-import` va sostituito con quelli dei frammenti che restano online), e i `SKILL.md` del plugin che citano il path. Un riferimento a un file che non esiste più è un drift creato dalla bonifica.
+
+### 7. Chiudi
+
+- Rigenera l'indice (uno split o un TLDR riscritto lo richiedono sempre):
+  ```bash
+  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
+  ```
+- **Rimisura**: rilancia `doc-metrics.sh --online` e dichiara il delta prima/dopo. È l'unica verifica che la bonifica abbia prodotto l'effetto che si proponeva.
+- **Non stampare i diff** in chat. Solo la lista file dal contratto `APPLIED:`.
+- **Stage, mai commit**: `git add -- <file>...`.
+- Report finale: violazioni per verdetto, file toccati, footprint prima → dopo, voci non applicate.
+
+## Convenzione TTS
+
+Prima di ogni `AskUserQuestion`:
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic 3-7 parole specifiche>"
+```
+
+## Note
+
+- **Bonifica ≠ prevenzione.** Questa skill è una campagna retroattiva. Le regole che valgono anche al momento della scrittura stanno già altrove: il cap TLDR dentro `build-index.sh` (warning a ogni rigenerazione), l'as-is dentro il contratto che `doc-writer` legge a ogni invocazione. Se una violazione si ripresenta a ogni esecuzione, il fix non è rilanciare `lint-doc` — è spostare quella regola in un punto di enforcement.
+- **La soglia non si negozia a runtime.** Se un file ci passa per pochi caratteri, resta sopra soglia: il numero sta nel contratto, e uno scostamento discusso caso per caso rende le due esecuzioni successive incoerenti.
+- **`GEN` non si splitta a mano.** `INDEX.md` è un artefatto: se è troppo grande, la causa sono i TLDR dei file indicizzati, e il fix sta là.

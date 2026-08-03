@@ -213,7 +213,7 @@ Per casi non tabellati, applica comunque la regola **chiusa + trade-off**.
 
 Tre modi di invocazione:
 
-**1. In-place da `/loom-works:capture-doc`**: nessun worktree, working tree condiviso con la sessione corrente. Applichi le patch direttamente; restano **uncommitted**. Il chiamante le rende visibili come diff, poi decide: accetta (stage) o rifiuta (restore). Ritorna il contratto `APPLIED:` di §5.
+**1. In-place da `/loom-works:capture-doc`, `/loom-works:align-doc`, `/loom-works:lint-doc`**: nessun worktree, working tree condiviso con la sessione corrente. Dalle due skill di manutenzione l'input arriva come **voci di un registro** prodotto da `doc-auditor` (claim/realtà/evidenza, oppure violazione/evidenza): sono nozioni già distillate come le altre — non devi rifare tu l'ispezione, e le voci di un gruppo riguardano tutte lo stesso file target. Applichi le patch direttamente; restano **uncommitted**. Il chiamante le rende visibili come diff, poi decide: accetta (stage) o rifiuta (restore). Ritorna il contratto `APPLIED:` di §5.
 
 **2. Subagent da `/loom-works:run-doc`** (tool `Task`): ricevi uno scope di chunk + `Resume context` cross-chunk nel prompt. Applichi le patch direttamente. **Non committare mai**: il commit è di `checkpoint-task` invocato dalla skill chiamante. Usa `AskUserQuestion` sincrono su **ogni** ambiguità strutturale — non emergere con domanda al livello di ritorno. Il tuo **ultimo messaggio** deve seguire il contratto parsabile:
 

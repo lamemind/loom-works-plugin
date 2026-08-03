@@ -56,6 +56,15 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh
 
 Emette **liste**, non tabelle. Un file senza TLDR sulla riga 3 resta fuori dall'indice (warning a stderr). Parametri: `--dir`, `--output`, `--exclude` (comma), `--title`.
 
+## Manutenzione
+
+Due skill gemelle, distinte dalla **fonte di verità** contro cui misurano la doc:
+
+- `align-doc` — misura contro il **codice** → trova i **drift** (la doc dice X, il sorgente fa Y). Un drift è peggio di una lacuna: la doc offline esiste per *sostituire* la lettura del codice, quindi chi si fida agisce su una realtà inesistente e nessun segnale glielo dice.
+- `lint-doc` — misura contro **questo contratto** → trova le violazioni (file sopra soglia, TLDR-riassunto, residui storici, costo online). Non apre mai i sorgenti.
+
+Entrambe girano su `doc-auditor` **read-only** — non scrive, quindi N perimetri si ispezionano in parallelo sulla stessa working copy — e producono un registro con verdetti proposti. Applica `doc-writer`, solo sulle voci che l'utente approva. Le misure numeriche (char per file, char TLDR, footprint per-sessione incluse le entry hook) vengono da `scripts/docs/doc-metrics.sh`, non da un giudizio a runtime.
+
 ## Freshness
 
 **Doc segue codice, stesso commit.** Nuovo perimetro (servizio, comando, export pubblico) → file online se serve orientamento, offline se serve dettaglio consultabile. Nuovo file in `reference/` → rigenera l'indice.
