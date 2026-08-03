@@ -101,6 +101,7 @@ Fulcri nominati dall'utente:
 - ...
 
 Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 
 Applica i file direttamente (Write/Edit), non committare, non rigenerare l'indice. Ritorna il contratto APPLIED: (marker NEW/MOD per file) + INDEX_REBUILD_NEEDED.
 

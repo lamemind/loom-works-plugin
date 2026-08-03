@@ -66,6 +66,7 @@ Contesto:
 <estratto rilevante della conversazione, 10-30 righe max>
 
 Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 
 Applica le patch direttamente (Write/Edit), incluso l'eventuale patch a CLAUDE.md; non committare, non rigenerare l'indice. Leggi ${user_config.doc_folder_name}/reference/INDEX.md, scegli target (EXTEND file esistente o NEW). Ritorna il contratto APPLIED: (marker NEW/MOD per ogni file) + INDEX_REBUILD_NEEDED.
 ```

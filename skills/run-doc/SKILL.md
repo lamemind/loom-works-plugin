@@ -62,7 +62,7 @@ Leggi dal task file:
 Leggi per overview del landscape (no deep read — quello lo fa il subagent per chunk):
 - `CLAUDE.md` del progetto
 - `${user_config.doc_folder_name}/reference/INDEX.md`
-- `${user_config.doc_folder_name}/meta/doc-management.md` se presente (convenzioni)
+- `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md` (contratto doc: convenzioni e soglie numeriche)
 
 Scorri le Fonti per farti un'idea del volume.
 
@@ -147,6 +147,7 @@ PATCHES: <lista file toccati, uno per riga>
 BLOCK_REASON: <presente solo se STATUS=blocked>
 
 Docs root: ${PROJECT_ROOT}/${user_config.doc_folder_name}
+Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 ```
 
 ### 3.3 Parse ritorno

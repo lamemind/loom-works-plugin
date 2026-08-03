@@ -7,19 +7,26 @@
 # =============================================================================
 #
 # Scansiona ricorsivamente <dir> (default: docs/reference/) e per ogni file .md
-# estrae la prima riga nel formato:
+# estrae la riga 3 nel formato:
 #   > **TLDR**: <testo>
-# Genera un INDEX.md con struttura a sezioni (una per sottocartella) e tabelle
-# `| File | TLDR |`.
+# Genera un INDEX.md con struttura a sezioni (una per sottocartella) e liste
+# `- \`file.md\` — <tldr>`.
 #
 # I file senza TLDR vengono segnalati a stderr ma NON inclusi nell'indice.
 # L'INDEX.md stesso è sempre escluso.
+#
+# I TLDR oltre TLDR_CAP char vengono segnalati a stderr e inclusi comunque:
+# l'indice resta generabile, la violazione resta visibile. Il cap viene dal
+# contratto doc (docs/doc-management.md §Soglie) — cambiarlo qui lo sfasa da lì.
 #
 # Env:
 #   PROJECT_ROOT (default: $PWD)
 # =============================================================================
 
 set -euo pipefail
+
+# Cap TLDR in caratteri — contratto doc §Soglie
+TLDR_CAP=600
 
 DIR=""
 OUTPUT=""
@@ -83,6 +90,7 @@ TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
 MISSING=0
+OVERCAP=0
 while IFS= read -r -d '' file; do
     # skip INDEX.md stesso
     [[ "$(basename "$file")" == "INDEX.md" ]] && continue
@@ -95,13 +103,19 @@ while IFS= read -r -d '' file; do
         continue
     fi
 
+    # ${#var} conta caratteri (non byte) con locale UTF-8 — coerente col cap del contratto
+    if (( ${#tldr} > TLDR_CAP )); then
+        echo "[build-index] WARN TLDR ${#tldr} char (cap ${TLDR_CAP}): ${file#$PROJECT_ROOT/}" >&2
+        OVERCAP=$((OVERCAP+1))
+    fi
+
     rel="${file#$SCAN_DIR/}"
     reldir="$(dirname "$rel")"
     fname="$(basename "$rel")"
     [[ "$reldir" == "." ]] && reldir=""
 
-    # Escapa | nei TLDR
-    tldr="${tldr//|/\\|}"
+    # Nessun escape di `|`: l'output è a liste, e `read` assegna all'ultima
+    # variabile il resto della riga separatori inclusi → il TLDR arriva intatto.
     echo "${reldir}|${fname}|${tldr}" >> "$TMP"
 done < <(find "$SCAN_DIR" -type f -name '*.md' -print0 | sort -z)
 
@@ -124,14 +138,13 @@ done < <(find "$SCAN_DIR" -type f -name '*.md' -print0 | sort -z)
                 echo "## ${reldir}/"
             fi
             echo ""
-            echo "| File | TLDR |"
-            echo "| ---- | ---- |"
             current_section="$section"
         fi
-        echo "| \`${fname}\` | ${tldr} |"
+        echo "- \`${fname}\` — ${tldr}"
     done
 } > "$OUTPUT_FILE"
 
 echo "[build-index] wrote: ${OUTPUT_FILE#$PROJECT_ROOT/}"
 [[ $MISSING -gt 0 ]] && echo "[build-index] ${MISSING} file(s) skipped (no TLDR)" >&2
+[[ $OVERCAP -gt 0 ]] && echo "[build-index] ${OVERCAP} TLDR over cap ${TLDR_CAP} — riscrivili come ancora (contratto doc §Soglie)" >&2
 exit 0
