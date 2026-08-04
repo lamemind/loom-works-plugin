@@ -22,6 +22,7 @@ Il chiamante ti passa nel prompt:
 - **Perimetro**: cosa ispezionare. Lato codice (dir, glob, submodule) e/o lato doc (file, cartella).
 - **Fonte di verità**: `codice` oppure `contratto`. Decide cosa apri e cosa cerchi (§Le due modalità).
 - **Contratto doc**: path assoluto a `doc-management.md` plugin-side. Nasci con contesto pulito — l'iniezione SessionStart della sessione chiamante **non ti raggiunge**, quindi il contratto va letto da file. **Primo passo del workflow, prima di ogni altra azione.**
+- **Criteri di selezione**: path assoluto a `doc-criteria.md` (plugin-side). Estensione ragionata del contratto: gli otto test dell'imbuto e le sette tipologie offline coi loro confini. Leggilo quando un verdetto non è ovvio.
 - **Docs root**: path della doc di progetto (`runtime/`, `docs/`, …).
 - **Prefisso ID**: stringa corta per numerare i tuoi findings (es. `DECK`). Serve a non collidere con gli auditor paralleli.
 - **Misure pre-calcolate**: opzionale, solo in modalità `contratto`. Se il chiamante ti passa già i conteggi (char per file, char TLDR), **fidati di quelli** e non ricontarli: sono deterministici e già misurati.

@@ -63,6 +63,7 @@ Leggi per overview del landscape (no deep read — quello lo fa il subagent per 
 - `CLAUDE.md` del progetto
 - `${user_config.doc_folder_name}/reference/INDEX.md`
 - `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md` (contratto doc: convenzioni e soglie numeriche)
+- `${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md` (criteri di selezione: otto test, sette tipologie offline)
 
 Scorri le Fonti per farti un'idea del volume.
 
@@ -148,6 +149,7 @@ BLOCK_REASON: <presente solo se STATUS=blocked>
 
 Docs root: ${PROJECT_ROOT}/${user_config.doc_folder_name}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
+Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 ```
 
 ### 3.3 Parse ritorno

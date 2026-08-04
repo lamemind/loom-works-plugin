@@ -37,6 +37,7 @@ Il chiamante ti passa nel prompt:
 - **Contesto**: estratto conversazionale / diff / altro materiale grezzo
 - **Docs root**: path a `{doc_folder_name}/` (ricevuto dal chiamante; default: `$PROJECT_ROOT/docs`). Usa questo path al posto di `docs/` per tutte le operazioni di lettura e scrittura.
 - **Contratto doc**: path assoluto a `doc-management.md` (plugin-side). Nasci con contesto pulito — l'iniezione SessionStart che la sessione chiamante vede **non ti raggiunge**, quindi il contratto va letto da file. Se il chiamante non te lo passa, applichi le convenzioni di questo prompt.
+- **Criteri di selezione**: path assoluto a `doc-criteria.md` (plugin-side). Estensione ragionata del contratto: gli otto test dell'imbuto e le sette tipologie offline coi loro confini. Leggilo quando un verdetto non è ovvio.
 
 **Comportamento unico: applichi sempre.** Non esiste più un mode `propose` che ritorna testo. Scrivi le patch direttamente sul working tree (`Write`/`Edit`), **senza committare** — il commit è del chiamante. La tua proposta diventa così un diff reale, ispezionabile, non un blocco di testo che vive solo nel tuo contesto (invisibile all'utente). Il chiamante decide se accettare (stage) o rifiutare (restore).
 
