@@ -132,4 +132,4 @@ Topic = argomento concreto della domanda. NO generici ("domanda per te").
 
 Se durante run-task emergono nozioni documentali (decisioni di design, pattern non-ovvi, gotcha, conoscenza che merita doc), **appendile direttamente** alla sezione `## Doc Impact` del task file. Format: bullet con **nozione** + **ancora primaria** (tag/keyword/comando/pattern).
 
-Non decidere il target doc qui — lo gestisce il gate al `checkpoint-task` (capture inline / D-task / skip).
+Non decidere il target doc qui — lo gestisce il gate al `checkpoint-task` (capture inline / skip).

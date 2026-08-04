@@ -103,4 +103,8 @@ Entrambe girano su `doc-auditor` read-only, N perimetri in parallelo; applica `d
 
 ## Origine D-task
 
-Le task documentali (`D{N}`) nascono via `/loom-works:doc-task` — spot, nessun parent — oppure dal gate al checkpoint di una code task con `## Doc Impact` non vuoto, e allora il D-file porta `**Parent Task**: T{N}` e il parent ha `- [ ] D{N} (<maniglia>) chiusa` in Acceptance. Task e lane: [Task Management](./task-management.md).
+Le task documentali (`D{N}`) nascono **solo on-demand**, via `/loom-works:doc-task`. Nessun automatismo le genera: il gate al checkpoint di una code task non ne crea più (le voci `## Doc Impact` rinviate le raccoglie `align-doc` sul perimetro task).
+
+Soglia per aprirne una: il lavoro deve essere **multi-chunk**, cioè partizionabile in scope che `run-doc` esegue a giri con un `doc-writer` fresco per chunk. Una nozione singola resta `capture-doc`, che è one-shot — aprire una D per essa paga il ciclo (task file, planning, checkpoint per giro) per un lavoro che non lo ammortizza.
+
+Se passi `parent=T{N}` a mano, il D-file porta `**Parent Task**: T{N}` e il parent va corredato di `- [ ] D{N} (<maniglia>) chiusa` in Acceptance: alla chiusura della D il suo checkpoint flagga indietro la checkbox. Task e lane: [Task Management](./task-management.md).

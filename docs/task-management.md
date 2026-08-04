@@ -90,10 +90,11 @@ Vincoli:
 Ogni `checkpoint-task` su code task (K=⚙️) legge `## Doc Impact` del task file. Per ogni voce non marcata `→ ✔️`, l'utente sceglie:
 
 - `[1] capture inline` — invoca `capture-doc`; il file doc modificato entra nello stesso commit del checkpoint. Voce marcata `→ ✔️ capture`.
-- `[2] D-task` — invoca `doc-task parent=T{N}`; append `- [ ] D{N} chiusa` in Acceptance del task. Voce marcata `→ ✔️ D{N}`.
-- `[3] skip` — lascia la voce non consolidata. Reentry al prossimo checkpoint. Nessun enforcement.
+- `[2] skip` — lascia la voce non consolidata. Reentry al prossimo checkpoint. Nessun enforcement.
 
-**Gate morbido**: scelta utente su _quando_ documentare (subito vs differito), ma l'esistenza di un ref è enforced. Se sceglie D-task, la checkbox in Acceptance impedisce il done del task finché la D non passa done; la chiusura della D flagga indietro la checkbox via `**Parent Task**: T{N}` nel D-file. Doc task (K=📝) **non** triggerano il gate (la doc è l'obiettivo, non un side-effect).
+**Gate morbido**: scelta utente su _quando_ documentare, subito o dopo. Il gate non crea task: una voce skippata resta senza marker, e il marker mancante **è** il segnale di «non consolidata» — lo stesso indice d'ingresso che `align-doc` usa sul perimetro task per raccoglierle in blocco e timbrarle `→ ✔️ align`. Il rinvio non ha quindi bisogno di un ref proprio: differire costa zero e non si perde niente.
+
+Doc task (K=📝) **non** triggerano il gate (la doc è l'obiettivo, non un side-effect).
 
 ## Task Folder
 

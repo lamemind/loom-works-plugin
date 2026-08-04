@@ -7,6 +7,14 @@ model: opus
 
 Crea una nuova task documentale. I deliverable sono editoriali (sezioni di doc approvate, aggiornate o create), non code. La task vive nel task-system esistente come qualsiasi altra, con prefix `D{N}` e template dedicato.
 
+## Quando una D-task è la risposta giusta
+
+Nasce **solo su invocazione esplicita** — nessun automatismo la genera. Il gate `## Doc Impact` al checkpoint di una code task non ne apre: le voci rinviate lì restano senza marker e le raccoglie `align-doc` sul perimetro task.
+
+Soglia dimensionale: il lavoro dev'essere **multi-chunk**, cioè partizionabile in scope che `/loom-works:run-doc` esegue a giri con un `doc-writer` fresco per chunk. Se la nozione è singola, la risposta è `/loom-works:capture-doc` (one-shot inline): aprire una D per essa paga il ciclo — task file, planning con conferma utente, checkpoint per giro — su un lavoro che non lo ammortizza.
+
+Se non sei sicuro che il lavoro sia multi-chunk, chiedilo prima di creare la task.
+
 Due modalità:
 - **Interattiva** (default): estrazione dal contesto + domande mirate sui campi incerti
 - **YOLO**: deduce tutto dalla descrizione e dal contesto conversazionale, nessuna domanda
@@ -22,13 +30,15 @@ Cerca keyword nell'input: **"yolo"**, **"no domande"**, **"senza domande"**
 - Se presente → modalità YOLO
 - Altrimenti → modalità interattiva
 
-## Parent Task (chiamata da checkpoint gate)
+## Parent Task (opzionale, passato a mano)
 
-Se `$ARGUMENTS` contiene `parent=T{N}` (es. `parent=T07`), la D-task nasce da un Doc Impact gate al checkpoint del parent. Popola il campo `**Parent Task**` nel file. Il caller (checkpoint-task) è responsabile di:
-- appendere `- [ ] D{taskId} chiusa` in `## Acceptance Criteria` del parent
-- marcare la voce processata in `## Doc Impact` del parent con `→ ✔️ D{taskId}`
+Se `$ARGUMENTS` contiene `parent=T{N}` (es. `parent=T07`), la D-task viene legata a una code task: popola il campo `**Parent Task**` nel file. Nessuna skill passa più questo argomento — lo scrive l'utente quando vuole che il parent non si chiuda prima della doc.
 
-A chiusura della D-task (suo checkpoint con done), il checkpoint flagga indietro la checkbox nel parent via lookup del campo `**Parent Task**`.
+Quando lo ricevi, sei tu a chiudere il cerchio sul parent (non c'è un caller che lo faccia):
+- appendi `- [ ] D{taskId} (<maniglia verbo+oggetto>) chiusa` in `## Acceptance Criteria` del parent
+- marca in `## Doc Impact` del parent le voci coperte da questa D con `→ ✔️ D{taskId}`, così il gate al checkpoint non le ripresenta
+
+A chiusura della D-task (suo checkpoint con done), `checkpoint-task` flagga indietro la checkbox nel parent via lookup del campo `**Parent Task**`.
 
 ---
 
@@ -79,10 +89,12 @@ In modalità interattiva, dopo l'estrazione dal contesto, raccogli/conferma in q
 2. **Priorità**: High / Med / Low
 3. **Durata stimata**
 4. **Description**: prosa discorsiva (perché la task esiste, contesto)
-5. **Target**: lista strutturata. Per ogni voce:
-   - path (es. `docs/reference/framework/logging.md`)
-   - livello: `online` (docs/project/, docs/meta/) / `offline` (docs/reference/)
-   - azione: `drift` (allineare a codice) / `extend` (aggiungere sezioni) / `create` (nuovo file)
+5. **Target**: lista strutturata, una voce per area doc. Per ognuna:
+   - **path** — es. `{docs_root}/reference/logging.md`
+   - **verdetto atteso**, uno dei quattro del contratto: `online` (in `{docs_root}/project/`, caricata via `@-import` da `CLAUDE.md`) · `offline` (in `{docs_root}/reference/`) · `→ codice` (non si scrive, si punta con `file + simbolo`) · `→ fonte viva` (non si copia, si punta col comando più la forma della domanda giusta)
+   - **azione**: `create` (nuovo file) · `extend` (aggiungere sezioni) · `drift` (riallineare alla fonte nativa del layer) · `pointer` (sostituire prosa esistente con un puntatore — è l'azione dei due verdetti di rimando) · `drop` (cancellare: la nozione non sopravvive all'imbuto)
+
+   Il verdetto scritto qui è una **previsione fatta prima di lavorare**, non un vincolo: chi esegue applica l'imbuto di selezione (`doc-criteria.md`) al materiale reale e può ribaltarlo, inclusa la conclusione «non scriverla». Un Target che dice `online`/`offline` su ogni voce, senza un solo rimando, di norma non ha applicato l'imbuto — e impegna la task a scrivere prosa che il codice già possiede.
 6. **Acceptance Criteria**: condizioni di validazione ("tutte le ancore coperte", "INDEX rigenerato", ecc.)
 7. **Deliverables Checklist**: sezioni doc approvate a fine task. Distinto dal Target:
    - **Target** = dove metto le mani (superficie di lavoro)
@@ -119,7 +131,7 @@ Sostituisci i placeholder:
 | `{{priorita_raccolta}}` | High / Med / Low |
 | `{{durata_standard}}` | es. `2h`, `1 giornata` |
 | `{{lane}}` | nome lane o lasciare vuoto/omesso |
-| `{{parent_task}}` | ID task parent (es. `T07`) se la D-task nasce da un Doc Impact gate al checkpoint, altrimenti vuoto |
+| `{{parent_task}}` | ID task parent (es. `T07`) se `$ARGUMENTS` conteneva `parent=T{N}`, altrimenti vuoto |
 | `{{descrizione_dettagliata}}` | prosa sotto `## Description` |
 | `{{target_raccolto}}` | lista strutturata sotto `## Target` |
 | `{{criteri_accettazione_raccolti}}` | bullet sotto `## Acceptance Criteria` |

@@ -15,7 +15,7 @@
 
 ## Target
 
-*Lista strutturata dei file/aree doc da toccare. Per ognuno: path, livello (online/offline), azione prevista (drift/extend/create). Separa il **dove metto le mani** dal **cosa consegno approvato** (quest'ultimo è in Deliverables Checklist). Può essere raffinato in corso d'esecuzione.*
+*Lista strutturata dei file/aree doc da toccare. Per ognuno: path · verdetto atteso fra i quattro del contratto (`online` / `offline` / `→ codice` / `→ fonte viva`) · azione prevista (`create` / `extend` / `drift` / `pointer` / `drop`). Il verdetto è una previsione fatta prima di lavorare: l'imbuto di selezione applicato in esecuzione può ribaltarlo, «non scriverla» compresa. Separa il **dove metto le mani** dal **cosa consegno approvato** (quest'ultimo è in Deliverables Checklist).*
 
 {{target_raccolto}}
 
@@ -37,7 +37,7 @@
 
 ## Execution
 
-*Stato del workflow a giri. Popolata da `/loom-works:run-doc` giro per giro. Forma definita in `plugins/loom-works/DESIGN.md` §7.*
+*Stato del workflow a giri. Popolata da `/loom-works:run-doc` giro per giro — forma e semantica dei campi le definisce quella skill, non va replicata qui.*
 
 <!--
 Ogni chunk è una sottosezione H3 diretta:

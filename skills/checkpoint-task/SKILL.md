@@ -56,10 +56,11 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
      - su **skip/edit** capture-doc restora il working tree (nessun residuo). Se l'utente scarta, la voce resta **non consolidata**: **niente marker**, reentry al prossimo checkpoint.
 
      Non ri-chiedere `ok/edit/skip` qui: quel gate è dentro capture-doc. Leggi il suo esito (accettata/scartata) per decidere il marker.
-   - `[2] D-task` → invoca skill `doc-task` con `Parent Task: ${taskId}` e la voce come Description seed. Append in `## Acceptance Criteria` del task corrente la riga: `- [ ] D{N} chiusa` (sostituisci `D{N}` con l'ID restituito). Il gate "task non chiudibile" è gratis: la checkbox in Acceptance impedisce il done finché la D non viene chiusa (chiusura della D flagga la checkbox — vedi step 4).
-   - `[3] skip` → lascia la voce non consolidata. Niente enforcement. Reentry al prossimo checkpoint.
+   - `[2] skip` → lascia la voce non consolidata. Niente enforcement. Reentry al prossimo checkpoint.
 
-   **Marker di consolidamento**: a fine handling, in coda alla voce processata appendi `→ ✔️ capture` (solo se capture-doc ha **accettato**) oppure `→ ✔️ D{N}`. Voci con marker `→ ✔️` sono saltate ai checkpoint successivi. Voce scartata dentro capture-doc = nessun marker.
+   **Non offrire un terzo ramo "apri una D-task"**: il gate non crea task. Una voce rinviata resta senza marker, e l'assenza del marker è già il segnale che `align-doc` legge come indice d'ingresso sul perimetro task — il rinvio è quindi tracciato senza che serva un ref proprio.
+
+   **Marker di consolidamento**: a fine handling, in coda alla voce processata appendi `→ ✔️ capture`, e solo se capture-doc ha **accettato**. Voci con marker `→ ✔️` sono saltate ai checkpoint successivi. Voce scartata dentro capture-doc = nessun marker.
 
    **Multi-voce, ordine e restore**: processa le voci **in sequenza**, non in parallelo. Lo stage-su-ok di capture-doc è il *punto di ripristino* condiviso: se una voce successiva tocca un file già approvato da una precedente e viene scartata, il `git restore` di capture-doc torna allo stato **staged** (l'approvato), non a HEAD → l'approvazione precedente è protetta. Vale solo se le voci non si sovrappongono in parallelo.
 
@@ -147,5 +148,5 @@ Topic = argomento concreto della domanda. NO generici.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
 - **Link compare**: Generato automaticamente dallo script commit (spanna entrambi i commit: TRACKED_SHA…HEAD)
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
-- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / D-task / skip), ma se sceglie D-task la checkbox `- [ ] D{N} chiusa` in Acceptance impedisce il done finché la D non passa done — quando la D passa done, il suo checkpoint flagga indietro la checkbox usando il campo `**Parent Task**: T{N}` del D-file. Voci marcate `→ ✔️` saltano i checkpoint successivi.
+- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} chiusa` (step 5.4) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
 - **Apply-first (opzione [1])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree, la review è sul diff reale (pannello git). Stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). I file approvati arrivano al commit **già staged**; lo split path-based del commit script li isola comunque nel commit 2 `docs(...)`.
