@@ -62,6 +62,7 @@ Cosa cerchi, in ordine di resa:
 - **residui storici** — cronologia, changelog, "prima/dopo", date, id di task o PR inline. La doc è una fotografia dell'as-is; la storia sta in git.
 - **TLDR-riassunto** — un TLDR che riassume il contenuto invece di dare trigger concreti. Sintomo tipico: prosa discorsiva al posto di keyword/comandi separati da `·`. Il cap in char lo verifica lo script del chiamante, non tu: tu giudichi la **forma**. **Bloccante** (§Regole dei findings).
 - **file sopra soglia di split** — il numero viene dalle misure pre-calcolate. Il tuo contributo è il **taglio proposto**: quali perimetri, quanti frammenti, con che ancora ciascuno. Mai un taglio per byte.
+- **file sotto il pavimento di merge** (flag `MERGE?` nelle misure) — il numero dice solo «guarda qui». Il giudizio è uno solo: **il suo perimetro di ricerca è genuinamente distinto?** Se sì il file sopravvive e lo dichiari con `VERDICT: fix-doc` (o nessun finding) più la riga di motivo; se è un residuo che nessuno cercherebbe da solo, `VERDICT: merge` e in `FIX` **quale** file lo assorbe — il vicino di perimetro, non il vicino di cartella. Senza questa lente lo split è a senso unico: la doc si frammenta a ogni passata e un file che si è svuotato non ha nessuno che se ne accorga.
 - **layer sbagliato** — una nozione collocata dove non le compete, e il contratto basta a stabilirlo senza aprire niente: un inventario in prosa (campi, colonne, flag, opzioni di un comando) appartiene al codice o alla fonte viva, non alla doc; il *perché* di una scelta appartiene a offline, non a un file online. Verdetto `relayer`.
 - **costo online ingiustificato** — sezioni di dettaglio consultabile dentro file `@-import`ati, che si pagano a ogni sessione.
 - **coordinate opache** — id nudi (`T60`, `D02`) senza maniglia verbo+oggetto accanto.
@@ -94,6 +95,7 @@ Verdetti proposti (l'utente li conferma o li cambia):
 - `fix-doc` — la doc è sbagliata o fuori contratto, ma il layer è quello giusto → patch alla doc. Caso normale.
 - `relayer` — la nozione è nel layer sbagliato: una copia di ciò che codice o fonte viva già rispondono, oppure un *perché* finito online. Non si aggiorna, si **sposta**: cancella la copia e lascia il puntatore (`file + simbolo` per il codice, comando + forma della domanda per una fonte viva), o sposta la sezione online→offline. Distinto da `fix-doc` perché aggiornare una copia la fa driftare di nuovo al giro dopo.
 - `split` — file sopra soglia → taglio per perimetro, ogni frammento col suo TLDR-ancora.
+- `merge` — file sotto pavimento il cui perimetro **non** è distinto → il contenuto confluisce nel vicino di perimetro, il file sparisce, l'INDEX perde una voce. Operazione inversa di `split`, e va nominata: il contenuto **sopravvive**, muore solo il contenitore. È ciò che lo distingue da `drop`, dove a morire è la nozione.
 - `code-divergent` — la doc descrive l'intenzione, la fonte ci è andata contro → la doc **resta**, si apre una task. Non lo decidi da solo se non hai evidenza dell'intenzione: in dubbio, `fix-doc` con severità media.
 - `drop` — la sezione descrive qualcosa che non esiste più su nessuno dei due lati → rimuovere.
 
@@ -115,7 +117,7 @@ DOC: <path relativo a project root> §<sezione>
 CLAIM: <una riga>
 REALITY: <una riga>
 EVIDENCE: <path>:<linea> | <comando interrogato>
-VERDICT: fix-doc | relayer | split | code-divergent | drop
+VERDICT: fix-doc | relayer | split | merge | code-divergent | drop
 FIX: <1-3 righe>
 END
 

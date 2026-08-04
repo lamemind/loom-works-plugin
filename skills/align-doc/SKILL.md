@@ -105,10 +105,13 @@ Sul perimetro **task** (§0) il prompt cambia in tre punti: `Nozioni candidate:`
 
 ### 3. Consolida il registro
 
-Unisci i registri in **un unico file**, ordinato per severità (alta prima). Colloca:
+Unisci i registri in **un unico file**, ordinato per severità (alta prima). Dove atterra lo risolve uno script, non una domanda:
 
-- task attiva con `**Folder**:` popolato → `<task folder>/align-doc-findings.md`;
-- altrimenti `AskUserQuestion`: nuova scratch folder (`/loom-works:scratch-new`) oppure registro solo in chat.
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name align-doc-findings.md --docs-root "${user_config.doc_folder_name}"
+```
+
+Cascata: task attiva con `**Folder**:` popolato → quella folder · task attiva senza folder → la crea (`set-task-folder.sh`, che riscrive il campo) · nessuna task → scratch `.YY-MM-DD-align-doc-findings`. Usa la riga `REGISTRY_PATH=` che stampa.
 
 Mai dentro `{docs_root}/`: è materiale di lavoro, non doc di progetto.
 
@@ -162,6 +165,11 @@ Per ogni voce con questo verdetto la doc descrive l'intenzione e la fonte ci è 
   "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
   ```
   **Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione bloccante del contratto, non un comando fallito. Non annulla l'allineamento — riportala e lascia le voci a `lint-doc`, che è la skill di quel perimetro. Exit 1 = indice non scritto, quello è un errore.
+- Se le patch hanno **rimosso** sezioni (verdetti `relayer` e `drop` cancellano, non solo correggono), verifica che non abbiano lasciato riferimenti appesi:
+  ```bash
+  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh" --docs-root "${user_config.doc_folder_name}"
+  ```
+  Exit 2 = ci sono riferimenti a file spariti (`DANGLING`) o a `§` che non esistono più (`NOSECTION`). Il secondo è il caso tipico qui: cancelli la sezione, e il puntatore che la citava resta valido sul path e falso sulla sezione — invisibile a un grep. Risolvili con `Edit` prima di chiudere.
 - Sul perimetro **task** (§0): marca `→ ✔️ align` le voci `## Doc Impact` integrate, nel task file. È l'unico file di runtime che questa skill tocca — e lo tocca lei, mai il `doc-writer`, che ha `{docs_root}/tasks/` fuori dal proprio perimetro.
 - **Non stampare i diff** in chat: bruciano contesto e sono già ispezionabili nel pannello git. Stampa la lista file dal contratto `APPLIED:`.
 - **Stage, mai commit**: `git add -- <file>...`. Il commit è dell'utente o del `checkpoint-task`.

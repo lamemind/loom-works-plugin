@@ -34,58 +34,81 @@ Con `--format tsv` l'output è passabile tale e quale agli auditor: sono misure 
 
 Registra il totale **prima** dell'intervento: senza baseline il "dopo" non dice niente.
 
-### 2. Fan-out doc-auditor
+### 2. Partiziona i perimetri
 
-Un `Task` con `subagent_type: doc-auditor` per **gruppo di file** (per cartella, o i file grossi uno per uno), tutti nello stesso messaggio → parallelo. Read-only ⇒ nessun conflitto sul working tree. Massimo 4 auditor per esecuzione.
+**Quali** file vanno insieme non è una scelta a runtime: due esecuzioni sullo stesso albero devono produrre gli stessi gruppi, o il registro non è confrontabile col precedente.
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-partition.sh" --docs-root "${user_config.doc_folder_name}" --format tsv
+```
+
+Consuma le misure del §1 e ritorna i gruppi già formati, ciascuno col proprio `PREFIX` (il prefisso ID dei finding) e le righe di misura dei suoi file. Il criterio: un file sopra soglia di split fa gruppo da solo, il resto va per cartella, i gruppi-cartella più leggeri si fondono se sforano il cap.
+
+**Due cap, non uno**: `--max-groups` (4) è quanti auditor per *ondata* — oltre, il registro diventa illeggibile e il gate dei verdetti impraticabile; `--max-char` (60.000) è quanta doc legge *un* auditor. Il secondo esiste perché senza di esso «un gruppo per cartella» degenera: una `reference/` da 23 file finisce tutta in un perimetro solo.
+
+Se la colonna `WAVE` porta più di 1, **esegui un'ondata per messaggio** e consolida il registro alla fine. Non tagliare i gruppi in eccesso: quei file resterebbero non auditati senza che nulla lo dica.
+
+### 3. Fan-out doc-auditor
+
+Un `Task` con `subagent_type: doc-auditor` per gruppo dell'ondata corrente, tutti nello stesso messaggio → parallelo. Read-only ⇒ nessun conflitto sul working tree.
 
 ```
 Perimetro:
-- Doc: <file o cartella>
+- Doc: <i PATH del gruppo>
 
 Fonte di verità: contratto
 
 Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
-Prefisso ID: <sigla corta, es. LINT-DECK>
+Prefisso ID: <la colonna PREFIX del gruppo>
 
 Misure pre-calcolate (fidati di queste, non ricontare):
-<righe TSV di doc-metrics.sh per i file di questo perimetro>
+<righe del gruppo: PATH / CHAR / TLDR / FLAGS>
 
 Non aprire i sorgenti del progetto. Cerca: residui storici, TLDR-riassunto,
-file sopra soglia (col taglio proposto), layer sbagliato, motivazioni finite online,
-costo online ingiustificato, coordinate opache, formato. Ritorna solo il registro.
+file sopra soglia (col taglio proposto), file sotto pavimento col flag MERGE?
+(perimetro distinto → sopravvive; residuo → verdetto merge, e dì in quale file
+confluisce), layer sbagliato, motivazioni finite online, costo online ingiustificato,
+coordinate opache, formato. Ritorna solo il registro.
 
 Bloccanti: TLDR oltre il cap e TLDR-riassunto sono SEVERITY: alta per definizione,
 mai media o bassa — non sono giudizi di gusto. Marcali `BLOCKING: si`.
 ```
 
-### 3. Consolida il registro
+### 4. Consolida il registro
 
-Un unico file ordinato per severità. Colloca:
+Un unico file ordinato per severità. Dove atterra lo risolve uno script, non una domanda:
 
-- task attiva con `**Folder**:` popolato → `<task folder>/lint-doc-findings.md`;
-- altrimenti `AskUserQuestion`: nuova scratch folder (`/loom-works:scratch-new`) oppure registro solo in chat.
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name lint-doc-findings.md --docs-root "${user_config.doc_folder_name}"
+```
+
+Cascata: task attiva con `**Folder**:` popolato → quella folder · task attiva senza folder → la crea (`set-task-folder.sh`, che riscrive il campo) · nessuna task → scratch `.YY-MM-DD-lint-doc-findings`. Usa la riga `REGISTRY_PATH=` che stampa.
+
+Il ramo «task senza folder» prima finiva in `AskUserQuestion`, e la risposta era comunque «creala»: una task che produce un registro ha per definizione materiale da ospitare.
 
 Mai dentro `{docs_root}/`: è materiale di lavoro, non doc di progetto.
 
 In chat va la **sintesi** — una riga per finding (`ID · severità · file · violazione · verdetto proposto`) — più il footprint misurato. Il dettaglio resta nel file.
 
-### 4. Gate dei verdetti — in blocco
+### 5. Gate dei verdetti — in blocco
 
 Come in `align-doc`: i verdetti si raccolgono **una volta sola sul registro completo**. `AskUserQuestion` (prima il ping TTS) con: conferma tutti · conferma tranne alcuni ID · solo severità alta · nessuno.
 
 Annota il verdetto finale su ogni voce del registro.
 
-**Le voci `BLOCKING: si` non si declassano.** Un TLDR oltre il cap o che riassume invece di agganciare è un numero e una forma, non una preferenza: entra sempre nel gruppo applicato, anche sotto l'opzione «solo severità alta». L'utente resta libero di scegliere «nessuno» e non applicare niente — ma allora il report finale (§7) dichiara la doc **non conforme**, con l'elenco delle voci residue. Il gate decide *quando* si bonifica, mai *se* la violazione esiste.
+**Le voci `BLOCKING: si` non si declassano.** Un TLDR oltre il cap o che riassume invece di agganciare è un numero e una forma, non una preferenza: entra sempre nel gruppo applicato, anche sotto l'opzione «solo severità alta». L'utente resta libero di scegliere «nessuno» e non applicare niente — ma allora il report finale (§8) dichiara la doc **non conforme**, con l'elenco delle voci residue. Il gate decide *quando* si bonifica, mai *se* la violazione esiste.
 
-### 5. Applica
+### 6. Applica
 
 Raggruppa per **file doc target**, un `doc-writer` per gruppo. Gruppi che **non condividono nessun file target** vanno in **parallelo**, nello stesso messaggio: il vincolo è «mai due writer sullo stesso file», non «mai due writer». Sequenziali solo dove i gruppi si sovrappongono — e se si sovrappongono, di norma erano un gruppo solo.
 
-Con più writer in volo il gate two-phase dello split (§6) va **risolto prima**: nessuno può fermarsi a chiedere conferma dell'outline mentre gli altri scrivono, o N domande si aprono sullo stesso schermo. L'outline la approva il gate dei verdetti (§4); passala già validata nel prompt e dichiaralo, così il writer va dritto alla scrittura.
+Un `merge` accoppia **due** file (chi confluisce e chi assorbe): entrambi vanno nello stesso gruppo, o due writer si contendono la stessa fusione.
 
-Dai a ogni writer il perimetro dei file che può toccare e l'istruzione di **segnalare invece di editare** ciò che sta fuori: uno split rompe puntatori anche in file assegnati a un altro gruppo, e due writer che si contendono lo stesso puntatore lo riscrivono a vicenda. Lo sweep lo fa il chiamante, a valle (§6).
+Con più writer in volo il gate two-phase dello split (§7) va **risolto prima**: nessuno può fermarsi a chiedere conferma dell'outline mentre gli altri scrivono, o N domande si aprono sullo stesso schermo. L'outline la approva il gate dei verdetti (§5); passala già validata nel prompt e dichiaralo, così il writer va dritto alla scrittura.
+
+Dai a ogni writer il perimetro dei file che può toccare e l'istruzione di **segnalare invece di editare** ciò che sta fuori: uno split rompe puntatori anche in file assegnati a un altro gruppo, e due writer che si contendono lo stesso puntatore lo riscrivono a vicenda. Lo sweep lo fa il chiamante, a valle (§7).
 
 Le violazioni non-split (residui storici, TLDR da riscrivere, motivazioni da spostare offline, formato) passano come una normale nozione → patch.
 
@@ -103,28 +126,44 @@ Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e
 
 Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'indice.
 Sostituisci la sezione toccata, non stratificare. Ritorna APPLIED: + INDEX_REBUILD_NEEDED.
+Se splitti, fondi o cancelli un file, ritorna anche SPLIT_MAP: — serve allo sweep dei puntatori.
 ```
 
-### 6. Split e merge — i fix che non sono "nozione → patch"
+### 7. Split e merge — i fix che non sono "nozione → patch"
 
 Split e merge riscrivono la topologia della doc, non una sezione. Quattro vincoli:
 
 - **Riduzioni prima del taglio.** Eco, cronaca e inventari si tolgono *prima* di decidere dove tagliare: sono spesso migliaia di char, e un frammento dimensionato su peso che sta per sparire nasce a ridosso della soglia — cioè già candidato al prossimo split.
 - **Taglio per perimetro, mai per byte.** Frammenti da 7.500 char ottenuti tagliando a metà sono peggio dell'originale: nessuno dei due è cercabile.
 - **Ogni frammento nasce col proprio TLDR-ancora.** Un file splittato in N perde l'unica ancora che aveva: senza un TLDR per frammento lo split *peggiora* la reperibilità invece di migliorarla.
-- **Outline validata prima della scrittura.** Il `doc-writer` ha il gate two-phase (§3.5 del suo contratto): con **un solo** writer in volo, passa lo split con `NEW file con ≥3 H2` e lascia che chieda conferma via `AskUserQuestion`. Con più writer in parallelo l'outline va approvata al gate dei verdetti (§4) e passata già validata — vedi §5.
+- **Outline validata prima della scrittura.** Il `doc-writer` ha il gate two-phase (§3.5 del suo contratto): con **un solo** writer in volo, passa lo split con `NEW file con ≥3 H2` e lascia che chieda conferma via `AskUserQuestion`. Con più writer in parallelo l'outline va approvata al gate dei verdetti (§5) e passata già validata — vedi §6.
 
 **Il merge è l'operazione inversa, e va usata.** Un file sotto il pavimento del contratto non si fonde d'ufficio: si riesamina il suo perimetro di ricerca. Se è distinto, sopravvive e lo si dichiara nel registro; se è un residuo, confluisce nel vicino di perimetro e l'INDEX perde una voce. Senza questo ramo lo split è a senso unico: la doc si frammenta a ogni passata e nessuno nota il file che si è svuotato.
 
-Dopo uno split o un merge, **i riferimenti al file vecchio restano appesi**. Prima di chiudere:
+Un merge applicato è **tre patch, non una**: la sezione entra nel file che assorbe (`MOD`), il file svuotato sparisce (`DEL`, che il writer fa solo su verdetto tuo), e i riferimenti al path morto vanno rimappati come dopo uno split.
+
+#### Sweep dei puntatori — lo fa il chiamante, non il writer
+
+Dopo uno split o un merge i riferimenti al file vecchio restano appesi, **anche in file che nessun writer ha toccato**. Enumerarli è meccanico:
 
 ```bash
-grep -rn "<vecchio-path>" --include='*.md' <PROJECT_ROOT> | grep -v "<task folder>"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh" --docs-root "${user_config.doc_folder_name}"
 ```
 
-Aggiorna quelli che trovi: altri file doc, `CLAUDE.md` (se il file era `ONLINE`, l'`@-import` va sostituito con quelli dei frammenti che restano online), e i `SKILL.md` del plugin che citano il path. Un riferimento a un file che non esiste più è un drift creato dalla bonifica.
+Scansiona `{docs_root}/` più `CLAUDE.md`. `--also <file|dir>` (ripetibile) aggiunge perimetri che citano path di progetto senza esserne parte — tipicamente un submodule di plugin/tooling nel repo. Passalo solo se quel perimetro esiste davvero qui.
 
-### 7. Chiudi
+Due livelli, e il secondo è il motivo per cui un `grep` del path vecchio non basta:
+
+- `DANGLING` — il file puntato non esiste più. Un grep lo trova.
+- `NOSECTION` — il file esiste, ma la `§` citata non c'è. Dopo uno split è il caso **normale**: il riferimento è stato riscritto sul frammento giusto e la sezione è finita in un altro. Un grep sul path nuovo risulta pulito, e il drift resta.
+
+**Exit 2 è il verdetto** (ci sono riferimenti appesi), exit 0 pulito, exit 1 errore duro.
+
+Il mapping di ogni voce al frammento giusto viene dal blocco `SPLIT_MAP:` che il writer ha ritornato: è l'unico che sa in quale frammento è finita `§X`. Applica le riscritture tu, con `Edit`, e ricontrolla finché lo script non esce 0. Restano a carico tuo anche `CLAUDE.md` (se il file era `ONLINE`, l'`@-import` va sostituito con quelli dei frammenti che restano online) e i `SKILL.md` del plugin che citano il path.
+
+Un riferimento appeso è drift **prodotto dalla bonifica stessa**: nasce con la patch che doveva migliorare la doc, e nessun segnale lo denuncia.
+
+### 8. Chiudi
 
 - Rigenera l'indice (uno split o un TLDR riscritto lo richiedono sempre):
   ```bash
@@ -132,9 +171,10 @@ Aggiorna quelli che trovi: altri file doc, `CLAUDE.md` (se il file era `ONLINE`,
   ```
   **Exit 2 è il verdetto dello script**, non un comando fallito: l'indice è scritto, ma i TLDR elencati su stderr restano oltre il cap. È la stessa misura del §1 letta a valle — se esce 2 dopo una bonifica che doveva chiudere quelle voci, la bonifica non ha fatto il suo lavoro e va detto nel report. Exit 1 = indice non scritto, quello è un errore da risolvere.
 - **Rimisura**: rilancia `doc-metrics.sh --online` e dichiara il delta prima/dopo. È l'unica verifica che la bonifica abbia prodotto l'effetto che si proponeva.
+- **Riverifica i puntatori**: `check-doc-links.sh` (§7) deve uscire **0**. Se esce 2 lo sweep non è finito, e i riferimenti residui vanno nel report — non si chiude in silenzio.
 - **Non stampare i diff** in chat. Solo la lista file dal contratto `APPLIED:`.
-- **Stage, mai commit**: `git add -- <file>...`.
-- Report finale: violazioni per verdetto, file toccati, footprint prima → dopo, voci non applicate. Se restano voci `BLOCKING: si` non applicate, la riga di chiusura è **`doc NON conforme: <n> violazioni bloccanti`** con i file elencati — non un riepilogo neutro.
+- **Stage, mai commit**: `git add -- <file>...`. Per un `DEL` il file è già sparito dal working tree, quindi serve `git add -A -- <path>`: senza `-A` la cancellazione non entra nell'indice e il commit del chiamante fa rinascere il file.
+- Report finale: violazioni per verdetto, file toccati, footprint prima → dopo, riferimenti appesi risolti, voci non applicate. Se restano voci `BLOCKING: si` non applicate, la riga di chiusura è **`doc NON conforme: <n> violazioni bloccanti`** con i file elencati — non un riepilogo neutro.
 
 ## Convenzione TTS
 

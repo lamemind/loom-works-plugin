@@ -97,19 +97,25 @@ Forma del contenuto:
 
 Applica **tutte** le patch, `CLAUDE.md` inclusa. Non trattenere parti: la review la fa il chiamante sul diff, non su un testo di ritorno.
 
-Poi stampa il **contratto di ritorno** parsabile, come ultima parte dell'output. Il marker per-file dice al chiamante *come* si annulla: `NEW` = file creato ex-novo, rollback `rm` (git restore non lo recupera, non è in HEAD) · `MOD` = file preesistente, rollback `git restore`.
+Poi stampa il **contratto di ritorno** parsabile, come ultima parte dell'output. Il marker per-file dice al chiamante *come* si annulla: `NEW` = file creato ex-novo, rollback `rm` (git restore non lo recupera, non è in HEAD) · `MOD` = file preesistente, rollback `git restore` · `DEL` = file rimosso, rollback `git checkout -- <path>`.
 
 ```
 APPLIED:
 - MOD docs/reference/foo.md
 - NEW docs/reference/bar.md
+- DEL docs/reference/baz.md
 - MOD CLAUDE.md
+SPLIT_MAP:
+- docs/reference/foo.md §Sezione vecchia → docs/reference/bar.md §Sezione nuova
+- docs/reference/baz.md → docs/reference/foo.md §Sezione che lo ha assorbito
 DISCARDED:
 - «<nozione>» → <motivo secco: eco / cronaca / inventario> (<dove sta la fonte>)
 INDEX_REBUILD_NEEDED: yes | no
 ```
 
 - La lista `APPLIED:` dev'essere **esatta e completa**: è l'unica base su cui il chiamante ripulisce il working tree se rifiuta. Mai un glob, mai omissioni — un file scritto e non elencato resta orfano.
+- **`DEL` solo su verdetto del chiamante** (`merge`, `drop`). Non cancelli mai un file di tua iniziativa: una nozione che non regge i test si dichiara in `DISCARDED:`, non si cancella il file che la ospitava.
+- `SPLIT_MAP:` è **obbligatorio** quando hai splittato, fuso o cancellato un file, e omesso altrimenti. Serve a rimappare i riferimenti che restano appesi altrove nella doc: la riga vecchia diceva `foo.md §X`, e solo tu sai in quale frammento §X è finita. Una riga per coppia origine → destinazione, con la sezione quando cambia; una riga senza `§` vale come default per tutto ciò che puntava a quel file. Senza la mappa il chiamante può solo grepparne il path, e una `§` che non esiste più **non si vede in un grep** — è drift nuovo, prodotto dalla bonifica stessa.
 - `DISCARDED:` porta le nozioni che hai deciso di non scrivere, una riga ciascuna col motivo. Il chiamante lo mette nel corpo del messaggio di commit: è lì che il verdetto resta greppabile, coerente col principio che la cronaca sta in git e non nella doc. Nessuno scarto → ometti il blocco.
 - `INDEX_REBUILD_NEEDED: yes` **solo** se hai toccato `${docs_root}/reference/` (file nuovo o TLDR cambiato). Il rebuild lo fa la skill chiamante, non tu.
 
