@@ -84,6 +84,8 @@ Patch applicata (rivedi il diff nel pannello git):
 - NEW docs/reference/bar.md
 ```
 
+Se il contratto porta un blocco `DISCARDED:`, **stampalo**: sono nozioni che il writer ha deciso di non scrivere perché non reggono l'imbuto (il sorgente le risponde già, sono cronaca della task, sono un inventario). È un verdetto, e taciuto diventa una cattura che sembra riuscita a metà senza che si sappia perché. Un `APPLIED:` vuoto con un `DISCARDED:` pieno è un esito legittimo — non rilanciare il writer per farlo scrivere comunque.
+
 Poi il ping TTS e `AskUserQuestion` con opzioni `ok` / `edit` / `skip`:
 
 ```bash
@@ -109,6 +111,8 @@ Solo su patch **accettata** (ok) e se il contratto `APPLIED:` porta `INDEX_REBUI
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
 ```
+
+**Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione **bloccante** del contratto, non un comando fallito. Non annulla la cattura; se il TLDR fuori cap è quello che hai appena scritto, riscrivilo come ancora prima di chiudere.
 
 Poi il ping TTS:
 ```bash

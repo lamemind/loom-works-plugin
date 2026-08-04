@@ -147,6 +147,8 @@ Solo su `ok` e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o s
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
 ```
 
+**Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione **bloccante** del contratto, non un comando fallito. Su uno scaffold appena generato i TLDR sono tuoi — riscrivi come ancora quelli segnalati prima del report.
+
 ### 7. Report finale
 
 Lista:

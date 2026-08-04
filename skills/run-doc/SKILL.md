@@ -138,13 +138,14 @@ ${sottoinsieme di ## Fonti pertinenti a questo chunk; se non sai filtrare, passa
 ${contenuto della sezione ### Resume context, integrale}
 
 ## Contratto di ritorno
-Opera in mode `apply`. Usa AskUserQuestion su ogni ambiguità strutturale (non tornare con domande al livello di ritorno). Non committare.
+Usa AskUserQuestion su ogni ambiguità strutturale (non tornare con domande al livello di ritorno). Non committare.
 
 Il tuo ultimo messaggio DEVE essere formattato così:
 
 STATUS: done | blocked
 SUMMARY: <1-2 righe descrittive per il round log>
 PATCHES: <lista file toccati, uno per riga>
+DISCARDED: <nozioni scartate col motivo, una per riga — omesso se nessuna>
 BLOCK_REASON: <presente solo se STATUS=blocked>
 
 Docs root: ${PROJECT_ROOT}/${user_config.doc_folder_name}
@@ -158,6 +159,7 @@ Dal messaggio finale del subagent estrai:
 - `STATUS` (done o blocked)
 - `SUMMARY`
 - `PATCHES` (lista file)
+- `DISCARDED` (nozioni non scritte, se presente) → riportale nel corpo del messaggio di commit del checkpoint (§3.6), non nel task file: uno scarto è un verdetto e il suo posto durevole è git
 - `BLOCK_REASON` (se blocked)
 
 Se il formato manca o è corrotto, tratta come `blocked` con `BLOCK_REASON: formato ritorno non parsabile`.
@@ -185,6 +187,8 @@ Se nei PATCHES compaiono file in `${user_config.doc_folder_name}/reference/`, ri
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
 ```
+
+**Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione **bloccante** del contratto, non un comando fallito. Non blocca il checkpoint del giro; i TLDR fuori cap scritti in questo round vanno riscritti come ancora prima di chiuderlo.
 
 ### 3.6 Checkpoint
 

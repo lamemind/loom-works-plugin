@@ -15,9 +15,14 @@
 # I file senza TLDR vengono segnalati a stderr ma NON inclusi nell'indice.
 # L'INDEX.md stesso è sempre escluso.
 #
-# I TLDR oltre TLDR_CAP char vengono segnalati a stderr e inclusi comunque:
-# l'indice resta generabile, la violazione resta visibile. Il cap viene dal
-# contratto doc (docs/doc-management.md §Soglie) — cambiarlo qui lo sfasa da lì.
+# I TLDR oltre TLDR_CAP char sono una violazione BLOCCANTE del contratto doc
+# (docs/doc-management.md §Soglie): l'indice viene scritto comunque, ma lo
+# script esce 2. Il cap viene dal contratto — cambiarlo qui lo sfasa da lì.
+#
+# Exit code:
+#   0  indice scritto, nessuna violazione
+#   1  errore duro: indice NON scritto (dir inesistente, argomento ignoto)
+#   2  indice scritto, uno o più TLDR oltre il cap
 #
 # Env:
 #   PROJECT_ROOT (default: $PWD)
@@ -105,7 +110,7 @@ while IFS= read -r -d '' file; do
 
     # ${#var} conta caratteri (non byte) con locale UTF-8 — coerente col cap del contratto
     if (( ${#tldr} > TLDR_CAP )); then
-        echo "[build-index] WARN TLDR ${#tldr} char (cap ${TLDR_CAP}): ${file#$PROJECT_ROOT/}" >&2
+        echo "[build-index] OVER-CAP TLDR ${#tldr} char (cap ${TLDR_CAP}): ${file#$PROJECT_ROOT/}" >&2
         OVERCAP=$((OVERCAP+1))
     fi
 
@@ -146,5 +151,9 @@ done < <(find "$SCAN_DIR" -type f -name '*.md' -print0 | sort -z)
 
 echo "[build-index] wrote: ${OUTPUT_FILE#$PROJECT_ROOT/}"
 [[ $MISSING -gt 0 ]] && echo "[build-index] ${MISSING} file(s) skipped (no TLDR)" >&2
-[[ $OVERCAP -gt 0 ]] && echo "[build-index] ${OVERCAP} TLDR over cap ${TLDR_CAP} — riscrivili come ancora (contratto doc §Soglie)" >&2
+
+if (( OVERCAP > 0 )); then
+    echo "[build-index] FAIL: ${OVERCAP} TLDR oltre il cap ${TLDR_CAP} — riscrivili come ancora (contratto doc §Soglie)" >&2
+    exit 2
+fi
 exit 0

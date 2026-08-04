@@ -53,8 +53,11 @@ Misure pre-calcolate (fidati di queste, non ricontare):
 <righe TSV di doc-metrics.sh per i file di questo perimetro>
 
 Non aprire i sorgenti del progetto. Cerca: residui storici, TLDR-riassunto,
-file sopra soglia (col taglio proposto), motivazioni finite online, costo online
-ingiustificato, coordinate opache, formato. Ritorna solo il registro.
+file sopra soglia (col taglio proposto), layer sbagliato, motivazioni finite online,
+costo online ingiustificato, coordinate opache, formato. Ritorna solo il registro.
+
+Bloccanti: TLDR oltre il cap e TLDR-riassunto sono SEVERITY: alta per definizione,
+mai media o bassa — non sono giudizi di gusto. Marcali `BLOCKING: si`.
 ```
 
 ### 3. Consolida il registro
@@ -73,6 +76,8 @@ In chat va la **sintesi** — una riga per finding (`ID · severità · file · 
 Come in `align-doc`: i verdetti si raccolgono **una volta sola sul registro completo**. `AskUserQuestion` (prima il ping TTS) con: conferma tutti · conferma tranne alcuni ID · solo severità alta · nessuno.
 
 Annota il verdetto finale su ogni voce del registro.
+
+**Le voci `BLOCKING: si` non si declassano.** Un TLDR oltre il cap o che riassume invece di agganciare è un numero e una forma, non una preferenza: entra sempre nel gruppo applicato, anche sotto l'opzione «solo severità alta». L'utente resta libero di scegliere «nessuno» e non applicare niente — ma allora il report finale (§7) dichiara la doc **non conforme**, con l'elenco delle voci residue. Il gate decide *quando* si bonifica, mai *se* la violazione esiste.
 
 ### 5. Applica
 
@@ -118,10 +123,11 @@ Aggiorna quelli che trovi: altri file doc, `CLAUDE.md` (se il file era `ONLINE`,
   ```bash
   "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
   ```
+  **Exit 2 è il verdetto dello script**, non un comando fallito: l'indice è scritto, ma i TLDR elencati su stderr restano oltre il cap. È la stessa misura del §1 letta a valle — se esce 2 dopo una bonifica che doveva chiudere quelle voci, la bonifica non ha fatto il suo lavoro e va detto nel report. Exit 1 = indice non scritto, quello è un errore da risolvere.
 - **Rimisura**: rilancia `doc-metrics.sh --online` e dichiara il delta prima/dopo. È l'unica verifica che la bonifica abbia prodotto l'effetto che si proponeva.
 - **Non stampare i diff** in chat. Solo la lista file dal contratto `APPLIED:`.
 - **Stage, mai commit**: `git add -- <file>...`.
-- Report finale: violazioni per verdetto, file toccati, footprint prima → dopo, voci non applicate.
+- Report finale: violazioni per verdetto, file toccati, footprint prima → dopo, voci non applicate. Se restano voci `BLOCKING: si` non applicate, la riga di chiusura è **`doc NON conforme: <n> violazioni bloccanti`** con i file elencati — non un riepilogo neutro.
 
 ## Convenzione TTS
 
@@ -132,6 +138,6 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <top
 
 ## Note
 
-- **Bonifica ≠ prevenzione.** Questa skill è una campagna retroattiva. Le regole che valgono anche al momento della scrittura stanno già altrove: il cap TLDR dentro `build-index.sh` (warning a ogni rigenerazione), l'as-is dentro il contratto che `doc-writer` legge a ogni invocazione. Se una violazione si ripresenta a ogni esecuzione, il fix non è rilanciare `lint-doc` — è spostare quella regola in un punto di enforcement.
+- **Bonifica ≠ prevenzione.** Questa skill è una campagna retroattiva. Le regole che valgono anche al momento della scrittura stanno già altrove: il cap TLDR dentro `build-index.sh` (exit 2 a ogni rigenerazione), l'as-is dentro il contratto che `doc-writer` legge a ogni invocazione. Se una violazione si ripresenta a ogni esecuzione, il fix non è rilanciare `lint-doc` — è spostare quella regola in un punto di enforcement.
 - **La soglia non si negozia a runtime.** Se un file ci passa per pochi caratteri, resta sopra soglia: il numero sta nel contratto, e uno scostamento discusso caso per caso rende le due esecuzioni successive incoerenti.
 - **`GEN` non si splitta a mano.** `INDEX.md` è un artefatto: se è troppo grande, la causa sono i TLDR dei file indicizzati, e il fix sta là.
