@@ -81,7 +81,11 @@ Annota il verdetto finale su ogni voce del registro.
 
 ### 5. Applica
 
-Raggruppa per **file doc target**, un `doc-writer` per gruppo, sequenziali (scrivono davvero; due writer sullo stesso file si sovrascrivono).
+Raggruppa per **file doc target**, un `doc-writer` per gruppo. Gruppi che **non condividono nessun file target** vanno in **parallelo**, nello stesso messaggio: il vincolo è «mai due writer sullo stesso file», non «mai due writer». Sequenziali solo dove i gruppi si sovrappongono — e se si sovrappongono, di norma erano un gruppo solo.
+
+Con più writer in volo il gate two-phase dello split (§6) va **risolto prima**: nessuno può fermarsi a chiedere conferma dell'outline mentre gli altri scrivono, o N domande si aprono sullo stesso schermo. L'outline la approva il gate dei verdetti (§4); passala già validata nel prompt e dichiaralo, così il writer va dritto alla scrittura.
+
+Dai a ogni writer il perimetro dei file che può toccare e l'istruzione di **segnalare invece di editare** ciò che sta fuori: uno split rompe puntatori anche in file assegnati a un altro gruppo, e due writer che si contendono lo stesso puntatore lo riscrivono a vicenda. Lo sweep lo fa il chiamante, a valle (§6).
 
 Le violazioni non-split (residui storici, TLDR da riscrivere, motivazioni da spostare offline, formato) passano come una normale nozione → patch.
 
@@ -101,15 +105,18 @@ Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'ind
 Sostituisci la sezione toccata, non stratificare. Ritorna APPLIED: + INDEX_REBUILD_NEEDED.
 ```
 
-### 6. Split — l'unico fix che non è "nozione → patch"
+### 6. Split e merge — i fix che non sono "nozione → patch"
 
-Uno `split` riscrive la topologia della doc, non una sezione. Tre vincoli:
+Split e merge riscrivono la topologia della doc, non una sezione. Quattro vincoli:
 
+- **Riduzioni prima del taglio.** Eco, cronaca e inventari si tolgono *prima* di decidere dove tagliare: sono spesso migliaia di char, e un frammento dimensionato su peso che sta per sparire nasce a ridosso della soglia — cioè già candidato al prossimo split.
 - **Taglio per perimetro, mai per byte.** Frammenti da 7.500 char ottenuti tagliando a metà sono peggio dell'originale: nessuno dei due è cercabile.
 - **Ogni frammento nasce col proprio TLDR-ancora.** Un file splittato in N perde l'unica ancora che aveva: senza un TLDR per frammento lo split *peggiora* la reperibilità invece di migliorarla.
-- **Outline validata prima della scrittura.** Il `doc-writer` ha già il gate two-phase (§3.5 del suo contratto): passa lo split con `NEW file con ≥3 H2` e lascia che chieda conferma dell'outline via `AskUserQuestion` prima di scrivere i corpi.
+- **Outline validata prima della scrittura.** Il `doc-writer` ha il gate two-phase (§3.5 del suo contratto): con **un solo** writer in volo, passa lo split con `NEW file con ≥3 H2` e lascia che chieda conferma via `AskUserQuestion`. Con più writer in parallelo l'outline va approvata al gate dei verdetti (§4) e passata già validata — vedi §5.
 
-Dopo uno split, **i riferimenti al file vecchio restano appesi**. Prima di chiudere:
+**Il merge è l'operazione inversa, e va usata.** Un file sotto il pavimento del contratto non si fonde d'ufficio: si riesamina il suo perimetro di ricerca. Se è distinto, sopravvive e lo si dichiara nel registro; se è un residuo, confluisce nel vicino di perimetro e l'INDEX perde una voce. Senza questo ramo lo split è a senso unico: la doc si frammenta a ogni passata e nessuno nota il file che si è svuotato.
+
+Dopo uno split o un merge, **i riferimenti al file vecchio restano appesi**. Prima di chiudere:
 
 ```bash
 grep -rn "<vecchio-path>" --include='*.md' <PROJECT_ROOT> | grep -v "<task folder>"

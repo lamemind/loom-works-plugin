@@ -3,7 +3,8 @@
 # =============================================================================
 # doc-metrics.sh — misure deterministiche sulla doc di progetto
 # Usage: doc-metrics.sh [--docs-root <name>] [--dir <path>] [--online]
-#                      [--split-threshold N] [--tldr-cap N] [--format text|tsv]
+#                      [--split-threshold N] [--merge-threshold N] [--tldr-cap N]
+#                      [--format text|tsv]
 # =============================================================================
 #
 # Conta i CHAR (non i byte) di ogni file .md della doc, estrae il TLDR di riga 3
@@ -18,6 +19,8 @@
 #
 # Flag per file:
 #   SPLIT   char >= soglia split
+#   MERGE?  char <= pavimento merge — trigger di RIESAME, non un ordine di fusione:
+#           il file sopravvive se il suo perimetro di ricerca e' distinto
 #   TLDR>N  TLDR oltre il cap
 #   NOTLDR  file sotto reference/ senza TLDR su riga 3 (resta fuori dall'INDEX)
 #   ONLINE  file @-importato da CLAUDE.md (si paga a ogni sessione)
@@ -32,6 +35,7 @@
 set -uo pipefail
 
 SPLIT_THRESHOLD=15000
+MERGE_THRESHOLD=3000
 TLDR_CAP=600
 DIR=""
 ONLINE=0
@@ -43,6 +47,7 @@ while [[ $# -gt 0 ]]; do
         --dir)              DIR="$2"; shift 2 ;;
         --online)           ONLINE=1; shift ;;
         --split-threshold)  SPLIT_THRESHOLD="$2"; shift 2 ;;
+        --merge-threshold)  MERGE_THRESHOLD="$2"; shift 2 ;;
         --tldr-cap)         TLDR_CAP="$2"; shift 2 ;;
         --format)           FORMAT="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
@@ -87,7 +92,7 @@ tldr_of() {  # <file> — convenzione strict: riga 3, stessa di build-index.sh
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
-n_files=0; n_split=0; n_overcap=0; n_notldr=0; total_char=0
+n_files=0; n_split=0; n_merge=0; n_overcap=0; n_notldr=0; total_char=0
 
 while IFS= read -r -d '' file; do
     rel="${file#"$PROJECT_ROOT"/}"
@@ -104,6 +109,8 @@ while IFS= read -r -d '' file; do
         flags="GEN"
     elif (( chars >= SPLIT_THRESHOLD )); then
         flags="SPLIT"; n_split=$((n_split+1))
+    elif (( chars <= MERGE_THRESHOLD )); then
+        flags="MERGE?"; n_merge=$((n_merge+1))
     fi
     if [[ -n "$tldr" ]]; then
         if (( tldr_len > TLDR_CAP )); then
@@ -124,7 +131,7 @@ if [[ "$FORMAT" == "tsv" ]]; then
     printf 'PATH\tCHAR\tTLDR\tFLAGS\n'
     sort -t$'\t' -k2,2nr "$TMP"
 else
-    echo "[doc-metrics] root: ${DIR#"$PROJECT_ROOT"/}  ·  soglia split ${SPLIT_THRESHOLD}  ·  cap TLDR ${TLDR_CAP}"
+    echo "[doc-metrics] root: ${DIR#"$PROJECT_ROOT"/}  ·  split ${SPLIT_THRESHOLD}  ·  merge ${MERGE_THRESHOLD}  ·  cap TLDR ${TLDR_CAP}"
     echo
     printf '%-56s %8s %6s  %s\n' "PATH" "CHAR" "TLDR" "FLAGS"
     sort -t$'\t' -k2,2nr "$TMP" | while IFS=$'\t' read -r p c t f; do
@@ -134,6 +141,7 @@ else
     echo "TOTALI"
     echo "- file: ${n_files}  ·  char: ${total_char}"
     echo "- sopra soglia split (${SPLIT_THRESHOLD}): ${n_split}"
+    echo "- sotto pavimento merge (${MERGE_THRESHOLD}), da riesaminare: ${n_merge}"
     echo "- TLDR sopra cap (${TLDR_CAP}): ${n_overcap}"
     echo "- reference/ senza TLDR (fuori dall'INDEX): ${n_notldr}"
 fi

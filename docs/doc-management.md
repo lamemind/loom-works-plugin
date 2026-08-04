@@ -69,7 +69,8 @@ come si accorge che è falsa?   → invariante: asseriscila in un test
 
 Numeri, non giudizi a runtime: due verifiche sullo stesso file devono dare lo stesso esito.
 
-- **Split**: file ≥ **15.000 char** → va splittato. Il taglio è **per perimetro** (lo decide la reperibilità: due trigger di ricerca distinti = due file), mai per byte; ogni frammento nasce col proprio TLDR-ancora.
+- **Split**: file ≥ **15.000 char** → va splittato. Il taglio è **per perimetro** (lo decide la reperibilità: due trigger di ricerca distinti = due file), mai per byte; ogni frammento nasce col proprio TLDR-ancora. **Le riduzioni precedono il taglio**: eco e cronaca si tolgono prima, o i frammenti nascono dimensionati su peso che stava per sparire — e quello grosso nasce già a ridosso della soglia.
+- **Merge**: file ≤ **3.000 char** → va **riesaminato**, non fuso d'ufficio. Ogni file costa un TLDR nell'INDEX, che è online: sotto quella soglia l'indicizzazione si mangia un quinto del contenuto. Sopravvive se il suo perimetro di ricerca è genuinamente distinto; altrimenti confluisce nel vicino di perimetro. Il pavimento esiste perché senza lo split è a senso unico, e un file che si svuota non ha nessuno che se ne accorga.
 - **TLDR**: cap **600 char**, violazione **bloccante** — `build-index.sh` esce non-zero oltre soglia. Il TLDR finisce nell'INDEX, che è online: un TLDR prolisso si paga come se il file intero fosse online.
 
 ## Formato file offline
@@ -94,7 +95,7 @@ Contenuto dettagliato...
 Due skill gemelle, distinte dalla fonte di verità contro cui misurano:
 
 - `align-doc` — misura contro la **fonte nativa del layer** (il sorgente, oppure la query viva) → i **drift**. Un drift è peggio di una lacuna: chi si fida agisce su una realtà inesistente e nessun segnale glielo dice.
-- `lint-doc` — misura contro **questo contratto** → le violazioni (soglie, TLDR-riassunto, layer sbagliato, cronaca persistita). Non apre mai i sorgenti.
+- `lint-doc` — misura contro **questo contratto** → le violazioni (soglie in **entrambe** le direzioni, TLDR-riassunto, layer sbagliato, cronaca persistita). Non apre mai i sorgenti.
 
 Entrambe girano su `doc-auditor` read-only, N perimetri in parallelo; applica `doc-writer`. Le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime.
 

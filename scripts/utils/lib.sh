@@ -68,8 +68,31 @@ lw_is_repo() {
 }
 
 # ---- Docs root ---------------------------------------------------------------
+#
+# Precedenza: file config del progetto → LOOM_DOCS_ROOT → "docs".
+#
+# Il FILE vince sull'env di proposito. `LOOM_DOCS_ROOT` arriva quasi sempre dal
+# flag --docs-root che le skill interpolano da `user_config.doc_folder_name`, cioè
+# da una preferenza utente GLOBALE, uguale per tutti i progetti. Il campo `docsRoot`
+# in .claude/loom-works.json è invece PER-PROGETTO e committato: su un progetto che
+# tiene la doc in runtime/ è l'unica fonte che lo sa. Il più specifico batte il più
+# generico — stesso principio del layer Config in project-config-architecture.md.
+#
+# Senza questa precedenza uno script gira sulla cartella sbagliata in silenzio: non
+# fallisce, misura zero file, e chi legge l'output crede che la doc sia a posto.
 
 lw_docs_root() {
+    local cfg root
+    root="$(lw_find_project_root)"
+    cfg="${root}/.claude/loom-works.json"
+    if [[ -f "$cfg" ]] && command -v jq >/dev/null 2>&1; then
+        local from_file
+        from_file="$(jq -r '.docsRoot // empty' "$cfg" 2>/dev/null)"
+        if [[ -n "$from_file" ]]; then
+            echo "$from_file"
+            return 0
+        fi
+    fi
     echo "${LOOM_DOCS_ROOT:-docs}"
 }
 
