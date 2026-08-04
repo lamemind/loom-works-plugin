@@ -45,14 +45,70 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
 
    **IMPORTANTE**: Ignora la sezione `## Prod Validation` — item non checkati in quella sezione NON bloccano il completamento della task.
 
-3. **Doc Impact gate (morbido)**
+3. **Aggiornamento task documentation**
+   1. Aggiorna checklist con [x] items completati
+   2. Aggiorna Progress % se cambiato
+   3. Aggiungi sezione "## Progress Log" se non esiste
+   4. Aggiungi entry nel Progress Log:
+      ```markdown
+      ### Avanzamento ${id_incrementale}
+      - Start Commit: ${TRACKED_SHA}
+      - Descrizione: ${sintesi_delle_modifiche}
+      ```
 
-   Leggi la sezione `## Doc Impact` del task file. Se **vuota** o assente → skip step.
+4. **Task completata?**
+   Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
+   1. Imposta Progress a `✔️ Done` (nel file task)
+   2. **Linked**: Elimina symlink: `rm ${user_config.doc_folder_name}/current-task.md`
+   3. **Detached**: nessun symlink da rimuovere
+   4. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
+      - Risolvi task parent: `${user_config.doc_folder_name}/tasks/T{N}-*.md`
+      - Flagga la riga `- [ ] D{taskId} chiusa` → `- [x] D{taskId} chiusa` nella sezione `## Acceptance Criteria` del parent
+      - Se la riga non esiste, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
+
+5. **Aggiorna ${user_config.doc_folder_name}/tasks.md**
+   1. Leggi `${user_config.doc_folder_name}/tasks.md`
+   2. Nella sezione Tasks Overview (formato: `| ID | Pri | K | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
+   3. Aggiorna la colonna Prog (solo emoji):
+      - Se task completata (step 4): `✔️`
+      - Altrimenti: `🟡` (emoji sola, niente percentuali)
+   4. Se la task appare nel grafo Execution Plan (dentro il blocco ``` dopo "Legend:"):
+      - Se completata: metti ✔️ davanti al task ID (es. `T199` → `✔️T199`, `🟡T199` → `✔️T199`)
+      - Se in progress: metti 🟡 davanti al task ID (se non già presente)
+   5. Usa Edit tool per applicare le modifiche
+
+   Nota: le eventuali divergenze tra branch vengono riconciliate da `reconcile-tasks` in `merge-lane`.
+
+6. **Commit e push — fase codice**
+
+   Il codice si committa **e si pusha prima** della fase doc. Il push è il punto in cui il lavoro diventa visibile alle **altre sessioni** — altre task nello stesso worktree o in worktree paralleli, che da qui possono ripartire mentre questa sessione finisce la doc. La doc si allinea dopo, con commit e push propri (step 8).
+
+   Lo script partiziona comunque i file staged in due commit:
+   - **Commit 1** `checkpoint(${taskId}): ${descrizione}` → codice + task tracking (task file, `tasks.md`).
+   - **Commit 2** `docs(${taskId}): …` → file doc-nozione (sotto `${user_config.doc_folder_name}/` **tranne** `tasks.md` e `tasks/`). In questa fase ne esistono solo se la doc era già stata toccata **prima** del checkpoint: passa `--doc-message` che li descrive, oppure ometti il flag se l'analisi (step 1) non ne ha mostrati.
+
+   **Linked**:
+   ```bash
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" "checkpoint(${taskId}): ${descrizione}"
+   ```
+   Lo script: `git add -A` → split staged → commit(s) → push + aggiorna Last tracked commit (HEAD finale) + mostra link compare.
+
+   **Detached**:
+   1. Stage selettivo: `git add <file1> <file2> ...` solo per i file **codice** della task corrente (identificati al punto 1).
+   2. Esegui:
+      ```bash
+      ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" --task ${taskId} --no-add "checkpoint(${taskId}): ${descrizione}"
+      ```
+   `--task` risolve il task file via Glob (no symlink), `--no-add` salta `git add -A` (lo staging l'hai fatto tu). Lo split doc/codice opera sul set che hai messo in stage.
+
+7. **Doc Impact gate (morbido)**
+
+   Leggi la sezione `## Doc Impact` del task file. Se **vuota** o assente → skip step (e salta anche lo step 8).
 
    Se contiene voci non ancora consolidate (vedi marker sotto), per **ogni voce** chiedi all'utente via `AskUserQuestion`:
 
    - `[1] capture-doc inline (apply-first)` → invoca skill `capture-doc` con la voce come hint, contesto = conversazione corrente. **capture-doc applica** la patch al working tree, mostra i file toccati (marker NEW/MOD) e chiede lei stessa `ok/edit/skip`:
-     - su **ok** stagia i file approvati (`git add`) → restano staged per il **commit doc separato** del checkpoint (step 7, commit 2). Solo qui appendi il marker `→ ✔️ capture` alla voce.
+     - su **ok** stagia i file approvati (`git add`) → restano staged per il commit doc dello step 8. Solo qui appendi il marker `→ ✔️ capture` alla voce.
      - su **skip/edit** capture-doc restora il working tree (nessun residuo). Se l'utente scarta, la voce resta **non consolidata**: **niente marker**, reentry al prossimo checkpoint.
 
      Non ri-chiedere `ok/edit/skip` qui: quel gate è dentro capture-doc. Leggi il suo esito (accettata/scartata) per decidere il marker.
@@ -68,63 +124,20 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
 
    **Detached**: il gate si applica uguale. Nessuna differenza di flusso.
 
-4. **Aggiornamento task documentation**
-   1. Aggiorna checklist con [x] items completati
-   2. Aggiorna Progress % se cambiato
-   3. Aggiungi sezione "## Progress Log" se non esiste
-   4. Aggiungi entry nel Progress Log:
-      ```markdown
-      ### Avanzamento ${id_incrementale}
-      - Start Commit: ${TRACKED_SHA}
-      - Descrizione: ${sintesi_delle_modifiche}
-      ```
+8. **Commit e push — fase doc**
 
-5. **Task completata?**
-   Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
-   1. Imposta Progress a `✔️ Done` (nel file task)
-   2. **Linked**: Elimina symlink: `rm ${user_config.doc_folder_name}/current-task.md`
-   3. **Detached**: nessun symlink da rimuovere
-   4. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
-      - Risolvi task parent: `${user_config.doc_folder_name}/tasks/T{N}-*.md`
-      - Flagga la riga `- [ ] D{taskId} chiusa` → `- [x] D{taskId} chiusa` nella sezione `## Acceptance Criteria` del parent
-      - Se la riga non esiste, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
+   Solo se il gate ha consolidato almeno una voce. Se erano tutte skippate, o la sezione era vuota, salta: il push della fase codice ha già chiuso il checkpoint.
 
-6. **Aggiorna ${user_config.doc_folder_name}/tasks.md**
-   1. Leggi `${user_config.doc_folder_name}/tasks.md`
-   2. Nella sezione Tasks Overview (formato: `| ID | Pri | K | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
-   3. Aggiorna la colonna Prog (solo emoji):
-      - Se task completata (step 4): `✔️`
-      - Altrimenti: `🟡` (emoji sola, niente percentuali)
-   4. Se la task appare nel grafo Execution Plan (dentro il blocco ``` dopo "Legend:"):
-      - Se completata: metti ✔️ davanti al task ID (es. `T199` → `✔️T199`, `🟡T199` → `✔️T199`)
-      - Se in progress: metti 🟡 davanti al task ID (se non già presente)
-   5. Usa Edit tool per applicare le modifiche
-
-   Nota: le eventuali divergenze tra branch vengono riconciliate da `reconcile-tasks` in `merge-lane`.
-
-7. **Commit e push** — **doppio commit**
-
-   Lo script partiziona i file in due commit:
-   - **Commit 1** `checkpoint(${taskId}): ${descrizione}` → codice + task tracking (task file, `tasks.md`).
-   - **Commit 2** `docs(${taskId}): ${sintesi_doc}` → file doc-nozione (tutto sotto `${user_config.doc_folder_name}/` **tranne** `tasks.md` e `tasks/`, es. `reference/*.md` toccati da capture-doc inline allo step 3).
-
-   Se non c'è nessun file doc-nozione, viene fatto solo il commit 1 (comportamento a commit singolo).
-
-   **Linked**:
+   Invocazione **identica in linked e detached**:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): ${descrizione}"
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): marker Doc Impact"
    ```
-   Lo script: `git add -A` → split staged → commit 1 + commit 2 → push (unico) + aggiorna Last tracked commit (HEAD finale) + mostra link compare.
 
-   **Detached**:
-   1. Stage selettivo: `git add <file1> <file2> ...` solo per i file **codice** della task corrente (identificati al punto 1). I file doc approvati al gate (step 3, opzione [1]) sono **già staged** da capture-doc → non serve ri-aggiungerli (e un file scartato è già stato restorato, quindi non va in stage).
-   2. Esegui:
-      ```bash
-      ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): ${descrizione}"
-      ```
-   `--task` risolve il task file via Glob (no symlink), `--no-add` salta `git add -A` (lo staging l'hai fatto tu). Lo split doc/codice opera sul set che hai messo in stage.
+   Due flag obbligatori, per due motivi distinti:
+   - **`--no-add`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo. I file doc sono già staged da capture-doc (stage = approvazione); il task file coi marker lo aggiunge lo script da sé.
+   - **`--task`** — anche in linked, dove di norma basterebbe il symlink: se la task si è chiusa allo step 4 il symlink è già stato rimosso, e senza `--task` lo script non risolverebbe il task file su cui hai appena appeso i marker.
 
-8. **Feedback finale**
+9. **Feedback finale**
    L'output dello script contiene tutte le info necessarie.
    Aggiungi eventuali note per l'utente.
    Esegui il ping TTS:
@@ -144,9 +157,10 @@ Topic = argomento concreto della domanda. NO generici.
 ## Note
 
 - **Due script**: analyze per raccogliere info (solo linked), commit per eseguire
-- **Doppio commit**: lo script commit separa codice+tracking (`checkpoint(...)`) da doc-nozione (`docs(...)`). Partizione path-based: doc-nozione = sotto `docs-root/` ma fuori da `tasks.md` e `tasks/`. Push unico finale. Zero file doc → commit singolo.
+- **Due fasi di commit**: la fase codice (step 6) chiude e **pusha** il lavoro prima che la doc cominci; la fase doc (step 8) ne fa una seconda con `--no-add`. Dentro ogni fase lo script separa comunque codice+tracking (`checkpoint(...)`) da doc-nozione (`docs(...)`) — partizione path-based: doc-nozione = sotto `docs-root/` ma fuori da `tasks.md` e `tasks/`. Zero file doc in stage → commit singolo.
+- **Perché il gate doc sta dopo il commit**: prima veniva eseguito prima, e il `git add -A` finale cadeva su una working copy in cui `doc-writer` stava ancora scrivendo — checkpoint lungo quanto la fase doc, working copy inutilizzabile nel frattempo, lavoro di codice non ancora al sicuro. Committare e pushare per primo il codice è il commit di transazione che sblocca le altre sessioni; la doc arriva dopo, e un fallimento lì non porta con sé il codice.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
 - **Link compare**: Generato automaticamente dallo script commit (spanna entrambi i commit: TRACKED_SHA…HEAD)
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
-- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} chiusa` (step 5.4) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
-- **Apply-first (opzione [1])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree, la review è sul diff reale (pannello git). Stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). I file approvati arrivano al commit **già staged**; lo split path-based del commit script li isola comunque nel commit 2 `docs(...)`.
+- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} chiusa` (step 4.4) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
+- **Apply-first (opzione [1])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree, la review è sul diff reale (pannello git). Stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). I file approvati arrivano allo step 8 **già staged**, ed è ciò che rende possibile il `--no-add`: lo stage è l'unica lista di cosa committare.
