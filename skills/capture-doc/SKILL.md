@@ -22,13 +22,13 @@ Input utente:
 $ARGUMENTS
 ~~~
 
-**YOLO**: se `$ARGUMENTS` contiene il token `yolo` (case-insensitive), salta la review e tiene la patch applicata. Strippa il token prima di passare il resto al subagent.
+**YOLO**: se `$ARGUMENTS` contiene il token `yolo` (case-insensitive), salta la review e **auto-accetta**: la patch resta applicata e viene stagiata senza chiedere niente. Strippa il token prima di passare il resto al subagent.
 
 ## Scope
 
 Questa skill è **path 3** (estemporaneo) del triple-capture di loom-works:
 1. Task-bound capture: `create-task`, `run-task` → `## Doc Impact` nel task file
-2. Task-bound processing: `checkpoint-task` Doc Impact gate → invoca **questa skill** inline (opzione [1]) oppure `doc-task` (opzione [2])
+2. Task-bound processing: `checkpoint-task` Doc Impact gate → invoca **questa skill**, in yolo (opzione [1]) o con review (opzione [2])
 3. **Estemporaneo (questa skill)**: fuori dal ciclo task, review immediata
 
 Nessun worktree, nessun commit automatico. La patch accettata resta **staged** (non committed); quella rifiutata è restorata via git.
@@ -80,7 +80,7 @@ Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e
 Applica le patch direttamente (Write/Edit), incluso l'eventuale patch a CLAUDE.md; non committare, non rigenerare l'indice. Leggi ${DOCS_ROOT}/reference/INDEX.md, scegli target (EXTEND file esistente o NEW). Ritorna il contratto APPLIED: (marker NEW/MOD per ogni file) + INDEX_REBUILD_NEEDED.
 ```
 
-**YOLO**: stesso invito, ma **salta gli step 4** (niente review): la patch resta applicata. Vai dritto a step 5.
+**YOLO**: stesso invito, ma **salta lo step 4** (niente review) eseguendone da te il ramo **ok**: `git add -- <file>...` su tutti i file del contratto `APPLIED:`, poi step 5. Lo stage non è un dettaglio saltabile — chi invoca in yolo (il gate di `checkpoint-task`) committa con `--no-add`, quindi un file applicato ma non staged non entra in nessun commit e la cattura si perde in silenzio.
 
 ### 4. Review dal diff → ok / edit / skip
 

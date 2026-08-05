@@ -102,12 +102,13 @@ Vincoli:
 
 Ogni `checkpoint-task` su code task (K=⚙️) legge `## Doc Impact` del task file. Per ogni voce non marcata `→ ✔️`, l'utente sceglie:
 
-- `[1] capture inline` — invoca `capture-doc`; il file doc modificato entra nel commit doc, separato e successivo a quello del codice. Voce marcata `→ ✔️ capture`.
-- `[2] skip` — lascia la voce non consolidata. Reentry al prossimo checkpoint. Nessun enforcement.
+- `[1] capture yolo` — invoca `capture-doc` col token `yolo`: applica, stagia e marca `→ ✔️ capture` senza review.
+- `[2] capture inline` — idem, ma con review dal diff dentro `capture-doc`; il marker solo se accettata.
+- `[3] skip` — lascia la voce non consolidata. Reentry al prossimo checkpoint. Nessun enforcement.
 
 **Il gate gira dopo il commit e il push del codice**, mai prima: il push è ciò che rende il lavoro visibile alle altre sessioni, che ripartono mentre questa finisce la doc. Committare per primo il codice toglie anche il `git add -A` dalla finestra in cui `doc-writer` sta scrivendo — la working copy resta usabile e un fallimento della fase doc non porta con sé il codice.
 
-**Gate morbido**: scelta utente su _quando_ documentare, subito o dopo. Il gate non crea task: una voce skippata resta senza marker, e il marker mancante **è** il segnale di «non consolidata» — lo stesso indice d'ingresso che `align-doc` usa sul perimetro task per raccoglierle in blocco e timbrarle `→ ✔️ align`. Il rinvio non ha quindi bisogno di un ref proprio: differire costa zero e non si perde niente.
+**Gate morbido**: scelta utente su _quando_ documentare, subito o dopo. Il gate non crea task: una voce skippata resta senza marker, e il marker mancante **è** il segnale di «non consolidata» — lo stesso indice d'ingresso che `align-doc` usa sul perimetro task per raccoglierle in blocco e timbrarle `→ ✔️ align`. Il rinvio non ha quindi bisogno di un ref proprio.
 
 Doc task (K=📝) **non** triggerano il gate (la doc è l'obiettivo, non un side-effect).
 

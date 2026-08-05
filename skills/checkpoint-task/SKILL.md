@@ -121,16 +121,17 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Se contiene voci non ancora consolidate (vedi marker sotto), per **ogni voce** chiedi all'utente via `AskUserQuestion`:
 
-   - `[1] capture-doc inline (apply-first)` → invoca skill `capture-doc` con la voce come hint, contesto = conversazione corrente. **capture-doc applica** la patch al working tree, mostra i file toccati (marker NEW/MOD) e chiede lei stessa `ok/edit/skip`:
+   - `[1] capture-doc yolo` → invoca skill `capture-doc` col token `yolo` in `$ARGUMENTS`, la voce come hint, contesto = conversazione corrente. capture-doc applica la patch al working tree e **auto-accetta**: stagia da sé, senza aprire il proprio gate `ok/edit/skip`. Nessuna review neanche qui — appendi il marker `→ ✔️ capture` e prosegui col flusso.
+   - `[2] capture-doc inline` → stessa invocazione **senza** il token `yolo`. **capture-doc applica** la patch al working tree, mostra i file toccati (marker NEW/MOD) e chiede lei stessa `ok/edit/skip`:
      - su **ok** stagia i file approvati (`git add`) → restano staged per il commit doc dello step 8. Solo qui appendi il marker `→ ✔️ capture` alla voce.
      - su **skip/edit** capture-doc restora il working tree (nessun residuo). Se l'utente scarta, la voce resta **non consolidata**: **niente marker**, reentry al prossimo checkpoint.
 
      Non ri-chiedere `ok/edit/skip` qui: quel gate è dentro capture-doc. Leggi il suo esito (accettata/scartata) per decidere il marker.
-   - `[2] skip` → lascia la voce non consolidata. Niente enforcement. Reentry al prossimo checkpoint.
+   - `[3] skip` → lascia la voce non consolidata. Niente enforcement. Reentry al prossimo checkpoint.
 
-   **Non offrire un terzo ramo "apri una D-task"**: il gate non crea task. Una voce rinviata resta senza marker, e l'assenza del marker è già il segnale che `align-doc` legge come indice d'ingresso sul perimetro task — il rinvio è quindi tracciato senza che serva un ref proprio.
+   **Non offrire un quarto ramo "apri una D-task"**: il gate non crea task. Una voce rinviata resta senza marker, e l'assenza del marker è già il segnale che `align-doc` legge come indice d'ingresso sul perimetro task — il rinvio è quindi tracciato senza che serva un ref proprio.
 
-   **Marker di consolidamento**: a fine handling, in coda alla voce processata appendi `→ ✔️ capture`, e solo se capture-doc ha **accettato**. Voci con marker `→ ✔️` sono saltate ai checkpoint successivi. Voce scartata dentro capture-doc = nessun marker.
+   **Marker di consolidamento**: a fine handling, in coda alla voce processata appendi `→ ✔️ capture`. Sempre su `[1] yolo` (non c'è esito di rifiuto); su `[2] inline` solo se capture-doc ha **accettato**. Voci con marker `→ ✔️` sono saltate ai checkpoint successivi. Voce scartata dentro capture-doc = nessun marker.
 
    **Multi-voce, ordine e restore**: processa le voci **in sequenza**, non in parallelo. Lo stage-su-ok di capture-doc è il *punto di ripristino* condiviso: se una voce successiva tocca un file già approvato da una precedente e viene scartata, il `git restore` di capture-doc torna allo stato **staged** (l'approvato), non a HEAD → l'approvazione precedente è protetta. Vale solo se le voci non si sovrappongono in parallelo.
 
@@ -176,5 +177,5 @@ Topic = argomento concreto della domanda. NO generici.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
 - **Link compare**: Generato automaticamente dallo script commit (spanna entrambi i commit: TRACKED_SHA…HEAD)
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
-- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} (<maniglia>) chiusa` (step 4.3) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
-- **Apply-first (opzione [1])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree, la review è sul diff reale (pannello git). Stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). I file approvati arrivano allo step 8 **già staged**, ed è ciò che rende possibile il `--no-add`: lo stage è l'unica lista di cosa committare.
+- **Doc Impact gate morbido**: scelta utente quando consolidare (capture yolo / capture inline / skip), tre rami — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} (<maniglia>) chiusa` (step 4.3) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
+- **Apply-first (opzioni [1] e [2])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree. Su `[2]` la review è sul diff reale (pannello git): stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). Su `[1]` la review non c'è affatto: la patch è staged d'ufficio, e il diff resta comunque ispezionabile *dopo*, prima del commit doc dello step 8. In entrambi i casi i file arrivano allo step 8 **già staged**, ed è ciò che rende possibile il `--no-add`: lo stage è l'unica lista di cosa committare.
