@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: opus
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Bootstrap documentale per un progetto **freshly installed** senza doc o con doc minimale. Pipeline a tre step: static scan → interview → delega a `doc-writer` per produrre la prima generazione di doc.
 
 Input utente:
@@ -83,8 +91,8 @@ Invoca `doc-writer` via `Task` con un prompt strutturato che contenga **tutto il
 ```
 Nozione da documentare:
 - **Nozione**: Bootstrap documentale del progetto. Produrre
-  `${user_config.doc_folder_name}/project/overview.md` (vision/scope + mappa sub-progetti + fulcri)
-  ed eventualmente stub in `${user_config.doc_folder_name}/reference/<area>/<fulcro>.md` per i fulcri principali.
+  `${DOCS_ROOT}/project/overview.md` (vision/scope + mappa sub-progetti + fulcri)
+  ed eventualmente stub in `${DOCS_ROOT}/reference/<area>/<fulcro>.md` per i fulcri principali.
 - **Ancora primaria**: n/a (overview è online, stub offline hanno ancore dedicate)
 
 Contesto:
@@ -100,7 +108,7 @@ Fulcri nominati dall'utente:
 - <nome> — <ruolo (1 riga)>
 - ...
 
-Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 
@@ -112,7 +120,7 @@ Istruzioni:
 2. `overview.md` deve avere: paragrafo cos'è il progetto (dal tuo meglio, basato
    su nome/manifesti/struttura), tabella sub-progetti con scope 1-riga, sezione
    "Fulcri" con bullet per ogni fulcro nominato.
-3. Per ogni fulcro nominato, crea uno stub in `${user_config.doc_folder_name}/reference/<area>/<fulcro>.md`:
+3. Per ogni fulcro nominato, crea uno stub in `${DOCS_ROOT}/reference/<area>/<fulcro>.md`:
    solo header + TLDR ancorato + sezione "Ruolo" (2-3 righe) + sezione
    "Da documentare" bullet list con "TODO" — è uno stub, non una doc completa.
 4. Se crei file online (overview.md), applica anche la patch a CLAUDE.md per aggiungere
@@ -141,10 +149,10 @@ Opzioni (path assoluti, `cwd` = project root):
 
 ### 6. Rebuild INDEX se serve
 
-Solo su `ok` e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${user_config.doc_folder_name}/reference/`):
+Solo su `ok` e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${DOCS_ROOT}/reference/`):
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
 ```
 
 **Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione **bloccante** del contratto, non un comando fallito. Su uno scaffold appena generato i TLDR sono tuoi — riscrivi come ancora quelli segnalati prima del report.

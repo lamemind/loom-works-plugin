@@ -17,7 +17,7 @@ $ARGUMENTS
 Stessa cascata di `run-task` — `arg → $LOOM_TASK → symlink`, risolta dallo script:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
 `${taskId}` = ID nelle Note utente (es. `T310`); ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` · `TASK_SRC`. Exit non-zero = nessun binding: chiedi quale task.

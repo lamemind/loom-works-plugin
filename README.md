@@ -67,7 +67,6 @@ All options are optional. Set in your project's `.claude/settings.json`:
   "pluginConfigs": {
     "loom-works@lamemind": {
       "options": {
-        "doc_folder_name": "docs",
         "on_lane_spawned_hook": ""
       }
     }
@@ -77,8 +76,17 @@ All options are optional. Set in your project's `.claude/settings.json`:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `doc_folder_name` | `docs` | Folder for tasks.md, tasks/, reference/, current-task.md |
 | `on_lane_spawned_hook` | (empty) | Path relative to project root, executed once after `spawn-lane` |
+
+### Docs folder — not a user option
+
+The folder holding `tasks.md`, `tasks/`, `reference/` and `current-task.md` is **per-project**, so it lives in the project file `.claude/loom-works.json` under `docsRoot` (default `docs`), not in `userConfig`. User options are global across every project: a project keeping its docs in `runtime/` cannot be described by one.
+
+```json
+{ "id": "my-project", "docsRoot": "runtime" }
+```
+
+Read it with `scripts/utils/docs-root.sh` (`--abs` for an absolute path); scripts resolve it themselves via `lw_docs_root` in `scripts/utils/lib.sh`.
 
 ## TTS support
 

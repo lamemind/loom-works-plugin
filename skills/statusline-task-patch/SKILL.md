@@ -45,7 +45,7 @@ cat ${CLAUDE_PLUGIN_ROOT}/scripts/statusline/task-widget.block.sh
 Inseriscilo con `Edit` **dopo** la cattura del JSON e **prima** dell'assemblaggio dell'output finale. Adatta SOLO se il target differisce dai default:
 
 - se la var JSON non è `data` → sostituisci `"$data"` nel blocco con la var giusta.
-- folder docs: il blocco prova `runtime/` e `docs/`. Se `${user_config.doc_folder_name}` è diverso da entrambi, aggiungi `"$LW_proj/${user_config.doc_folder_name}/current-task.md"` come primo candidato nel loop.
+- folder docs: il blocco prova `runtime/` e `docs/`. Se la docs-root del progetto è diversa da entrambe — leggila con `"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"` — aggiungi `"$LW_proj/<docs-root>/current-task.md"` come primo candidato nel loop.
 - **non toccare** i marker `# >>> ... >>>` / `# <<< ... <<<`.
 
 ## 4. Wire nell'output

@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, AskUserQuestion, Edit
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Distrugge una lane senza mergiare. **Operazione distruttiva**: perde commit non mergiati e modifiche uncommitted.
 Per lane abbandonate (esperimenti falliti, branch da buttare). Per mergiare invece usa `/loom-works:merge-lane`.
 
@@ -28,7 +36,6 @@ Se lane assente, chiedi quale lane (mostra lista da `list-worktrees --filter lan
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/drop-lane.sh \
-    --docs-root "${user_config.doc_folder_name}" \
     "${lane}"
 ```
 
@@ -48,7 +55,6 @@ Mostra `AskUserQuestion` con il riepilogo di cosa verrà perso (commit non mergi
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/drop-lane.sh \
-    --docs-root "${user_config.doc_folder_name}" \
     "${lane}" --yes
 ```
 
@@ -56,7 +62,7 @@ Lo script: rimuove profilo Ptyxis (best-effort) → `git worktree remove --force
 
 ### 4. Pulizia sezione LANES in tasks.md
 
-Se esiste la sezione `<!-- LANES:START -->...<!-- LANES:END -->` in `${user_config.doc_folder_name}/tasks.md`, rimuovi la riga della lane distrutta con Edit tool.
+Se esiste la sezione `<!-- LANES:START -->...<!-- LANES:END -->` in `${DOCS_ROOT}/tasks.md`, rimuovi la riga della lane distrutta con Edit tool.
 
 Inoltre, nel grafo Execution Plan, rimuovi eventuali marker 🟡 davanti ai task ID che erano in lavorazione su questa lane (tornano allo stato precedente). Se non sei certo dello stato pregresso, lascia il task come 🔵 Todo e segnalalo all'utente.
 

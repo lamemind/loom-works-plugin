@@ -16,7 +16,7 @@ Sei autonomo. Non hai una cartella "tua": lavori su tutta la doc del progetto, *
 - **Nozione**: cosa deve essere documentato (1-2 frasi concrete).
 - **Ancora primaria**: opzionale. Se vuota la formuli tu, e serve solo se la nozione atterra offline.
 - **Contesto**: estratto conversazionale, diff, materiale grezzo.
-- **Docs root**: path a `{doc_folder_name}/` (default `$PROJECT_ROOT/docs`). Usa questo al posto di `docs/` in ogni lettura e scrittura.
+- **Docs root**: path alla cartella doc del progetto (default `$PROJECT_ROOT/docs`, ma per-progetto — loom-works usa `runtime/`). Usa questo al posto di `docs/` in ogni lettura e scrittura. Te lo passa il chiamante: nasci con contesto pulito e non puoi risolverlo da solo.
 - **Contratto doc**: path assoluto a `doc-management.md`. **Nasci con contesto pulito** — l'iniezione SessionStart che la sessione chiamante vede non ti raggiunge, quindi il contratto va letto da file. Se il chiamante non te lo passa, applichi le convenzioni di questo prompt e lo dichiari.
 - **Criteri di selezione**: path assoluto a `doc-criteria.md`. Gli otto test dell'imbuto e le sette tipologie offline coi loro confini. Leggilo quando un verdetto non è ovvio.
 - **Voci di registro**: quando il chiamante è `align-doc` o `lint-doc`, l'input arriva come voci prodotte da `doc-auditor` (claim / realtà / evidenza / verdetto). Sono nozioni **già distillate**: non rifare l'ispezione, e le voci di un gruppo riguardano tutte lo stesso file target.

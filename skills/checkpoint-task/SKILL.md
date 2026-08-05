@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Edit, Read
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Checkpoint di progresso sulla task attiva: analizza diff dall'ultimo tracked commit, aggiorna task/tasks.md, committa e pusha.
 
 ## Note utente
@@ -17,7 +25,7 @@ $ARGUMENTS
 Da `$ARGUMENTS` estrai un eventuale **taskId** (pattern `T\d+` o `D\d+`), poi risolvi:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
 Il `TASK_SRC` che lo script stampa **determina la modalità** — non la presenza dell'argomento:
@@ -30,13 +38,13 @@ Detached = analisi diff saltata (i deliverables li deriva l'agente dal contesto 
 
 Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argomento grezzo.
 
-`Read` di `TASK_FILE`, poi leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `${user_config.doc_folder_name}/tasks/`.
+`Read` di `TASK_FILE`, poi leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `${DOCS_ROOT}/tasks/`.
 
 ## Flusso checkpoint
 
 1. **Analisi modifiche**
 
-   **Linked**: esegui `${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-analyze.sh --docs-root "${user_config.doc_folder_name}"` — **senza** `--task`: lo script risolve dal symlink da sé, e passargli un id lo farebbe cadere nel ramo detached (un id esplicito *è* un binding di sessione). Legge metadata, mostra commit/file modificati.
+   **Linked**: esegui `${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-analyze.sh` — **senza** `--task`: lo script risolve dal symlink da sé, e passargli un id lo farebbe cadere nel ramo detached (un id esplicito *è* un binding di sessione). Legge metadata, mostra commit/file modificati.
 
    **Detached**: SKIP. Nessuno script di analisi. L'agente ricava dal contesto:
    - quali deliverables della task corrente sono completati
@@ -66,14 +74,14 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 4. **Task completata?**
    Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
    1. Imposta Progress a `✔️ Done` (nel file task)
-   2. Se il symlink `${user_config.doc_folder_name}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
+   2. Se il symlink `${DOCS_ROOT}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
    3. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
-      - Risolvi task parent: `${user_config.doc_folder_name}/tasks/T{N}-*.md`
+      - Risolvi task parent: `${DOCS_ROOT}/tasks/T{N}-*.md`
       - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera** — `doc-task` la scrive con la maniglia (`- [ ] D07 (unificare docs-root) chiusa`), quindi cercare `- [ ] D{taskId} chiusa` alla lettera non trova mai nulla e il flag-back muore nel ramo warning qui sotto. Riscrivi solo il box, lasciando maniglia e testo intatti.
       - Se nessuna riga porta l'id, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
 
-5. **Aggiorna ${user_config.doc_folder_name}/tasks.md**
-   1. Leggi `${user_config.doc_folder_name}/tasks.md`
+5. **Aggiorna ${DOCS_ROOT}/tasks.md**
+   1. Leggi `${DOCS_ROOT}/tasks.md`
    2. Nella sezione Tasks Overview (formato: `| ID | Pri | K | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
    3. Aggiorna la colonna Prog (solo emoji):
       - Se task completata (step 4): `✔️`
@@ -91,11 +99,11 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Lo script partiziona comunque i file staged in due commit:
    - **Commit 1** `checkpoint(${taskId}): ${descrizione}` → codice + task tracking (task file, `tasks.md`).
-   - **Commit 2** `docs(${taskId}): …` → file doc-nozione (sotto `${user_config.doc_folder_name}/` **tranne** `tasks.md` e `tasks/`). In questa fase ne esistono solo se la doc era già stata toccata **prima** del checkpoint: passa `--doc-message` che li descrive, oppure ometti il flag se l'analisi (step 1) non ne ha mostrati.
+   - **Commit 2** `docs(${taskId}): …` → file doc-nozione (sotto `${DOCS_ROOT}/` **tranne** `tasks.md` e `tasks/`). In questa fase ne esistono solo se la doc era già stata toccata **prima** del checkpoint: passa `--doc-message` che li descrive, oppure ometti il flag se l'analisi (step 1) non ne ha mostrati.
 
    **Linked**:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --docs-root "${user_config.doc_folder_name}" "checkpoint(${taskId}): ${descrizione}"
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh "checkpoint(${taskId}): ${descrizione}"
    ```
    Lo script: `git add -A` → split staged → commit(s) → push + aggiorna Last tracked commit (HEAD finale) + mostra link compare.
 
@@ -103,7 +111,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    1. Stage selettivo: `git add <file1> <file2> ...` solo per i file **codice** della task corrente (identificati al punto 1).
    2. Esegui:
       ```bash
-      ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --docs-root "${user_config.doc_folder_name}" --task ${taskId} --no-add "checkpoint(${taskId}): ${descrizione}"
+      ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --no-add "checkpoint(${taskId}): ${descrizione}"
       ```
    `--task` fissa il task file all'ID risolto, `--no-add` salta `git add -A` (lo staging l'hai fatto tu). Lo split doc/codice opera sul set che hai messo in stage. Con `TASK_SRC=env` lo script forza comunque `--no-add` da sé: la contaminazione fra sessioni parallele è silenziosa e si scopre a push fatto, quindi il default sicuro non è delegato al chiamante.
 
@@ -136,7 +144,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Invocazione **identica in linked e detached**:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --docs-root "${user_config.doc_folder_name}" --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): marker Doc Impact"
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): marker Doc Impact"
    ```
 
    Due flag obbligatori, per due motivi distinti:

@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Confronta la doc di progetto con la **fonte nativa del suo layer** e trova i **drift**: fatti documentati che la fonte smentisce.
 
 Input utente (perimetro: dir, glob, submodule, file doc, task ID — oppure vuoto):
@@ -88,7 +96,7 @@ Perimetro:
 
 Fonte di verità: fonte-nativa
 
-Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 Prefisso ID: <sigla corta del perimetro, es. DECK>
@@ -108,7 +116,7 @@ Sul perimetro **task** (§0) il prompt cambia in tre punti: `Nozioni candidate:`
 Unisci i registri in **un unico file**, ordinato per severità (alta prima). Dove atterra lo risolve uno script, non una domanda:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name align-doc-findings.md --docs-root "${user_config.doc_folder_name}"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name align-doc-findings.md
 ```
 
 Cascata: task attiva con `**Folder**:` popolato → quella folder · task attiva senza folder → la crea (`set-task-folder.sh`, che riscrive il campo) · nessuna task → scratch `.YY-MM-DD-align-doc-findings`. Usa la riga `REGISTRY_PATH=` che stampa.
@@ -143,7 +151,7 @@ Nozione da documentare:
 Contesto:
 <le voci del registro per questo file: CLAIM / REALITY / EVIDENCE / FIX>
 
-Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 
@@ -162,12 +170,12 @@ Per ogni voce con questo verdetto la doc descrive l'intenzione e la fonte ci è 
 
 - Se le patch hanno toccato `{docs_root}/reference/`:
   ```bash
-  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
+  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
   ```
   **Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione bloccante del contratto, non un comando fallito. Non annulla l'allineamento — riportala e lascia le voci a `lint-doc`, che è la skill di quel perimetro. Exit 1 = indice non scritto, quello è un errore.
 - Se le patch hanno **rimosso** sezioni (verdetti `relayer` e `drop` cancellano, non solo correggono), verifica che non abbiano lasciato riferimenti appesi:
   ```bash
-  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh" --docs-root "${user_config.doc_folder_name}"
+  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh"
   ```
   Exit 2 = ci sono riferimenti a file spariti (`DANGLING`) o a `§` che non esistono più (`NOSECTION`). Il secondo è il caso tipico qui: cancelli la sezione, e il puntatore che la citava resta valido sul path e falso sulla sezione — invisibile a un grep. Risolvili con `Edit` prima di chiudere.
 - Sul perimetro **task** (§0): marca `→ ✔️ align` le voci `## Doc Impact` integrate, nel task file. È l'unico file di runtime che questa skill tocca — e lo tocca lei, mai il `doc-writer`, che ha `{docs_root}/tasks/` fuori dal proprio perimetro.

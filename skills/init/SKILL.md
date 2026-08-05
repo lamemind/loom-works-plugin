@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, Write, Edit, AskUserQuestion
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Inizializza un progetto vergine (o verifica/ripara un progetto esistente) creando la struttura minima che le altre skill loom-works si aspettano.
 
 Input utente:
@@ -15,10 +23,10 @@ $ARGUMENTS
 ## Cosa crea
 
 Solo se **assenti** (idempotente):
-- `${user_config.doc_folder_name}/tasks.md` — dal template `tasks-skeleton.md` (Tasks Overview + Execution Plan)
-- `${user_config.doc_folder_name}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
-- `${user_config.doc_folder_name}/tasks/` — directory per i file task
-- `${user_config.doc_folder_name}/reference/` — directory per doc offline
+- `${DOCS_ROOT}/tasks.md` — dal template `tasks-skeleton.md` (Tasks Overview + Execution Plan)
+- `${DOCS_ROOT}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
+- `${DOCS_ROOT}/tasks/` — directory per i file task
+- `${DOCS_ROOT}/reference/` — directory per doc offline
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`
 
 **CLAUDE.md**: init **propone** (non forza) l'aggiunta degli `@-import` base — vedi step 3. **Non tocca**: file git, config, dipendenze.
@@ -30,16 +38,16 @@ Solo se **assenti** (idempotente):
 Prima di eseguire, mostra all'utente il valore che sarà usato:
 
 ```
-📁 Docs folder: ${user_config.doc_folder_name}
-   (default "docs" se non configurato — cambiabile in Claude Code › Plugin settings › loom-works)
+📁 Docs folder: ${DOCS_ROOT}
+   (default "docs" — per cambiarla: campo "docsRoot" in .claude/loom-works.json)
 ```
 
-Se `${user_config.doc_folder_name}` risulta vuoto o non risolto, usa il fallback `docs` e avvisa l'utente.
+Il fallback lo garantisce già `docs-root.sh`: se il file config manca o non ha `docsRoot`, stampa `docs`. Un output vuoto è quindi un guasto dello script, non una configurazione assente — segnalalo invece di tirare a indovinare.
 
 ### 1. Run script
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/init/init.sh --docs-root "${user_config.doc_folder_name}"
+${CLAUDE_PLUGIN_ROOT}/scripts/init/init.sh
 ```
 
 Se l'input contiene `--force`, passa il flag (rigenera `tasks.md` e `INDEX.md` anche se presenti — distruttivo, chiedi conferma prima).
@@ -94,8 +102,8 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/config/materialize-profiles.sh "<id>"
 **Formato riga @-import** (sia `@-import` che ancora cliccabile MD, sulla stessa riga):
 
 ```markdown
-- @${user_config.doc_folder_name}/tasks.md [Tasks](${user_config.doc_folder_name}/tasks.md)
-- @${user_config.doc_folder_name}/reference/INDEX.md [Reference Index](${user_config.doc_folder_name}/reference/INDEX.md)
+- @${DOCS_ROOT}/tasks.md [Tasks](${DOCS_ROOT}/tasks.md)
+- @${DOCS_ROOT}/reference/INDEX.md [Reference Index](${DOCS_ROOT}/reference/INDEX.md)
 ```
 
 **`current-task.md` non va @-importato**, mai — nemmeno "per comodità". La task attiva la scrive in contesto **solo** l'hook `SessionStart` (`inject-task.sh`), che risolve la cascata `$LOOM_TASK → symlink`. Un `@-import` la farebbe entrare in parallelo per conto proprio: in una sessione con `$LOOM_TASK` il modello si troverebbe **due** task attive divergenti, l'iniettata e quella (stale) a cui punta il symlink del worktree. Il symlink resta una primitiva di *risoluzione*, non un canale di *iniezione*.
@@ -105,7 +113,7 @@ Caso A — **`CLAUDE.md` assente**:
 - Su **yes** → `Write` di uno skeleton con heading progetto placeholder + blocco `@-import` sopra.
 - Su **no** → stampa lo snippet, l'utente lo aggiunge a mano.
 
-Caso B — **`CLAUDE.md` presente ma manca almeno uno tra `@{doc_folder_name}/tasks.md` e `@{doc_folder_name}/reference/INDEX.md`**:
+Caso B — **`CLAUDE.md` presente ma manca almeno uno tra `@${DOCS_ROOT}/tasks.md` e `@${DOCS_ROOT}/reference/INDEX.md`**:
 - Usa `AskUserQuestion` mostrando quali righe mancano → "Aggiungo le righe mancanti in fondo a `CLAUDE.md`?"
 - Su **yes** → `Edit` append delle sole righe mancanti (nel formato sopra, `@-import` + ancora MD cliccabile).
 - Su **no** → stampa lo snippet, l'utente lo aggiunge a mano.
@@ -119,4 +127,4 @@ Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CL
 ## Note
 
 - Lo script è sicuro da rilanciare: salta file già presenti
-- Le preferenze cross-project (`doc_folder_name`…) vivono in plugin settings.json; l'**identità per-progetto** vive in `.claude/loom-works.json` — file **obbligatorio**, unico marker di project-root per `lib.sh`. Nessun fallback: il vecchio sentinel `.claude/loom-works.initialized` non vale più e va rimosso.
+- Le preferenze cross-project (`on_lane_spawned_hook`…) vivono in plugin settings.json; tutto ciò che è **per-progetto** — identità, surface e **docs-root** (`docsRoot`) — vive in `.claude/loom-works.json`, file **obbligatorio** e unico marker di project-root per `lib.sh`. Il discriminante è la portata, non il tipo di dato: un userConfig vale per ogni progetto insieme, quindi non può descriverne uno. Nessun fallback: il vecchio sentinel `.claude/loom-works.initialized` non vale più e va rimosso.

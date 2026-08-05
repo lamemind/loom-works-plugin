@@ -1,14 +1,8 @@
 {
   "name": "loom-works",
   "description": "Lane / Task management with coupled documentation lifecycle",
-  "version": "2.29.0",
+  "version": "3.0.0",
   "userConfig": {
-    "doc_folder_name": {
-      "type": "string",
-      "title": "Docs folder name",
-      "description": "Folder for tasks.md, tasks/, reference/, current-task.md. Default: docs",
-      "sensitive": false
-    },
     "on_lane_spawned_hook": {
       "type": "string",
       "title": "On lane spawned hook",

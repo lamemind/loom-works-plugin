@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, AskUserQuestion
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Crea il worktree per una lane. Idempotente: se il worktree esiste già mostra il path e si ferma.
 
 Supporta:
@@ -25,7 +33,7 @@ Da `$ARGUMENTS` estrai:
   - Presenti → multi-project mode
 
 Se `$ARGUMENTS` è vuoto:
-1. Leggi `${user_config.doc_folder_name}/tasks.md` → Execution Plan
+1. Leggi `${DOCS_ROOT}/tasks.md` → Execution Plan
 2. Mostra le lane nel grafo con `AskUserQuestion`. Opzioni:
    - Lane definite nel grafo (con prima task non-✔️)
    - Opzione libera "Nuova lane ad-hoc (inserisci nome)"
@@ -45,7 +53,6 @@ Se ci sono modifiche non committate, avvisa l'utente (non blocca, ma il worktree
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/spawn-lane.sh \
-    --docs-root "${user_config.doc_folder_name}" \
     --lane-hook "${user_config.on_lane_spawned_hook}" \
     "${lane}" ${repos}
 ```

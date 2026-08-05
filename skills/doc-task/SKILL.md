@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, Write, Edit, AskUserQuestion
 model: opus
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Crea una nuova task documentale. I deliverable sono editoriali (sezioni di doc approvate, aggiornate o create), non code. La task vive nel task-system esistente come qualsiasi altra, con prefix `D{N}` e template dedicato.
 
 ## Quando una D-task è la risposta giusta
@@ -77,7 +85,7 @@ Esempio: `/loom-works:doc-task yolo riorganizza sezione logging in common-packag
 
 ### 1. Generazione ID task
 ```bash
-TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh --prefix D --docs-root "${user_config.doc_folder_name}")
+TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh --prefix D)
 ```
 Output: ID completo con prefix D (es: D01, D02, D03). Counter indipendente da quello delle code task (`T{N}`).
 
@@ -111,11 +119,11 @@ Chiedi solo se:
 - L'input utente contiene indicazioni di lane ("nella lane X", "per la lane Y")
 - La discussione precedente implica isolamento pesante
 
-Se serve selezionare, leggi il grafo da `${user_config.doc_folder_name}/tasks.md` e proponi le lane esistenti via `AskUserQuestion` (come fa `create-task`), più opzione "Nessuna (task spot)" e "Nuova lane".
+Se serve selezionare, leggi il grafo da `${DOCS_ROOT}/tasks.md` e proponi le lane esistenti via `AskUserQuestion` (come fa `create-task`), più opzione "Nessuna (task spot)" e "Nuova lane".
 
 ### 4. Creazione file task
 
-Crea `${user_config.doc_folder_name}/tasks/${TASK_ID}-${taskName}.md` copiando il template:
+Crea `${DOCS_ROOT}/tasks/${TASK_ID}-${taskName}.md` copiando il template:
 
 ```
 ${CLAUDE_PLUGIN_ROOT}/templates/doc-task-template.md
@@ -145,13 +153,12 @@ Sostituisci i placeholder:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh \
-    --docs-root "${user_config.doc_folder_name}" \
     ${TASK_ID} ${task-name} "${descrizione_breve}" ${priority}
 ```
 
 Lo script:
 - Deriva automaticamente `K=📝` dal prefix `D` (⚙️ per altri prefix)
-- Aggiunge la riga alla tabella `## Tasks Overview` di `${user_config.doc_folder_name}/tasks.md`
+- Aggiunge la riga alla tabella `## Tasks Overview` di `${DOCS_ROOT}/tasks.md`
 - Committa e pusha (senza remote il push avvisa su stderr e prosegue)
 
 ### 6. Feedback finale

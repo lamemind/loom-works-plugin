@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Task, Read, Edit, Glob, AskUserQuestion, TodoWrite
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 ## Note utente
 ~~~human
 $ARGUMENTS
@@ -15,7 +23,7 @@ $ARGUMENTS
 Risolvi il task file con lo script, mai a mano — la cascata `arg → $LOOM_TASK → symlink` è una sola per tutta la famiglia:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
 `${taskId}` = ID trovato nelle Note utente (es. `T310`); ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` (assoluto) · `TASK_SRC` ∈ `arg|env|symlink`. Exit non-zero = nessun binding risolvibile: chiedi all'utente quale task eseguire, non tirare a indovinare.
@@ -34,9 +42,9 @@ Stampa SEMPRE un riassunto compatto prima di qualsiasi altra azione:
 
 ## Artefatti e materiale di lavoro
 
-Output intermedi che non sono codice del progetto (dump, analisi, findings, script di supporto) → dentro la **task folder**, mai sparsi nel repo né sotto `${user_config.doc_folder_name}/tasks/`.
+Output intermedi che non sono codice del progetto (dump, analisi, findings, script di supporto) → dentro la **task folder**, mai sparsi nel repo né sotto `${DOCS_ROOT}/tasks/`.
 
-- La task folder vive in **project root**, dot-prefixed; il campo `📁 Folder` la mostra root-relative (`./.YY-MM-DD-slug`). Sotto `${user_config.doc_folder_name}/tasks/` stanno **solo** i task file `.md` — **mai** una folder.
+- La task folder vive in **project root**, dot-prefixed; il campo `📁 Folder` la mostra root-relative (`./.YY-MM-DD-slug`). Sotto `${DOCS_ROOT}/tasks/` stanno **solo** i task file `.md` — **mai** una folder.
 - **Non creare folder a mano** (`mkdir`). Crearla/agganciarla solo via skill:
   - task senza folder che ora serve → `/loom-works:set-task-folder ${taskId}` (la colloca giusta in root + popola il campo Folder)
   - materiale fuori dal ciclo task → `/loom-works:scratch-new <slug>`

@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Cattura **estemporanea** di una nozione documentale (fuori dal ciclo task). Leggi il contesto conversazionale corrente + eventuale hint dell'utente, invoca `doc-writer` che **applica la patch** al working tree; poi rivedi il diff e **accetti** (stage) o **rifiuti** (restore).
 
 Flusso **apply-first**: il doc-writer non ritorna più una proposta come testo (invisibile in chat) — scrive direttamente i file. La modifica diventa un diff reale, ispezionabile nel pannello git. Stage = approvazione, restore = rifiuto.
@@ -65,11 +73,11 @@ Nozione da documentare:
 Contesto:
 <estratto rilevante della conversazione, 10-30 righe max>
 
-Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 
-Applica le patch direttamente (Write/Edit), incluso l'eventuale patch a CLAUDE.md; non committare, non rigenerare l'indice. Leggi ${user_config.doc_folder_name}/reference/INDEX.md, scegli target (EXTEND file esistente o NEW). Ritorna il contratto APPLIED: (marker NEW/MOD per ogni file) + INDEX_REBUILD_NEEDED.
+Applica le patch direttamente (Write/Edit), incluso l'eventuale patch a CLAUDE.md; non committare, non rigenerare l'indice. Leggi ${DOCS_ROOT}/reference/INDEX.md, scegli target (EXTEND file esistente o NEW). Ritorna il contratto APPLIED: (marker NEW/MOD per ogni file) + INDEX_REBUILD_NEEDED.
 ```
 
 **YOLO**: stesso invito, ma **salta gli step 4** (niente review): la patch resta applicata. Vai dritto a step 5.
@@ -104,10 +112,10 @@ Gestione della scelta (path assoluti, `cwd` = project root):
 
 ### 5. Rigenera INDEX se serve
 
-Solo su patch **accettata** (ok) e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${user_config.doc_folder_name}/reference/`):
+Solo su patch **accettata** (ok) e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${DOCS_ROOT}/reference/`):
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
 ```
 
 **Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione **bloccante** del contratto, non un comando fallito. Non annulla la cattura; se il TLDR fuori cap è quello che hai appena scritto, riscrivilo come ancora prima di chiudere.
@@ -117,7 +125,7 @@ Poi il ping TTS:
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc catturata"
 ```
 
-Se `INDEX.md` è stato rigenerato, mettilo in stage anch'esso: `git add -- ${user_config.doc_folder_name}/reference/INDEX.md`.
+Se `INDEX.md` è stato rigenerato, mettilo in stage anch'esso: `git add -- ${DOCS_ROOT}/reference/INDEX.md`.
 
 ### 6. Report finale
 

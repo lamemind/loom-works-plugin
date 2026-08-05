@@ -65,15 +65,24 @@ lw_has_remote() {
 #
 # Precedenza: file config del progetto → LOOM_DOCS_ROOT → "docs".
 #
-# Il FILE vince sull'env di proposito. `LOOM_DOCS_ROOT` arriva quasi sempre dal
-# flag --docs-root che le skill interpolano da `user_config.doc_folder_name`, cioè
-# da una preferenza utente GLOBALE, uguale per tutti i progetti. Il campo `docsRoot`
-# in .claude/loom-works.json è invece PER-PROGETTO e committato: su un progetto che
-# tiene la doc in runtime/ è l'unica fonte che lo sa. Il più specifico batte il più
-# generico — stesso principio del layer Config in project-config-architecture.md.
+# FONTE UNICA = il campo `docsRoot` di .claude/loom-works.json. E' PER-PROGETTO e
+# committato: su un progetto che tiene la doc in runtime/ e' l'unica cosa che lo sa,
+# e viaggia col repo. Il canale che c'era prima — il userConfig globale
+# `doc_folder_name`, interpolato dalle skill nel flag --docs-root — e' stato rimosso
+# (plugin v3.0.0): una preferenza utente vale per TUTTI i progetti, quindi non puo'
+# descriverne uno non-default. Non era teoria: interpolava il valore globale `docs`
+# su un progetto `runtime` e gli script giravano sulla cartella sbagliata in
+# silenzio — non fallivano, misuravano zero file, e chi leggeva l'output credeva
+# che la doc fosse a posto.
 #
-# Senza questa precedenza uno script gira sulla cartella sbagliata in silenzio: non
-# fallisce, misura zero file, e chi legge l'output crede che la doc sia a posto.
+# `LOOM_DOCS_ROOT` sopravvive sotto il file come escape hatch (test, fixture senza
+# file config). Resta SOTTO di proposito: un env sfuggito da una sessione o da un
+# altro progetto non deve poter dirottare uno script su un progetto che ha gia'
+# dichiarato la propria docs-root. Il piu' specifico batte il piu' generico —
+# stesso principio del layer Config in project-config-architecture.md.
+#
+# Chi non puo' sourcare bash (il markdown delle skill) usa il wrapper CLI
+# scripts/utils/docs-root.sh, gemello di resolve-task.sh.
 
 lw_docs_root() {
     local cfg root

@@ -74,7 +74,7 @@
     "docsRoot": {
       "type": "string",
       "minLength": 1,
-      "description": "Sottocartella (relativa alla project root) che contiene tasks.md, tasks/, reference/, current-task.md. Opzionale, default 'docs'. Es. loom-works usa 'runtime'. Proprietà PER-PROGETTO e cross-membro (letta da plugin, deck, compass via registry) → vive qui, non nel userConfig globale doc_folder_name."
+      "description": "Sottocartella (relativa alla project root) che contiene tasks.md, tasks/, reference/, current-task.md. Opzionale, default 'docs'. Es. loom-works usa 'runtime'. Proprietà PER-PROGETTO e cross-membro (letta da plugin, deck, compass via registry): questo campo è la FONTE UNICA — da plugin v3.0.0 non esiste più un canale userConfig alternativo. Lettura: scripts/utils/docs-root.sh, o lw_docs_root in scripts/utils/lib.sh."
     },
     "order": {
       "type": "integer",

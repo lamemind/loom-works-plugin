@@ -24,11 +24,10 @@ Se l'utente non specifica nulla, esegui senza filtri (mostra tutto).
 
 ## Flusso
 
-Esegui lo script passando `LOOM_DOCS_ROOT` (serve a risolvere il symlink `current-task.md` → campo Task):
+Esegui lo script — risolve da sé la docs-root dal file config del progetto, e con essa il symlink `current-task.md` → campo Task:
 
 ```bash
-LOOM_DOCS_ROOT="${user_config.doc_folder_name}" \
-    bash "${CLAUDE_PLUGIN_ROOT}/scripts/utils/list-worktrees.sh" \
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/utils/list-worktrees.sh" \
     [--filter <main|lane|all>] [--lane <name>]
 ```
 

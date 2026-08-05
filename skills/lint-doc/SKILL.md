@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: sonnet
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Confronta la doc di progetto col **contratto editoriale** (`${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md`) e trova le **violazioni**.
 
 Input utente (perimetro doc: file, cartella, vuoto = tutta la doc · più i token `clean` / `split` / `gate` / `plan` / `yolo`):
@@ -126,7 +134,7 @@ Le soglie sono **numeri nel contratto**, non valutazioni: due esecuzioni sullo s
 ### 1. Passo numerico
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --docs-root "${user_config.doc_folder_name}" --online
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --online
 ```
 
 Restituisce per ogni file: char, char del TLDR, flag (`SPLIT`, `TLDR>600`, `NOTLDR`, `ONLINE`, `GEN`) e il **footprint per-sessione** — `@-import` di `CLAUDE.md` **più** le entry hook `SessionStart`. Le due voci vanno lette insieme: gli `@-import` da soli sono circa il 70% del costo reale, e ottimizzare solo quelli lascia un terzo del problema sul tavolo.
@@ -140,7 +148,7 @@ Registra il totale **prima** dell'intervento: senza baseline il "dopo" non dice 
 **Quali** file vanno insieme non è una scelta a runtime: due esecuzioni sullo stesso albero devono produrre gli stessi gruppi, o il registro non è confrontabile col precedente.
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-partition.sh" --docs-root "${user_config.doc_folder_name}" --format tsv
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-partition.sh" --format tsv
 ```
 
 Consuma le misure del §1 e ritorna i gruppi già formati, ciascuno col proprio `PREFIX` (il prefisso ID dei finding) e le righe di misura dei suoi file. Il criterio: un file sopra soglia di split fa gruppo da solo, il resto va per cartella, i gruppi-cartella più leggeri si fondono se sforano il cap.
@@ -164,7 +172,7 @@ Perimetro:
 Fonte di verità: contratto
 Fase: <clean | split>
 
-Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 Prefisso ID: <la colonna PREFIX del gruppo>
@@ -214,7 +222,7 @@ e' gia' passata, e una voce nuova qui e' materiale per la prossima esecuzione.
 Un unico file ordinato per severità, con **una sezione per fase** (`## FASE: clean`, `## FASE: split`): la fase 2 deve poter leggere cosa ha fatto la fase 1, e due file separati perdono il collegamento. Dove atterra lo risolve uno script, non una domanda:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name lint-doc-findings.md --docs-root "${user_config.doc_folder_name}"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name lint-doc-findings.md
 ```
 
 Cascata: task attiva con `**Folder**:` popolato → quella folder · task attiva senza folder → la crea (`set-task-folder.sh`, che riscrive il campo) · nessuna task → scratch `.YY-MM-DD-lint-doc-findings`. Usa la riga `REGISTRY_PATH=` che stampa.
@@ -255,7 +263,7 @@ Nozione da documentare:
 Contesto:
 <le voci del registro per questo file: violazione / evidenza / FIX>
 
-Docs root: <PROJECT_ROOT>/${user_config.doc_folder_name}
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 
@@ -282,7 +290,7 @@ Un merge applicato è **tre patch, non una**: la sezione entra nel file che asso
 Dopo uno split o un merge i riferimenti al file vecchio restano appesi, **anche in file che nessun writer ha toccato**. Enumerarli è meccanico:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh" --docs-root "${user_config.doc_folder_name}"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh"
 ```
 
 Scansiona `{docs_root}/` più `CLAUDE.md`. `--also <file|dir>` (ripetibile) aggiunge perimetri che citano path di progetto senza esserne parte — tipicamente un submodule di plugin/tooling nel repo. Passalo solo se quel perimetro esiste davvero qui.
@@ -317,7 +325,7 @@ Il punto 4 non è una precauzione formale: una parte dei candidati scende sotto 
 
 - Rigenera l'indice, **una volta sola in coda a tutte le fasi** (non fra clean e split: l'INDEX non è input della fase 2):
   ```bash
-  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "${user_config.doc_folder_name}"
+  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
   ```
   **Exit 2 è il verdetto dello script**, non un comando fallito: l'indice è scritto, ma i TLDR elencati su stderr restano oltre il cap. È la stessa misura del §1 letta a valle — se esce 2 dopo una bonifica che doveva chiudere quelle voci, la bonifica non ha fatto il suo lavoro e va detto nel report. Exit 1 = indice non scritto, quello è un errore da risolvere.
 - **Rimisura finale**: rilancia `doc-metrics.sh --online` e dichiara il delta prima/dopo. È l'unica verifica che la bonifica abbia prodotto l'effetto che si proponeva.

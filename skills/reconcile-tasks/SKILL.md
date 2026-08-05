@@ -22,7 +22,6 @@ $ARGUMENTS
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/reconcile-tasks-context.sh \
-    --docs-root "${user_config.doc_folder_name}" \
     ${conflict_dir}
 ```
 

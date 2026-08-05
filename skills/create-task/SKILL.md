@@ -5,6 +5,14 @@ allowed-tools: Bash(*), Read, Write, Edit, AskUserQuestion
 model: opus
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Crea una nuova task. Supporta due modalità:
 - **Interattiva** (default): raccoglie dettagli dall'utente
 - **YOLO**: deduce tutto dalla descrizione, nessuna domanda
@@ -30,7 +38,7 @@ Decisione binaria `CREATE_FOLDER=yes|no`:
 
 Nel template file, il campo `**Folder**:` viene popolato automaticamente dallo script (step 3b) col path root-relative `./.YY-MM-DD-slug`.
 
-> ⚠️ La task folder vive in **project root**, **mai** sotto `${user_config.doc_folder_name}/tasks/` (lì solo i task file `.md`). Non crearla a mano: la crea `set-task-folder.sh` allo step 3b.
+> ⚠️ La task folder vive in **project root**, **mai** sotto `${DOCS_ROOT}/tasks/` (lì solo i task file `.md`). Non crearla a mano: la crea `set-task-folder.sh` allo step 3b.
 
 ---
 
@@ -55,7 +63,7 @@ Esempio: `/loom-works:create-task yolo migliorare logging dei servizi`
 
 ### 1. Generazione ID task
 ```bash
-TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh --docs-root "${user_config.doc_folder_name}")
+TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh)
 ```
 Output: ID completo pronto all'uso (es: T319, T320). Prefix `T` hardcoded.
 
@@ -77,7 +85,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <top
 ```
 
 **Domanda 1 — Lane**:
-Leggi il grafo lane da `${user_config.doc_folder_name}/tasks.md`. Se esiste, mostra le lane come opzioni selezionabili:
+Leggi il grafo lane da `${DOCS_ROOT}/tasks.md`. Se esiste, mostra le lane come opzioni selezionabili:
 ```
 In quale lane inserire ${TASK_ID}?
 
@@ -91,7 +99,7 @@ In quale lane inserire ${TASK_ID}?
 L'utente clicca e basta. Se "Nuova lane" → chiedi nome. Se "Nessuna" → task spot, no grafo.
 
 **Domanda 2 — Dipendenze cross-lane**:
-Se assegnata a una lane, analizza le task dalla tabella `${user_config.doc_folder_name}/tasks.md` e suggerisci dipendenze probabili.
+Se assegnata a una lane, analizza le task dalla tabella `${DOCS_ROOT}/tasks.md` e suggerisci dipendenze probabili.
 Usa euristiche: task che toccano stessi servizi/file, task nella stessa area funzionale, task che appaiono nel grafo come predecessori naturali.
 ```
 Dipendenze cross-lane per ${TASK_ID}?
@@ -124,25 +132,25 @@ Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emer
 **YOLO**: anche in modalità YOLO questa cattura è sempre attiva. Si salta la domanda all'utente ma si legge lo stesso il contesto conversazionale.
 
 ### 3. Creazione file task
-Crea `${user_config.doc_folder_name}/tasks/${TASK_ID}-${taskName}.md` usando il template `${CLAUDE_PLUGIN_ROOT}/templates/task-template.md`.
+Crea `${DOCS_ROOT}/tasks/${TASK_ID}-${taskName}.md` usando il template `${CLAUDE_PLUGIN_ROOT}/templates/task-template.md`.
 
 ### 3b. Task folder (condizionale)
 
 Se `CREATE_FOLDER=yes` (vedi §Task Folder — Policy):
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${TASK_ID} --slug ${task-name} --docs-root "${user_config.doc_folder_name}"
+${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${TASK_ID} --slug ${task-name}
 ```
 
-Lo script gestisce folder canonica `${PROJECT_ROOT}/.${YYYY-MM-DD}-${task-name}` in autonomia (mkdir + campo Folder + git add). **Non** anticiparlo con `mkdir` manuali, e mai sotto `${user_config.doc_folder_name}/tasks/`.
+Lo script gestisce folder canonica `${PROJECT_ROOT}/.${YYYY-MM-DD}-${task-name}` in autonomia (mkdir + campo Folder + git add). **Non** anticiparlo con `mkdir` manuali, e mai sotto `${DOCS_ROOT}/tasks/`.
 
 ### 4. Finalizzazione
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh --docs-root "${user_config.doc_folder_name}" ${TASK_ID} ${task-name} "${descrizione_breve}" ${priority}
+${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh ${TASK_ID} ${task-name} "${descrizione_breve}" ${priority}
 # Priority: High | Med | Low
 # descrizione_breve: max 100 caratteri (troncata automaticamente dallo script)
 ```
-- Aggiunge la task alla tabella Tasks Overview di `${user_config.doc_folder_name}/tasks.md` (formato: `| ID | Pri | Prog | Task (max 100) |`)
+- Aggiunge la task alla tabella Tasks Overview di `${DOCS_ROOT}/tasks.md` (formato: `| ID | Pri | Prog | Task (max 100) |`)
 - Committa e pusha le modifiche
 
 ### 5. Feedback finale

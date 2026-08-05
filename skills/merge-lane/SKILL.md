@@ -28,7 +28,6 @@ Se lane assente, chiedi all'utente quale lane mergiare (mostra lista da `list-wo
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/merge-lane.sh \
-    --docs-root "${user_config.doc_folder_name}" \
     "${lane}" ${cleanup_flag}; echo "EXIT_CODE=$?"
 ```
 
@@ -47,7 +46,6 @@ Cattura **sia stdout che exit code** (`echo "EXIT_CODE=$?"` dopo il `;`).
 - Dopo reconcile, rilancia lo script (max 1 retry):
   ```bash
   ${CLAUDE_PLUGIN_ROOT}/scripts/task/merge-lane.sh \
-      --docs-root "${user_config.doc_folder_name}" \
       "${lane}" ${cleanup_flag}; echo "EXIT_CODE=$?"
   ```
 - Se fallisce ancora → riporta errore dettagliato all'utente

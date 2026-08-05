@@ -5,20 +5,28 @@ allowed-tools: Bash(*), Read, Glob
 model: opus
 ---
 
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
 Panoramica dello stato corrente del progetto per riorientarsi all'inizio di una sessione o dopo un context-switch. **Read-only**: non scrive né modifica nessun file.
 
 ## Fase 1 — Raccolta dati
 
 **1a. Stato git/fs** — esegui:
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/recap-git-status.sh --docs-root "${user_config.doc_folder_name}"
+${CLAUDE_PLUGIN_ROOT}/scripts/recap-git-status.sh
 ```
 
 **1b. Doc** — leggi in parallelo dove possibile:
-- `${user_config.doc_folder_name}/tasks.md` → Tasks Overview + Execution Plan
+- `${DOCS_ROOT}/tasks.md` → Tasks Overview + Execution Plan
 - L'output script dice `active: <path>` o `none` per current-task
   - Se attivo: leggi il task file puntato (path relativo alla repo root)
-- Glob `${user_config.doc_folder_name}/tasks/*.md` → leggi tutti i file task che non hanno `Progress: ✔️` nella loro intestazione (al più 8-10 task — non serve leggere i completati se ce ne sono molti)
+- Glob `${DOCS_ROOT}/tasks/*.md` → leggi tutti i file task che non hanno `Progress: ✔️` nella loro intestazione (al più 8-10 task — non serve leggere i completati se ce ne sono molti)
 
 ## Fase 2 — Verifica incrociata
 
