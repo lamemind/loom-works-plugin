@@ -1,13 +1,13 @@
 ---
 name: lint-doc
-description: Misura la doc di progetto contro il contratto editoriale — file sopra soglia, TLDR-riassunto, residui storici, costo online, coordinate opache. Due fasi sequenziali (clean, poi split), auto-apply, misure numeriche via doc-metrics.sh, giudizio via doc-auditor read-only, patch via doc-writer.
+description: Misura la doc di progetto contro il contratto editoriale — file sopra soglia, TLDR-riassunto, residui storici, costo online, coordinate opache. Due fasi sequenziali (clean, poi split), auto-apply, misure numeriche via doc-metrics.sh, giudizio via doc-auditor read-only, patch via doc-writer. Token `plan`: misura e piano delle invocazioni, senza applicare niente.
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: sonnet
 ---
 
 Confronta la doc di progetto col **contratto editoriale** (`${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md`) e trova le **violazioni**.
 
-Input utente (perimetro doc: file, cartella, vuoto = tutta la doc · più i token `clean` / `split` / `gate`):
+Input utente (perimetro doc: file, cartella, vuoto = tutta la doc · più i token `clean` / `split` / `gate` / `plan`):
 ~~~human
 $ARGUMENTS
 ~~~
@@ -31,7 +31,7 @@ Il costo si divide in due voci che non vanno confuse: **rilevare** che un file �
 
 ### Fase e perimetro dall'input
 
-Dall'input si estraggono due cose indipendenti. I token noti sono `clean`, `split`, `gate`; **tutto il resto è perimetro**.
+Dall'input si estraggono due cose indipendenti. I token noti sono `clean`, `split`, `gate`, `plan`; **tutto il resto è perimetro**.
 
 - nessun token di fase → **entrambe**, `clean` poi `split`, in un'unica invocazione
 - `clean` → solo riduzioni; i file sopra soglia restano nel registro come `SPLIT: deferred`
@@ -45,7 +45,23 @@ Esempi:
 /loom-works:lint-doc docs/reference/engine clean    → solo clean
 /loom-works:lint-doc docs/reference/db/dtl-schema.md split
 /loom-works:lint-doc                                → tutta la doc, entrambe le fasi
+/loom-works:lint-doc plan                           → misura + piano, non applica niente
 ```
+
+### `plan` — misura e fermati
+
+`plan` **non è una fase**: le fasi dicono *cosa fare*, `plan` dice **fin dove arrivare**. Col token la skill esegue §1 (misura) e §2 (partizione), stampa il piano e **si ferma lì** — niente fan-out di auditor (§3), niente registro su disco (§4), niente writer, niente stage. Il costo sono due chiamate bash e nessun subagent: è ciò che lo rende consultabile *prima* di decidere se e da dove partire.
+
+Con `plan` gli altri token diventano inerti: `gate` non ha verdetti da raccogliere, e i token di fase non selezionano niente, perché **il perimetro della fase split non è calcolabile ex-ante** — dipende dai char *dopo* le riduzioni (§8). Il piano elenca quindi sempre le invocazioni `clean` per gruppo e chiude con uno step `split` a perimetro da ricalcolare.
+
+Cosa stampa, e nient'altro:
+
+- totale doc e **footprint per-sessione** del §1, con le due voci (`@-import` di `CLAUDE.md` + entry hook) separate;
+- le violazioni **già visibili dai soli numeri** — i flag `SPLIT`, `TLDR>600`, `MERGE?` che `doc-metrics.sh` ha calcolato, senza aprire un file;
+- i gruppi del §2 con char, conteggio file e ragione del raggruppamento;
+- le **righe di comando** delle invocazioni successive, nell'ordine imposto dal contratto: prima i `clean`, coi file a flag `SPLIT` in testa (le loro riduzioni possono farli scendere sotto soglia e togliere del tutto la fase 2), poi un `split` finale.
+
+**Dichiara sempre che la partizione non è pinnata.** Ogni invocazione successiva con perimetro ristretto ricalcola la propria partizione su quel sottoinsieme (§2): i gruppi del piano sono una *work-list*, non i gruppi che quegli auditor useranno davvero. Senza quella riga il piano si legge come un contratto, e il registro che arriva dopo non torna coi numeri annunciati.
 
 ### Auto-apply è il default — il gate è il diff
 
