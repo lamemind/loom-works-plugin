@@ -69,8 +69,8 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    2. Se il symlink `${user_config.doc_folder_name}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
    3. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
       - Risolvi task parent: `${user_config.doc_folder_name}/tasks/T{N}-*.md`
-      - Flagga la riga `- [ ] D{taskId} chiusa` → `- [x] D{taskId} chiusa` nella sezione `## Acceptance Criteria` del parent
-      - Se la riga non esiste, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
+      - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera** — `doc-task` la scrive con la maniglia (`- [ ] D07 (unificare docs-root) chiusa`), quindi cercare `- [ ] D{taskId} chiusa` alla lettera non trova mai nulla e il flag-back muore nel ramo warning qui sotto. Riscrivi solo il box, lasciando maniglia e testo intatti.
+      - Se nessuna riga porta l'id, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
 
 5. **Aggiorna ${user_config.doc_folder_name}/tasks.md**
    1. Leggi `${user_config.doc_folder_name}/tasks.md`
@@ -168,5 +168,5 @@ Topic = argomento concreto della domanda. NO generici.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
 - **Link compare**: Generato automaticamente dallo script commit (spanna entrambi i commit: TRACKED_SHA…HEAD)
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
-- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} chiusa` (step 4.3) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
+- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} (<maniglia>) chiusa` (step 4.3) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
 - **Apply-first (opzione [1])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree, la review è sul diff reale (pannello git). Stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). I file approvati arrivano allo step 8 **già staged**, ed è ciò che rende possibile il `--no-add`: lo stage è l'unica lista di cosa committare.

@@ -37,6 +37,6 @@ Aggiungi `--filter` / `--lane` solo se l'utente li ha richiesti. Mostra l'output
 ## Note
 
 - **Single-project**: esegue sul project root corrente. Per multi-project, una panoramica completa richiede di lanciarlo da ciascun sub-repo (lo script lavora su un repo per volta).
-- Il campo **Task** è popolato solo dove `docs/current-task.md` è branchato (single-project); altrimenti `(none)`.
+- Il campo **Task** è popolato solo dove `{docs_root}/current-task.md` è branchato (single-project); altrimenti `(none)`.
 - Read-only: nessuna modifica, nessuna conferma necessaria.
 - Stesso script usato internamente da `merge-lane` e `drop-lane` per elencare le lane.

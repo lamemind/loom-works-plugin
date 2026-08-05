@@ -14,12 +14,12 @@ $ARGUMENTS
 
 ## Quando usarla
 
-- Plugin appena installato su un codebase di grandi dimensioni, nessun `docs/project/*`
+- Plugin appena installato su un codebase di grandi dimensioni, nessun `{docs_root}/project/*`
 - Workspace multi-progetto (es. N sub-repo indipendenti) dove serve una mappa d'insieme
 - Subito dopo `/loom-works:init` per riempire i file scheletro appena creati
 - NON per aggiornamenti incrementali: per quello usa `/loom-works:capture-doc` o il task-loop
 
-Se il progetto ha già `docs/project/overview.md` o un `CLAUDE.md` corposo, segnalalo e chiedi se l'utente vuole comunque procedere (rischio duplicazione).
+Se il progetto ha già `{docs_root}/project/overview.md` o un `CLAUDE.md` corposo, segnalalo e chiedi se l'utente vuole comunque procedere (rischio duplicazione).
 
 ## Prerequisiti
 
@@ -41,7 +41,7 @@ Leggi il file con `Read` e mostra all'utente un **riassunto** in 10-15 righe cop
 - Ecosistemi rilevati
 - Sub-progetti elencati (path + ecosystem + size)
 - Fulcri candidati (euristica — marcali esplicitamente come "tentativo, da confermare")
-- Stato doc esistente (README, CLAUDE.md, `docs/`)
+- Stato doc esistente (README, CLAUDE.md, docs root del progetto)
 
 Conserva `$SCAN_OUT` — ti serve per lo step 4.
 
@@ -107,7 +107,7 @@ Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e
 Applica i file direttamente (Write/Edit), non committare, non rigenerare l'indice. Ritorna il contratto APPLIED: (marker NEW/MOD per file) + INDEX_REBUILD_NEEDED.
 
 Istruzioni:
-1. Se già esiste `docs/project/overview.md` o un CLAUDE.md corposo, NON duplicare —
+1. Se già esiste `<docs root>/project/overview.md` o un CLAUDE.md corposo, NON duplicare —
    fai invece un EXTEND mirato o segnala overlap.
 2. `overview.md` deve avere: paragrafo cos'è il progetto (dal tuo meglio, basato
    su nome/manifesti/struttura), tabella sub-progetti con scope 1-riga, sezione

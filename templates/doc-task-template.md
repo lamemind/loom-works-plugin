@@ -5,7 +5,7 @@
 - **Priority**: {{priorita_raccolta}}
 - **Estimated Time**: {{durata_standard}}
 - **Lane**: {{lane}}
-- **Parent Task**: {{parent_task}}
+- **Parent Task**: {{parent_task}} {{parent_task_maniglia}}
 - **Progress**: 🔵 Todo
 - **Last tracked commit**:
 

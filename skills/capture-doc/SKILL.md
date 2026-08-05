@@ -29,7 +29,7 @@ Nessun worktree, nessun commit automatico. La patch accettata resta **staged** (
 
 ## Prerequisiti
 
-Progetto inizializzato con `docs/reference/INDEX.md`. La verifica è implicita: il subagent `doc-writer` in step 1 legge `INDEX.md` e, se manca, segnala di lanciare `/loom-works:init`. Non anticipare il check con un `test -f`.
+Progetto inizializzato con `{docs_root}/reference/INDEX.md`. La verifica è implicita: il subagent `doc-writer` in step 1 legge `INDEX.md` e, se manca, segnala di lanciare `/loom-works:init`. Non anticipare il check con un `test -f`.
 
 ## Flusso
 
@@ -139,5 +139,5 @@ Topic = argomento concreto della domanda. NO generici.
 
 - Il subagent lavora **in-place**: nessun worktree, nessun branch. Se il progetto è `no-repo`, funziona uguale (il gate degrada a informativo, vedi step 4).
 - Per capture **in** una task, usa `create-task` / `run-task` (path 1), non questa skill.
-- Il doc-writer opera su **tutta la doc** (online `docs/project/`, `docs/meta/`, offline `docs/reference/`) e applica **anche una patch a `CLAUDE.md`** quando serve (es. aggiunta `@-import` per un nuovo file online). Quel file compare come `MOD CLAUDE.md` nel contratto `APPLIED:` → segue la stessa sorte del resto: staged su ok, restorato su skip.
+- Il doc-writer opera su **tutta la doc** (online `{docs_root}/project/`, offline `{docs_root}/reference/`) e applica **anche una patch a `CLAUDE.md`** quando serve (es. aggiunta `@-import` per un nuovo file online). Quel file compare come `MOD CLAUDE.md` nel contratto `APPLIED:` → segue la stessa sorte del resto: staged su ok, restorato su skip.
 - **Apply-first**: la review dell'utente è sul diff reale (working tree), non su un testo di ritorno del subagent. Stage = approvazione, restore = rifiuto. Lo stage-su-ok è anche il *punto di ripristino* che protegge le patch approvate da un rifiuto successivo su file condiviso.

@@ -65,7 +65,7 @@ Se exit 1 (errore), mostra il messaggio di errore e non procedere.
 
 ## Note
 
-- Esegui dal worktree base (il repo con docs/tasks.md, branch main)
+- Esegui dal worktree base (il repo con `{docs_root}/tasks.md`, branch main)
 - Il nome lane identifica il worktree — usalo coerente tra spawn e merge
 - Dopo spawn: apri una sessione Claude nel worktree lane, poi `/loom-works:start-task`
 - `merge-lane` auto-rileva i worktrees `*-{lane}` → non serve ripetere i repo a merge

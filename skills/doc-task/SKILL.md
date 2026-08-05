@@ -132,6 +132,7 @@ Sostituisci i placeholder:
 | `{{durata_standard}}` | es. `2h`, `1 giornata` |
 | `{{lane}}` | nome lane o lasciare vuoto/omesso |
 | `{{parent_task}}` | ID task parent (es. `T07`) se `$ARGUMENTS` conteneva `parent=T{N}`, altrimenti vuoto |
+| `{{parent_task_maniglia}}` | maniglia verbo+oggetto del parent fra parentesi, letta dalla sua riga in `tasks.md` (es. `(unificare docs-root)`) — vuoto se non c'è parent. Un id nudo su file non aggancia più niente quando il file si rilegge a settimane di distanza |
 | `{{descrizione_dettagliata}}` | prosa sotto `## Description` |
 | `{{target_raccolto}}` | lista strutturata sotto `## Target` |
 | `{{criteri_accettazione_raccolti}}` | bullet sotto `## Acceptance Criteria` |
