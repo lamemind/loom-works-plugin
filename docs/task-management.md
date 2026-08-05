@@ -23,7 +23,19 @@ Task prefix `T` (hardcoded), ID incrementali (T01, T02, …). Le task documental
 
 I task file stanno in `docs/tasks/T{N}-{slug}.md`. Materiale di supporto (design docs, findings, analisi estemporanee) va in **task folder dedicata** — vive in **project root**, dot-prefixed `.YY-MM-DD-slug`, **mai** sotto `docs/tasks/` (lì stanno solo i task *file* `.md`) — vedi §Task Folder; o scratch folder per attività estemporanee.
 
-Symlink runtime: `docs/current-task.md` → task attiva (gestito da `/loom-works:start-task`). In modalità detached il symlink NON viene creato e il task ID viaggia esplicito sessione per sessione (vedi §Detached).
+## Quale task è attiva
+
+Una sola cascata, per ogni consumer: **`arg esplicito → $LOOM_TASK → symlink docs/current-task.md`**.
+
+- **arg** — l'ID nominato nell'invocazione (`/loom-works:run-task T48`). In cima, o una sessione già vincolata non potrebbe più chiedere un'altra task.
+- **`$LOOM_TASK`** — binding di **sessione**, esportato allo spawn (`deck-run`). Batte il symlink perché N sessioni parallele nello stesso worktree ne condividono uno solo: quale delle N sei tu lo sa solo l'env.
+- **symlink `docs/current-task.md`** — binding di **worktree**, scritto da `start-task`. In detached non viene creato affatto.
+
+Implementata **una volta**: `lw_resolve_task` in `scripts/utils/lib.sh`, e per chi non può sourcare bash (il markdown delle skill) il wrapper `scripts/task/resolve-task.sh`. Restituisce `TASK_ID` · `TASK_FILE` · `TASK_SRC` ∈ `arg|env|symlink`. `TASK_SRC` non è cosmetico: rende la provenienza dichiarata invece che silenziosa, ed è ciò che decide linked vs detached (§Detached), cioè `git add -A` contro stage selettivo.
+
+**Un solo canale scrive la task in contesto**: l'hook `SessionStart` (`inject-task.sh`). Il symlink **non va @-importato** in `CLAUDE.md` — entrerebbe in parallelo all'iniezione e in una sessione con `$LOOM_TASK` il modello vedrebbe due task attive divergenti, l'iniettata e quella stale del worktree. È una primitiva di *risoluzione*, non un canale di *iniezione*.
+
+`start-task` **rifiuta di girare** quando `$LOOM_TASK` è settata, anche sullo stesso ID: scriverebbe un symlink che la sessione corrente ignora (l'env lo batte), cioè lo stale che la cascata esiste per non produrre.
 
 ## Lane
 
@@ -71,12 +83,13 @@ Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-la
 
 ### Detached (più task in parallelo, stesso worktree)
 
-Più task piccole in parallelo nello stesso worktree, una per sessione Claude: `/loom-works:start-task T102 detach` attiva la task SENZA creare il symlink `docs/current-task.md`; il task ID resta esplicito in ogni comando (`run-task T102`, `checkpoint-task T102`). Una sessione gestisce una singola task: l'agente sa cosa appartiene alla task corrente perché la conversazione lo dice.
+Più task piccole in parallelo nello stesso worktree, una per sessione Claude. Due modi di entrarci, stesso regime: `/loom-works:start-task T102 detach` (task ID esplicito in ogni comando) oppure una sessione spawnata dal deck, che porta `$LOOM_TASK`.
+
+**Lo decide `TASK_SRC`, non l'argomento**: `symlink` → linked · `env`/`arg` → detached. Il criterio è chi possiede il binding — il *worktree* (una task sola, tutto il movimento del repo è suo) o la *sessione* (il repo si muove anche per mano d'altri).
 
 Differenze vs linked:
-- **Symlink**: non creato → risoluzione task da taskId esplicito (Glob), non da symlink
-- **Analisi diff** (`checkpoint-task-analyze.sh` su `TRACKED_SHA..HEAD`): **skippata** — deliverables dal contesto conversazione
-- **Staging commit**: stage selettivo manuale + `--no-add` (linked: `git add -A` da script)
+- **Analisi diff** (`checkpoint-task-analyze.sh` su `TRACKED_SHA..HEAD`): **skippata** — il diff raccoglierebbe anche il lavoro delle altre task. Deliverables dal contesto conversazione
+- **Staging commit**: stage selettivo manuale + `--no-add` (linked: `git add -A` da script). Su `TASK_SRC=env` lo script forza `--no-add` da sé: la contaminazione è silenziosa e si scopre a push fatto
 - **Concorrenza**: N task per worktree, sessioni separate (linked: 1 task per worktree)
 
 Vincoli:

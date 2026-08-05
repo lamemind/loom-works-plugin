@@ -14,22 +14,29 @@ $ARGUMENTS
 
 ## Modalità
 
-Da `$ARGUMENTS` estrai un eventuale **taskId** (pattern `T\d+` o `D\d+`).
+Da `$ARGUMENTS` estrai un eventuale **taskId** (pattern `T\d+` o `D\d+`), poi risolvi:
 
-- **Linked** (taskId assente): la task attiva è quella puntata dal symlink `${user_config.doc_folder_name}/current-task.md`. Flusso classico con analisi diff.
-- **Detached** (taskId presente): la task è specificata esplicitamente. Niente symlink. **L'analisi diff viene saltata**: l'agente deriva i deliverables completati e i file da committare dal contesto della conversazione corrente. Pensata per task piccole gestite in parallelo nello stesso worktree (sessioni Claude separate). Vedi `docs/task-management.md` §Detached.
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
+```
 
-Risolvi il task file:
-- Linked: `readlink -f ${user_config.doc_folder_name}/current-task.md`
-- Detached: Glob `${user_config.doc_folder_name}/tasks/${taskId}-*.md`
+Il `TASK_SRC` che lo script stampa **determina la modalità** — non la presenza dell'argomento:
 
-Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `${user_config.doc_folder_name}/tasks/`.
+- `symlink` → **linked**. Binding di *worktree*: la task è una sola, tutto il movimento del repo le appartiene → analisi diff + `git add -A`.
+- `env` (`$LOOM_TASK`) → **detached**. Binding di *sessione*: N sessioni parallele nello stesso worktree, una task ciascuna. Un `git add -A` da qui rastrellerebbe nel commit i file su cui stanno lavorando le altre, in silenzio.
+- `arg` → **detached**. Chi nomina una task esplicita non sta dichiarando di essere solo nel worktree.
+
+Detached = analisi diff saltata (i deliverables li deriva l'agente dal contesto della conversazione) + stage selettivo. Vedi `docs/task-management.md` §Detached.
+
+Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argomento grezzo.
+
+`Read` di `TASK_FILE`, poi leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `${user_config.doc_folder_name}/tasks/`.
 
 ## Flusso checkpoint
 
 1. **Analisi modifiche**
 
-   **Linked**: esegui `${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-analyze.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}"`. Lo script verifica symlink, legge metadata, mostra commit/file modificati.
+   **Linked**: esegui `${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-analyze.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}"` — **senza** `--task`: lo script risolve dal symlink da sé, e passargli un id lo farebbe cadere nel ramo detached (un id esplicito *è* un binding di sessione). Legge metadata, mostra commit/file modificati.
 
    **Detached**: SKIP. Nessuno script di analisi. L'agente ricava dal contesto:
    - quali deliverables della task corrente sono completati
@@ -59,9 +66,8 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
 4. **Task completata?**
    Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
    1. Imposta Progress a `✔️ Done` (nel file task)
-   2. **Linked**: Elimina symlink: `rm ${user_config.doc_folder_name}/current-task.md`
-   3. **Detached**: nessun symlink da rimuovere
-   4. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
+   2. Se il symlink `${user_config.doc_folder_name}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
+   3. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
       - Risolvi task parent: `${user_config.doc_folder_name}/tasks/T{N}-*.md`
       - Flagga la riga `- [ ] D{taskId} chiusa` → `- [x] D{taskId} chiusa` nella sezione `## Acceptance Criteria` del parent
       - Se la riga non esiste, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
@@ -99,7 +105,7 @@ Leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output pref
       ```bash
       ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" --task ${taskId} --no-add "checkpoint(${taskId}): ${descrizione}"
       ```
-   `--task` risolve il task file via Glob (no symlink), `--no-add` salta `git add -A` (lo staging l'hai fatto tu). Lo split doc/codice opera sul set che hai messo in stage.
+   `--task` fissa il task file all'ID risolto, `--no-add` salta `git add -A` (lo staging l'hai fatto tu). Lo split doc/codice opera sul set che hai messo in stage. Con `TASK_SRC=env` lo script forza comunque `--no-add` da sé: la contaminazione fra sessioni parallele è silenziosa e si scopre a push fatto, quindi il default sicuro non è delegato al chiamante.
 
 7. **Doc Impact gate (morbido)**
 
@@ -162,5 +168,5 @@ Topic = argomento concreto della domanda. NO generici.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
 - **Link compare**: Generato automaticamente dallo script commit (spanna entrambi i commit: TRACKED_SHA…HEAD)
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
-- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} chiusa` (step 4.4) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
+- **Doc Impact gate morbido**: scelta utente quando consolidare (capture inline / skip), due rami soli — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} chiusa` (step 4.3) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
 - **Apply-first (opzione [1])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree, la review è sul diff reale (pannello git). Stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). I file approvati arrivano allo step 8 **già staged**, ed è ciò che rende possibile il `--no-add`: lo stage è l'unica lista di cosa committare.

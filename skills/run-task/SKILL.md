@@ -12,14 +12,15 @@ $ARGUMENTS
 
 ## 0. Presenta la task
 
-Risolvi il file task con questa precedenza:
+Risolvi il task file con lo script, mai a mano — la cascata `arg → $LOOM_TASK → symlink` è una sola per tutta la famiglia:
 
-1. Se l'utente ha specificato un task ID nelle Note utente (es. `T310`), cercalo con Glob `${user_config.doc_folder_name}/tasks/${taskId}-*.md` e caricalo attivamente. Esecuzione **on-the-fly** o **detached** (start-task fatto con `detach`): il file non è in contesto, va letto.
-2. Altrimenti leggi il symlink `${user_config.doc_folder_name}/current-task.md` (modalità linked).
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
+```
 
-Il workflow operativo è identico nei due casi: l'unica differenza è il punto di caricamento del file.
+`${taskId}` = ID trovato nelle Note utente (es. `T310`); ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` (assoluto) · `TASK_SRC` ∈ `arg|env|symlink`. Exit non-zero = nessun binding risolvibile: chiedi all'utente quale task eseguire, non tirare a indovinare.
 
-In modalità detached il taskId è obbligatorio: niente symlink fallback. Se il symlink non esiste e non è stato passato un taskId, chiedi all'utente quale task eseguire.
+Fai **sempre** `Read` di `TASK_FILE`: in contesto può non esserci affatto (invocazione on-the-fly) o esserci troncato (budget dell'hook di iniezione). Il workflow operativo non cambia con `TASK_SRC` — cambia solo da dove è arrivato l'ID.
 
 Stampa SEMPRE un riassunto compatto prima di qualsiasi altra azione:
 

@@ -30,9 +30,13 @@ Architettura **option B** (DESIGN §6): la main session non fa lavoro editoriale
 
 ## 0. Risolvi la task
 
-Con questa precedenza:
-1. Se le Note utente contengono un ID (es. `D03`), risolvilo via `Glob ${user_config.doc_folder_name}/tasks/${id}-*.md`
-2. Altrimenti leggi il symlink `${user_config.doc_folder_name}/current-task.md`
+Cascata `arg → $LOOM_TASK → symlink`, risolta dallo script:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
+```
+
+`${taskId}` = ID nelle Note utente (es. `D03`); ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` · `TASK_SRC`. Exit non-zero = nessun binding: chiedi quale task.
 
 Verifica che la task sia di **tipo doc** (prefix `D`). Se è code (prefix `T`), reindirizza l'utente a `/loom-works:run-task` e fermati.
 

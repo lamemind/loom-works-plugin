@@ -2,19 +2,24 @@
 
 # =============================================================================
 # set-task-folder.sh - Crea folder canonico per una task esistente
-# Usage: set-task-folder.sh <task-id> [--slug <slug>]
-# Env:   PROJECT_ROOT (default: $PWD)
+# Usage: set-task-folder.sh [<task-id>] [--slug <slug>] [--docs-root <path>]
+# Env:   PROJECT_ROOT (default: $PWD), LOOM_TASK
 # =============================================================================
 #
 # Naming canonico: .YY-MM-DD-{slug}
 # Permissivo: se la folder canonica esiste la riusa, altrimenti la crea.
 # Stampa il folder name (relativo a PROJECT_ROOT).
+#
+# task-id omesso -> cascata $LOOM_TASK -> symlink current-task.md (lw_resolve_task).
 # =============================================================================
 
 set -euo pipefail
 
-TASK_ID="${1:?Usage: set-task-folder.sh <task-id> [--slug <slug>] [--docs-root <path>]}"
-shift
+TASK_ID=""
+if [[ $# -gt 0 && "$1" != -* ]]; then
+    TASK_ID="$1"
+    shift
+fi
 
 SLUG_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
@@ -40,16 +45,13 @@ source "${SCRIPT_DIR}/../utils/lib.sh"
 
 PROJECT_ROOT="$(lw_find_project_root)"
 
+RESOLVED="$(lw_resolve_task "$TASK_ID")" || exit 1
+eval "$RESOLVED"
+
 # Ricava slug dal task file se non override
 if [[ -n "$SLUG_OVERRIDE" ]]; then
     SLUG="$SLUG_OVERRIDE"
 else
-    TASK_FILE_PATTERN="${PROJECT_ROOT}/$(lw_docs_root)/tasks/${TASK_ID}-*.md"
-    TASK_FILE=$(ls $TASK_FILE_PATTERN 2>/dev/null | head -1)
-    if [[ -z "$TASK_FILE" ]]; then
-        echo "ERROR: task file non trovato per ${TASK_ID}" >&2
-        exit 1
-    fi
     BASENAME=$(basename "$TASK_FILE" .md)
     SLUG="${BASENAME#${TASK_ID}-}"
 fi
@@ -69,12 +71,6 @@ else
 fi
 
 # Update **Folder** field in task file (unconditional replace).
-TASK_FILE_PATTERN="${PROJECT_ROOT}/$(lw_docs_root)/tasks/${TASK_ID}-*.md"
-TASK_FILE=$(ls $TASK_FILE_PATTERN 2>/dev/null | head -1)
-if [[ -z "$TASK_FILE" ]]; then
-    echo "ERROR: task file non trovato per ${TASK_ID} (atteso: ${TASK_FILE_PATTERN})" >&2
-    exit 1
-fi
 if ! grep -q '^- \*\*Folder\*\*:' "$TASK_FILE"; then
     echo "ERROR: campo '- **Folder**:' mancante in ${TASK_FILE}" >&2
     exit 1

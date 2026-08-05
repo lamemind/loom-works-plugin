@@ -18,6 +18,28 @@ done
 
 TASK_ID="${1:?Usage: start-task.sh [--mode <repo|no-repo>] [--detach] <task-id>}"
 
+# -----------------------------------------------------------------------------
+# Guardia: sessione gia' vincolata via $LOOM_TASK
+# -----------------------------------------------------------------------------
+# start-task e' la primitiva che CREA il binding, scrivendo il symlink. Dove il
+# binding esiste gia' per altra via (env esportata dallo spawn deck) qui non c'e'
+# mestiere: il symlink resterebbe un puntatore che la sessione corrente ignora
+# — l'env batte il symlink nella cascata — cioe' esattamente la forma di stale
+# che questa guardia esiste per non produrre. Rifiuto anche quando l'ID coincide:
+# concordi adesso, divergenti al primo start-task su un'altra task.
+
+if [[ -n "${LOOM_TASK:-}" ]]; then
+    {
+        echo "ERROR: sessione gia' vincolata a ${LOOM_TASK} via \$LOOM_TASK — start-task non procede."
+        echo "       Niente symlink, niente riga 🟡 in tasks.md, niente SHA di tracking."
+        echo ""
+        echo "       - lavorare su ${LOOM_TASK}      -> /loom-works:run-task (risolve dall'env)"
+        echo "       - lavorare su un'altra task  -> /loom-works:run-task <ID> (arg esplicito, batte l'env)"
+        echo "       - creare il binding di worktree -> rilancia in una sessione senza \$LOOM_TASK"
+    } >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../utils/lib.sh
 source "${SCRIPT_DIR}/../utils/lib.sh"

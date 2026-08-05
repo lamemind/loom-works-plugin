@@ -95,12 +95,13 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/config/materialize-profiles.sh "<id>"
 
 ```markdown
 - @${user_config.doc_folder_name}/tasks.md [Tasks](${user_config.doc_folder_name}/tasks.md)
-- @${user_config.doc_folder_name}/current-task.md [Current Task](${user_config.doc_folder_name}/current-task.md)
 - @${user_config.doc_folder_name}/reference/INDEX.md [Reference Index](${user_config.doc_folder_name}/reference/INDEX.md)
 ```
 
+**`current-task.md` non va @-importato**, mai — nemmeno "per comodità". La task attiva la scrive in contesto **solo** l'hook `SessionStart` (`inject-task.sh`), che risolve la cascata `$LOOM_TASK → symlink`. Un `@-import` la farebbe entrare in parallelo per conto proprio: in una sessione con `$LOOM_TASK` il modello si troverebbe **due** task attive divergenti, l'iniettata e quella (stale) a cui punta il symlink del worktree. Il symlink resta una primitiva di *risoluzione*, non un canale di *iniezione*.
+
 Caso A — **`CLAUDE.md` assente**:
-- Usa `AskUserQuestion` → "Creo `CLAUDE.md` con skeleton minimo (@-import a tasks.md, current-task.md, reference/INDEX.md)?"
+- Usa `AskUserQuestion` → "Creo `CLAUDE.md` con skeleton minimo (@-import a tasks.md e reference/INDEX.md)?"
 - Su **yes** → `Write` di uno skeleton con heading progetto placeholder + blocco `@-import` sopra.
 - Su **no** → stampa lo snippet, l'utente lo aggiunge a mano.
 

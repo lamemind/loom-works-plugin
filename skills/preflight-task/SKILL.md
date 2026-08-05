@@ -14,14 +14,15 @@ $ARGUMENTS
 
 ## 0. Risoluzione task file
 
-Stessa precedenza di `run-task`:
+Stessa cascata di `run-task` — `arg → $LOOM_TASK → symlink`, risolta dallo script:
 
-1. Se l'utente ha specificato un task ID nelle Note utente (es. `T310`), cercalo con Glob `${user_config.doc_folder_name}/tasks/${taskId}-*.md`.
-2. Altrimenti leggi il symlink `${user_config.doc_folder_name}/current-task.md` (modalità linked).
+```bash
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
+```
 
-Detached: taskId obbligatorio. Se manca symlink e manca taskId, chiedi quale task.
+`${taskId}` = ID nelle Note utente (es. `T310`); ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` · `TASK_SRC`. Exit non-zero = nessun binding: chiedi quale task.
 
-**No subagent. Glob + Read diretti.**
+**No subagent. `Read` diretto di `TASK_FILE`.**
 
 Stampa header compatto identico a run-task:
 

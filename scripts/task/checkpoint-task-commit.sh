@@ -33,27 +33,30 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../utils/lib.sh
 source "${SCRIPT_DIR}/../utils/lib.sh"
 
-SYMLINK_PATH="${PROJECT_ROOT}/$(lw_docs_root)/current-task.md"
-TASKS_DIR="${PROJECT_ROOT}/$(lw_docs_root)/tasks"
-
 TASK_FILE=""
 TASK_ID=""
+TASK_SRC=""
 TRACKED_SHA=""
 
-if [[ -n "$TASK_ID_ARG" ]]; then
-    TASK_FILE=$(find "$TASKS_DIR" -maxdepth 1 -name "${TASK_ID_ARG}-*.md" 2>/dev/null | head -1)
-    if [[ -z "$TASK_FILE" || ! -f "$TASK_FILE" ]]; then
-        echo "ERROR: Task file non trovato per ${TASK_ID_ARG} in ${TASKS_DIR}" >&2
-        exit 1
-    fi
-    TASK_ID=$(grep -m1 '^\- \*\*ID\*\*:' "$TASK_FILE" | sed 's/.*: //')
+if RESOLVED="$(lw_resolve_task "$TASK_ID_ARG")"; then
+    eval "$RESOLVED"
     TRACKED_SHA=$(grep -m1 '^\- \*\*Last tracked commit\*\*:' "$TASK_FILE" | sed 's/.*: //')
-elif [[ -L "$SYMLINK_PATH" ]]; then
-    TASK_FILE=$(readlink -f "$SYMLINK_PATH")
-    if [[ -f "$TASK_FILE" ]]; then
-        TASK_ID=$(grep -m1 '^\- \*\*ID\*\*:' "$TASK_FILE" | sed 's/.*: //')
-        TRACKED_SHA=$(grep -m1 '^\- \*\*Last tracked commit\*\*:' "$TASK_FILE" | sed 's/.*: //')
-    fi
+elif [[ -n "$TASK_ID_ARG" ]]; then
+    # Un id chiesto esplicitamente e non risolvibile e' un errore duro: chi lo ha
+    # passato sa quale task vuole, committare "quella sbagliata ma qualcosa" sarebbe
+    # peggio del fallimento. Senza arg si prosegue: il commit del codice non deve
+    # dipendere dall'esistenza di un binding (lw_resolve_task ha gia' loggato perche').
+    exit 1
+fi
+
+# $LOOM_TASK = N sessioni parallele sullo stesso worktree, una task ciascuna. Li'
+# `git add -A` rastrella dentro questo commit i file su cui stanno lavorando le
+# altre — in silenzio, senza errore, e il danno si scopre a push fatto. Lo stage
+# selettivo diventa quindi obbligatorio a prescindere da cosa ha passato il
+# chiamante: peggio che possa succedere ora e' un "niente in stage", visibile.
+if [[ "$TASK_SRC" == "env" && $NO_ADD -eq 0 ]]; then
+    NO_ADD=1
+    echo "-> binding via \$LOOM_TASK=${TASK_ID}: forzato --no-add (stage selettivo, il worktree puo' ospitare altre sessioni)"
 fi
 
 CURRENT_BRANCH=$(lw_current_branch)

@@ -17,32 +17,30 @@ $ARGUMENTS
 ## Parsing argomenti
 
 Da `$ARGUMENTS` estrai:
-- **taskId**: pattern `T\d+` (obbligatorio)
+- **taskId**: pattern `T\d+` o `D\d+` (opzionale — omesso, lo risolve la cascata)
 - **`--slug <slug>`**: override slug per naming canonical (opzionale). Default: task slug dal filename.
-
-Se taskId assente → leggi symlink `${user_config.doc_folder_name}/current-task.md` per ricavarlo. Se anche symlink assente → errore, chiedi task ID.
 
 ## Flusso
 
 ### 1. Risolvi task file
 
 ```bash
-ls ${user_config.doc_folder_name}/tasks/${taskId}-*.md
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --docs-root "${user_config.doc_folder_name}"
 ```
 
-Leggi il file task. Estrai:
-- task slug (dal filename: `T02-my-slug.md` → slug = `my-slug`)
-- campo `**Folder**:` corrente
+Cascata `arg → $LOOM_TASK → symlink`. Exit non-zero = nessun binding: chiedi il task ID.
 
-Se campo Folder già popolato → avvisa l'utente e chiedi conferma prima di sovrascrivere.
+`Read` di `TASK_FILE`. Estrai il campo `**Folder**:` corrente — se già popolato, avvisa l'utente e chiedi conferma prima di sovrascrivere.
 
 ### 2. Crea (o riusa) la folder canonical
 
 Naming canonico `.YY-MM-DD-slug` **in project root** (mai sotto `${user_config.doc_folder_name}/tasks/`: il nome dotted è solo il nome, il parent è la root):
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${taskId} [--slug <slug>] --docs-root "${user_config.doc_folder_name}"
+${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${TASK_ID} [--slug <slug>] --docs-root "${user_config.doc_folder_name}"
 ```
+
+Passa il `TASK_ID` **risolto** allo step 1, non l'arg grezzo: senza, lo script rifà la cascata per conto suo e una fonte diversa gli farebbe scrivere il campo `**Folder**:` in un altro task file.
 
 Lo script:
 - Calcola `DATE=$(date +%y-%m-%d)`

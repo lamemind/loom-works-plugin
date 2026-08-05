@@ -2,14 +2,24 @@
 
 # =============================================================================
 # checkpoint-task-analyze.sh - Raccoglie info per checkpoint-task
-# Usage: checkpoint-task-analyze.sh
-# Env:   PROJECT_ROOT (default: $PWD)
+# Usage: checkpoint-task-analyze.sh [--task <id>]
+# Env:   PROJECT_ROOT (default: $PWD), LOOM_TASK
+# =============================================================================
+#
+# L'analisi diff TRACKED_SHA..HEAD ha senso solo sul binding di WORKTREE (symlink
+# current-task.md): li' la task e' una sola e tutto il movimento del repo le
+# appartiene. Con un binding di SESSIONE (arg esplicito o $LOOM_TASK) il worktree
+# ospita N task in parallelo, quindi il diff raccoglie anche il lavoro delle altre
+# — lo script lo salta e lascia al chiamante il compito di derivare i deliverables
+# dal contesto della conversazione. Vedi docs/task-management.md §Detached.
 # =============================================================================
 
+TASK_ID_ARG=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --mode) LOOM_PROJECT_MODE="$2"; shift 2 ;;
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
+        --task) TASK_ID_ARG="$2"; shift 2 ;;
         *) break ;;
     esac
 done
@@ -20,27 +30,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../utils/lib.sh
 source "${SCRIPT_DIR}/../utils/lib.sh"
 
-SYMLINK_PATH="${PROJECT_ROOT}/$(lw_docs_root)/current-task.md"
+RESOLVED="$(lw_resolve_task "$TASK_ID_ARG")" || exit 1
+eval "$RESOLVED"
 
-if [[ ! -L "$SYMLINK_PATH" ]]; then
-    echo "ERROR: Nessuna task attiva. Usa /loom-works:start-task prima." >&2
-    exit 1
-fi
-
-TASK_FILE=$(readlink -f "$SYMLINK_PATH")
-
-if [[ ! -f "$TASK_FILE" ]]; then
-    echo "ERROR: Task file non trovato: ${TASK_FILE}" >&2
-    exit 1
-fi
-
-TASK_ID=$(grep -m1 '^\- \*\*ID\*\*:' "$TASK_FILE" | sed 's/.*: //')
 PROGRESS=$(grep -m1 '^\- \*\*Progress\*\*:' "$TASK_FILE" | sed 's/.*: //')
 TRACKED_SHA=$(grep -m1 '^\- \*\*Last tracked commit\*\*:' "$TASK_FILE" | sed 's/.*: //')
 
-if [[ -z "$TASK_ID" ]]; then
-    echo "ERROR: Impossibile estrarre metadata dal task file" >&2
-    exit 1
+if [[ "$TASK_SRC" != "symlink" ]]; then
+    echo "CHECKPOINT-TASK-ANALYSIS task=${TASK_ID} src=${TASK_SRC} branch=$(lw_current_branch) progress=${PROGRESS} mode=detached-equivalent"
+    echo ""
+    echo "  Analisi diff saltata: binding di sessione (${TASK_SRC}), il worktree puo' ospitare"
+    echo "  altre task in parallelo. Deriva i deliverables dal contesto e stagia a mano"
+    echo "  (checkpoint-task-commit.sh --task ${TASK_ID} --no-add)."
+    echo ""
+    exit 0
 fi
 
 if lw_is_repo && [[ -z "$TRACKED_SHA" ]]; then
@@ -67,7 +70,7 @@ fi
 SHA_RANGE="${TRACKED_SHA:-n/a}..${CURRENT_SHA:-n/a}"
 BRANCH_DISPLAY="${CURRENT_BRANCH:-n/a}"
 
-echo "CHECKPOINT-TASK-ANALYSIS task=${TASK_ID} branch=${BRANCH_DISPLAY} progress=${PROGRESS} sha=${SHA_RANGE} mode=$(lw_project_mode)"
+echo "CHECKPOINT-TASK-ANALYSIS task=${TASK_ID} src=${TASK_SRC} branch=${BRANCH_DISPLAY} progress=${PROGRESS} sha=${SHA_RANGE} mode=$(lw_project_mode)"
 
 if [[ -n "$COMMITS_SINCE" ]]; then
     echo ""
