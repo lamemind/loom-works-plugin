@@ -2,7 +2,7 @@
 
 # =============================================================================
 # cleanup-done-tasks.sh - Pota task Done oltre soglia giorni
-# Usage: cleanup-done-tasks.sh [--mode <repo|no-repo>] [--docs-root <path>]
+# Usage: cleanup-done-tasks.sh [--docs-root <path>]
 #                               [--days N] [--apply] [task-id ...]
 #
 # Dry-run di default: elenca candidati senza modifiche.
@@ -23,7 +23,6 @@ TASK_FILTER=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode)          LOOM_PROJECT_MODE="$2"; shift 2 ;;
         --docs-root)     LOOM_DOCS_ROOT="$2"; shift 2 ;;
         --days)          DAYS="${2:?--days requires a number}"; shift 2 ;;
         --apply)         APPLY=1; shift ;;
@@ -221,11 +220,6 @@ if [[ $APPLY -eq 0 ]]; then
 fi
 
 # ---- Apply: delete + commit per task -----------------------------------------
-
-if ! lw_is_repo; then
-    echo "ERROR: --apply richiede modalità repo" >&2
-    exit 1
-fi
 
 # ---- Gate: task folder con file ignored/untracked ----------------------------
 # `git rm -rf` non rimuove i file ignorati/untracked di una folder: sopravvivono

@@ -2,21 +2,20 @@
 
 # =============================================================================
 # start-task.sh - Attiva una task per checkpoint tracking
-# Usage: start-task.sh [--mode <repo|no-repo>] [--detach] <task-id>
+# Usage: start-task.sh [--detach] <task-id>
 # Env:   PROJECT_ROOT (default: $PWD)
 # =============================================================================
 
 DETACH=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode) LOOM_PROJECT_MODE="$2"; shift 2 ;;
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
         --detach) DETACH=1; shift ;;
         *) break ;;
     esac
 done
 
-TASK_ID="${1:?Usage: start-task.sh [--mode <repo|no-repo>] [--detach] <task-id>}"
+TASK_ID="${1:?Usage: start-task.sh [--detach] <task-id>}"
 
 # -----------------------------------------------------------------------------
 # Guardia: sessione gia' vincolata via $LOOM_TASK
@@ -63,13 +62,13 @@ fi
 TASK_FILENAME=$(basename "$TASK_FILE")
 
 # -----------------------------------------------------------------------------
-# Ottieni SHA corrente (vuoto in no-repo)
+# Ottieni SHA corrente
 # -----------------------------------------------------------------------------
 
 SHA=$(lw_current_sha)
 SHA_DISPLAY="${SHA:-n/a}"
 
-if lw_is_repo && [[ -z "$SHA" ]]; then
+if [[ -z "$SHA" ]]; then
     echo "ERROR: Impossibile ottenere SHA corrente" >&2
     exit 1
 fi

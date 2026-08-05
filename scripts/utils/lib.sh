@@ -6,13 +6,16 @@
 # =============================================================================
 #
 # Fornisce:
-# - Detection project_mode (repo | no-repo) via auto-detect
-# - Wrapper git condizionali: noop silenzioso in no-repo
-# - Read helper git: ritornano stringa vuota in no-repo
+# - Wrapper git e read helper
+# - Detection del remote: l'unica capability davvero variabile
 #
 # Env letto:
 # - PROJECT_ROOT (default: $PWD)
-# - LOOM_PROJECT_MODE (override manuale, opzionale)
+#
+# Modello: REPO SEMPRE, REMOTE OPZIONALE. Un progetto loom-works e' sempre un
+# repo git — se non lo e', `git init` e' un prerequisito, non un modo alternativo
+# di funzionare. Cio' che manca davvero in natura e' il REMOTE: si lavora in
+# locale, si committa, e non c'e' dove pushare. Il gate sta quindi solo sul push.
 #
 # Config vera vive in plugin settings.json (project level), non nel sentinel.
 # =============================================================================
@@ -47,24 +50,15 @@ lw_find_project_root() {
     echo "$PWD"
 }
 
-# ---- Project mode detection ---------------------------------------------------
+# ---- Remote detection ---------------------------------------------------------
+#
+# La sola capability variabile del modello. Gate su `origin` e non sulla presenza
+# generica di un remote: tutto il resto della lib parla origin (lw_remote_url, il
+# push con branch esplicito), quindi un remote di altro nome non renderebbe
+# comunque pushabile il branch.
 
-lw_project_mode() {
-    if [[ -n "${LOOM_PROJECT_MODE:-}" ]]; then
-        echo "$LOOM_PROJECT_MODE"
-        return 0
-    fi
-    local root
-    root="$(lw_find_project_root)"
-    if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        echo "repo"
-    else
-        echo "no-repo"
-    fi
-}
-
-lw_is_repo() {
-    [[ "$(lw_project_mode)" == "repo" ]]
+lw_has_remote() {
+    git -C "$(lw_find_project_root)" remote get-url origin >/dev/null 2>&1
 }
 
 # ---- Docs root ---------------------------------------------------------------
@@ -161,15 +155,13 @@ lw_resolve_task() {   # [<task-id>]
     printf 'TASK_ID=%q\nTASK_FILE=%q\nTASK_SRC=%q\n' "$id" "$file" "$src"
 }
 
-# ---- Git wrappers (noop in no-repo) ------------------------------------------
+# ---- Git wrappers -------------------------------------------------------------
 
 lw_git_add() {
-    lw_is_repo || return 0
     git -C "$(lw_find_project_root)" add "$@"
 }
 
 lw_git_commit() {
-    lw_is_repo || return 0
     git -C "$(lw_find_project_root)" commit -m "$1"
 }
 
@@ -178,7 +170,6 @@ lw_git_commit() {
 #   1 = commit fallito
 #   2 = niente in stage (nessun commit fatto, no-op silenzioso)
 lw_git_commit_staged() {
-    lw_is_repo || return 2
     local root
     root="$(lw_find_project_root)"
     git -C "$root" diff --cached --quiet && return 2
@@ -186,8 +177,15 @@ lw_git_commit_staged() {
     return 0
 }
 
+# Senza `origin` non fallisce: avvisa su stderr ed esce 0, cosi' la skill chiamante
+# prosegue invece di rompersi a meta'. Il warning NON e' cosmetico — e' l'unica
+# differenza percepibile fra "pushato" e "resta locale". Un no-op muto lascerebbe
+# credere che il lavoro sia remoto, e ogni skill task-level chiude con un push.
 lw_git_push() {
-    lw_is_repo || return 0
+    if ! lw_has_remote; then
+        echo "WARNING: nessun remote 'origin' — commit locali, niente push." >&2
+        return 0
+    fi
     local branch="${1:-}"
     if [[ -n "$branch" ]]; then
         git -C "$(lw_find_project_root)" push origin "$branch"
@@ -196,25 +194,23 @@ lw_git_push() {
     fi
 }
 
-# ---- Git read helpers (empty string in no-repo) ------------------------------
+# ---- Git read helpers ---------------------------------------------------------
 
 lw_current_branch() {
-    lw_is_repo || { echo ""; return 0; }
     git -C "$(lw_find_project_root)" branch --show-current
 }
 
 lw_current_sha() {
-    lw_is_repo || { echo ""; return 0; }
     git -C "$(lw_find_project_root)" rev-parse --short HEAD
 }
 
 lw_git_status_porcelain() {
-    lw_is_repo || { echo ""; return 0; }
     git -C "$(lw_find_project_root)" status --porcelain
 }
 
+# Stringa vuota quando il remote non c'e' — qui l'assenza e' un valore legittimo,
+# non un errore: e' esattamente cio' che il modello ammette.
 lw_remote_url() {
-    lw_is_repo || { echo ""; return 0; }
     git -C "$(lw_find_project_root)" config --get remote.origin.url 2>/dev/null || echo ""
 }
 
@@ -227,7 +223,6 @@ lw_remote_url() {
 # is repo-relative. Note: `ls-files -o` WITHOUT `--exclude-standard` = untracked
 # AND ignored — exactly the leftover set.
 lw_folder_survivors() {  # <rel_folder>
-    lw_is_repo || { echo ""; return 0; }
     git -C "$(lw_find_project_root)" ls-files -o -- "$1" 2>/dev/null || true
 }
 

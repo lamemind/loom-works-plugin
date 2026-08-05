@@ -68,7 +68,6 @@ All options are optional. Set in your project's `.claude/settings.json`:
     "loom-works@lamemind": {
       "options": {
         "doc_folder_name": "docs",
-        "project_mode": "repo",
         "on_lane_spawned_hook": ""
       }
     }
@@ -79,7 +78,6 @@ All options are optional. Set in your project's `.claude/settings.json`:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `doc_folder_name` | `docs` | Folder for tasks.md, tasks/, reference/, current-task.md |
-| `project_mode` | auto-detect | `repo` or `no-repo` — auto-detected via `git rev-parse` if empty |
 | `on_lane_spawned_hook` | (empty) | Path relative to project root, executed once after `spawn-lane` |
 
 ## TTS support

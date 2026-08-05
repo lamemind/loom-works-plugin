@@ -2,7 +2,7 @@
 
 # =============================================================================
 # checkpoint-task-commit.sh - Commit e push per checkpoint-task
-# Usage: checkpoint-task-commit.sh [--mode <repo|no-repo>] [--task <id>] [--no-add] [--doc-message "<msg>"] "commit message"
+# Usage: checkpoint-task-commit.sh [--task <id>] [--no-add] [--doc-message "<msg>"] "commit message"
 # Env:   PROJECT_ROOT (default: $PWD)
 #
 # Doppio commit: i file doc-nozione (sotto <docs-root>/ ma fuori da tasks.md e
@@ -16,7 +16,6 @@ TASK_ID_ARG=""
 DOC_MESSAGE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode) LOOM_PROJECT_MODE="$2"; shift 2 ;;
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
         --task) TASK_ID_ARG="$2"; shift 2 ;;
         --no-add) NO_ADD=1; shift ;;
@@ -25,7 +24,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-COMMIT_MESSAGE="${1:?Usage: checkpoint-task-commit.sh [--mode <repo|no-repo>] [--task <id>] [--no-add] \"commit message\"}"
+COMMIT_MESSAGE="${1:?Usage: checkpoint-task-commit.sh [--task <id>] [--no-add] \"commit message\"}"
 
 PROJECT_ROOT="${PROJECT_ROOT:-$PWD}"
 
@@ -61,11 +60,6 @@ fi
 
 CURRENT_BRANCH=$(lw_current_branch)
 CURRENT_SHA=$(lw_current_sha)
-
-if ! lw_is_repo; then
-    echo "-> no-repo mode: skip commit/push (nessun tracking git)"
-    exit 0
-fi
 
 # Normalizza drift Progress: il modello a volte chiude la task con "✔️ 100%"
 # invece di "✔️ Done" (idioma percentuale ereditato da start-task). Replace secco

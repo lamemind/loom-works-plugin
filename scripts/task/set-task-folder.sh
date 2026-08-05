@@ -79,7 +79,6 @@ sed -i "s|^- \*\*Folder\*\*:.*\$|- **Folder**: ${FOLDER_FIELD}|" "$TASK_FILE"
 echo "-> updated **Folder** field in $(basename "$TASK_FILE")"
 
 # Stage folder + task file so callers' next commit includes them.
-# In no-repo mode lw_git_add is a noop.
 lw_git_add "$FOLDER_PATH"
 lw_git_add "$TASK_FILE"
 

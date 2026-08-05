@@ -8,13 +8,12 @@
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode) LOOM_PROJECT_MODE="$2"; shift 2 ;;
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
         *) break ;;
     esac
 done
 
-TASK_ID="${1:?Usage: create-task.sh [--mode <repo|no-repo>] <task-id> <task-name> <task-desc> <priority>}"
+TASK_ID="${1:?Usage: create-task.sh <task-id> <task-name> <task-desc> <priority>}"
 TASK_NAME="${2:?Task name required (kebab-case per filename)}"
 TASK_DESC="${3:?Task description required}"
 PRIORITY="${4:?Priority required (High/Med/Low)}"
@@ -87,13 +86,9 @@ echo "-> Aggiunta task ${TASK_ID} alla tabella"
 
 cd "$PROJECT_ROOT" || exit 1
 
-if lw_is_repo; then
-    lw_git_add "$TASK_FILE"
-    lw_git_add "$TASKS_FILE"
-    lw_git_commit "task(${TASK_ID}): create - ${TASK_DESC}"
-    lw_git_push
-else
-    echo "-> no-repo mode: skip git add/commit/push"
-fi
+lw_git_add "$TASK_FILE"
+lw_git_add "$TASKS_FILE"
+lw_git_commit "task(${TASK_ID}): create - ${TASK_DESC}"
+lw_git_push
 
 echo "-> ✔️task=${TASK_ID} file=$(lw_docs_root)/tasks/${TASK_ID}-${TASK_NAME}.md"

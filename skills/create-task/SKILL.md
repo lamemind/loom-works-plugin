@@ -55,7 +55,7 @@ Esempio: `/loom-works:create-task yolo migliorare logging dei servizi`
 
 ### 1. Generazione ID task
 ```bash
-TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}")
+TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh --docs-root "${user_config.doc_folder_name}")
 ```
 Output: ID completo pronto all'uso (es: T319, T320). Prefix `T` hardcoded.
 
@@ -138,7 +138,7 @@ Lo script gestisce folder canonica `${PROJECT_ROOT}/.${YYYY-MM-DD}-${task-name}`
 
 ### 4. Finalizzazione
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" ${TASK_ID} ${task-name} "${descrizione_breve}" ${priority}
+${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh --docs-root "${user_config.doc_folder_name}" ${TASK_ID} ${task-name} "${descrizione_breve}" ${priority}
 # Priority: High | Med | Low
 # descrizione_breve: max 100 caratteri (troncata automaticamente dallo script)
 ```

@@ -26,7 +26,7 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${user_confi
 
 2. **Esegui script**
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/start-task.sh --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}" ${DETACH:+--detach} ${TASK_ID}
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/start-task.sh --docs-root "${user_config.doc_folder_name}" ${DETACH:+--detach} ${TASK_ID}
    ```
    (passa `--detach` solo se DETACH=1)
 

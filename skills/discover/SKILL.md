@@ -137,7 +137,7 @@ Opzioni (path assoluti, `cwd` = project root):
 - `edit` → **restore** del batch (annulla), poi rilancia lo step 4 con le correzioni, su base pulita. Torna a step 5.
 - `skip` → **restore** del batch, nessuna modifica persiste. Fine (salta step 6).
 
-**Restore** = per ogni file del contratto `APPLIED:`: `MOD` → `git restore -- <file>`, `NEW` (untracked) → `rm -- <file>`. In `no-repo` (nessun git) il rollback non è offribile: stampa la lista file + avviso «no-repo: bootstrap applicato, nessun rollback automatico», niente gate ok/skip.
+**Restore** = per ogni file del contratto `APPLIED:`: `MOD` → `git restore -- <file>`, `NEW` (untracked) → `rm -- <file>`.
 
 ### 6. Rebuild INDEX se serve
 
@@ -177,5 +177,4 @@ Topic = argomento concreto della domanda. NO generici.
 - **Apply-first**: il doc-writer applica i file, la review è sul diff reale (pannello git), non su un testo di ritorno. Su `ok` i file restano **staged** (non committed); il commit è dell'utente. Su `skip`/`edit` il batch è restorato.
 - **Non invocare discover due volte senza aspettare review**: ogni chiamata al doc-writer è costosa in token.
 - **Multi-lingua**: lo scan copre workspace-level (ecosystemi). Per doc di dettaglio intra-codice (classi, metodi) di progetti TS/JS esiste `scripts/explorer/extract-codebase.ts` come futuro L3 — non integrato in questa versione della skill.
-- **Fallback no-repo**: la skill funziona uguale in progetti senza git, ma il gate review degrada a informativo (nessun stage/restore, patch non reversibile automaticamente — vedi step 5).
 - **Scope split con `capture-doc`**: discover produce la **prima generazione** (scaffold + stub). capture-doc riempie i dettagli **man mano**. Non duplicare responsabilità: se l'utente chiede "documenta meglio il servizio X", rimandalo a capture-doc.

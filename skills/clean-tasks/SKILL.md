@@ -37,7 +37,6 @@ Passa l'intero SPEC/range in **una sola invocazione**: lo script espande i range
 **Modo A:**
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
-    --mode "${user_config.project_mode}" \
     --docs-root "${user_config.doc_folder_name}" \
     <SPEC...>
 ```
@@ -45,7 +44,6 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
 **Modo B:**
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/cleanup-done-tasks.sh \
-    --mode "${user_config.project_mode}" \
     --docs-root "${user_config.doc_folder_name}" \
     --days ${DAYS}
 ```
@@ -78,7 +76,6 @@ Stesso comando con `--apply`. Lo script cicla i target e committa uno per uno.
 **Modo A:**
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
-    --mode "${user_config.project_mode}" \
     --docs-root "${user_config.doc_folder_name}" \
     --apply \
     <SPEC...>
@@ -87,7 +84,6 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
 **Modo B:**
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/cleanup-done-tasks.sh \
-    --mode "${user_config.project_mode}" \
     --docs-root "${user_config.doc_folder_name}" \
     --days ${DAYS} \
     --apply
@@ -115,7 +111,6 @@ Poi rilancia lo **stesso** comando `--apply` aggiungendo `--ignored-files keep` 
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/clean-tasks.sh \
-    --mode "${user_config.project_mode}" \
     --docs-root "${user_config.doc_folder_name}" \
     --apply --ignored-files <keep|purge> \
     <SPEC...>

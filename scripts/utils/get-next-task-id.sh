@@ -2,7 +2,7 @@
 
 # =============================================================================
 # get-next-task-id.sh - Genera il prossimo ID task
-# Usage: get-next-task-id.sh [--mode <repo|no-repo>] [--prefix <T|D|...>]
+# Usage: get-next-task-id.sh [--prefix <T|D|...>]
 # Env:   PROJECT_ROOT (default: $PWD)
 # Output: ID completo (es: T04, T319, D01)
 #
@@ -21,10 +21,6 @@ PREFIX="T"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode)
-            LOOM_PROJECT_MODE="$2"
-            shift 2
-            ;;
         --docs-root)
             LOOM_DOCS_ROOT="$2"
             shift 2

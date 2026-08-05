@@ -9,7 +9,6 @@ Stampa quello che la skill vede e quello che lo script vede.
 
 ## Dalla skill (interpolazione markdown)
 
-- `project_mode` (da `${user_config.project_mode}`): **${user_config.project_mode}**
 - `doc_folder_name` (da `${user_config.doc_folder_name}`): **${user_config.doc_folder_name}**
 - `CLAUDE_PLUGIN_ROOT`: **${CLAUDE_PLUGIN_ROOT}**
 

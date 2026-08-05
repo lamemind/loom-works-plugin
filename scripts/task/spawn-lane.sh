@@ -31,8 +31,6 @@ REPOS=("$@")
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../utils/lib.sh
 source "${SCRIPT_DIR}/../utils/lib.sh"
-# shellcheck source=../utils/assert-capability.sh
-"${SCRIPT_DIR}/../utils/assert-capability.sh" repo
 
 PROJECT_ROOT="$(lw_find_project_root)"
 WORKTREE_BASE="$(dirname "$PROJECT_ROOT")"

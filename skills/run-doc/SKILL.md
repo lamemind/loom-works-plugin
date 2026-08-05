@@ -236,6 +236,6 @@ Topic = argomento concreto della domanda. NO generici.
 ## Note operative
 
 - **`/clear` non serve per-chunk**: ogni subagent nasce fresco, la main session cresce lento (solo task file read + Agent summary per iterazione). Se l'utente sente pressione di contesto dopo molti giri, può interrompere e rilanciare `/loom-works:run-doc` — il task file supporta cold-restart via `### Rounds` e `### Resume context`.
-- **Checkpoint per giro**: commit frequenti. In progetto `no-repo`, checkpoint-task degrada a noop silenzioso (nessun commit).
+- **Checkpoint per giro**: commit frequenti.
 - **Non modificare doc direttamente**: tutto il lavoro editoriale passa dal subagent. Questa skill **orchestra**, non scrive doc.
 - **Progress del task file**: a primo giro, aggiorna `- **Progress**:` da `🔵 Todo` a `🟡 In Progress` (coerente con `start-task`, se non già fatto).

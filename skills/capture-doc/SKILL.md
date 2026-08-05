@@ -102,8 +102,6 @@ Gestione della scelta (path assoluti, `cwd` = project root):
   Nessuna modifica persiste. **Salta step 5** (niente rebuild INDEX su patch scartata). Vai a step 6.
 - **edit** → restore (come skip) + **rilancia lo step 3** col feedback dell'utente, su base pulita. Poi torna a step 4.
 
-**no-repo** (nessun git): niente stage né restore. La patch resta applicata; il gate degrada a **informativo** — stampa la lista file + avviso «no-repo: patch applicata, nessun rollback automatico», **nessuna** `AskUserQuestion` ok/skip (non c'è reversibilità da offrire). Rileva con `git rev-parse --is-inside-work-tree 2>/dev/null` prima di offrire il gate.
-
 ### 5. Rigenera INDEX se serve
 
 Solo su patch **accettata** (ok) e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${user_config.doc_folder_name}/reference/`):
@@ -137,7 +135,7 @@ Topic = argomento concreto della domanda. NO generici.
 
 ## Note
 
-- Il subagent lavora **in-place**: nessun worktree, nessun branch. Se il progetto è `no-repo`, funziona uguale (il gate degrada a informativo, vedi step 4).
+- Il subagent lavora **in-place**: nessun worktree, nessun branch. Il gate di review poggia su git (stage su ok, restore su skip), che il modello dà per presente.
 - Per capture **in** una task, usa `create-task` / `run-task` (path 1), non questa skill.
 - Il doc-writer opera su **tutta la doc** (online `{docs_root}/project/`, offline `{docs_root}/reference/`) e applica **anche una patch a `CLAUDE.md`** quando serve (es. aggiunta `@-import` per un nuovo file online). Quel file compare come `MOD CLAUDE.md` nel contratto `APPLIED:` → segue la stessa sorte del resto: staged su ok, restorato su skip.
 - **Apply-first**: la review dell'utente è sul diff reale (working tree), non su un testo di ritorno del subagent. Stage = approvazione, restore = rifiuto. Lo stage-su-ok è anche il *punto di ripristino* che protegge le patch approvate da un rifiuto successivo su file condiviso.

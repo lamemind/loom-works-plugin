@@ -19,7 +19,6 @@ set -euo pipefail
 # --remove <lane>: esclude esplicitamente una lane dalla vista (cleanup post-merge
 #   quando il worktree non è ancora stato rimosso al momento della render).
 #
-# Noop silenzioso in no-repo (nessun worktree possibile).
 # =============================================================================
 
 REMOVE_LANE=""
@@ -36,9 +35,6 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "${SCRIPT_DIR}/lib.sh"
-
-# no-repo → nessun worktree, niente da rendere
-lw_is_repo || exit 0
 
 PROJECT_ROOT="$(lw_find_project_root)"
 WORKTREE_BASE="$(dirname "$PROJECT_ROOT")"

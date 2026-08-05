@@ -77,7 +77,7 @@ Esempio: `/loom-works:doc-task yolo riorganizza sezione logging in common-packag
 
 ### 1. Generazione ID task
 ```bash
-TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh --prefix D --mode "${user_config.project_mode}" --docs-root "${user_config.doc_folder_name}")
+TASK_ID=$(${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh --prefix D --docs-root "${user_config.doc_folder_name}")
 ```
 Output: ID completo con prefix D (es: D01, D02, D03). Counter indipendente da quello delle code task (`T{N}`).
 
@@ -145,7 +145,6 @@ Sostituisci i placeholder:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh \
-    --mode "${user_config.project_mode}" \
     --docs-root "${user_config.doc_folder_name}" \
     ${TASK_ID} ${task-name} "${descrizione_breve}" ${priority}
 ```
@@ -153,7 +152,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh \
 Lo script:
 - Deriva automaticamente `K=📝` dal prefix `D` (⚙️ per altri prefix)
 - Aggiunge la riga alla tabella `## Tasks Overview` di `${user_config.doc_folder_name}/tasks.md`
-- Committa e pusha (skip in `no-repo`)
+- Committa e pusha (senza remote il push avvisa su stderr e prosegue)
 
 ### 6. Feedback finale
 
@@ -186,4 +185,3 @@ Topic = argomento concreto della domanda. NO generici.
 - **Path assoluti** per tutte le operazioni filesystem
 - **Timestamp** formato `YYYY-MM-DD HH:mm`
 - **Kebab-case** per task name se contiene spazi
-- In `no-repo` mode: `create-task.sh` salta automaticamente git add/commit/push (helper `lw_is_repo` in `lib.sh`)
