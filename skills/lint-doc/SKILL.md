@@ -1,13 +1,13 @@
 ---
 name: lint-doc
-description: Misura la doc di progetto contro il contratto editoriale — file sopra soglia, TLDR-riassunto, residui storici, costo online, coordinate opache. Due fasi sequenziali (clean, poi split), auto-apply, misure numeriche via doc-metrics.sh, giudizio via doc-auditor read-only, patch via doc-writer. Token `plan`: misura e piano delle invocazioni, senza applicare niente.
+description: Misura la doc di progetto contro il contratto editoriale — file sopra soglia, TLDR-riassunto, residui storici, costo online, coordinate opache. Due fasi sequenziali (clean, poi split), auto-apply, misure numeriche via doc-metrics.sh, giudizio via doc-auditor read-only, patch via doc-writer. Token `plan`: misura e piano delle invocazioni, senza applicare niente. Token `yolo`: ciclo completo non presidiato, committa da sé.
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: sonnet
 ---
 
 Confronta la doc di progetto col **contratto editoriale** (`${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md`) e trova le **violazioni**.
 
-Input utente (perimetro doc: file, cartella, vuoto = tutta la doc · più i token `clean` / `split` / `gate` / `plan`):
+Input utente (perimetro doc: file, cartella, vuoto = tutta la doc · più i token `clean` / `split` / `gate` / `plan` / `yolo`):
 ~~~human
 $ARGUMENTS
 ~~~
@@ -31,7 +31,7 @@ Il costo si divide in due voci che non vanno confuse: **rilevare** che un file �
 
 ### Fase e perimetro dall'input
 
-Dall'input si estraggono due cose indipendenti. I token noti sono `clean`, `split`, `gate`, `plan`; **tutto il resto è perimetro**.
+Dall'input si estraggono due cose indipendenti. I token noti sono `clean`, `split`, `gate`, `plan`, `yolo`; **tutto il resto è perimetro**.
 
 - nessun token di fase → **entrambe**, `clean` poi `split`, in un'unica invocazione
 - `clean` → solo riduzioni; i file sopra soglia restano nel registro come `SPLIT: deferred`
@@ -46,13 +46,28 @@ Esempi:
 /loom-works:lint-doc docs/reference/db/dtl-schema.md split
 /loom-works:lint-doc                                → tutta la doc, entrambe le fasi
 /loom-works:lint-doc plan                           → misura + piano, non applica niente
+/loom-works:lint-doc yolo                           → ciclo completo, committa, zero domande
 ```
 
-### `plan` — misura e fermati
+### Fin dove arrivare — `plan` e `yolo`
 
-`plan` **non è una fase**: le fasi dicono *cosa fare*, `plan` dice **fin dove arrivare**. Col token la skill esegue §1 (misura) e §2 (partizione), stampa il piano e **si ferma lì** — niente fan-out di auditor (§3), niente registro su disco (§4), niente writer, niente stage. Il costo sono due chiamate bash e nessun subagent: è ciò che lo rende consultabile *prima* di decidere se e da dove partire.
+Nessuno dei due è una fase: le fasi dicono *cosa fare*, questi dicono **fin dove arrivare**. Sono i due estremi dello stesso asse, col default in mezzo.
 
-Con `plan` gli altri token diventano inerti: `gate` non ha verdetti da raccogliere, e i token di fase non selezionano niente, perché **il perimetro della fase split non è calcolabile ex-ante** — dipende dai char *dopo* le riduzioni (§8). Il piano elenca quindi sempre le invocazioni `clean` per gruppo e chiude con uno step `split` a perimetro da ricalcolare.
+| token | applica | committa | si ferma |
+| --- | --- | --- | --- |
+| `plan` | no | no | dopo la misura (§1-§2) |
+| _(nessuno)_ | sì | no — stagea | dopo lo stage |
+| `yolo` | sì | sì | a bonifica chiusa, registro rimosso |
+
+`gate` sta sull'asse ortogonale — l'interattività — ed è **incompatibile con entrambi gli estremi**: con `plan` non c'è nessun verdetto da approvare, con `yolo` chiedere è la negazione del token. Se arriva insieme a uno dei due, `gate` perde e il report lo dichiara.
+
+`plan` e `yolo` insieme sono contraddittori: vince **`plan`** — fra due estremi opposti, quello che non scrive.
+
+#### `plan` — misura e fermati
+
+Col token la skill esegue §1 (misura) e §2 (partizione), stampa il piano e **si ferma lì** — niente fan-out di auditor (§3), niente registro su disco (§4), niente writer, niente stage. Il costo sono due chiamate bash e nessun subagent: è ciò che lo rende consultabile *prima* di decidere se e da dove partire.
+
+Anche i token di fase sono inerti: **il perimetro della fase split non è calcolabile ex-ante** — dipende dai char *dopo* le riduzioni (§8). Il piano elenca quindi sempre le invocazioni `clean` per gruppo e chiude con uno step `split` a perimetro da ricalcolare.
 
 Cosa stampa, e nient'altro:
 
@@ -63,13 +78,46 @@ Cosa stampa, e nient'altro:
 
 **Dichiara sempre che la partizione non è pinnata.** Ogni invocazione successiva con perimetro ristretto ricalcola la propria partizione su quel sottoinsieme (§2): i gruppi del piano sono una *work-list*, non i gruppi che quegli auditor useranno davvero. Senza quella riga il piano si legge come un contratto, e il registro che arriva dopo non torna coi numeri annunciati.
 
+#### `yolo` — ciclo completo, nessuna interazione
+
+Piano, entrambe le fasi, tutte le ondate, commit, pulizia: in una sola invocazione, senza una `AskUserQuestion`, senza soste fra le ondate, senza chiedere al chiamante di rilanciare.
+
+**Primo atto, prima di toccare qualunque file** — stampa lo SHA di partenza:
+
+```bash
+git rev-parse --short HEAD
+```
+
+È **l'unica coordinata di undo dell'intera run**, e va stampata due volte: all'inizio (prima che serva) e nel report finale (quando serve). La reversibilità cambia natura rispetto al default — lì niente è committato e ogni patch è un `git checkout -- <path>` di distanza, qui i commit sono già in cronologia e `git checkout` non annulla più niente. L'undo diventa `git reset --hard <SHA>`, che porta via anche i file **nuovi** di uno split: l'asimmetria dichiarata in §"Auto-apply è il default" qui non si applica.
+
+**Non pusha, deliberatamente.** Finché i commit restano locali l'undo è una riga; pushati, diventa un force-push su un ramo che altre sessioni possono già aver letto. Il push è una decisione del chiamante, a valle, quando il diff l'ha visto qualcuno.
+
+Sequenza dei commit — il registro entra in cronologia **prima** delle patch che lo eseguono:
+
+| # | dopo | contenuto | messaggio |
+| - | --- | --- | --- |
+| 1 | §2 | registro col solo piano in testa | `docs(lint): piano bonifica` |
+| 2 | §4 | registro coi finding della fase | `docs(lint): registro fase <clean\|split>` |
+| 3 | §7 | patch dei writer + sweep dei puntatori | `docs(lint): <riduzioni\|split topologia> fase <fase>` |
+| 4 | §9 | INDEX rigenerato, registro rimosso | `docs(lint): chiude bonifica` |
+
+I commit 2 e 3 si ripetono per fase eseguita. Il commit 1 esiste perché **il piano non ha un posto suo**: è la testa del registro, e committarlo lì lo rende consultabile a mesi di distanza invece di morire nello scrollback. Coi commit 2 e 3 adiacenti, `git show` sul primo dice *cosa era stato trovato* e il secondo *cosa è stato fatto* — l'unica traccia forense di una bonifica che nessuno ha revisionato.
+
+Il commit 4 rimuove il registro (materiale di lavoro esaurito, la cronologia lo conserva comunque): serve `git add -A -- <path>`, o la cancellazione non entra nell'indice — stessa ragione del §9.
+
+**Se il registro è gitignorato** (in certi progetti le folder dot-prefixed lo sono), i commit 1, 2 e 4 non hanno niente da stagiare e `git commit` esce non-zero: verifica con `git check-ignore -q <REGISTRY_PATH>` prima del commit 1, e se è ignorato salta i tre commit del registro **dichiarandolo nel report**. Le patch (commit 3) restano.
+
+**Re-entrante senza bookkeeping.** Se la sessione muore a metà, si rilancia `yolo` e riprende — non c'è stato da recuperare, perché **la misura è lo stato**: un file già ripulito è sotto soglia ed esce dalla partizione da solo alla rimisura del §1. È la stessa proprietà per cui la fase split ricalcola il perimetro invece di riusare la lista della fase clean (§8), applicata all'intera run invece che al solo passaggio fra fasi.
+
+**Il contesto dell'orchestratore è la risorsa scarsa** — l'unica che può far fallire il ciclo: auditor e writer hanno contesto proprio e lo buttano, il chiamante accumula per tutta la run. Quindi in `yolo` non si ri-echeggia in chat niente che stia già su disco: né registro, né diff, né elenchi di finding. Una riga per fase, il report solo alla fine.
+
 ### Auto-apply è il default — il gate è il diff
 
 Senza il token `gate` la skill **non chiede verdetti**: applica le patch e stagea. Il controllo di merito si sposta a valle, sul `git diff` dell'utente, ed è la stessa sentenza dell'apply-first del gate doc al checkpoint — patch applicata, mai committata, review dal diff.
 
 Regge perché **niente è irreversibile**: la skill stagea e si ferma, e ogni patch è un `git checkout` di distanza. Unica asimmetria da dichiarare nel report: uno split crea file **nuovi**, che `git checkout -- <path>` non rimuove — annullarlo richiede anche di cancellare i frammenti (`git rm -f`, o `git clean -f` se non erano stati staged).
 
-Con `gate` torna l'`AskUserQuestion` sul registro completo (§5), **una volta per fase**.
+Con `gate` torna l'`AskUserQuestion` sul registro completo (§5), **una volta per fase**. Con `yolo` la reversibilità non passa più di qui: i commit sono già in cronologia e l'unica coordinata è lo SHA baseline (§`yolo`).
 
 ## Numeri prima, giudizio dopo
 
@@ -100,6 +148,8 @@ Consuma le misure del §1 e ritorna i gruppi già formati, ciascuno col proprio 
 **Due cap, non uno**: `--max-groups` (4) è quanti auditor per *ondata* — oltre, il registro diventa illeggibile e il gate dei verdetti impraticabile; `--max-char` (60.000) è quanta doc legge *un* auditor. Il secondo esiste perché senza di esso «un gruppo per cartella» degenera: una `reference/` da 23 file finisce tutta in un perimetro solo.
 
 Se la colonna `WAVE` porta più di 1, **esegui un'ondata per messaggio** e consolida il registro alla fine. Non tagliare i gruppi in eccesso: quei file resterebbero non auditati senza che nulla lo dica.
+
+In **`yolo` le ondate girano back-to-back** nella stessa invocazione. La sosta per messaggio esiste per tenere il registro leggibile e il gate praticabile, e in modo non presidiato nessuna delle due ragioni regge: `--max-groups` torna a essere solo un limite di **concorrenza** (4 auditor in volo), non un punto di fermata.
 
 In **fase split** la partizione va ricalcolata sul perimetro ristretto (§8), non riusata da quella di clean.
 
@@ -177,9 +227,11 @@ Mai dentro `{docs_root}/`: è materiale di lavoro, non doc di progetto.
 
 In chat va la **sintesi** — una riga per finding (`ID · severità · file · violazione · verdetto proposto`) — più il footprint misurato. Il dettaglio resta nel file.
 
+In `yolo` nemmeno quella: **una riga per fase**, e il piano va scritto in testa al registro prima del suo primo commit (§`yolo`). Ri-echeggiare in chat ciò che è già su disco consuma l'unica risorsa che deve reggere fino in fondo al ciclo.
+
 ### 5. Gate dei verdetti — solo col token `gate`
 
-Senza `gate` questo passo **non esiste**: i verdetti proposti dagli auditor valgono come approvati e si passa al §6. Il controllo è il `git diff` finale.
+Senza `gate` questo passo **non esiste**: i verdetti proposti dagli auditor valgono come approvati e si passa al §6. Il controllo è il `git diff` finale — in `yolo`, dove il diff è già committato, è lo SHA baseline.
 
 Col token `gate`, i verdetti si raccolgono **una volta sola sul registro completo della fase corrente** — mai finding per finding. `AskUserQuestion` (prima il ping TTS) con: conferma tutti · conferma tranne alcuni ID · solo severità alta · nessuno. Annota il verdetto finale su ogni voce del registro.
 
@@ -271,8 +323,8 @@ Il punto 4 non è una precauzione formale: una parte dei candidati scende sotto 
 - **Rimisura finale**: rilancia `doc-metrics.sh --online` e dichiara il delta prima/dopo. È l'unica verifica che la bonifica abbia prodotto l'effetto che si proponeva.
 - **Riverifica i puntatori**: `check-doc-links.sh` (§7) deve uscire **0**. Se esce 2 lo sweep non è finito, e i riferimenti residui vanno nel report — non si chiude in silenzio.
 - **Non stampare i diff** in chat. Solo la lista file dal contratto `APPLIED:`.
-- **Stage, mai commit**: `git add -- <file>...`. Per un `DEL` il file è già sparito dal working tree, quindi serve `git add -A -- <path>`: senza `-A` la cancellazione non entra nell'indice e il commit del chiamante fa rinascere il file.
-- Report finale, **una sezione per fase eseguita**: violazioni per verdetto, file toccati, footprint prima → dopo, riferimenti appesi risolti, voci non applicate. In modo auto aggiungi la riga di reversibilità: i file `NEW` prodotti da uno split non tornano indietro con `git checkout` e vanno rimossi a mano. Se restano voci `BLOCKING: si` non applicate, la riga di chiusura è **`doc NON conforme: <n> violazioni bloccanti`** con i file elencati — non un riepilogo neutro.
+- **Stage, mai commit**: `git add -- <file>...`. Per un `DEL` il file è già sparito dal working tree, quindi serve `git add -A -- <path>`: senza `-A` la cancellazione non entra nell'indice e il commit del chiamante fa rinascere il file. In `yolo` lo stage diventa commit: sequenza e messaggi nel §`yolo`, e il commit di chiusura rimuove il registro.
+- Report finale, **una sezione per fase eseguita**: violazioni per verdetto, file toccati, footprint prima → dopo, riferimenti appesi risolti, voci non applicate. In modo auto aggiungi la riga di reversibilità: i file `NEW` prodotti da uno split non tornano indietro con `git checkout` e vanno rimossi a mano — in `yolo` la riga è invece lo SHA baseline e `git reset --hard`, che li porta via da sé. Se restano voci `BLOCKING: si` non applicate, la riga di chiusura è **`doc NON conforme: <n> violazioni bloccanti`** con i file elencati — non un riepilogo neutro.
 
 ## Convenzione TTS
 
@@ -286,4 +338,4 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <top
 - **Bonifica ≠ prevenzione.** Questa skill è una campagna retroattiva. Le regole che valgono anche al momento della scrittura stanno già altrove: il cap TLDR dentro `build-index.sh` (exit 2 a ogni rigenerazione), l'as-is dentro il contratto che `doc-writer` legge a ogni invocazione. Se una violazione si ripresenta a ogni esecuzione, il fix non è rilanciare `lint-doc` — è spostare quella regola in un punto di enforcement.
 - **La soglia non si negozia a runtime.** Se un file ci passa per pochi caratteri, resta sopra soglia: il numero sta nel contratto, e uno scostamento discusso caso per caso rende le due esecuzioni successive incoerenti.
 - **`GEN` non si splitta a mano.** `INDEX.md` è un artefatto: se è troppo grande, la causa sono i TLDR dei file indicizzati, e il fix sta là.
-- **Due fasi ≠ due commit.** La skill stagea e si ferma in entrambi i casi; separare `docs: riduzioni` da `docs: split topologia` rende il diff molto più leggibile, ma è una scelta del chiamante a valle, non un vincolo di qui.
+- **Due fasi ≠ due commit — tranne in `yolo`.** In modo default la skill stagea e si ferma comunque: separare `docs: riduzioni` da `docs: split topologia` rende il diff molto più leggibile, ma è una scelta del chiamante a valle. In `yolo` non c'è un chiamante a valle che possa farla, quindi la separazione per fase è cablata nella sequenza dei commit.
