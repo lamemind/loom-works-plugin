@@ -62,30 +62,12 @@ fi
 TASK_FILENAME=$(basename "$TASK_FILE")
 
 # -----------------------------------------------------------------------------
-# Ottieni SHA corrente
-# -----------------------------------------------------------------------------
-
-SHA=$(lw_current_sha)
-SHA_DISPLAY="${SHA:-n/a}"
-
-if [[ -z "$SHA" ]]; then
-    echo "ERROR: Impossibile ottenere SHA corrente" >&2
-    exit 1
-fi
-
-# -----------------------------------------------------------------------------
-# Aggiorna file task: Progress e Last tracked commit
+# Aggiorna file task: Progress
 # -----------------------------------------------------------------------------
 
 sed -i '0,/^- \*\*Progress\*\*:/s/^\(- \*\*Progress\*\*:\).*/\1 🟡 0%/' "$TASK_FILE"
 
-if grep -q '^\- \*\*Last tracked commit\*\*:' "$TASK_FILE"; then
-    sed -i "s|^\(- \*\*Last tracked commit\*\*:\).*|\1 ${SHA_DISPLAY}|" "$TASK_FILE"
-else
-    sed -i "/^\- \*\*Priority\*\*:/a - **Last tracked commit**: ${SHA_DISPLAY}" "$TASK_FILE"
-fi
-
-echo "-> Task file aggiornato: Progress 🟡 0%, SHA ${SHA_DISPLAY}"
+echo "-> Task file aggiornato: Progress 🟡 0%"
 
 # -----------------------------------------------------------------------------
 # Aggiorna tasks.md: Progress nella tabella e grafo lane
@@ -123,4 +105,4 @@ else
     MODE_DISPLAY="linked"
 fi
 
-echo "-> started: task=${TASK_ID} sha=${SHA_DISPLAY} mode=${MODE_DISPLAY} file=$(lw_docs_root)/tasks/${TASK_FILENAME}"
+echo "-> started: task=${TASK_ID} mode=${MODE_DISPLAY} file=$(lw_docs_root)/tasks/${TASK_FILENAME}"

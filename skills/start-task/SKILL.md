@@ -40,9 +40,7 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${DOCS_ROOT}
 
    Lo script:
    - Trova il file task in `${DOCS_ROOT}/tasks/`
-   - Ottiene SHA corrente
    - Aggiorna Progress a 🟡 0% (nel file task)
-   - Aggiorna Last tracked commit (nel file task)
    - Aggiorna `${DOCS_ROOT}/tasks.md`: Progress 🟡 In Progress nella Tasks Overview + emoji nel grafo lane
    - Crea symlink `${DOCS_ROOT}/current-task.md` (skippato in detached)
 
@@ -60,7 +58,6 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${DOCS_ROOT}
       📦 ${numero deliverables} deliverables
       🛫 Preflight: ${stato preflight}
       📁 Folder: ${campo Folder se popolato, altrimenti ometti riga}
-      🟡 Tracked from: ${SHA}
       🔗 Mode: ${linked|detached}
 
       ▶️  Usa /loom-works:run-task ${taskId se detached, altrimenti vuoto} per eseguire,
@@ -72,6 +69,6 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${DOCS_ROOT}
 ## Note
 
 - **tasks.md update**: lo script aggiorna direttamente `${DOCS_ROOT}/tasks.md`. Eventuali divergenze tra branch vengono riconciliate da `reconcile-tasks` in `merge-lane`.
-- **Checkpoint approach**: SHA tracking per diff analysis
+- **Checkpoint approach**: la finestra di diff non si inizializza qui — `checkpoint-task` la deriva dalla history del task file (ultimo `### Avanzamento`, o commit di creazione).
 - **Working tree può essere sporco**: Normale durante sviluppo
 - **Detached mode**: niente symlink, task ID va passato esplicitamente a run-task e checkpoint-task. Esempio: `/loom-works:start-task T102 detach`. Più task detached possono coesistere nello stesso worktree (sessioni separate). In detached, checkpoint-task NON usa l'analisi diff: l'agente deriva i deliverables completati dal contesto della conversazione e fa staging selettivo.

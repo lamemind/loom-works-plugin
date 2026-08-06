@@ -35,11 +35,9 @@ source "${SCRIPT_DIR}/../utils/lib.sh"
 TASK_FILE=""
 TASK_ID=""
 TASK_SRC=""
-TRACKED_SHA=""
 
 if RESOLVED="$(lw_resolve_task "$TASK_ID_ARG")"; then
     eval "$RESOLVED"
-    TRACKED_SHA=$(grep -m1 '^\- \*\*Last tracked commit\*\*:' "$TASK_FILE" | sed 's/.*: //')
 elif [[ -n "$TASK_ID_ARG" ]]; then
     # Un id chiesto esplicitamente e non risolvibile e' un errore duro: chi lo ha
     # passato sa quale task vuole, committare "quella sbagliata ma qualcosa" sarebbe
@@ -140,45 +138,9 @@ if ! lw_git_push "$CURRENT_BRANCH"; then
     exit 1
 fi
 
-NEW_SHA=$(lw_current_sha)
-
-# Last tracked commit: bump SOLO se la task NON è done. Il SHA del checkpoint si
-# conosce solo DOPO il commit, quindi il sed modifica il task file post-commit
-# (chicken-egg: scrivere il SHA cambierebbe di nuovo il SHA). Per le task in
-# progress la riga sporca viene assorbita dal checkpoint successivo; per una task
-# done non c'è checkpoint successivo → resterebbe WT dirty permanente. Lasciamo
-# il valore stale (irrilevante: tracking chiuso) e WT pulito.
-TASK_DONE=0
-if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]] \
-   && grep -qE '^- \*\*Progress\*\*:.*Done' "$TASK_FILE"; then
-    TASK_DONE=1
-fi
-
-if [[ -n "$TASK_FILE" && -f "$TASK_FILE" && $TASK_DONE -eq 0 ]]; then
-    sed -i "s|^\(- \*\*Last tracked commit\*\*:\).*|\1 ${NEW_SHA}|" "$TASK_FILE"
-elif [[ $TASK_DONE -eq 1 ]]; then
-    echo "-> task done: Last tracked commit non aggiornato (WT resta pulito)"
-fi
-
-# Derive compare URL from git remote (generic, non-hardcoded)
-REMOTE_URL=$(lw_remote_url)
-COMPARE_BASE=""
-if [[ "$REMOTE_URL" =~ github\.com[:/](.+/.+)(\.git)?$ ]]; then
-    REPO_PATH="${BASH_REMATCH[1]%.git}"
-    COMPARE_BASE="https://github.com/${REPO_PATH}/compare"
-fi
-
 if [[ $COMMIT1_DONE -eq 1 ]]; then
     echo "-> commit 1 (codice+tracking): ${COMMIT1_SHA}"
 fi
 if [[ $COMMIT2_DONE -eq 1 ]]; then
     echo "-> commit 2 (doc-nozione, ${#DOC_FILES[@]} file): ${COMMIT2_SHA}"
-fi
-echo "-> HEAD: ${NEW_SHA} (was: ${TRACKED_SHA:-${CURRENT_SHA}})"
-if [[ -n "$COMPARE_BASE" ]]; then
-    if [[ -n "$TRACKED_SHA" ]]; then
-        echo "-> compare: ${COMPARE_BASE}/${TRACKED_SHA}...${NEW_SHA}"
-    else
-        echo "-> compare: ${COMPARE_BASE}/${CURRENT_SHA}...${NEW_SHA}"
-    fi
 fi

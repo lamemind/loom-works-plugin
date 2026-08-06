@@ -88,7 +88,7 @@ Più task piccole in parallelo nello stesso worktree, una per sessione Claude. D
 **Lo decide `TASK_SRC`, non l'argomento**: `symlink` → linked · `env`/`arg` → detached. Il criterio è chi possiede il binding — il *worktree* (una task sola, tutto il movimento del repo è suo) o la *sessione* (il repo si muove anche per mano d'altri).
 
 Differenze vs linked:
-- **Analisi diff** (`checkpoint-task-analyze.sh` su `TRACKED_SHA..HEAD`): **skippata** — il diff raccoglierebbe anche il lavoro delle altre task. Deliverables dal contesto conversazione
+- **Analisi diff** (`checkpoint-task-analyze.sh`, finestra `<baseline>..HEAD`): **skippata** — il diff raccoglierebbe anche il lavoro delle altre task. Deliverables dal contesto conversazione
 - **Staging commit**: stage selettivo manuale + `--no-add` (linked: `git add -A` da script). Su `TASK_SRC=env` lo script forza `--no-add` da sé: la contaminazione è silenziosa e si scopre a push fatto
 - **Concorrenza**: N task per worktree, sessioni separate (linked: 1 task per worktree)
 

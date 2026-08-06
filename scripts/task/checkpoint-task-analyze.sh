@@ -6,7 +6,7 @@
 # Env:   PROJECT_ROOT (default: $PWD), LOOM_TASK
 # =============================================================================
 #
-# L'analisi diff TRACKED_SHA..HEAD ha senso solo sul binding di WORKTREE (symlink
+# L'analisi diff <baseline>..HEAD ha senso solo sul binding di WORKTREE (symlink
 # current-task.md): li' la task e' una sola e tutto il movimento del repo le
 # appartiene. Con un binding di SESSIONE (arg esplicito o $LOOM_TASK) il worktree
 # ospita N task in parallelo, quindi il diff raccoglie anche il lavoro delle altre
@@ -33,7 +33,6 @@ RESOLVED="$(lw_resolve_task "$TASK_ID_ARG")" || exit 1
 eval "$RESOLVED"
 
 PROGRESS=$(grep -m1 '^\- \*\*Progress\*\*:' "$TASK_FILE" | sed 's/.*: //')
-TRACKED_SHA=$(grep -m1 '^\- \*\*Last tracked commit\*\*:' "$TASK_FILE" | sed 's/.*: //')
 
 if [[ "$TASK_SRC" != "symlink" ]]; then
     echo "CHECKPOINT-TASK-ANALYSIS task=${TASK_ID} src=${TASK_SRC} branch=$(lw_current_branch) progress=${PROGRESS} mode=detached-equivalent"
@@ -45,21 +44,19 @@ if [[ "$TASK_SRC" != "symlink" ]]; then
     exit 0
 fi
 
-if [[ -z "$TRACKED_SHA" ]]; then
-    echo "ERROR: Last tracked commit non trovato nel task file" >&2
-    echo "       Esegui /loom-works:start-task per inizializzare il tracking" >&2
-    exit 1
-fi
+# Baseline derivato dalla history (lw_task_baseline_sha in lib.sh): ancorato
+# all'ultimo '### Avanzamento' del Progress Log letto da HEAD.
+BASELINE_SHA="$(lw_task_baseline_sha "$TASK_FILE")" || exit 1
 
 CURRENT_BRANCH=$(lw_current_branch)
 CURRENT_SHA=$(lw_current_sha)
 
-FILES_COMMITTED=$(git -C "$PROJECT_ROOT" diff --name-only "${TRACKED_SHA}" 2>/dev/null || echo "")
+FILES_COMMITTED=$(git -C "$PROJECT_ROOT" diff --name-only "${BASELINE_SHA}" 2>/dev/null || echo "")
 FILES_UNCOMMITTED=$(git -C "$PROJECT_ROOT" status --porcelain 2>/dev/null || echo "")
-COMMITS_SINCE=$(git -C "$PROJECT_ROOT" log "${TRACKED_SHA}..HEAD" --oneline 2>/dev/null || echo "")
-DIFF_STATS=$(git -C "$PROJECT_ROOT" diff --stat "${TRACKED_SHA}" 2>/dev/null || echo "")
+COMMITS_SINCE=$(git -C "$PROJECT_ROOT" log "${BASELINE_SHA}..HEAD" --oneline 2>/dev/null || echo "")
+DIFF_STATS=$(git -C "$PROJECT_ROOT" diff --stat "${BASELINE_SHA}" 2>/dev/null || echo "")
 
-SHA_RANGE="${TRACKED_SHA:-n/a}..${CURRENT_SHA:-n/a}"
+SHA_RANGE="$(git -C "$PROJECT_ROOT" rev-parse --short "${BASELINE_SHA}")..${CURRENT_SHA:-n/a}"
 BRANCH_DISPLAY="${CURRENT_BRANCH:-n/a}"
 
 echo "CHECKPOINT-TASK-ANALYSIS task=${TASK_ID} src=${TASK_SRC} branch=${BRANCH_DISPLAY} progress=${PROGRESS} sha=${SHA_RANGE} mode=linked"

@@ -129,13 +129,7 @@ for task_id in "${DONE_IDS[@]}"; do
         done_date=$(echo "$progress_line" | grep -oP 'Done at \K\d{4}-\d{2}-\d{2}' || true)
     fi
 
-    # Fallback 1: Last tracked commit SHA → data git
-    tracked_sha=$(read_field "$task_file" "Last tracked commit")
-    if [[ -z "$done_date" && -n "$tracked_sha" ]]; then
-        done_date=$(git -C "$PROJECT_ROOT" show -s --format=%cI "$tracked_sha" 2>/dev/null || true)
-    fi
-
-    # Fallback 2: last commit touching the task file
+    # Fallback: last commit touching the task file
     if [[ -z "$done_date" ]]; then
         rel_path="${DOCS_ROOT}/tasks/$(basename "$task_file")"
         done_date=$(git -C "$PROJECT_ROOT" log -1 --format=%cI -- "$rel_path" 2>/dev/null || true)
@@ -267,16 +261,10 @@ for c in "${CANDIDATES[@]}"; do
     echo ""
     echo "--- purge ${id} ---"
 
-    # Determine Done SHA for commit body
-    tracked_sha=$(read_field "$tf" "Last tracked commit")
-    done_date=""
-    if [[ -n "$tracked_sha" ]]; then
-        done_date=$(git -C "$PROJECT_ROOT" show -s --format="%cI" "$tracked_sha" 2>/dev/null || true)
-    fi
-    if [[ -z "$done_date" ]]; then
-        rel_path="${DOCS_ROOT}/tasks/$(basename "$tf")"
-        done_date=$(git -C "$PROJECT_ROOT" log -1 --format=%cI -- "$rel_path" 2>/dev/null || true)
-    fi
+    # Done SHA + data per il body del commit: ultimo commit che ha toccato il task file
+    tracked_sha=""; done_date=""
+    rel_path="${DOCS_ROOT}/tasks/$(basename "$tf")"
+    read -r tracked_sha done_date < <(git -C "$PROJECT_ROOT" log -1 --format='%H %cI' -- "$rel_path" 2>/dev/null) || true
 
     # keep: PRIMA di qualsiasi git rm, snapshotta in un commit dedicato i file che
     # sopravviverebbero al purge (ignored/untracked). Cosi' restano recuperabili da

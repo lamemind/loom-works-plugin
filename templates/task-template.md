@@ -8,7 +8,6 @@
 - **Lane**: {{lane}}
 - **Folder**:
 - **Progress**: 🔵 Todo
-- **Last tracked commit**:
 
 ## Description
 {{descrizione_dettagliata}}

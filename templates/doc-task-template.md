@@ -7,7 +7,6 @@
 - **Lane**: {{lane}}
 - **Parent Task**: {{parent_task}} {{parent_task_maniglia}}
 - **Progress**: 🔵 Todo
-- **Last tracked commit**:
 
 ## Description
 

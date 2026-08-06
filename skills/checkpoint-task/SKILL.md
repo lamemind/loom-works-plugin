@@ -13,7 +13,7 @@ model: sonnet
 
 Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Checkpoint di progresso sulla task attiva: analizza diff dall'ultimo tracked commit, aggiorna task/tasks.md, committa e pusha.
+Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna task/tasks.md, committa e pusha.
 
 ## Note utente
 ~~~human
@@ -67,9 +67,9 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    4. Aggiungi entry nel Progress Log:
       ```markdown
       ### Avanzamento ${id_incrementale}
-      - Start Commit: ${TRACKED_SHA}
       - Descrizione: ${sintesi_delle_modifiche}
       ```
+      L'header `### Avanzamento N` non è cosmetico: è l'**ancora del baseline**. Il prossimo checkpoint deriva la finestra di diff dal commit che ha introdotto l'ultimo header di questa forma (`lw_task_baseline_sha`), quindi riscriverlo in altro formato allarga la finestra fino alla nascita della task.
 
 4. **Task completata?**
    Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
@@ -105,7 +105,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh "checkpoint(${taskId}): ${descrizione}"
    ```
-   Lo script: `git add -A` → split staged → commit(s) → push + aggiorna Last tracked commit (HEAD finale) + mostra link compare.
+   Lo script: `git add -A` → split staged → commit(s) → push. Non tocca il task file dopo il commit: il working tree resta pulito.
 
    **Detached**:
    1. Stage selettivo: `git add <file1> <file2> ...` solo per i file **codice** della task corrente (identificati al punto 1).
@@ -175,7 +175,7 @@ Topic = argomento concreto della domanda. NO generici.
 - **Due fasi di commit**: la fase codice (step 6) chiude e **pusha** il lavoro prima che la doc cominci; la fase doc (step 8) ne fa una seconda con `--no-add`. Dentro ogni fase lo script separa comunque codice+tracking (`checkpoint(...)`) da doc-nozione (`docs(...)`) — partizione path-based: doc-nozione = sotto `docs-root/` ma fuori da `tasks.md` e `tasks/`. Zero file doc in stage → commit singolo.
 - **Perché il gate doc sta dopo il commit**: prima veniva eseguito prima, e il `git add -A` finale cadeva su una working copy in cui `doc-writer` stava ancora scrivendo — checkpoint lungo quanto la fase doc, working copy inutilizzabile nel frattempo, lavoro di codice non ancora al sicuro. Committare e pushare per primo il codice è il commit di transazione che sblocca le altre sessioni; la doc arriva dopo, e un fallimento lì non porta con sé il codice.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
-- **Link compare**: Generato automaticamente dallo script commit (spanna entrambi i commit: TRACKED_SHA…HEAD)
+- **Baseline del diff**: derivato, mai storato. `checkpoint-task-analyze.sh` (solo linked) lo prende dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD` — zero avanzamenti → commit di creazione del task file.
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
 - **Doc Impact gate morbido**: scelta utente quando consolidare (capture yolo / capture inline / skip), tre rami — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} (<maniglia>) chiusa` (step 4.3) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
 - **Apply-first (opzioni [1] e [2])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree. Su `[2]` la review è sul diff reale (pannello git): stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). Su `[1]` la review non c'è affatto: la patch è staged d'ufficio, e il diff resta comunque ispezionabile *dopo*, prima del commit doc dello step 8. In entrambi i casi i file arrivano allo step 8 **già staged**, ed è ciò che rende possibile il `--no-add`: lo stage è l'unica lista di cosa committare.

@@ -53,9 +53,9 @@ lw_find_project_root() {
 # ---- Remote detection ---------------------------------------------------------
 #
 # La sola capability variabile del modello. Gate su `origin` e non sulla presenza
-# generica di un remote: tutto il resto della lib parla origin (lw_remote_url, il
-# push con branch esplicito), quindi un remote di altro nome non renderebbe
-# comunque pushabile il branch.
+# generica di un remote: tutto il resto della lib parla origin (il push con branch
+# esplicito), quindi un remote di altro nome non renderebbe comunque pushabile il
+# branch.
 
 lw_has_remote() {
     git -C "$(lw_find_project_root)" remote get-url origin >/dev/null 2>&1
@@ -164,6 +164,78 @@ lw_resolve_task() {   # [<task-id>]
     printf 'TASK_ID=%q\nTASK_FILE=%q\nTASK_SRC=%q\n' "$id" "$file" "$src"
 }
 
+# ---- Baseline del diff di checkpoint -----------------------------------------
+#
+# Da dove parte la finestra <base>..HEAD che checkpoint-task-analyze.sh mostra.
+# NON e' un campo scritto nel task file: quello era un chicken-egg — il SHA si
+# conosce solo DOPO il commit, ma scriverlo dentro il file appena committato lo
+# modifica di nuovo, quindi il sed girava post-commit e lasciava il working tree
+# sporco. Qui il baseline si deriva dalla history, ancorato al Progress Log:
+#
+#   - zero '### Avanzamento'  -> commit di CREAZIONE del task file
+#   - >=1                     -> commit che ha INTRODOTTO l'ultimo header
+#
+# Il file va letto da HEAD, non dal working tree: al checkpoint la skill scrive
+# '### Avanzamento N' PRIMA del commit, quindi sul working tree il pickaxe
+# cercherebbe in history un header non ancora committato e uscirebbe vuoto.
+#
+# L'ancoraggio all'avanzamento rende il baseline il perimetro di cio' che si sta
+# consolidando: un commit che sweep-a il task file per altro (una checkbox, le
+# Decisions di preflight-task) non lo sposta piu'. In piu' l'hash esce sempre
+# vivo dalla history, mentre un SHA storato puo' danglare dopo un rebase.
+#
+# Task file mai committato -> errore, non degradazione: una `git log` vuota
+# passata a `git diff` significa "diff sull'intera history", cioe' una finestra
+# falsa che si presenta come normale.
+#
+# Exit: 0 = SHA su stdout · 1 = non derivabile (messaggio su stderr)
+lw_task_baseline_sha() {   # <task-file>
+    local task_file="${1:?lw_task_baseline_sha: <task-file> richiesto}"
+    local root top abs rel last sha
+    root="$(lw_find_project_root)"
+    top="$(git -C "$root" rev-parse --show-toplevel 2>/dev/null)"
+    if [[ -z "$top" ]]; then
+        echo "ERROR: baseline non derivabile: ${root} non e' un repo git" >&2
+        return 1
+    fi
+    abs="$(realpath -m -- "$task_file" 2>/dev/null || true)"
+    rel="${abs#"${top}/"}"
+
+    if ! git -C "$top" cat-file -e "HEAD:${rel}" 2>/dev/null; then
+        echo "ERROR: task file mai committato: ${rel}" >&2
+        echo "       Il baseline del diff si deriva dalla history: committa il task file, poi rilancia." >&2
+        return 1
+    fi
+
+    # "Ultimo" = N piu' alto, NON l'ultimo in ordine di file: il Progress Log si
+    # trova scritto in entrambi i versi nel corpus (append in coda, oppure entry
+    # nuova in testa) e un `tail -1` sul secondo caso prende il piu' VECCHIO —
+    # baseline troppo indietro, finestra di diff che ingloba i checkpoint gia'
+    # consolidati, senza nessun segnale. Il numero incrementale e' l'unico
+    # ordinamento che non dipende da come la entry e' stata inserita.
+    #
+    # Poi pickaxe sull'header intero: -S conta le occorrenze, quindi regge anche
+    # due avanzamenti con lo stesso testo (il secondo cambia comunque il conteggio).
+    last="$(git -C "$top" show "HEAD:${rel}" \
+            | grep -E '^### Avanzamento[[:space:]]+[0-9]+' \
+            | sort -k3,3n | tail -1)"
+    if [[ -n "$last" ]]; then
+        sha="$(git -C "$top" log -S"$last" -1 --format=%H -- "$rel")"
+    fi
+
+    # Nessun avanzamento (o header legacy fuori formato): la finestra parte dalla
+    # nascita della task — larga, mai falsa. Non e' un'anomalia da segnalare.
+    if [[ -z "$sha" ]]; then
+        sha="$(git -C "$top" log --diff-filter=A -1 --format=%H -- "$rel")"
+    fi
+
+    if [[ -z "$sha" ]]; then
+        echo "ERROR: baseline non derivabile per ${rel}: nessun commit di creazione in history" >&2
+        return 1
+    fi
+    printf '%s\n' "$sha"
+}
+
 # ---- Git wrappers -------------------------------------------------------------
 
 lw_git_add() {
@@ -215,12 +287,6 @@ lw_current_sha() {
 
 lw_git_status_porcelain() {
     git -C "$(lw_find_project_root)" status --porcelain
-}
-
-# Stringa vuota quando il remote non c'e' — qui l'assenza e' un valore legittimo,
-# non un errore: e' esattamente cio' che il modello ammette.
-lw_remote_url() {
-    git -C "$(lw_find_project_root)" config --get remote.origin.url 2>/dev/null || echo ""
 }
 
 # ---- Folder purge helpers ----------------------------------------------------
