@@ -12,6 +12,14 @@
 # Genera un INDEX.md con struttura a sezioni (una per sottocartella) e liste
 # `- \`file.md\` — <tldr>`.
 #
+# In coda indicizza anche {docs_root}/inbox/ — il layer delle nozioni non ancora
+# collocate — in una sezione propria, preceduta dalla riga di PRECEDENZA: in caso
+# di contraddizione con reference/, vince l'inbox.
+#
+# La sezione (e con essa la riga) si emette solo se l'inbox contiene almeno un file
+# indicizzabile, non se la cartella esiste: una regola che sparisce quando smette di
+# applicarsi non può driftare, e su un'inbox vuota la precedenza sarebbe permanente.
+#
 # I file senza TLDR vengono segnalati a stderr ma NON inclusi nell'indice.
 # L'INDEX.md stesso è sempre escluso.
 #
@@ -34,6 +42,7 @@ set -euo pipefail
 TLDR_CAP=600
 
 DIR=""
+INBOX_DIR=""
 OUTPUT=""
 TITLE="Reference Index"
 EXCLUDE=""
@@ -41,6 +50,7 @@ EXCLUDE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dir)      DIR="$2"; shift 2 ;;
+        --inbox)    INBOX_DIR="$2"; shift 2 ;;
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
         --output)   OUTPUT="$2"; shift 2 ;;
         --title)    TITLE="$2"; shift 2 ;;
@@ -54,9 +64,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/lib.sh"
 
 [[ -z "$DIR" ]] && DIR="$(lw_docs_root)/reference"
+[[ -z "$INBOX_DIR" ]] && INBOX_DIR="$(lw_docs_root)/inbox"
 
 PROJECT_ROOT="$(lw_find_project_root)"
 SCAN_DIR="${PROJECT_ROOT}/${DIR}"
+INBOX_SCAN_DIR="${PROJECT_ROOT}/${INBOX_DIR}"
 OUTPUT_FILE="${OUTPUT:-${SCAN_DIR}/INDEX.md}"
 
 if [[ ! -d "$SCAN_DIR" ]]; then
@@ -92,37 +104,48 @@ should_exclude() {
 # --- Raccogli files, raggruppa per directory ----------------------------------
 # Output temp: "<reldir>|<filename>|<tldr>"
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+INBOX_TMP="$(mktemp)"
+trap 'rm -f "$TMP" "$INBOX_TMP"' EXIT
 
 MISSING=0
 OVERCAP=0
-while IFS= read -r -d '' file; do
-    # skip INDEX.md stesso
-    [[ "$(basename "$file")" == "INDEX.md" ]] && continue
-    should_exclude "$file" && continue
 
-    tldr="$(extract_tldr "$file")"
-    if [[ -z "$tldr" ]]; then
-        echo "[build-index] WARN no TLDR: ${file#$PROJECT_ROOT/}" >&2
-        MISSING=$((MISSING+1))
-        continue
-    fi
+collect() {  # <scan-dir> <tmp-file>
+    local scan="$1" out="$2" file tldr rel reldir fname
+    [[ -d "$scan" ]] || return 0
+    while IFS= read -r -d '' file; do
+        # skip INDEX.md stesso
+        [[ "$(basename "$file")" == "INDEX.md" ]] && continue
+        should_exclude "$file" && continue
 
-    # ${#var} conta caratteri (non byte) con locale UTF-8 — coerente col cap del contratto
-    if (( ${#tldr} > TLDR_CAP )); then
-        echo "[build-index] OVER-CAP TLDR ${#tldr} char (cap ${TLDR_CAP}): ${file#$PROJECT_ROOT/}" >&2
-        OVERCAP=$((OVERCAP+1))
-    fi
+        tldr="$(extract_tldr "$file")"
+        if [[ -z "$tldr" ]]; then
+            echo "[build-index] WARN no TLDR: ${file#$PROJECT_ROOT/}" >&2
+            MISSING=$((MISSING+1))
+            continue
+        fi
 
-    rel="${file#$SCAN_DIR/}"
-    reldir="$(dirname "$rel")"
-    fname="$(basename "$rel")"
-    [[ "$reldir" == "." ]] && reldir=""
+        # ${#var} conta caratteri (non byte) con locale UTF-8 — coerente col cap del contratto
+        if (( ${#tldr} > TLDR_CAP )); then
+            echo "[build-index] OVER-CAP TLDR ${#tldr} char (cap ${TLDR_CAP}): ${file#$PROJECT_ROOT/}" >&2
+            OVERCAP=$((OVERCAP+1))
+        fi
 
-    # Nessun escape di `|`: l'output è a liste, e `read` assegna all'ultima
-    # variabile il resto della riga separatori inclusi → il TLDR arriva intatto.
-    echo "${reldir}|${fname}|${tldr}" >> "$TMP"
-done < <(find "$SCAN_DIR" -type f -name '*.md' -print0 | sort -z)
+        rel="${file#"$scan"/}"
+        reldir="$(dirname "$rel")"
+        fname="$(basename "$rel")"
+        [[ "$reldir" == "." ]] && reldir=""
+
+        # Nessun escape di `|`: l'output è a liste, e `read` assegna all'ultima
+        # variabile il resto della riga separatori inclusi → il TLDR arriva intatto.
+        echo "${reldir}|${fname}|${tldr}" >> "$out"
+    done < <(find "$scan" -type f -name '*.md' -print0 | sort -z)
+}
+
+collect "$SCAN_DIR" "$TMP"
+# L'inbox si indicizza solo se è un perimetro diverso da quello già scansionato,
+# o un `--dir` puntato sull'inbox la elencherebbe due volte.
+[[ "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]] && collect "$INBOX_SCAN_DIR" "$INBOX_TMP"
 
 # --- Genera output ------------------------------------------------------------
 {
@@ -147,6 +170,20 @@ done < <(find "$SCAN_DIR" -type f -name '*.md' -print0 | sort -z)
         fi
         echo "- \`${fname}\` — ${tldr}"
     done
+
+    # Sezione inbox: emessa solo se c'è almeno una voce. Zero file → nessuna
+    # sezione → nessuna riga di precedenza.
+    if [[ -s "$INBOX_TMP" ]]; then
+        echo ""
+        echo "## inbox — nozioni non ancora collocate"
+        echo ""
+        echo "> Precedenza: in caso di contraddizione con un file di \`reference/\`,"
+        echo "> **prevale la voce inbox** — è più recente e nasce dal codice appena scritto."
+        echo ""
+        sort "$INBOX_TMP" | while IFS='|' read -r reldir fname tldr; do
+            echo "- \`${fname}\` — ${tldr}"
+        done
+    fi
 } > "$OUTPUT_FILE"
 
 echo "[build-index] wrote: ${OUTPUT_FILE#$PROJECT_ROOT/}"

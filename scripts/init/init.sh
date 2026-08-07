@@ -10,6 +10,10 @@
 #   {docs_root}/reference/INDEX.md    (da templates/reference-index-skeleton.md)
 #   {docs_root}/tasks/                (dir)
 #   {docs_root}/reference/            (dir)
+#   {docs_root}/inbox/                (dir, vuota e senza .gitkeep)
+#
+# L'inbox nasce vuota e non si versiona: ogni lettore ne tollera già l'assenza —
+# la ricrea il primo checkpoint che ci scrive.
 #
 # NB: l'identità di progetto .claude/loom-works.json (che è anche il marker di
 # project-root per lib.sh) è creata dallo step 1b della skill init (bootstrap
@@ -75,6 +79,7 @@ log "plugin root:  $PLUGIN_ROOT"
 create_dir "${PROJECT_ROOT}/${DOCS_ROOT}"
 create_dir "${PROJECT_ROOT}/${DOCS_ROOT}/tasks"
 create_dir "${PROJECT_ROOT}/${DOCS_ROOT}/reference"
+create_dir "${PROJECT_ROOT}/${DOCS_ROOT}/inbox"
 
 copy_template "${TEMPLATES}/tasks-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/tasks.md"
 copy_template "${TEMPLATES}/reference-index-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/reference/INDEX.md"

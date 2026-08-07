@@ -98,19 +98,15 @@ Vincoli:
 - **Checkpoint sequenziali**: due `checkpoint-task` simultanei possono fare race su `tasks.md` e `git`. Coordinali tu.
 - **Tasks.md row**: ogni task detached ha la sua riga 🟡 normalmente. Più 🟡 contemporanei = scenario voluto.
 
-### Doc Impact gate al checkpoint
+### Doc Impact al checkpoint
 
-Ogni `checkpoint-task` su code task (K=⚙️) legge `## Doc Impact` del task file. Per ogni voce non marcata `→ ✔️`, l'utente sceglie:
+Ogni `checkpoint-task` su code task (K=⚙️) legge le voci `## Doc Impact` non marcate, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta in un file `{docs_root}/inbox/` col TLDR-ancora e le marca `→ ✔️ inbox`. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
 
-- `[1] capture yolo` — invoca `capture-doc` col token `yolo`: applica, stagia e marca `→ ✔️ capture` senza review.
-- `[2] capture inline` — idem, ma con review dal diff dentro `capture-doc`; il marker solo se accettata.
-- `[3] skip` — lascia la voce non consolidata. Reentry al prossimo checkpoint. Nessun enforcement.
+**Niente gate**: c'era per decidere *quando* pagare il costo del consolidamento, e senza costo non resta niente da decidere. Dove la nozione atterri lo decide `drain-doc`, in differita.
 
-**Il gate gira dopo il commit e il push del codice**, mai prima: il push è ciò che rende il lavoro visibile alle altre sessioni, che ripartono mentre questa finisce la doc. Committare per primo il codice toglie anche il `git add -A` dalla finestra in cui `doc-writer` sta scrivendo — la working copy resta usabile e un fallimento della fase doc non porta con sé il codice.
+**La fase doc gira dopo il commit e il push del codice**, mai prima: il push è ciò che rende il lavoro visibile alle altre sessioni, che ripartono mentre questa finisce. Committare per primo il codice toglie anche il `git add -A` dalla finestra della scrittura doc — la working copy resta usabile, e un fallimento della fase doc non porta con sé il codice.
 
-**Gate morbido**: scelta utente su _quando_ documentare, subito o dopo. Il gate non crea task: una voce skippata resta senza marker, e il marker mancante **è** il segnale di «non consolidata» — lo stesso indice d'ingresso che `align-doc` usa sul perimetro task per raccoglierle in blocco e timbrarle `→ ✔️ align`. Il rinvio non ha quindi bisogno di un ref proprio.
-
-Doc task (K=📝) **non** triggerano il gate (la doc è l'obiettivo, non un side-effect).
+Doc task (K=📝) non passano di qui: la doc è l'obiettivo, non un side-effect.
 
 ## Task Folder
 

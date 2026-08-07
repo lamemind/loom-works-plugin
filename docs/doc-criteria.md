@@ -1,20 +1,14 @@
 # Criteri di selezione doc
 
-Estensione di `doc-management.md`, che resta la norma. Argomenta le due domande che la norma pone e non spiega: **perché una nozione è doc** (gli otto test) e **che forma prende quando lo è** (le sette tipologie offline).
+Estensione di `doc-management.md`, che resta la norma. Questo file **non è iniettato**: si apre da path quando un verdetto non è ovvio.
 
-## Gli otto test
+Il taglio fra i due non è per argomento ma per **quando si paga il verdetto**. La norma porta i criteri **indipendenti**, che si applicano guardando la sola nozione e devono essere in contesto al checkpoint senza aprire niente. Qui stanno i **dipendenti** — quelli il cui verdetto richiede di aprire il codice, una fonte viva o il resto della doc — più il razionale dei numeri e la meccanica della manutenzione. Li paga chi **colloca** (`doc-router`, `doc-auditor`, `drain-doc`), non chi cattura.
 
-Nell'ordine dell'imbuto, dal filtro più economico: i primi costano un'occhiata, gli ultimi richiedono di guardare fuori dalla frase. Ognuno cattura qualcosa che gli altri lasciano passare.
+I due test indipendenti che vivevano qui — *sopravvive alla task* e *costo di scoperta* — sono saliti in `doc-management.md` §Imbuto di selezione, con le nove parole. Non ne resta una copia: due fonti dello stesso test sono la prima a driftare.
 
-### Sopravvive alla task — nozione o cronaca
+## I criteri dipendenti
 
-> Fra sei mesi, senza sapere che è esistita la task che l'ha generata, questa frase ha ancora senso?
-
-Da applicare **nel momento in cui scrivi**, che è quando sei meno capace di applicarlo: durante una task il prima/dopo è la cosa più saliente che hai in testa, ed è la prima a evaporare.
-
-- ❌ «`caretWindow` sostituisce `tailCut` (RIMOSSO)» — nomina un simbolo che non esiste, ha senso solo per chi ricorda lo stato precedente
-- ❌ «l'append-only era una scelta, non un limite della libreria» — risponde a una domanda che solo quella task si è posta
-- ✅ «le frecce arrivano regolari; il limite vero è che `Home`/`End` non sono esposte» — stessa nozione, riscritta come stato attuale
+Nell'ordine dell'imbuto. Ognuno cattura qualcosa che gli altri lasciano passare.
 
 ### Sopravvive al refactor — durabilità
 
@@ -28,16 +22,7 @@ Il criterio non è il livello di dettaglio ma il **costo di manutenzione**: una 
 - ❌ «`MODE_FLAG` è un pattern flag opzionale, non un `if` che duplica `IN_TAB_CMD`» — un rename la falsifica
 - ✅ «VTE conta EAW con ambiguous=1 e ignora VS16» — nessun refactor del nostro codice la tocca
 
-Punto cieco: una frase può superarlo ed essere comunque inutile («il progetto usa TypeScript»). Per quello servono i due test seguenti.
-
-### Costo di scoperta — valore, misurato al contrario
-
-> Quanto è costato scoprirlo la prima volta?
-
-Valore di una nozione ≈ **costo di scoperta evitato × letture future**. Documentare ciò che si scopre in due minuti leggendo il sorgente rende quasi zero, per quanto sia vero e durevole.
-
-- ✅ «full-text sui corpi in RAM: 1-9 ms contro 26 ms di `grep`» — costa un benchmark, e la conclusione è controintuitiva
-- ❌ «il comando accetta tre flag» — costa dieci secondi di `--help`
+Punto cieco: una frase può superarlo ed essere comunque inutile («il progetto usa TypeScript»). Per quello servono il costo di scoperta (indipendente, sta nella norma) e la sorpresa.
 
 ### Sorpresa — violazione di aspettativa
 
@@ -49,7 +34,7 @@ Una frase che **conferma** un'assunzione ragionevole è peso morto: il lettore l
 - ✅ «`key.delete` è ANCHE Backspace» — due sequenze diverse collassano sullo stesso nome
 - ❌ «`RES_FLAG` è il gemello di `SID_FLAG`» — è esattamente ciò che ti aspetti dopo aver visto l'altro
 
-Costo di scoperta e sorpresa non selezionano lo stesso insieme: una misura può essere costosa da scoprire e per niente sorprendente; una trappola può sorprendere e costare cinque minuti. Entrambe passano.
+Costo di scoperta e sorpresa non selezionano lo stesso insieme: una misura può essere costosa da scoprire e per niente sorprendente; una trappola può sorprendere e costare cinque minuti. Entrambe passano. Cadono però in classi diverse — il costo lo sa chi ha appena lavorato, la sorpresa richiede di rileggere il codice con occhi competenti — ed è la ragione per cui l'una si applica al checkpoint e l'altra allo smaltimento.
 
 Corollario: i file di gotcha hanno la densità di valore più alta per carattere perché sono fatti **solo** di sorpresa. Non sono un'eccezione al criterio di zoom — sono il caso in cui il criterio dice «scendi in profondità».
 
@@ -172,6 +157,38 @@ Stessa nozione, due stadi di maturazione. Confonderle fa entrare in doc material
 
 - **scarto → sentenza** — l'alternativa bocciata, prima e dopo che la motivazione si è stabilizzata. Finché può riaprirsi resta nella task folder.
 - **ipotesi → referto** — la nozione, prima e dopo l'esecuzione. Una voce `## Doc Impact` è scritta a `create-task`, cioè **prima di lavorare**: sembra affidabile perché ha già il formato giusto (nozione + ancora), ma è una previsione. Si **verifica** contro il risultato, non si integra alla lettera.
+
+## Le cinque soglie — perché quel numero
+
+La norma porta i numeri, che sono ciò che serve per applicarli. Qui il perché, che serve per **cambiarli**.
+
+- **Split, 15.000 char.** È un proxy: dice *che* un file va tagliato, non *dove*. Il taglio lo decide la reperibilità — due trigger di ricerca distinti = due file. **Le riduzioni precedono il taglio**: se eco e cronaca si tolgono dopo, i frammenti nascono dimensionati su peso che stava per sparire, e quello grosso nasce già a ridosso della soglia.
+- **Merge, 3.000 char.** Non è un ordine di fusione, è un trigger di **riesame**. Ogni file costa un TLDR nell'INDEX, che è online: sotto quella soglia l'indicizzazione si mangia un quinto del contenuto. Il pavimento esiste perché senza, lo split è a senso unico — e un file che si svuota non ha nessuno che se ne accorga.
+- **Regroup, 60.000 char.** Preso in prestito da `doc-partition.sh --max-char`, dove misura quanta doc legge **un** auditor. Riusare quel numero tiene coerenti per costruzione la topologia e il fan-out che la percorre: una cartella sotto la soglia è un perimetro che un agente tiene in testa tutto insieme. È l'analogia giusta, non una prova — va tarata sull'esercizio.
+- **TLDR, 600 char.** Bloccante perché il TLDR finisce nell'INDEX, che è online: un TLDR prolisso si paga a ogni sessione come se il file intero lo fosse. È l'unica soglia che uno script fa rispettare (`build-index.sh` esce 2).
+- **Inbox, 8 file.** Conteggio e non char, perché dev'essere leggibile a colpo d'occhio in un header («3/8») senza aprire niente. Al ritmo di flusso misurato il tetto cade a cadenza settimanale — la stessa a cui l'azione notturna drenerebbe da sé. Provvisorio come il regroup.
+
+## Manutenzione
+
+`align-doc` e `lint-doc` **misurano** doc già collocata, contro fonti di verità diverse: la fonte nativa del layer la prima, questo contratto la seconda. `drain-doc` non misura — **colloca**, ed è per questo che è una terza skill e non una modalità delle altre.
+
+**Le fasi di `lint-doc` sono ordinate e l'ordine è vincolante**: `clean` → `split` → `regroup`. Le riduzioni prima del taglio (vedi §Le cinque soglie), e la categorizzazione per ultima — dimensionata su file che stanno per essere spezzati nascerebbe stale, e un file che dopo lo split diventa tre può cambiare cartella di appartenenza.
+
+Il regroup sposta file senza rinominarli: `loom-deck-spawn.md` → `loom-deck/loom-deck-spawn.md`, mai `loom-deck/spawn.md`. La ripetizione costa poco; togliere il prefisso rompe un'ancora che vive anche fuori dalla doc — nei `SKILL.md`, nei task file, nei messaggi di commit, cioè in perimetri che `check-doc-links.sh` non scandisce.
+
+Tre regole della partizione, ognuna contro un modo tipico di sbagliarla:
+
+- **Le categorie sono perimetri di ricerca, non temi.** Una tassonomia elegante ma ortogonale a come si cerca è *peggio* della root piatta: aggiunge navigazione senza aggiungere reperibilità.
+- **Nessuna categoria «varie».** Chi non appartiene a nessun raggruppamento resta in root — la root è la categoria di default, non il residuo.
+- **Zoom disomogeneo ammesso.** Una cartella da cinque file accanto a un file sciolto è l'esito corretto: la densità dei domini non è uniforme, e forzare la simmetria è ciò che genera il contenitore-avanzi.
+
+Corollario controintuitivo: **meglio una cartella con un solo file che una da dieci**. Una cartella non è un premio alla numerosità, è un confine di ricerca; se un dominio ne merita uno, lo merita anche da solo.
+
+## Origine D-task
+
+Soglia per aprire una `D{N}`: il lavoro dev'essere **multi-chunk**, cioè partizionabile in scope che `run-doc` esegue a giri con un `doc-writer` fresco per chunk. Una nozione singola resta `capture-doc`, che è one-shot — aprire una D per essa paga il ciclo (task file, planning, checkpoint per giro) per un lavoro che non lo ammortizza.
+
+Col `parent=T{N}` passato a mano il D-file porta `**Parent Task**: T{N}`, e il parent va corredato di `- [ ] D{N} (<maniglia>) chiusa` in Acceptance: alla chiusura della D il suo checkpoint flagga indietro la checkbox.
 
 ## Nota per l'auditor
 

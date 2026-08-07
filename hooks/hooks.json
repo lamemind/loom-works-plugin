@@ -13,7 +13,11 @@
           },
           {
             "type": "command",
-            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/caveman.md\""
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/writing-patterns.md\""
+          },
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/chat-output.md\""
           },
           {
             "type": "command",
@@ -27,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/caveman-restamp.md\""
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/restamp.md\""
           }
         ]
       }

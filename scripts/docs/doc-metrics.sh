@@ -4,6 +4,7 @@
 # doc-metrics.sh — misure deterministiche sulla doc di progetto
 # Usage: doc-metrics.sh [--docs-root <name>] [--dir <path>] [--online]
 #                      [--split-threshold N] [--merge-threshold N] [--tldr-cap N]
+#                      [--regroup-threshold N] [--inbox-cap N]
 #                      [--format text|tsv]
 # =============================================================================
 #
@@ -22,9 +23,19 @@
 #   MERGE?  char <= pavimento merge — trigger di RIESAME, non un ordine di fusione:
 #           il file sopravvive se il suo perimetro di ricerca e' distinto
 #   TLDR>N  TLDR oltre il cap
-#   NOTLDR  file sotto reference/ senza TLDR su riga 3 (resta fuori dall'INDEX)
+#   NOTLDR  file sotto reference/ o inbox/ senza TLDR su riga 3 (fuori dall'INDEX)
 #   ONLINE  file @-importato da CLAUDE.md (si paga a ogni sessione)
+#   INBOX   nozione non ancora collocata — si smaltisce, non si mantiene
 #   GEN     artefatto generato (INDEX.md) — mai splittato a mano
+#
+# Tre layer, contati separatamente perche' hanno regimi di costo diversi: ONLINE si
+# paga a ogni sessione, OFFLINE all'apertura, INBOX all'apertura piu' il TLDR online
+# — ed e' l'unico che deve tendere a zero. Il layer si legge dal path, tranne per
+# online che si legge dagli @-import: INDEX.md sta sotto reference/ ma e' online.
+#
+# CARTELLE: char per cartella (figli diretti, la stessa unita' con cui
+# doc-partition.sh forma i gruppi) contro la soglia di REGROUP — sopra, la cartella
+# non e' piu' un perimetro che un auditor tiene in testa tutto insieme.
 #
 # Escluso dallo scan: tasks/ (runtime, non doc) e current-task.md (symlink).
 #
@@ -37,19 +48,25 @@ set -uo pipefail
 SPLIT_THRESHOLD=15000
 MERGE_THRESHOLD=3000
 TLDR_CAP=600
+# Stesso numero di doc-partition.sh --max-char, e per la stessa ragione: misura
+# quanta doc legge un auditor. Riusarlo tiene coerenti topologia e fan-out.
+REGROUP_THRESHOLD=60000
+INBOX_CAP=8
 DIR=""
 ONLINE=0
 FORMAT="text"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --docs-root)        LOOM_DOCS_ROOT="$2"; shift 2 ;;
-        --dir)              DIR="$2"; shift 2 ;;
-        --online)           ONLINE=1; shift ;;
-        --split-threshold)  SPLIT_THRESHOLD="$2"; shift 2 ;;
-        --merge-threshold)  MERGE_THRESHOLD="$2"; shift 2 ;;
-        --tldr-cap)         TLDR_CAP="$2"; shift 2 ;;
-        --format)           FORMAT="$2"; shift 2 ;;
+        --docs-root)          LOOM_DOCS_ROOT="$2"; shift 2 ;;
+        --dir)                DIR="$2"; shift 2 ;;
+        --online)             ONLINE=1; shift ;;
+        --split-threshold)    SPLIT_THRESHOLD="$2"; shift 2 ;;
+        --merge-threshold)    MERGE_THRESHOLD="$2"; shift 2 ;;
+        --tldr-cap)           TLDR_CAP="$2"; shift 2 ;;
+        --regroup-threshold)  REGROUP_THRESHOLD="$2"; shift 2 ;;
+        --inbox-cap)          INBOX_CAP="$2"; shift 2 ;;
+        --format)             FORMAT="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
 done
@@ -93,6 +110,9 @@ TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
 n_files=0; n_split=0; n_merge=0; n_overcap=0; n_notldr=0; total_char=0
+n_online=0; n_offline=0; n_inbox=0; n_altro=0
+c_online=0; c_offline=0; c_inbox=0; c_altro=0
+declare -A DIR_CHAR=() DIR_FILES=()
 
 while IFS= read -r -d '' file; do
     rel="${file#"$PROJECT_ROOT"/}"
@@ -103,23 +123,50 @@ while IFS= read -r -d '' file; do
     chars="$(char_count "$file")"
     tldr="$(tldr_of "$file")"
     tldr_len=${#tldr}
+    online=0; is_online "$rel" && online=1
+
+    # Layer: online vince sul path (INDEX.md sta sotto reference/ ma si paga a ogni
+    # sessione), inbox vince su online (un file inbox @-importato resta inbox).
+    if [[ "$rel" == */inbox/* ]]; then
+        layer="inbox"
+    elif (( online )); then
+        layer="online"
+    elif [[ "$rel" == */reference/* ]]; then
+        layer="offline"
+    else
+        layer="altro"
+    fi
 
     flags=""
     if [[ "$(basename "$file")" == "INDEX.md" ]]; then
         flags="GEN"
     elif (( chars >= SPLIT_THRESHOLD )); then
         flags="SPLIT"; n_split=$((n_split+1))
-    elif (( chars <= MERGE_THRESHOLD )); then
+    elif (( chars <= MERGE_THRESHOLD )) && [[ "$layer" != "inbox" ]]; then
+        # Il pavimento di merge non si applica all'inbox: un file inbox nasce piccolo
+        # per contratto, e il verdetto su di lui è «smaltiscilo», non «fondilo».
         flags="MERGE?"; n_merge=$((n_merge+1))
     fi
     if [[ -n "$tldr" ]]; then
         if (( tldr_len > TLDR_CAP )); then
             flags="${flags:+$flags }TLDR>${TLDR_CAP}"; n_overcap=$((n_overcap+1))
         fi
-    elif [[ "$rel" == */reference/* && "$(basename "$file")" != "INDEX.md" ]]; then
+    elif [[ "$rel" == */reference/* || "$layer" == "inbox" ]] && [[ "$(basename "$file")" != "INDEX.md" ]]; then
         flags="${flags:+$flags }NOTLDR"; n_notldr=$((n_notldr+1))
     fi
-    is_online "$rel" && flags="${flags:+$flags }ONLINE"
+    [[ "$layer" == "inbox" ]] && flags="${flags:+$flags }INBOX"
+    (( online )) && flags="${flags:+$flags }ONLINE"
+
+    case "$layer" in
+        online)  n_online=$((n_online+1));   c_online=$((c_online + chars)) ;;
+        offline) n_offline=$((n_offline+1)); c_offline=$((c_offline + chars)) ;;
+        inbox)   n_inbox=$((n_inbox+1));     c_inbox=$((c_inbox + chars)) ;;
+        *)       n_altro=$((n_altro+1));     c_altro=$((c_altro + chars)) ;;
+    esac
+
+    d="$(dirname "$rel")"
+    DIR_CHAR["$d"]=$(( ${DIR_CHAR[$d]:-0} + chars ))
+    DIR_FILES["$d"]=$(( ${DIR_FILES[$d]:-0} + 1 ))
 
     printf '%s\t%s\t%s\t%s\n' "$rel" "$chars" "$tldr_len" "${flags:--}" >> "$TMP"
     n_files=$((n_files+1))
@@ -143,7 +190,32 @@ else
     echo "- sopra soglia split (${SPLIT_THRESHOLD}): ${n_split}"
     echo "- sotto pavimento merge (${MERGE_THRESHOLD}), da riesaminare: ${n_merge}"
     echo "- TLDR sopra cap (${TLDR_CAP}): ${n_overcap}"
-    echo "- reference/ senza TLDR (fuori dall'INDEX): ${n_notldr}"
+    echo "- senza TLDR (fuori dall'INDEX): ${n_notldr}"
+    echo
+    echo "LAYER"
+    printf '%-40s %6s %10s\n' "LAYER" "FILE" "CHAR"
+    printf '%-40s %6s %10s\n' "online (@-import CLAUDE.md)" "$n_online"  "$c_online"
+    printf '%-40s %6s %10s\n' "offline (reference/)"        "$n_offline" "$c_offline"
+    printf '%-40s %6s %10s\n' "inbox (non collocata)"       "$n_inbox"   "$c_inbox"
+    printf '%-40s %6s %10s\n' "altro"                       "$n_altro"   "$c_altro"
+    echo
+    if (( n_inbox > INBOX_CAP )); then
+        echo "- file inbox: ${n_inbox} / ${INBOX_CAP}  → OLTRE IL TETTO, lo smaltimento non è più opzionale"
+    else
+        echo "- file inbox: ${n_inbox} / ${INBOX_CAP}"
+    fi
+    echo
+    echo "CARTELLE (soglia regroup ${REGROUP_THRESHOLD})"
+    printf '%-56s %6s %10s  %s\n' "DIR" "FILE" "CHAR" "FLAGS"
+    n_regroup=0
+    while IFS=$'\t' read -r ch d; do
+        rf=""
+        if (( ch >= REGROUP_THRESHOLD )); then rf="REGROUP"; n_regroup=$((n_regroup+1)); fi
+        printf '%-56s %6s %10s  %s\n' "$d" "${DIR_FILES[$d]}" "$ch" "${rf:--}"
+    done < <(for d in "${!DIR_CHAR[@]}"; do printf '%s\t%s\n' "${DIR_CHAR[$d]}" "$d"; done \
+             | sort -t$'\t' -k1,1nr -k2,2)
+    echo
+    echo "- cartelle oltre soglia regroup (${REGROUP_THRESHOLD}): ${n_regroup}"
 fi
 
 # --- Footprint per-sessione ---------------------------------------------------
