@@ -157,9 +157,9 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    Aggiungi eventuali note per l'utente.
    Esegui il ping TTS:
    ```bash
-   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "checkpoint $(say_id ${taskId}) ok"
+   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "checkpoint $(say_id ${taskId}) done"
    ```
-   In caso di errore nel commit/push: `say_auto "checkpoint $(say_id ${taskId}) fallito"`.
+   In caso di errore nel commit/push: `say_auto "checkpoint $(say_id ${taskId}) failed"`.
 
 ## Convenzione TTS
 

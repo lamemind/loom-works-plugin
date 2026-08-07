@@ -123,9 +123,9 @@ Se il campo Size è assente, tratta come **M**.
 
 A lavoro completato, esegui il ping TTS:
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "$(say_id ${taskId}) completata"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "$(say_id ${taskId}) done"
 ```
-In caso di blocco reale: `say_auto "$(say_id ${taskId}) bloccata"`.
+In caso di blocco reale: `say_auto "$(say_id ${taskId}) blocked"`.
 
 Poi suggerisci all'utente di invocare `/loom-works:checkpoint-task` per il checkpoint (commit + aggiornamento epic).
 

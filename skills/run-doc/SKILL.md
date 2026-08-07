@@ -223,7 +223,7 @@ Tutti i chunks `done`:
 - Aggiorna `### Resume context` con un "outcome" sintetico (1-2 righe).
 - Esegui il ping TTS:
   ```bash
-  source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc $(say_id ${taskId}) completata"
+  source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc $(say_id ${taskId}) done"
   ```
 - Suggerisci all'utente di lanciare `/loom-works:checkpoint-task` per il commit finale.
 

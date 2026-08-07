@@ -159,7 +159,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh ${TASK_ID} ${task-name} "${des
 - Suggerisci review del file
 - Ping TTS fine creazione (la pre-analisi per fillare la task può durare >1min → l'utente va avvisato che è pronta):
   ```bash
-  source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "task $(say_id ${TASK_ID}) creata"
+  source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "task $(say_id ${TASK_ID}) created"
   ```
 
 ---

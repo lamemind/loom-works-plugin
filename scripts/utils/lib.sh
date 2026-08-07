@@ -331,7 +331,7 @@ die() {
     say_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/say.sh"
     if [[ -f "$say_sh" ]]; then
         # shellcheck source=/dev/null
-        source "$say_sh" 2>/dev/null && say_auto "errore $msg" 2>/dev/null || true
+        source "$say_sh" 2>/dev/null && say_auto "error $msg" 2>/dev/null || true
     fi
     exit 1
 }

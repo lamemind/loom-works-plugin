@@ -69,7 +69,7 @@ Inoltre, nel grafo Execution Plan, rimuovi eventuali marker 🟡 davanti ai task
 ### 5. Feedback + TTS
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "lane ${lane} distrutta"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "lane ${lane} destroyed"
 ```
 
 ## Convenzione TTS

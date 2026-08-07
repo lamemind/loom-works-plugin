@@ -122,7 +122,7 @@ Solo su patch **accettata** (ok) e se il contratto `APPLIED:` porta `INDEX_REBUI
 
 Poi il ping TTS:
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc catturata"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc captured"
 ```
 
 Se `INDEX.md` è stato rigenerato, mettilo in stage anch'esso: `git add -- ${DOCS_ROOT}/reference/INDEX.md`.

@@ -122,7 +122,7 @@ Mostra l'output dello script. Atteso: un commit `chore(tasks): purge …` per og
 Se almeno un commit è andato a buon fine:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "pulizia task completata"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "task cleanup done"
 ```
 
 ## Note

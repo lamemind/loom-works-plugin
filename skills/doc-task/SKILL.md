@@ -165,7 +165,7 @@ Lo script:
 
 Esegui il ping TTS:
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc task creata"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc task created"
 ```
 
 Stampa:

@@ -16,9 +16,9 @@ prompt="$(jq -r '.prompt // empty' 2>/dev/null)"
 source "$SAY_SH" 2>/dev/null || exit 0
 
 case "$prompt" in
-    /goal*)             say_it "goal: ${prompt#/goal}" 2>/dev/null || true ;;
-    /review*)           say_it "review in corso" 2>/dev/null || true ;;
-    /security-review*)  say_it "security review in corso" 2>/dev/null || true ;;
+    /goal*)             say_auto "goal: ${prompt#/goal}" 2>/dev/null || true ;;
+    /review*)           say_auto "review running" 2>/dev/null || true ;;
+    /security-review*)  say_auto "security review running" 2>/dev/null || true ;;
 esac
 
 exit 0
