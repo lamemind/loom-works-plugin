@@ -121,7 +121,7 @@ Il commit 4 rimuove il registro (materiale di lavoro esaurito, la cronologia lo 
 
 ### Auto-apply è il default — il gate è il diff
 
-Senza il token `gate` la skill **non chiede verdetti**: applica le patch e stagea. Il controllo di merito si sposta a valle, sul `git diff` dell'utente, ed è la stessa sentenza dell'apply-first del gate doc al checkpoint — patch applicata, mai committata, review dal diff.
+Senza il token `gate` la skill **non chiede verdetti**: applica le patch e stagea. Il controllo di merito si sposta a valle, sul `git diff` dell'utente — patch applicata, mai committata, review dal diff.
 
 Regge perché **niente è irreversibile**: la skill stagea e si ferma, e ogni patch è un `git checkout` di distanza. Unica asimmetria da dichiarare nel report: uno split crea file **nuovi**, che `git checkout -- <path>` non rimuove — annullarlo richiede anche di cancellare i frammenti (`git rm -f`, o `git clean -f` se non erano stati staged).
 

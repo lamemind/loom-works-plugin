@@ -74,7 +74,7 @@ Salvataggio del progresso. Commit delle modifiche.
 - A fine giornata (checkpoint intermedio)
 - Prima di passare ad altra task
 
-**Doc Impact gate (morbido)**: ogni checkpoint su code task processa la sezione `## Doc Impact` del task file. Per ogni voce non marcata, scelta utente: capture yolo / capture inline / skip — il gate non crea task. Dettagli: [Task Management §Doc Impact gate](./task-management.md).
+**Doc Impact**: ogni checkpoint su code task legge le voci `## Doc Impact` non marcate, applica i soli criteri indipendenti e porta ciò che passa in `{docs_root}/inbox/`, marcando ogni voce lavorata — `→ ✔️ inbox` se entra, `→ ✖️ <parola>` se no. Nessuna scelta utente, nessuno spawn. Dettagli: [Task Management §Doc Impact al checkpoint](./task-management.md).
 
 ### Pattern di Iterazione
 
