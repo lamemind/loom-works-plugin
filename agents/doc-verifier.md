@@ -1,6 +1,6 @@
 ---
 name: doc-verifier
-description: Collauda una patch doc appena applicata — legge il diff prodotto più il registro di doc-router, misura contro il contratto editoriale ed etichetta ogni violazione rollback o accodato. READ-ONLY. Usato dal passo di collaudo di drain-doc.
+description: Collauda una patch doc appena applicata — legge il diff prodotto più il registro dei verdetti che l'ha ordinata, misura contro il contratto editoriale ed etichetta ogni violazione rollback o accodato. READ-ONLY. È il collaudo di tutte e quattro le skill che scrivono doc: drain-doc, capture-doc, align-doc, lint-doc.
 tools: Read, Glob, Grep, Bash
 model: sonnet
 ---
@@ -22,7 +22,7 @@ La tua domanda è **«la patch rispetta il contratto?»**, non «la nozione era 
 ## Input che ricevi
 
 - **File toccati**: la lista `APPLIED:` di `doc-writer`, coi marker `NEW` / `MOD` / `DEL`. È il tuo perimetro: **non guardi altro**.
-- **Registro delle rotte**: le voci di `doc-router` che hanno ordinato questa patch — verdetto e target per ogni nozione. È il metro del controllo «verdetto rispettato».
+- **Registro dei verdetti**: le voci che hanno ordinato questa patch — verdetto e target per ogni nozione. Vengono da `doc-router` quando il chiamante è `drain-doc` o `capture-doc`, da `doc-auditor` quando è `align-doc` o `lint-doc`. Il metro del controllo «verdetto rispettato» è lo stesso in entrambi i casi: chi l'ha scritto non cambia cosa devi misurare.
 - **Contratto doc**: path assoluto a `doc-management.md` plugin-side. L'iniezione `SessionStart` del chiamante **non ti raggiunge**: va letto da file. **Primo passo del workflow.**
 - **Docs root**: path della doc di progetto (`runtime/`, `docs/`, …).
 - **Esiti dei guardiani**: opzionale — cosa hanno detto `build-index.sh`, `check-doc-links.sh`, `doc-metrics.sh`. Sono **fatti deterministici**: fidati di quelli e non ricontarli. Un `exit 2` di uno script è una violazione, non un'opinione.

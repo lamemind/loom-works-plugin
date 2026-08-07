@@ -1,6 +1,6 @@
 ---
 name: capture-doc
-description: Capture ad-hoc doc notions outside of a task. Spawns doc-router for the verdict, then doc-writer for the patch.
+description: Capture ad-hoc doc notions outside of a task. Chain of doc-router (verdict), doc-writer (patch), doc-verifier (collaudo), then commit.
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
 model: sonnet
 ---
@@ -13,22 +13,29 @@ model: sonnet
 
 Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Cattura **estemporanea** di una nozione documentale (fuori dal ciclo task). Leggi il contesto conversazionale corrente + eventuale hint dell'utente, spawna `doc-router` che **giudica** dove va, poi `doc-writer` che **applica la patch** al working tree; infine rivedi il diff e **accetti** (stage) o **rifiuti** (restore).
-
-Flusso **apply-first**: il writer non ritorna una proposta come testo (invisibile in chat) — scrive direttamente i file. La modifica diventa un diff reale, ispezionabile nel pannello git. Stage = approvazione, restore = rifiuto.
+Cattura **estemporanea** di una nozione documentale (fuori dal ciclo task). Leggi il contesto conversazionale corrente + eventuale hint dell'utente, spawna `doc-router` che **giudica** dove va, `doc-writer` che **applica la patch**, `doc-verifier` che la **collauda**; poi committa.
 
 Input utente:
 ~~~human
 $ARGUMENTS
 ~~~
 
-**YOLO**: se `$ARGUMENTS` contiene il token `yolo` (case-insensitive), salta la review e **auto-accetta**: la patch resta applicata e viene stagiata senza chiedere niente. Strippa il token prima di passare il resto al subagent.
+## Una sola domanda ammessa, e non è sulla patch
+
+Puoi chiedere **cosa** catturare quando il contesto è ambiguo (step 2). Non chiedi mai **se tenere** ciò che è stato scritto: quello lo misura `doc-verifier` contro il contratto, allo step 5.
+
+Il loop di review che stava qui — stage come approvazione, restore come rifiuto, e lo stage-su-ok come punto di ripristino — è stato **rimosso**. Era l'unico collaudo della skill, e poggiava su una patch lasciata nell'indice in attesa di un giudizio: lo stage git è uno per *worktree*, non per sessione, quindi quella patch veniva raccolta dal `git add -A` di qualunque altra sessione che committasse nel frattempo.
+
+Da cui, per l'intera esecuzione:
+
+- **Guardia in ingresso.** Se `git diff --cached --quiet` esce non-zero l'indice è già popolato da qualcun altro: **fermati e dillo**. Il commit ha una pathspec esplicita, e con un indice sporco porterebbe via lavoro non tuo.
+- **Mai staged fino al commit.** La patch vive solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica: `git add -- <path...> && git commit -- <path...>`.
 
 ## Scope
 
-Questa skill è l'ingresso **estemporaneo**: una nozione che nasce fuori dal ciclo task e va collocata subito, con review immediata. Le due vie task-bound sono altre e non passano di qui — `create-task` e `run-task` appendono a `## Doc Impact`, e il checkpoint porta quelle voci in `{docs_root}/inbox/` scrivendole da sé, senza spawnare nessuno.
+Questa skill è l'ingresso **estemporaneo**: una nozione che nasce fuori dal ciclo task e va collocata subito. Le due vie task-bound sono altre e non passano di qui — `create-task` e `run-task` appendono a `## Doc Impact`, e il checkpoint porta quelle voci in `{docs_root}/inbox/` scrivendole da sé, senza spawnare nessuno. Una nozione già in inbox la colloca `drain-doc`, non questa skill.
 
-Nessun worktree, nessun commit automatico. La patch accettata resta **staged** (non committed); quella rifiutata è restorata via git.
+Nessun worktree: i subagent lavorano in-place, sul working tree condiviso con la sessione chiamante.
 
 ## Prerequisiti
 
@@ -96,61 +103,69 @@ Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md
 
-Applica le patch direttamente (Write/Edit), incluso l'eventuale patch a CLAUDE.md; non committare, non rigenerare l'indice. Ritorna il contratto APPLIED: (marker NEW/MOD per ogni file) + INDEX_REBUILD_NEEDED.
+Applica le patch direttamente (Write/Edit), incluso l'eventuale patch a CLAUDE.md; non committare, non rigenerare l'indice, non stagiare niente. Ritorna il contratto APPLIED: (marker NEW/MOD per ogni file) + INDEX_REBUILD_NEEDED.
 ```
 
-**YOLO**: **salta lo step 5** (niente review) eseguendone da te il ramo **ok**: `git add -- <file>...` su tutti i file del contratto `APPLIED:`, poi step 6. Lo stage non è un dettaglio saltabile — chi invoca in yolo committa con `--no-add`, quindi un file applicato ma non staged non entra in nessun commit e la cattura si perde in silenzio.
+Un `APPLIED:` vuoto col razionale è un esito previsto — il contesto era insufficiente per scrivere qualcosa di vero. Non c'è niente da annullare: riportalo e chiudi.
 
-### 5. Review dal diff → ok / edit / skip
+### 5. Guardiani, poi collaudo
 
-**Non stampare il diff in chat** — un file reference NEW è 200+ righe e brucia contesto; è già ispezionabile, meglio, nel pannello git di VS Code. Stampa solo la **lista file** dal contratto `APPLIED:`, col marker:
-
-```
-Patch applicata (rivedi il diff nel pannello git):
-- MOD docs/reference/foo.md
-- NEW docs/reference/bar.md
-```
-
-Stampa anche i **`drop` del registro** e l'eventuale blocco `DISCARDED:` del writer: sono nozioni che non atterrano da nessuna parte, e il motivo è un verdetto. Taciuto, diventa una cattura che sembra riuscita a metà senza che si sappia perché. Una lista applicata vuota con dei `drop` pieni è un esito legittimo — non rilanciare nessuno dei due subagent per farla scrivere comunque.
-
-Poi il ping TTS e `AskUserQuestion` con opzioni `ok` / `edit` / `skip`:
+Prima gli script, che non hanno opinioni:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su patch doc da tenere o scartare"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"       # solo se INDEX_REBUILD_NEEDED: yes
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh"
 ```
 
-Gestione della scelta (path assoluti, `cwd` = project root):
+**Exit 2 è un verdetto, non un comando fallito**: su `build-index.sh` l'indice è scritto ma i TLDR elencati su stderr sono oltre il cap, su `check-doc-links.sh` ci sono riferimenti appesi. Non riparare niente qui — gli esiti si passano al collaudo, che decide.
 
-- **ok** → **stage** i file: `git add -- <file>...`. Lo stage è insieme *approvazione* e *punto di ripristino*: un rifiuto successivo su un file condiviso torna a questo stato, non a HEAD. Vai a step 6.
-- **skip** → **restore** (annulla la patch, working tree pulito), per ogni file secondo il marker:
-  - `MOD` → `git restore -- <file>`
-  - `NEW` (untracked, `git restore` non lo recupera) → `rm -- <file>`
-  
-  Nessuna modifica persiste. **Salta step 6** (niente rebuild INDEX su patch scartata). Vai a step 7.
-- **edit** → restore (come skip) + **rilancia dallo step 3** col feedback dell'utente, su base pulita. Si riparte dal router, non dal writer: un feedback sul dove la nozione è atterrata è una correzione del verdetto, e il writer non ha il mandato per cambiarlo.
+Poi `Task` con `subagent_type: doc-verifier`:
 
-### 6. Rigenera INDEX se serve
+```
+Patch da collaudare — cattura estemporanea.
 
-Solo su patch **accettata** (ok) e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${DOCS_ROOT}/reference/`):
+File toccati (dal contratto APPLIED: del writer):
+<la lista coi marker NEW / MOD / DEL>
+
+Registro delle rotte che hanno ordinato questa patch:
+<le voci del registro di doc-router>
+
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
+
+Esiti dei guardiani (fatti deterministici, non ricontarli):
+- build-index.sh: exit <n> <+ i TLDR oltre cap che ha elencato, se ce ne sono>
+- check-doc-links.sh: exit <n>, riferimenti appesi: <la lista, o «nessuno»>
+
+La patch non è staged: leggila con `git diff` sul working tree.
+Ritorna solo il referto.
+```
+
+- **`LABEL: accodato` non boccia**: un file che dopo la patch supera la soglia di split, o scende sotto il pavimento, è topologia che la patch ha *rivelato*, non causato. Lo raccoglie `lint-doc` alla prossima misura, perché la misura è lo stato.
+- **`OUTCOME: rollback` annulla la patch**, per file secondo il marker: `MOD` → `git checkout -- <file>` · `NEW` → `rm -- <file>` · `DEL` → `git checkout -- <file>`. Poi **rigenera l'indice**: il rebuild ha già scritto la voce di un file che adesso non esiste più. Niente commit, e il motivo — la `RULE:` della violazione — va nel report.
+
+### 6. Committa
+
+Solo su `pass`. Catena unica con pathspec esplicita:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
+git add -- <path...> && git commit -- <path...> -m "docs(capture): <di cosa parla la nozione>" -m "<corpo>"
 ```
 
-**Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione **bloccante** del contratto, non un comando fallito. Non annulla la cattura; se il TLDR fuori cap è quello che hai appena scritto, riscrivilo come ancora prima di chiudere.
+La pathspec sono tutti i file di `APPLIED:`, più `${DOCS_ROOT}/reference/INDEX.md` se il rebuild l'ha toccato. Il **corpo** porta i `drop` del registro col motivo e il blocco `DISCARDED:` del writer: sono nozioni che non atterrano da nessuna parte, e il messaggio di commit è dove quel verdetto resta greppabile.
+
+**Non pusha.** Il push è una decisione del chiamante.
 
 Poi il ping TTS:
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc captured"
 ```
 
-Se `INDEX.md` è stato rigenerato, mettilo in stage anch'esso: `git add -- ${DOCS_ROOT}/reference/INDEX.md`.
-
 ### 7. Report finale
 
-Lista sintetica dei file accettati (staged) / scartati (restored), i `drop` del registro col motivo, e se l'INDEX è stato rigenerato. Stop.
+**Non stampare il diff in chat** — un file reference `NEW` è 200+ righe e brucia contesto; è già ispezionabile, meglio, nel pannello git. Stampa la **lista file** dal contratto `APPLIED:` col marker, lo SHA del commit, e i **`drop`** col motivo.
 
-**Non committare**: la patch accettata resta **staged** (non committed). Il commit è dell'utente.
+Una lista applicata vuota con dei `drop` pieni è un esito legittimo — non rilanciare nessuno dei subagent per far scrivere comunque qualcosa.
 
 ## Convenzione TTS
 
@@ -162,7 +177,6 @@ Topic = argomento concreto della domanda. NO generici.
 
 ## Note
 
-- I subagent lavorano **in-place**: nessun worktree, nessun branch. Il gate di review poggia su git (stage su ok, restore su skip), che il modello dà per presente.
+- **Apply-first**: il writer non ritorna una proposta come testo — scrive i file. Una proposta vivrebbe solo nel suo contesto, invisibile a chi deve misurarla; una patch applicata è un diff reale, ed è su quello che il collaudo lavora.
 - Per capture **in** una task, appendi a `## Doc Impact` (`create-task` / `run-task`), non questa skill.
-- Il doc-writer opera su **tutta la doc** (online `{docs_root}/project/`, offline `{docs_root}/reference/`) e applica **anche una patch a `CLAUDE.md`** quando serve (es. aggiunta `@-import` per un nuovo file online). Quel file compare come `MOD CLAUDE.md` nel contratto `APPLIED:` → segue la stessa sorte del resto: staged su ok, restorato su skip.
-- **Apply-first**: la review dell'utente è sul diff reale (working tree), non su un testo di ritorno del subagent. Stage = approvazione, restore = rifiuto. Lo stage-su-ok è anche il *punto di ripristino* che protegge le patch approvate da un rifiuto successivo su file condiviso.
+- Il doc-writer opera su **tutta la doc** (online `{docs_root}/project/`, offline `{docs_root}/reference/`) e applica **anche una patch a `CLAUDE.md`** quando serve (es. aggiunta `@-import` per un nuovo file online). Quel file compare come `MOD CLAUDE.md` nel contratto `APPLIED:` → entra nella pathspec del commit, o torna indietro col rollback, come il resto.

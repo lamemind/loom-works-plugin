@@ -2,7 +2,7 @@
 
 # =============================================================================
 # doc-metrics.sh — misure deterministiche sulla doc di progetto
-# Usage: doc-metrics.sh [--docs-root <name>] [--dir <path>] [--online]
+# Usage: doc-metrics.sh [--docs-root <name>] [--dir <path>] [--online] [--inbox]
 #                      [--split-threshold N] [--merge-threshold N] [--tldr-cap N]
 #                      [--regroup-threshold N] [--inbox-cap N]
 #                      [--format text|tsv]
@@ -17,6 +17,15 @@
 # `--online` aggiunge il footprint per-sessione: gli @-import di CLAUDE.md PIÙ le
 # entry hook SessionStart (misurate da check-injection-budget.sh). Le due voci
 # vanno lette insieme: gli @-import da soli sono circa il 70% del costo reale.
+#
+# `--inbox` emette SOLO la coda di smaltimento — i file di {docs_root}/inbox/ in
+# ordine di eta', il piu' vecchio per primo — ed e' l'inventario che drain-doc
+# consuma. L'eta' viene dal commit che ha AGGIUNTO il file (`git log
+# --diff-filter=A`, il piu' vecchio), non dall'mtime: un file inbox si riscrive
+# solo per errore, mentre un checkout ne azzera l'mtime di tutti insieme e
+# l'ordine a coda sparirebbe senza che nulla lo segnali. Fallback su mtime per un
+# file mai committato. Il flag NON altera l'output di default: doc-partition.sh
+# lo consuma.
 #
 # Flag per file:
 #   SPLIT   char >= soglia split
@@ -54,6 +63,7 @@ REGROUP_THRESHOLD=60000
 INBOX_CAP=8
 DIR=""
 ONLINE=0
+INBOX_ONLY=0
 FORMAT="text"
 
 while [[ $# -gt 0 ]]; do
@@ -61,6 +71,7 @@ while [[ $# -gt 0 ]]; do
         --docs-root)          LOOM_DOCS_ROOT="$2"; shift 2 ;;
         --dir)                DIR="$2"; shift 2 ;;
         --online)             ONLINE=1; shift ;;
+        --inbox)              INBOX_ONLY=1; shift ;;
         --split-threshold)    SPLIT_THRESHOLD="$2"; shift 2 ;;
         --merge-threshold)    MERGE_THRESHOLD="$2"; shift 2 ;;
         --tldr-cap)           TLDR_CAP="$2"; shift 2 ;;
@@ -104,6 +115,50 @@ tldr_of() {  # <file> — convenzione strict: riga 3, stessa di build-index.sh
     local t="${BASH_REMATCH[1]}"
     echo "${t%"${t##*[![:space:]]}"}"
 }
+
+# --- Coda inbox (--inbox) -----------------------------------------------------
+# Ordine a coda: il piu' vecchio per primo. Le sentinelle di priorita' non
+# esistono ancora — quando esisteranno, si antepongono qui, non nel chiamante.
+if [[ "$INBOX_ONLY" -eq 1 ]]; then
+    INBOX_DIR="${PROJECT_ROOT}/${DOCS_ROOT}/inbox"
+    NOW="$(date +%s)"
+    QTMP="$(mktemp)"
+    trap 'rm -f "$QTMP"' EXIT
+
+    if [[ -d "$INBOX_DIR" ]]; then
+        while IFS= read -r -d '' file; do
+            rel="${file#"$PROJECT_ROOT"/}"
+            created="$(cd "$PROJECT_ROOT" && git log --diff-filter=A --format=%at -- "$rel" 2>/dev/null | tail -1)"
+            [[ "$created" =~ ^[0-9]+$ ]] || created="$(stat -c %Y "$file")"
+            tldr="$(tldr_of "$file")"
+            printf '%s\t%s\t%s\t%s\n' "$created" "$rel" "$(char_count "$file")" "${#tldr}" >> "$QTMP"
+        done < <(find "$INBOX_DIR" -maxdepth 1 -type f -name '*.md' -print0)
+    fi
+
+    n_q=0; c_q=0
+    while IFS=$'\t' read -r _ _ c _; do n_q=$((n_q+1)); c_q=$((c_q + c)); done < "$QTMP"
+
+    if [[ "$FORMAT" == "tsv" ]]; then
+        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tCREATED\n'
+        sort -t$'\t' -k1,1n "$QTMP" | while IFS=$'\t' read -r ts p c t; do
+            printf '%s\t%s\t%s\t%s\t%s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$ts"
+        done
+    else
+        echo "[doc-metrics] coda inbox: ${DOCS_ROOT}/inbox  ·  ordine: il più vecchio per primo"
+        echo
+        printf '%-56s %8s %6s %6s\n' "PATH" "CHAR" "AGE_D" "TLDR"
+        sort -t$'\t' -k1,1n "$QTMP" | while IFS=$'\t' read -r ts p c t; do
+            printf '%-56s %8s %6s %6s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t"
+        done
+        echo
+        if (( n_q > INBOX_CAP )); then
+            echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}  → OLTRE IL TETTO, lo smaltimento non è più opzionale"
+        else
+            echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}"
+        fi
+    fi
+    exit 0
+fi
 
 # --- Scan ---------------------------------------------------------------------
 TMP="$(mktemp)"

@@ -1,6 +1,6 @@
 ---
 name: doc-router
-description: Giudica dove va una nozione non ancora collocata — verdetto (online, offline, puntatore al codice, puntatore a una fonte viva, drop), file target ed evidenza. READ-ONLY, non scrive mai su disco. Paga i criteri dipendenti aprendo codice, fonti vive e resto della doc. Usato da drain-doc (un router per file inbox), capture-doc, align-doc, lint-doc, run-doc.
+description: Giudica dove va una nozione non ancora collocata — verdetto (online, offline, puntatore al codice, puntatore a una fonte viva, drop), file target ed evidenza. READ-ONLY, non scrive mai su disco. Paga i criteri dipendenti aprendo codice, fonti vive e resto della doc. Usato da drain-doc (un router per file inbox), capture-doc e run-doc; align-doc e lint-doc giudicano invece con doc-auditor, perché misurano doc già collocata.
 tools: Read, Glob, Grep, Bash
 model: sonnet
 ---

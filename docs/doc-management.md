@@ -94,16 +94,16 @@ Perché ogni numero è quello e non un altro: `doc-criteria.md` §Le cinque sogl
 - nozione in inbox → `drain-doc`, che la colloca
 - doc esistente che mente o viola → `align-doc` · `lint-doc`
 
-Le stesse skill compaiono in §Manutenzione per il mestiere opposto: lì **misurano e riparano** ciò che c'è, qui sono l'unico **ingresso** di ciò che entra.
-
 ## Manutenzione
 
-Tre skill, distinte da cosa fanno alla doc — `align-doc` **misura** contro la fonte nativa del layer (i **drift**) · `lint-doc` **misura** contro questo contratto (le violazioni) · `drain-doc` **colloca**, svuotando l'inbox e pagando i criteri dipendenti una volta per batch. Le due che misurano girano su `doc-auditor` read-only e applicano con `doc-writer`; `drain-doc` ha una catena propria — `doc-router` giudica, `doc-writer` applica, `doc-verifier` collauda la patch. Le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime. Perimetri, ordine delle fasi e regole del regroup: `doc-criteria.md` §Manutenzione.
+Tre skill, distinte da cosa fanno alla doc — `align-doc` **misura** contro la fonte nativa del layer (i **drift**) · `lint-doc` **misura** contro questo contratto (le violazioni) · `drain-doc` **colloca**, svuotando l'inbox e pagando i criteri dipendenti una volta per batch. Le due che misurano giudicano con `doc-auditor` read-only, `drain-doc` con `doc-router`; tutte applicano con `doc-writer` e chiudono uguale — guardiani deterministici, `doc-verifier` sul diff, commit. Le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime. Perimetri, ordine delle fasi e regole del regroup: `doc-criteria.md` §Manutenzione.
 
-**Tre operazioni topologiche**, due verticali e una orizzontale: **split** (un file oltre soglia diventa N) · **merge** (N file sotto il pavimento tornano uno) · **regroup** (N file in una sottocartella). Il regroup è la terza fase di `lint-doc`, in coda a `clean` e `split` e **mai prima**: una categorizzazione dimensionata su file che stanno per essere spezzati nasce stale.
+**Nessun man-in-the-loop.** Le quattro skill di scrittura non chiedono di approvare una patch e non lasciano niente staged: il collaudo è `doc-verifier`, che etichetta ogni violazione `rollback` (l'ha causata questa patch) o `accodato` (l'ha solo rivelata — topologia, e la raccoglie la misura successiva).
+
+**Tre operazioni topologiche**, due verticali e una orizzontale: **split** (un file oltre soglia diventa N) · **merge** (N file sotto il pavimento tornano uno) · **regroup** (N file in una sottocartella). Il regroup è la terza fase di `lint-doc`, in coda e **mai prima**: una categorizzazione dimensionata su file che stanno per essere spezzati nasce stale.
 
 **Doc segue codice, stesso commit.** Nuovo file in `reference/` o in `inbox/` → rigenera l'indice con `scripts/docs/build-index.sh`.
 
 ## Origine D-task
 
-Le task documentali (`D{N}`) nascono **solo on-demand**, via `/loom-works:doc-task`. Nessun automatismo le genera: il checkpoint di una code task porta le voci `## Doc Impact` in inbox, dove le raccoglie `drain-doc`. Soglia per aprirne una, e contratto parent-child: `doc-criteria.md` §Origine D-task.
+Le task documentali (`D{N}`) nascono **solo on-demand**, via `/loom-works:doc-task`: nessun automatismo le genera. Soglia per aprirne una, e contratto parent-child: `doc-criteria.md` §Origine D-task.

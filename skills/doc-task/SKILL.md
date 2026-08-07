@@ -17,7 +17,7 @@ Crea una nuova task documentale. I deliverable sono editoriali (sezioni di doc a
 
 ## Quando una D-task è la risposta giusta
 
-Nasce **solo su invocazione esplicita** — nessun automatismo la genera. Il gate `## Doc Impact` al checkpoint di una code task non ne apre: le voci rinviate lì restano senza marker e le raccoglie `align-doc` sul perimetro task.
+Nasce **solo su invocazione esplicita** — nessun automatismo la genera. Il checkpoint di una code task non ne apre: porta le voci `## Doc Impact` in `{docs_root}/inbox/`, dove le raccoglie `drain-doc`.
 
 Soglia dimensionale: il lavoro dev'essere **multi-chunk**, cioè partizionabile in scope che `/loom-works:run-doc` esegue a giri con un `doc-writer` fresco per chunk. Se la nozione è singola, la risposta è `/loom-works:capture-doc` (one-shot inline): aprire una D per essa paga il ciclo — task file, planning con conferma utente, checkpoint per giro — su un lavoro che non lo ammortizza.
 
@@ -44,7 +44,7 @@ Se `$ARGUMENTS` contiene `parent=T{N}` (es. `parent=T07`), la D-task viene legat
 
 Quando lo ricevi, sei tu a chiudere il cerchio sul parent (non c'è un caller che lo faccia):
 - appendi `- [ ] D{taskId} (<maniglia verbo+oggetto>) chiusa` in `## Acceptance Criteria` del parent
-- marca in `## Doc Impact` del parent le voci coperte da questa D con `→ ✔️ D{taskId}`, così il gate al checkpoint non le ripresenta
+- marca in `## Doc Impact` del parent le voci coperte da questa D con `→ ✔️ D{taskId}`, così il checkpoint non le manda in inbox
 
 A chiusura della D-task (suo checkpoint con done), `checkpoint-task` flagga indietro la checkbox nel parent via lookup del campo `**Parent Task**`.
 

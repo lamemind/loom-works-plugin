@@ -1,7 +1,7 @@
 ---
 name: align-doc
-description: Allinea la doc alla fonte nativa del suo layer — caccia ai drift (la doc dice X, il codice o la fonte viva dicono Y). Integra anche le nozioni di una task chiusa. Fan-out di doc-auditor read-only, registro con verdetti, patch via doc-writer solo sulle voci approvate.
-allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, AskUserQuestion
+description: Allinea la doc alla fonte nativa del suo layer — caccia ai drift (la doc dice X, il codice o la fonte viva dicono Y). Integra anche le nozioni di una task chiusa. Non presidiata, committa da sé. Fan-out di doc-auditor read-only, registro con verdetti, patch via doc-writer, collaudo via doc-verifier.
+allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task
 model: sonnet
 ---
 
@@ -32,6 +32,16 @@ Da qui l'asimmetria di tutto il flusso: si parte dalle **affermazioni della doc*
 L'unica eccezione è il perimetro **task** (§0): lì le affermazioni da verificare non stanno nella doc, stanno nel task file — ma la direzione resta la stessa, dall'affermazione alla fonte.
 
 Gemella di `lint-doc`, che misura la stessa doc contro il **contratto editoriale** invece che contro la fonte nativa. Stessa meccanica, fonte di verità opposta.
+
+## Non presidiata — nessuna domanda, e il collaudo è un agente
+
+`AskUserQuestion` non è nel toolset. La skill sceglie il perimetro con un criterio deterministico (§1), applica i verdetti dell'auditor senza farli approvare, li fa collaudare da `doc-verifier` (§6) e committa (§7).
+
+Il gate umano che stava fra il registro e la patch è stato **rimosso**: era l'unico collaudo della skill, e non può esserlo per una skill che gira anche di notte. Chi lo sostituisce misura la patch contro il contratto, non contro il gusto di chi guarda.
+
+**Guardia in ingresso, prima di qualunque altra cosa.** Se `git diff --cached --quiet` esce non-zero l'indice è già popolato da qualcun altro: **fermati e dillo**. Il commit di questa skill ha una pathspec esplicita, e con un indice sporco porterebbe via lavoro non tuo.
+
+**Mai staged fino al commit.** Lo stage git è uno per *worktree*, non per sessione: una patch lasciata nell'indice viene raccolta dal `git add -A` di qualunque altra sessione che committi nel frattempo. Le patch vivono quindi solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica — `git add -- <path...> && git commit -- <path...>`.
 
 ## La fonte nativa non è sempre il codice
 
@@ -77,7 +87,7 @@ Un perimetro = **una coppia** `fonte ↔ file doc`. Dall'input:
 
 - **path di codice** (`loom-deck/src/`, `scripts/config/`) → trova la doc che lo descrive: `grep -rl` del nome dir/file dentro `{docs_root}/`, più i TLDR di `{docs_root}/reference/INDEX.md` che lo nominano.
 - **file doc** (`reference/compass.md`) → trova la fonte: i path citati dentro il file stesso; e se il file descrive un sistema interrogabile (uno schema DB, un CLI esterno), la fonte è **quello**, non il codice che lo usa.
-- **vuoto** → deriva i candidati dall'INDEX (ogni file reference che cita path o comandi reali) e falli scegliere con `AskUserQuestion` — massimo 4 perimetri per esecuzione, altrimenti il registro diventa illeggibile e il gate dei verdetti impraticabile.
+- **vuoto** → deriva i candidati dall'INDEX (ogni file reference che cita path o comandi reali) e prendi i **primi 4 per char decrescente**. Il cap è di concorrenza, il criterio è deterministico: un file grosso porta più affermazioni verificabili, quindi più drift per auditor speso. Dichiara sempre quali perimetri hai preso e quali sono rimasti fuori — una selezione taciuta si legge come copertura completa.
 
 Se una coppia non si chiude (doc senza fonte identificabile), **non inventarla**: dillo e saltala. Un perimetro senza fonte di verità è lavoro per `lint-doc`, non per questa skill.
 
@@ -125,20 +135,9 @@ Mai dentro `{docs_root}/`: è materiale di lavoro, non doc di progetto.
 
 Poi presenta in chat la **sintesi**, non il registro intero: una riga per finding (`ID · severità · file doc · claim → realtà · verdetto proposto`). Il dettaglio sta nel file.
 
-### 4. Gate dei verdetti — in blocco
+I verdetti proposti dagli auditor **valgono come approvati**: non c'è un passo che li raccoglie e li fa confermare. Quello che li misura è il collaudo del §6, e misura la patch — non l'intenzione.
 
-I verdetti si raccolgono **una volta sola sul registro completo**, non finding per finding: N domande in sequenza costano più della lettura del registro e fanno perdere la vista d'insieme.
-
-`AskUserQuestion` (prima il ping TTS):
-
-- **conferma tutti** i verdetti proposti;
-- **conferma tranne alcuni** → l'utente nomina gli ID da cambiare, e solo quelli diventano una domanda;
-- **solo severità alta** → il resto resta nel registro, non applicato;
-- **nessuno** → il registro resta come materiale, stop.
-
-Annota il verdetto finale su ogni voce del file registro.
-
-### 5. Applica — doc-writer su `fix-doc`, `relayer`, `split`
+### 4. Applica — doc-writer su `fix-doc`, `relayer`, `split`
 
 Raggruppa le voci approvate **per file doc target** e invoca un `doc-writer` per gruppo (mai due writer sullo stesso file: si sovrascrivono a vicenda). Sequenziali, non paralleli — questi scrivono davvero.
 
@@ -163,7 +162,7 @@ Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md — il TLDR resta invariato salvo che un fix cambi il trigger del file.
 
-Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'indice.
+Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'indice, non stagiare niente.
 Sostituisci la sezione sbagliata, non appendere una correzione accanto a quella vecchia.
 Ritorna il contratto APPLIED: + INDEX_REBUILD_NEEDED.
 ```
@@ -172,33 +171,61 @@ Il `POINTER:` di una `relayer` lo produce **l'auditor**, che ha già aperto la f
 
 `drop` e `relayer` passano dallo stesso canale (sono patch di rimozione, con o senza puntatore che resta). `code-divergent` **no**: la doc resta.
 
-### 6. `code-divergent` → task, non patch
+### 5. `code-divergent` → task, non patch
 
 Per ogni voce con questo verdetto la doc descrive l'intenzione e la fonte ci è andata contro: correggere la doc **cancellerebbe l'intenzione**. Proponi `/loom-works:create-task` con titolo e razionale già pronti, e lascia la scelta all'utente. Se una task per quel perimetro esiste già (cerca in `{docs_root}/tasks.md`), citala con la sua maniglia verbo+oggetto invece di aprirne una gemella.
 
-### 7. Chiudi
+### 6. Guardiani, poi collaudo — `doc-verifier` sul diff
 
-- Se le patch hanno toccato `{docs_root}/reference/`:
-  ```bash
-  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
-  ```
-  **Exit 2** = indice scritto, ma i TLDR elencati su stderr sono oltre il cap: violazione bloccante del contratto, non un comando fallito. Non annulla l'allineamento — riportala e lascia le voci a `lint-doc`, che è la skill di quel perimetro. Exit 1 = indice non scritto, quello è un errore.
-- Se le patch hanno **rimosso** sezioni (verdetti `relayer` e `drop` cancellano, non solo correggono), verifica che non abbiano lasciato riferimenti appesi:
-  ```bash
-  "${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh"
-  ```
-  Exit 2 = ci sono riferimenti a file spariti (`DANGLING`) o a `§` che non esistono più (`NOSECTION`). Il secondo è il caso tipico qui: cancelli la sezione, e il puntatore che la citava resta valido sul path e falso sulla sezione — invisibile a un grep. Risolvili con `Edit` prima di chiudere.
+Prima gli script, che non hanno opinioni:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"       # solo se le patch hanno toccato reference/
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh"
+```
+
+**Exit 2 è un verdetto, non un comando fallito** — su `build-index.sh` significa indice scritto ma TLDR oltre il cap, su `check-doc-links.sh` riferimenti appesi. Il secondo è il caso tipico qui: i verdetti `relayer` e `drop` **cancellano** una sezione, e il puntatore che la citava resta valido sul path e falso sulla `§` — invisibile a un grep. Risolvi i `NOSECTION` con `Edit` finché lo script non esce 0; il resto passa al collaudo, che decide se è rollback o coda.
+
+Poi il collaudo, una volta, a patch applicate e prima del commit. `Task` con `subagent_type: doc-verifier`.
+
+```
+Patch da collaudare — allineamento su <i perimetri>.
+
+File toccati (dai contratti APPLIED: dei writer):
+<la lista coi marker NEW / MOD / DEL>
+
+Registro dei verdetti che hanno ordinato questa patch:
+<le voci del registro: claim / realtà / verdetto / target>
+
+Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
+
+Esiti dei guardiani (fatti deterministici, non ricontarli):
+- build-index.sh: exit <n> <+ i TLDR oltre cap che ha elencato, se ce ne sono>
+- check-doc-links.sh: exit <n>, riferimenti appesi residui: <la lista, o «nessuno»>
+
+La patch non è staged: leggila con `git diff` sul working tree.
+Ritorna solo il referto.
+```
+
+- **`LABEL: accodato` non boccia**: un file che dopo la patch supera la soglia di split o scende sotto il pavimento è topologia che la patch ha *rivelato*, non causato, e la raccoglie `lint-doc` alla prossima misura. Riportala e prosegui.
+- **`OUTCOME: rollback` annulla la patch**, per file secondo il marker: `MOD` → `git checkout -- <path>` · `NEW` → `rm -- <path>` · `DEL` → `git checkout -- <path>`. Le voci del registro tornano non applicate, col motivo — la `RULE:` della violazione — scritto sopra. Niente commit, e i marker `→ ✔️ align` del §0 **non** si scrivono: quelle nozioni non sono atterrate.
+
+Se hai già rigenerato l'indice, dopo un rollback **rigeneralo di nuovo**: contiene la voce di un file che adesso non esiste più, ed è drift prodotto dal rollback stesso.
+
+### 7. Chiudi e committa
+
+Solo su collaudo `pass`.
+
 - Sul perimetro **task** (§0): marca `→ ✔️ align` le voci `## Doc Impact` integrate, nel task file. È l'unico file di runtime che questa skill tocca — e lo tocca lei, mai il `doc-writer`, che ha `{docs_root}/tasks/` fuori dal proprio perimetro.
 - **Non stampare i diff** in chat: bruciano contesto e sono già ispezionabili nel pannello git. Stampa la lista file dal contratto `APPLIED:`.
-- **Stage, mai commit**: `git add -- <file>...`. Il commit è dell'utente o del `checkpoint-task`.
-- Report finale: quanti finding per verdetto, quali file toccati, quali voci restano nel registro non applicate. Se il `doc-writer` ha ritornato un blocco `DISCARDED:`, riportalo: è materiale che ha deciso di **non** scrivere, e il posto durevole di quel verdetto è il corpo del messaggio di commit.
-
-## Convenzione TTS
-
-Prima di ogni `AskUserQuestion`:
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic 3-7 parole specifiche>"
-```
+- **Committa**, catena unica con pathspec esplicita:
+  ```bash
+  git add -- <path...> && git commit -- <path...> -m "docs(align): <perimetro>" -m "<corpo>"
+  ```
+  La pathspec sono tutti i file di `APPLIED:`, più `INDEX.md` se il rebuild l'ha toccato e il task file se hai scritto i marker. Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file. Il **corpo** porta il blocco `DISCARDED:` del writer: è materiale che ha deciso di non scrivere, e il posto durevole di quel verdetto è il messaggio di commit.
+- **Non pusha.** Finché i commit restano locali l'undo è una riga; pushati, diventa un force-push su un ramo che altre sessioni possono già aver letto.
+- Report finale: quanti finding per verdetto, quali file toccati, quali voci restano nel registro non applicate, e l'esito del collaudo. Su `rollback` la riga di chiusura dice **cosa** ha violato la patch, non «bocciata».
 
 ## Note
 

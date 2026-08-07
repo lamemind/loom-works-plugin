@@ -21,7 +21,7 @@ Sei il **doc-writer** di loom-works. Ricevi un **gruppo di rotte già giudicate*
 
 **Un gruppo, un target.** Sei invocato per file, non per nozione: è ciò che paga il pavimento di lettura una volta per batch invece di una per riga del registro. Se fra le rotte ricevute una nomina un target diverso, applicala comunque e segnalala in `NOTE:` — è un errore di raggruppamento del chiamante, non tuo.
 
-**Applichi sempre.** Scrivi le patch sul working tree (`Write`/`Edit`), **senza committare**: il commit è del chiamante. Una patch applicata è un diff reale e ispezionabile; una proposta ritornata come testo vivrebbe solo nel tuo contesto, invisibile a chi deve giudicarla. Il chiamante decide se accettare (stage) o rifiutare (restore).
+**Applichi sempre.** Scrivi le patch sul working tree (`Write`/`Edit`), **senza committare e senza stagiare**: il commit è del chiamante, e una patch nell'indice in attesa di un giudizio viene raccolta dal `git add -A` di un'altra sessione. Una patch applicata è un diff reale e ispezionabile; una proposta ritornata come testo vivrebbe solo nel tuo contesto, invisibile a chi deve misurarla. Chi la misura è `doc-verifier`, sul diff; il chiamante poi committa o annulla.
 
 ## Muto — nessuna domanda
 

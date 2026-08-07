@@ -178,7 +178,15 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    - **`--no-add`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo. Lo stage lo fai tu, riga sopra; il task file coi marker lo aggiunge lo script da sé.
    - **`--task`** — anche in linked, dove di norma basterebbe il symlink: se la task si è chiusa allo step 4 il symlink è già stato rimosso, e senza `--task` lo script non risolverebbe il task file su cui hai appena appeso i marker.
 
-9. **Feedback finale**
+9. **Allerta inbox** — solo se lo step 7 ha scritto un file:
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --inbox
+   ```
+   L'ultima riga dice quanti file inbox ci sono sul tetto (`- file inbox: N / 8`). **Oltre il tetto**, chiudi il feedback con una riga sola: quanti file, da quanti giorni è in coda il più vecchio, e l'invito a invocare `/loom-works:drain-doc`.
+
+   L'allerta sta **qui** perché qui la soglia si supera — il checkpoint è l'unico produttore dell'inbox. Non è un gate e non blocca niente: il tetto è un trigger, mai un cap, e una nozione non si rifiuta perché la coda è lunga.
+
+10. **Feedback finale**
    L'output dello script contiene tutte le info necessarie.
    Aggiungi eventuali note per l'utente.
    Esegui il ping TTS:
