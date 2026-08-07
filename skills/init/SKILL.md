@@ -27,6 +27,7 @@ Solo se **assenti** (idempotente):
 - `${DOCS_ROOT}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
 - `${DOCS_ROOT}/tasks/` — directory per i file task
 - `${DOCS_ROOT}/reference/` — directory per doc offline
+- `${DOCS_ROOT}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-doc` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`
 
 **CLAUDE.md**: init **propone** (non forza) l'aggiunta degli `@-import` base — vedi step 3. **Non tocca**: file git, config, dipendenze.

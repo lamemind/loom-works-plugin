@@ -255,22 +255,34 @@ L'outline dello split (§7) va **risolta prima** del fan-out dei writer: nessuno
 
 Dai a ogni writer il perimetro dei file che può toccare e l'istruzione di **segnalare invece di editare** ciò che sta fuori: uno split rompe puntatori anche in file assegnati a un altro gruppo, e due writer che si contendono lo stesso puntatore lo riscrivono a vicenda. Lo sweep lo fa il chiamante, a valle (§7).
 
+**Ogni voce porta il proprio verdetto e il proprio target**: il writer non giudica e non sceglie dove scrivere. Una violazione passata come descrizione nuda («bonifica questo file») lo lascia a improvvisare la collocazione, che è il mestiere che gli è stato tolto.
+
 ```
-Nozione da documentare:
-- **Nozione**: bonifica <file> secondo il contratto doc. Violazioni: <elenco sintetico>.
-- **Ancora primaria**: riscrivi il TLDR come ancora se il registro lo segnala
+Rotte da applicare — verdetto e target sono già decisi e vincolanti, non rivalutarli.
+Target: <file>
+
+<una voce per violazione del registro:>
+NOTION: <la violazione, come sta nel file oggi>
+VERDICT: clean | relayer | split | merge | tldr
+TARGET: <file>.md §<sezione> | NEW <file>.md
+TLDR: <ancora proposta — solo su NEW o su verdetto tldr>
+POINTER: <file + simbolo> | <comando + forma della domanda> | —
+EVIDENCE: <path:linea | misura di doc-metrics.sh>
+WRITE: <cosa deve diventare la sezione>
 
 Contesto:
 <le voci del registro per questo file: violazione / evidenza / FIX>
 
 Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
-Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
+Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md
 
 Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'indice.
 Sostituisci la sezione toccata, non stratificare. Ritorna APPLIED: + INDEX_REBUILD_NEEDED.
 Se splitti, fondi o cancelli un file, ritorna anche SPLIT_MAP: — serve allo sweep dei puntatori.
 ```
+
+Su `relayer` il `POINTER:` lo produce **l'auditor**, che ha aperto la fonte per giudicare: il writer lo trascrive senza riaprire niente.
 
 ### 7. Split e merge — i fix che non sono "nozione → patch"
 
@@ -279,7 +291,7 @@ Split e merge riscrivono la topologia della doc, non una sezione, e per questo s
 - **Riduzioni prima del taglio.** È la ragione delle due fasi: eco, cronaca e inventari sono spesso migliaia di char, e un frammento dimensionato su peso che sta per sparire nasce a ridosso della soglia — cioè già candidato al prossimo split.
 - **Taglio per perimetro, mai per byte.** Frammenti da 7.500 char ottenuti tagliando a metà sono peggio dell'originale: nessuno dei due è cercabile.
 - **Ogni frammento nasce col proprio TLDR-ancora.** Un file splittato in N perde l'unica ancora che aveva: senza un TLDR per frammento lo split *peggiora* la reperibilità invece di migliorarla.
-- **Outline validata prima della scrittura.** Il `doc-writer` ha il gate two-phase (§3.5 del suo contratto). Con **un solo** writer in volo e il token `gate`, passa lo split con `NEW file con ≥3 H2` e lascia che chieda conferma via `AskUserQuestion`. In modo auto, o con più writer in parallelo, l'outline arriva già validata dal §6 e il two-phase va disattivato esplicitamente nel prompt.
+- **Outline validata prima della scrittura, sempre.** Il `doc-writer` è muto: non ha `AskUserQuestion` e non può fermarsi a chiedere conferma su un taglio che non convince. L'outline dello split arriva quindi già decisa nel prompt — dal registro dell'auditor in modo auto, dal gate §5 col token `gate`. Un writer che riceve un `NEW` senza outline applica la scelta conservativa (una sezione in coda, nessuna sottocartella) e la dichiara in `NOTE:`, che non è lo split che volevi.
 
 **Il merge è l'operazione inversa, e va usata.** Un file sotto il pavimento del contratto non si fonde d'ufficio: si riesamina il suo perimetro di ricerca. Se è distinto, sopravvive e lo si dichiara nel registro; se è un residuo, confluisce nel vicino di perimetro e l'INDEX perde una voce. Senza questo ramo lo split è a senso unico: la doc si frammenta a ogni passata e nessuno nota il file che si è svuotato.
 

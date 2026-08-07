@@ -100,7 +100,7 @@ Vincoli:
 
 ### Doc Impact al checkpoint
 
-Ogni `checkpoint-task` su code task (K=⚙️) legge le voci `## Doc Impact` non marcate, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta in un file `{docs_root}/inbox/` col TLDR-ancora e le marca `→ ✔️ inbox`. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
+Ogni `checkpoint-task` su code task (K=⚙️) legge le voci `## Doc Impact` non marcate, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta in un file `{docs_root}/inbox/` e le marca — `→ ✔️ inbox` se entrano, `→ ✖️ <parola>` se una delle sei le tiene fuori. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
 
 **Niente gate**: c'era per decidere *quando* pagare il costo del consolidamento, e senza costo non resta niente da decidere. Dove la nozione atterri lo decide `drain-doc`, in differita.
 

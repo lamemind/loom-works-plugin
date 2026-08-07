@@ -50,7 +50,7 @@ Chi interroga dipende da dove arriva la fonte. Se basta `Bash` (un `--help`, una
 
 Solo se l'input è un **task ID** (`T63`) o «task attiva». Il perimetro non è un'area di fonte: sono le nozioni che quella task ha prodotto, da verificare e far atterrare. Dal §3 in poi il flusso è identico — cambia solo da dove escono le affermazioni da verificare.
 
-**Indice d'ingresso: le voci `## Doc Impact` non marcate `→ ✔️`.** Quel marker esiste già ed è esattamente il segnale «non consolidata»: non serve inventare un registro. Conseguenza pratica — un checkpoint frettoloso, che non ha scritto niente in doc, non perde niente: la task entra comunque nello scope.
+**Indice d'ingresso: le voci `## Doc Impact` senza marker.** Il checkpoint ne appende uno a ogni voce che lavora — `→ ✔️ inbox` o `→ ✖️ <parola>` — quindi l'assenza è esattamente il segnale «mai guardata»: non serve inventare un registro. Conseguenza pratica — una task su cui nessun checkpoint ha girato entra comunque nello scope.
 
 **Bound di scope**: apri le fonti **di quella task e basta**. Nessuna scansione delle folder del progetto, nessun giro su altre task. Senza questo bound il costo tolto al checkpoint rientra intero dalla finestra.
 
@@ -69,7 +69,7 @@ Il rischio specifico di questo perimetro è opposto al drift: **gonfiare la doc 
 
 Al fan-out (§2) passa all'auditor l'**elenco esplicito** delle nozioni candidate, ognuna con la fonte nativa contro cui verificarla. È l'elenco che gli toglie il tetto dei 3 gap: la selezione l'hai già fatta tu.
 
-Chiudendo (§7), marca nel task file ogni voce integrata con `→ ✔️ align` — stesso schema dei marker `→ ✔️ capture` / `→ ✔️ D{N}`. Senza il marker il prossimo `checkpoint-task` ripresenta al gate voci già consolidate.
+Chiudendo (§7), marca nel task file ogni voce integrata con `→ ✔️ align` — stesso schema dei marker `→ ✔️ inbox` / `→ ✖️ <parola>` che appende il checkpoint. Senza il marker il prossimo `checkpoint-task` rilavora voci già collocate, e le manda in inbox una seconda volta.
 
 ### 1. Risolvi i perimetri
 
@@ -142,23 +142,33 @@ Annota il verdetto finale su ogni voce del file registro.
 
 Raggruppa le voci approvate **per file doc target** e invoca un `doc-writer` per gruppo (mai due writer sullo stesso file: si sovrascrivono a vicenda). Sequenziali, non paralleli — questi scrivono davvero.
 
+**Ogni voce porta il proprio verdetto**, non solo le `relayer`. Il writer non giudica: se una voce arriva senza verdetto e senza target esplicito, o rifiuta o improvvisa — è il modo tipico in cui una correzione atterra nel posto sbagliato.
+
 ```
-Nozione da documentare:
-- **Nozione**: correggi i drift elencati in <file doc>. Per ognuno: la doc afferma <claim>, la fonte dice <realtà> (evidenza <path:linea | comando>). Riscrivi as-is la parte sbagliata.
-- **Voci relayer**: non aggiornare la copia — cancellala e lascia il puntatore (file + simbolo per il codice, comando + forma della domanda per una fonte viva). Aggiornarla la farebbe driftare di nuovo.
-- **Ancora primaria**: invariata salvo che un fix cambi il trigger del file
+Rotte da applicare — verdetto e target sono già decisi e vincolanti, non rivalutarli.
+Target: <file doc>
+
+<una voce per finding del registro:>
+NOTION: <il claim, come la doc lo scrive oggi>
+VERDICT: fix-doc | relayer | drop
+TARGET: <file>.md §<sezione>
+POINTER: <file + simbolo> | <comando + forma della domanda> | —
+EVIDENCE: <path:linea | comando interrogato>
+WRITE: <cosa deve diventare la sezione — per fix-doc la realtà as-is; per relayer «cancella la copia, resta il puntatore»; per drop il motivo>
 
 Contesto:
 <le voci del registro per questo file: CLAIM / REALITY / EVIDENCE / FIX>
 
 Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
-Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
+Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md — il TLDR resta invariato salvo che un fix cambi il trigger del file.
 
 Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'indice.
 Sostituisci la sezione sbagliata, non appendere una correzione accanto a quella vecchia.
 Ritorna il contratto APPLIED: + INDEX_REBUILD_NEEDED.
 ```
+
+Il `POINTER:` di una `relayer` lo produce **l'auditor**, che ha già aperto la fonte per giudicare: il writer lo trascrive senza riaprire niente. Aggiornare la copia invece di cancellarla la farebbe driftare di nuovo.
 
 `drop` e `relayer` passano dallo stesso canale (sono patch di rimozione, con o senza puntatore che resta). `code-divergent` **no**: la doc resta.
 

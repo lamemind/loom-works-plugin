@@ -1,7 +1,7 @@
 ---
 name: checkpoint-task
 description: Checkpoint task progress: analyze changes, commit, update tasks.md.
-allowed-tools: Bash(*), Edit, Read
+allowed-tools: Bash(*), Edit, Read, Write
 model: sonnet
 ---
 
@@ -115,41 +115,67 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
       ```
    `--task` fissa il task file all'ID risolto, `--no-add` salta `git add -A` (lo staging l'hai fatto tu). Lo split doc/codice opera sul set che hai messo in stage. Con `TASK_SRC=env` lo script forza comunque `--no-add` da sé: la contaminazione fra sessioni parallele è silenziosa e si scopre a push fatto, quindi il default sicuro non è delegato al chiamante.
 
-7. **Doc Impact gate (morbido)**
+7. **Fase doc — le voci `## Doc Impact` in inbox**
 
-   Leggi la sezione `## Doc Impact` del task file. Se **vuota** o assente → skip step (e salta anche lo step 8).
+   Leggi la sezione `## Doc Impact` del task file. Se **vuota**, assente, o con tutte le voci già marcate → skip questo step e lo step 8.
 
-   Se contiene voci non ancora consolidate (vedi marker sotto), per **ogni voce** chiedi all'utente via `AskUserQuestion`:
+   **Doc task (K=📝)**: step **saltato**. La doc è il loro obiettivo, non un side-effect.
 
-   - `[1] capture-doc yolo` → invoca skill `capture-doc` col token `yolo` in `$ARGUMENTS`, la voce come hint, contesto = conversazione corrente. capture-doc applica la patch al working tree e **auto-accetta**: stagia da sé, senza aprire il proprio gate `ok/edit/skip`. Nessuna review neanche qui — appendi il marker `→ ✔️ capture` e prosegui col flusso.
-   - `[2] capture-doc inline` → stessa invocazione **senza** il token `yolo`. **capture-doc applica** la patch al working tree, mostra i file toccati (marker NEW/MOD) e chiede lei stessa `ok/edit/skip`:
-     - su **ok** stagia i file approvati (`git add`) → restano staged per il commit doc dello step 8. Solo qui appendi il marker `→ ✔️ capture` alla voce.
-     - su **skip/edit** capture-doc restora il working tree (nessun residuo). Se l'utente scarta, la voce resta **non consolidata**: **niente marker**, reentry al prossimo checkpoint.
+   Nessuna domanda all'utente, nessuno spawn di subagent: la nozione la scrive questa sessione, che ha già il contesto della task in memoria. Un subagent dovrebbe ricostruirlo, ed è il costo che questa fase esiste per togliere.
 
-     Non ri-chiedere `ok/edit/skip` qui: quel gate è dentro capture-doc. Leggi il suo esito (accettata/scartata) per decidere il marker.
-   - `[3] skip` → lascia la voce non consolidata. Niente enforcement. Reentry al prossimo checkpoint.
+   **7.1 — Filtra coi soli criteri indipendenti.** Sono quelli che si rispondono guardando la frase, senza aprire niente, e li hai già in contesto (`doc-management.md` §Imbuto): *sopravvive alla task* · *costo di scoperta* · le **sei parole** riconoscibili dal testo — cronaca, intenzione, ipotesi, cantiere, scarto, cornice.
 
-   **Non offrire un quarto ramo "apri una D-task"**: il gate non crea task. Una voce rinviata resta senza marker, e l'assenza del marker è già il segnale che `align-doc` legge come indice d'ingresso sul perimetro task — il rinvio è quindi tracciato senza che serva un ref proprio.
+   **Non giudicare il resto.** *Eco*, *inventario*, *calco*, *sorpresa* e «è già scritto altrove» dipendono dal codice, da una fonte viva o dal resto della doc, e aprirli qui rimette il pavimento di lettura. Una voce ridondante entra in inbox e muore allo smaltimento: è l'esito previsto, non una svista da anticipare.
 
-   **Marker di consolidamento**: a fine handling, in coda alla voce processata appendi `→ ✔️ capture`. Sempre su `[1] yolo` (non c'è esito di rifiuto); su `[2] inline` solo se capture-doc ha **accettato**. Voci con marker `→ ✔️` sono saltate ai checkpoint successivi. Voce scartata dentro capture-doc = nessun marker.
+   **7.2 — Riscrivi, non copiare.** Una voce mista si **pota**: la cronaca cade, il nucleo entra. Nel task file non tocchi il testo — l'unica scrittura lì è il marker.
 
-   **Multi-voce, ordine e restore**: processa le voci **in sequenza**, non in parallelo. Lo stage-su-ok di capture-doc è il *punto di ripristino* condiviso: se una voce successiva tocca un file già approvato da una precedente e viene scartata, il `git restore` di capture-doc torna allo stato **staged** (l'approvato), non a HEAD → l'approvazione precedente è protetta. Vale solo se le voci non si sovrappongono in parallelo.
+   **7.3 — Marca ogni voce lavorata**, in coda alla voce nel task file:
+   - entra → `→ ✔️ inbox`
+   - non entra → `→ ✖️ <parola>`, una delle sei (es. `→ ✖️ cronaca`)
 
-   **Doc task (K=📝)**: questo step viene **saltato** — le doc task non hanno Doc Impact (la doc è l'obiettivo).
+   Il marker impedisce al checkpoint successivo di riscansionare ciò che hai già deciso. Una voce senza marker è per costruzione «non ancora lavorata», ed è così che `align-doc` la ripesca sul perimetro task.
 
-   **Detached**: il gate si applica uguale. Nessuna differenza di flusso.
+   **7.4 — Scrivi il file inbox.**
+
+   ```bash
+   mkdir -p "${DOCS_ROOT}/inbox"
+   ```
+   `init.sh` la crea, ma un progetto registrato prima che esistesse non ce l'ha.
+
+   Path: `${DOCS_ROOT}/inbox/${taskId}-<slug>-<N>.md` — `<slug>` è quello del task file, `<N>` il numero dell'avanzamento che hai scritto allo step 3.
+
+   **Un file per checkpoint, immutabile una volta scritto.** Mai appendere a un file inbox esistente: `drain-doc` lo elabora e poi lo rimuove, quindi un append arrivato nel frattempo sparirebbe senza essere mai stato letto.
+
+   Forma: `# Titolo`, poi **esattamente sulla riga 3** `> **TLDR**: <perimetro>`, poi una voce per nozione. Fuori dalla riga 3 il file resta fuori dall'INDEX, e un file inbox non indicizzato non serve a nessuno. La formula del TLDR inbox è **perimetro**, non ancora, e sta in `${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md`: leggilo prima di scrivere.
+
+   Zero voci sopravvissute al filtro → **nessun file**. Restano i marker `→ ✖️`, che vanno comunque committati (step 8).
+
+   **7.5 — Rigenera l'indice**, solo se il file è nato:
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
+   ```
+   **Exit 2** = indice scritto, ma un TLDR è oltre il cap di 600 char: violazione **bloccante** del contratto, non un comando fallito. Se è quello che hai appena scritto, accorcialo e rilancia.
+
+   **Detached**: nessuna differenza di flusso.
 
 8. **Commit e push — fase doc**
 
-   Solo se il gate ha consolidato almeno una voce. Se erano tutte skippate, o la sezione era vuota, salta: il push della fase codice ha già chiuso il checkpoint.
+   Solo se lo step 7 ha girato. Se la sezione era vuota o tutte le voci erano già marcate, salta: il push della fase codice ha già chiuso il checkpoint.
 
-   Invocazione **identica in linked e detached**:
+   Stagia ciò che hai scritto — il file inbox e l'`INDEX.md` rigenerato:
+   ```bash
+   git add -- "${DOCS_ROOT}/inbox/${taskId}-<slug>-<N>.md" "${DOCS_ROOT}/reference/INDEX.md"
+   ```
+
+   Poi, **identico in linked e detached**:
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): marker Doc Impact"
    ```
 
+   Nessun file inbox nato → salta il `git add` e **ometti `--doc-message`**: restano solo i marker `→ ✖️`, che sono task tracking e vanno nel commit `checkpoint(...)`.
+
    Due flag obbligatori, per due motivi distinti:
-   - **`--no-add`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo. I file doc sono già staged da capture-doc (stage = approvazione); il task file coi marker lo aggiunge lo script da sé.
+   - **`--no-add`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo. Lo stage lo fai tu, riga sopra; il task file coi marker lo aggiunge lo script da sé.
    - **`--task`** — anche in linked, dove di norma basterebbe il symlink: se la task si è chiusa allo step 4 il symlink è già stato rimosso, e senza `--task` lo script non risolverebbe il task file su cui hai appena appeso i marker.
 
 9. **Feedback finale**
@@ -173,9 +199,9 @@ Topic = argomento concreto della domanda. NO generici.
 
 - **Due script**: analyze per raccogliere info (solo linked), commit per eseguire
 - **Due fasi di commit**: la fase codice (step 6) chiude e **pusha** il lavoro prima che la doc cominci; la fase doc (step 8) ne fa una seconda con `--no-add`. Dentro ogni fase lo script separa comunque codice+tracking (`checkpoint(...)`) da doc-nozione (`docs(...)`) — partizione path-based: doc-nozione = sotto `docs-root/` ma fuori da `tasks.md` e `tasks/`. Zero file doc in stage → commit singolo.
-- **Perché il gate doc sta dopo il commit**: prima veniva eseguito prima, e il `git add -A` finale cadeva su una working copy in cui `doc-writer` stava ancora scrivendo — checkpoint lungo quanto la fase doc, working copy inutilizzabile nel frattempo, lavoro di codice non ancora al sicuro. Committare e pushare per primo il codice è il commit di transazione che sblocca le altre sessioni; la doc arriva dopo, e un fallimento lì non porta con sé il codice.
+- **Perché la fase doc sta dopo il commit**: il `git add -A` finale cadeva su una working copy ancora in scrittura — working copy inutilizzabile nel frattempo, lavoro di codice non ancora al sicuro. Committare e pushare per primo il codice è il commit di transazione che sblocca le altre sessioni; la doc arriva dopo, e un fallimento lì non porta con sé il codice.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
 - **Baseline del diff**: derivato, mai storato. `checkpoint-task-analyze.sh` (solo linked) lo prende dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD` — zero avanzamenti → commit di creazione del task file.
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
-- **Doc Impact gate morbido**: scelta utente quando consolidare (capture yolo / capture inline / skip), tre rami — il gate non apre task. Voci marcate `→ ✔️` saltano i checkpoint successivi; una voce senza marker è per costruzione «non consolidata» e resta pescabile da `align-doc` sul perimetro task. Il flag-back della checkbox `- [ ] D{N} (<maniglia>) chiusa` (step 4.3) sopravvive per le D create a mano con `parent=`, non per un ramo del gate.
-- **Apply-first (opzioni [1] e [2])**: capture-doc non ritorna una proposta testuale (invisibile) — **applica** la patch al working tree. Su `[2]` la review è sul diff reale (pannello git): stage = approvazione (marker `→ ✔️ capture`), restore = rifiuto (nessun marker). Su `[1]` la review non c'è affatto: la patch è staged d'ufficio, e il diff resta comunque ispezionabile *dopo*, prima del commit doc dello step 8. In entrambi i casi i file arrivano allo step 8 **già staged**, ed è ciò che rende possibile il `--no-add`: lo stage è l'unica lista di cosa committare.
+- **Niente gate sulla fase doc**: serviva a decidere *quando* pagare il costo del consolidamento, e senza quel costo non resta una decisione da prendere. Tutto ciò che passa i criteri indipendenti va in inbox, sempre; dove atterri lo decide `drain-doc`, in differita.
+- **Ogni voce lavorata porta un marker**, `→ ✔️ inbox` o `→ ✖️ <parola>`: è l'unico stato che distingue «già deciso» da «non ancora guardato», e senza il secondo marker una voce scartata tornerebbe a ogni checkpoint. Il flag-back della checkbox `- [ ] D{N} (<maniglia>) chiusa` (step 4.3) è un meccanismo distinto e resta: vale per le D create a mano con `parent=`.

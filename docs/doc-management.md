@@ -17,7 +17,7 @@ Nei primi due la doc **è** la verità. Negli altri due la verità sta altrove, 
 
 ## Il terzo layer — inbox
 
-`{docs_root}/inbox/` tiene le nozioni **vere ma non ancora collocate**: un file per task, col TLDR-ancora sulla riga 3, indicizzato nell'INDEX come tutto il resto. Non è un quinto verdetto — è uno **stato di transizione** verso i quattro.
+`{docs_root}/inbox/` tiene le nozioni **vere ma non ancora collocate**: un file per checkpoint, col TLDR sulla riga 3, indicizzato nell'INDEX come tutto il resto. Non è un quinto verdetto — è uno **stato di transizione** verso i quattro.
 
 - **indicizzata** — senza TLDR resta fuori dall'INDEX, e un file inbox non indicizzato non ha ragione di esistere.
 - **temporanea per contratto** — nasce per sparire. Un file inbox fermo da mesi è un fallimento del sistema, non uno stato stabile.
@@ -60,7 +60,7 @@ come si accorge che è falsa?   → invariante: asseriscila in un test
 
 **I test non si pagano tutti nello stesso momento**, e il discriminante è da cosa dipende il verdetto.
 
-- **indipendenti** — si rispondono guardando la nozione e chi l'ha scritta, senza aprire niente. Sono i soli che si applicano alla **transizione in inbox**: *sopravvive alla task* (fra sei mesi, senza sapere che è esistita la task che l'ha generata, la frase ha ancora senso?) · *costo di scoperta* (quanto è costato scoprirlo la prima volta? lo sa chi ha appena lavorato) · le nove parole riconoscibili dal testo — cronaca, intenzione, ipotesi, cantiere, scarto, cornice · il TLDR-ancora, che è forma.
+- **indipendenti** — si rispondono guardando la nozione e chi l'ha scritta, senza aprire niente. Sono i soli che si applicano alla **transizione in inbox**: *sopravvive alla task* (fra sei mesi, senza sapere che è esistita la task che l'ha generata, la frase ha ancora senso?) · *costo di scoperta* (quanto è costato scoprirlo la prima volta? lo sa chi ha appena lavorato) · le nove parole riconoscibili dal testo — cronaca, intenzione, ipotesi, cantiere, scarto, cornice · il TLDR, che è forma.
 - **dipendenti** — il verdetto sta fuori dalla frase: *eco*, *sorpresa* e *sopravvive al refactor* dipendono dal **codice** · *inventario* e *calco* dalla **fonte viva** · *fonte unica*, *online o offline*, *quale file* e le soglie del target dipendono dalla **doc**. Si pagano allo **smaltimento**, che apre quelle fonti una volta per batch invece di una per nozione.
 
 La riga «costosa o sorprendente» ne mescola due: il costo di scoperta è indipendente, la sorpresa è una domanda sul codice e aspetta.
@@ -85,26 +85,20 @@ Numeri, non giudizi a runtime: due verifiche sullo stesso file devono dare lo st
 
 Perché ogni numero è quello e non un altro: `doc-criteria.md` §Le cinque soglie.
 
-## Formato file offline
+## Chi scrive la doc
 
-Il TLDR sta **esattamente sulla riga 3**, o il file resta fuori dall'indice:
+**La doc non si scrive a mano**: ogni scrittura passa da una skill, che porta con sé forma, soglie e le due formule del TLDR (`${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md`).
 
-```markdown
-# Titolo
+- nozione ad hoc, fuori da una task → `capture-doc`
+- voce `## Doc Impact` → il checkpoint, che la porta in inbox
+- nozione in inbox → `drain-doc`, che la colloca
+- doc esistente che mente o viola → `align-doc` · `lint-doc`
 
-> **TLDR**: <ancora primaria>
-
-Contenuto dettagliato...
-```
-
-**Il TLDR è un'ancora, non un riassunto**: deve far decidere *se aprire* il file, non risparmiare l'apertura. Trigger concreti separati da `·` — comando, flag, tag, pattern, messaggio d'errore, frase con cui uno cercherebbe la cosa.
-
-- ✅ `deck-run --resume · sidecar session-tasks.jsonl · "bindare una task a una sessione"`
-- ❌ `Descrive il funzionamento del deck e le sue interazioni con le sessioni.`
+Le stesse skill compaiono in §Manutenzione per il mestiere opposto: lì **misurano e riparano** ciò che c'è, qui sono l'unico **ingresso** di ciò che entra.
 
 ## Manutenzione
 
-Tre skill, distinte da cosa fanno alla doc — `align-doc` **misura** contro la fonte nativa del layer (i **drift**) · `lint-doc` **misura** contro questo contratto (le violazioni) · `drain-doc` **colloca**, svuotando l'inbox e pagando i criteri dipendenti una volta per batch. Girano su `doc-auditor` read-only, applica `doc-writer`; le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime. Perimetri, ordine delle fasi e regole del regroup: `doc-criteria.md` §Manutenzione.
+Tre skill, distinte da cosa fanno alla doc — `align-doc` **misura** contro la fonte nativa del layer (i **drift**) · `lint-doc` **misura** contro questo contratto (le violazioni) · `drain-doc` **colloca**, svuotando l'inbox e pagando i criteri dipendenti una volta per batch. Le due che misurano girano su `doc-auditor` read-only e applicano con `doc-writer`; `drain-doc` ha una catena propria — `doc-router` giudica, `doc-writer` applica, `doc-verifier` collauda la patch. Le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime. Perimetri, ordine delle fasi e regole del regroup: `doc-criteria.md` §Manutenzione.
 
 **Tre operazioni topologiche**, due verticali e una orizzontale: **split** (un file oltre soglia diventa N) · **merge** (N file sotto il pavimento tornano uno) · **regroup** (N file in una sottocartella). Il regroup è la terza fase di `lint-doc`, in coda a `clean` e `split` e **mai prima**: una categorizzazione dimensionata su file che stanno per essere spezzati nasce stale.
 

@@ -2,7 +2,7 @@
 
 Estensione di `doc-management.md`, che resta la norma. Questo file **non è iniettato**: si apre da path quando un verdetto non è ovvio.
 
-Il taglio fra i due non è per argomento ma per **quando si paga il verdetto**. La norma porta i criteri **indipendenti**, che si applicano guardando la sola nozione e devono essere in contesto al checkpoint senza aprire niente. Qui stanno i **dipendenti** — quelli il cui verdetto richiede di aprire il codice, una fonte viva o il resto della doc — più il razionale dei numeri e la meccanica della manutenzione. Li paga chi **colloca** (`doc-router`, `doc-auditor`, `drain-doc`), non chi cattura.
+Il taglio fra i due non è per argomento ma per **quando si paga il verdetto**. La norma porta i criteri **indipendenti**, che si applicano guardando la sola nozione e devono essere in contesto al checkpoint senza aprire niente. Qui stanno i **dipendenti** — quelli il cui verdetto richiede di aprire il codice, una fonte viva o il resto della doc — più il razionale dei numeri e la meccanica della manutenzione. Li paga chi **colloca** (`doc-router`, `doc-auditor`, `drain-doc`) e chi **collauda** (`doc-verifier`, che misura una patch contro il contratto e per farlo apre la doc), non chi cattura.
 
 I due test indipendenti che vivevano qui — *sopravvive alla task* e *costo di scoperta* — sono saliti in `doc-management.md` §Imbuto di selezione, con le nove parole. Non ne resta una copia: due fonti dello stesso test sono la prima a driftare.
 

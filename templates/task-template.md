@@ -28,7 +28,7 @@
 *Criteri di test e validazione*
 
 ## Doc Impact
-*Nozioni documentali emerse nella conversazione o durante l'esecuzione. Ogni voce: **nozione** (cosa merita documentazione) + **ancora primaria** (trigger concreto: tag, keyword, comando, pattern). Il target doc NON si decide qui — è deferito al processing. Popolata a create-task dal contesto conversazionale; append libero a run-task; **processing a checkpoint-task con gate morbido**: per ogni voce non marcata, l'utente sceglie capture-doc inline / skip. Una voce consolidata appende il marker `→ ✔️ capture` e salta i checkpoint successivi; una voce rinviata resta senza marker, ed è così che `align-doc` la ritrova sul perimetro task.*
+*Nozioni documentali emerse nella conversazione o durante l'esecuzione. Ogni voce: **nozione** (cosa merita documentazione) + **ancora primaria** (trigger concreto: tag, keyword, comando, pattern). Il target doc NON si decide qui — lo decide `drain-doc`, in differita. Popolata a create-task dal contesto conversazionale; append libero a run-task; **processing a checkpoint-task, senza gate**: ogni voce non marcata passa i soli criteri indipendenti e finisce in `{docs_root}/inbox/`, poi porta il marker `→ ✔️ inbox` (entrata) o `→ ✖️ <parola>` (scartata). Una voce marcata salta i checkpoint successivi; una senza marker resta pescabile da `align-doc` sul perimetro task.*
 
 {{doc_impact}}
 
