@@ -142,3 +142,23 @@ Topic = argomento concreto della domanda. NO generici ("domanda per te").
 Se durante run-task emergono nozioni documentali (decisioni di design, pattern non-ovvi, gotcha, conoscenza che merita doc), **appendile direttamente** alla sezione `## Doc Impact` del task file. Format: bullet con **nozione** + **ancora primaria** (tag/keyword/comando/pattern).
 
 Non decidere il target doc qui: il checkpoint porta la voce in `{docs_root}/inbox/` e la marca, e dove atterri lo decide `drain-doc` in differita.
+
+### Sentinelle di drift — prima di chiudere
+
+`run-task` è l'unica delle tre skill produttrici in cui i file toccati esistono davvero, quindi è l'unica dove il rilevamento è **meccanico**. Passa allo script i path che hai modificato — la lista la conosci tu, non gliela far dedurre da un `git diff`: in detached il working tree porta anche i file delle altre sessioni.
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/drift-candidates.sh" <path1> <path2> ...
+```
+
+Ritorna i file doc che **citano** i path toccati, con `strong` (la doc nomina il modulo per intero) o `weak` (nomina solo il basename, che può appartenere a un altro file omonimo). Exit sempre 0: è una misura, il verdetto è tuo.
+
+Per ogni candidato, apri il punto e chiediti: *quella pagina adesso dice il falso?* Solo se sì, appendi alla voce corrispondente in `## Doc Impact`:
+
+```markdown
+  🚨 drift: {docs_root}/reference/<file>.md
+```
+
+Il checkpoint la propaga sul file inbox, e `drain-doc` smaltisce quel file **per primo, anche sotto il tetto di 8**.
+
+**Il grep non chiude il caso, lo apre.** Un candidato che a leggerlo è ancora vero non porta sentinella — la lista è di path citati, non di pagine false. E all'opposto, **un comportamento cambiato senza che nessun nome cambi non produce nessun candidato**: è precisamente il caso per cui la sentinella si mette anche a mano, senza che nessuno script l'abbia suggerita.

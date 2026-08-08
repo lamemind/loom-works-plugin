@@ -15,7 +15,7 @@ Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa 
 
 Porta le nozioni di `${DOCS_ROOT}/inbox/` nei quattro layer: verdetto, file target, patch, collaudo, commit.
 
-Input utente (perimetro: nomi di file inbox, un numero, `tutto` · più il token `plan`):
+Input utente (perimetro: nomi di file inbox, un numero, `tutto`, `urgenti` · più il token `plan`):
 ~~~human
 $ARGUMENTS
 ~~~
@@ -36,7 +36,7 @@ Il tuo mestiere sono i criteri **dipendenti**: *eco*, *sorpresa* e *sopravvive a
 
 Col token la skill esegue §1 e §2, stampa il piano e **si ferma lì**: niente router, niente writer, niente commit. Il costo sono due chiamate bash e nessun subagent.
 
-Stampa la coda con char ed età, quanti file la presa in carico raccoglierebbe, e le righe di comando dei router che partirebbero. **Non stampa i gruppi**: il raggruppamento per target è calcolabile solo *dopo* il routing, che è l'unico passo che sa dove ogni nozione va a finire.
+Stampa la coda con char, età e priorità, quanti file la presa in carico raccoglierebbe, e le righe di comando dei router che partirebbero. **Non stampa i gruppi**: il raggruppamento per target è calcolabile solo *dopo* il routing, che è l'unico passo che sa dove ogni nozione va a finire.
 
 ## Mai staged fino al commit
 
@@ -56,7 +56,9 @@ Il rollback è `git checkout -- <path>` sui `MOD` e `rm -- <path>` sui `NEW`, ch
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --inbox --format tsv
 ```
 
-Ritorna la coda già ordinata: **il più vecchio per primo**, con char, età in giorni e lunghezza del TLDR. L'età viene dal commit che ha aggiunto il file, non dall'mtime.
+Ritorna la coda **già ordinata e già triata**: i file con sentinella di drift in testa, poi il più vecchio per primo dentro ogni classe. Colonne `PRIO` (`urgente` | `normale`) e `DRIFT` (i file doc che quella nozione dovrebbe correggere). L'età viene dal commit che ha aggiunto il file, non dall'mtime.
+
+**L'ordine lo decide lo script, non tu.** Due lettori della stessa coda devono vederla nello stesso ordine, e la riga `> **PRIORITY**: 🚨` sulla riga 4 di un file inbox è un dato che il produttore ha scritto — non si rivaluta qui. Un file senza quella riga vale priorità normale: è il caso di maggioranza, e i file nati prima che le sentinelle esistessero non vanno ritoccati.
 
 Servono altre due misure, e vanno prese **adesso** perché sono baseline:
 
@@ -68,17 +70,18 @@ Servono altre due misure, e vanno prese **adesso** perché sono baseline:
 - La prima è la misura per-file di tutta la doc: la passi ai router, che così non ricontano e possono rispettare la regola del target sopra soglia.
 - La seconda è il baseline dei riferimenti appesi. **Senza, il collaudo non sa distinguere un `DANGLING` introdotto dalla patch da uno che c'era già** — e il secondo non è colpa di nessuno. Exit 2 all'ingresso non è un blocco: è il numero da cui si misura il delta.
 
-**Il triage per priorità non esiste ancora.** Le sentinelle di drift hanno una fase propria: finché non le produce nessuno, l'ordine è quello a coda e un filtro «urgenti» non avrebbe niente da filtrare. Se l'utente lo chiede, dillo e procedi a coda.
-
 ## 2. Presa in carico
 
 Dal perimetro nell'input:
 
 - **vuoto o `tutto`** → l'intera coda
-- **un numero** (`3`) → i primi N della coda, cioè i più vecchi
+- **`urgenti`** → i soli file con `PRIO: urgente`
+- **un numero** (`3`) → i primi N della coda, che sono gli urgenti se ce ne sono e i più vecchi altrimenti
 - **uno o più nomi** → quei file, nell'ordine della coda
 
-Coda vuota è un esito normale e va detto in una riga: nessun file inbox, niente da smaltire, stop. Non è un fallimento e non va cercato altrove il lavoro.
+Coda vuota è un esito normale e va detto in una riga: nessun file inbox, niente da smaltire, stop. Non è un fallimento e non va cercato altrove il lavoro. Lo stesso vale per `urgenti` su una coda senza sentinelle: dillo e fermati, non ripiegare sulla coda intera — chi ha chiesto gli urgenti sta pagando un giro corto apposta.
+
+**Un lotto urgente gira sotto il tetto, ed è il punto.** Il cap di 8 file dice quando lo smaltimento non è più *opzionale*; non dice quando è *permesso*. Una nozione con la sentinella sta curando una pagina già falsa, e farla aspettare la soglia tiene in piedi la bugia per tutto il tempo dell'attesa.
 
 ## 3. Routing — un `doc-router` per file inbox, in parallelo
 
@@ -93,6 +96,8 @@ Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — i criteri dipendenti sono il tuo mestiere.
 Prefisso ID: INBOX<n>
+Sentinella di drift: <i path della colonna DRIFT, se il file ne porta — altrimenti ometti la riga>
+  Sono le pagine che chi ha catturato la nozione ritiene già FALSE. Aprile: se la nozione le corregge, sono il target naturale. Non è un ordine — un candidato ancora vero non le rende tali.
 
 Misure pre-calcolate (fidati di queste, non ricontare):
 <le righe PATH / CHAR / TLDR / FLAGS di doc-metrics.sh>
@@ -244,7 +249,7 @@ Su disco, non in chat — il contesto dell'orchestratore è l'unica risorsa che 
 
 Cosa contiene, una riga per voce:
 
-- **coda in ingresso**: file, char, età
+- **coda in ingresso**: file, char, età, priorità
 - **un blocco per gruppo**: target · quante nozioni · quanti char di materiale · esito del collaudo · le violazioni con etichetta e regola
 - **rotte non atterrate**: `drop`, `→ codice`, `→ fonte viva`, col motivo
 - **file inbox rimossi** e **file rimasti in coda**, questi ultimi col motivo

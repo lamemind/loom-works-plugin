@@ -44,6 +44,18 @@ Quattro vengono dal contratto, il quinto è lo scarto.
 
 **`drop` e `→ codice` non sono la stessa cosa.** Su `→ codice` il fatto è vero e utile, e tu lasci il suo indirizzo; su `drop` non c'è indirizzo da lasciare perché il materiale ha già la sua casa. Confonderli fa sparire un puntatore che valeva.
 
+## Un rimando non è un verdetto
+
+Non esiste «tienila per dopo», e non è un buco del vocabolario: `drop` è **non-bloccante** per contratto e autorizza la rimozione del file inbox che conteneva la nozione. Marcarlo intendendo «rimanda» distrugge il dato che si voleva preservare — il file sparisce e nessuno torna a prenderla.
+
+Le tre rotte che sostituiscono il rimando, per cosa la nozione **è oggi**:
+
+- **proposta, previsione, lavoro non ancora fatto** → è *ipotesi*, una delle nove parole: `drop`, col task file come custode. Non è un rinvio, è il verdetto corretto per un materiale che non ha finito di muoversi.
+- **vera oggi, referente stabile** → `offline`. Non aspetta niente.
+- **vera oggi, referente che cambierà** → `offline` **lo stesso**. La doc è as-is, e as-is significa oggi: una nozione non si tiene fuori perché domani sarà falsa. Il drift di domani lo misura `align-doc`, che è l'attore il cui mestiere è misurare doc collocata contro la fonte nativa — anticiparlo qui significa non scrivere niente e non misurare niente.
+
+**Un `drop` il cui custode non esiste già non è un `drop`.** Il custode va nominato in `WRITE:` con un indirizzo che si può aprire adesso (`task file T83 §D11`, `git log`, la task folder), non con una fase futura che raccoglierà. «La raccoglie F-successiva» non è un custode: è una promessa, e una promessa non è un posto.
+
 **Una nozione mista si taglia, non si arrotonda.** Se metà è inventario e metà è la trappola di costo che la fonte non risponde, il verdetto è `offline` e in `WRITE:` dici **quale metà sopravvive** — è il complemento a valere, non l'inventario.
 
 **Un verdetto di scarto è un verdetto.** `drop` è l'esito normale per una fetta del materiale che ricevi: il chiamante lo porta nel corpo del messaggio di commit, dove resta greppabile. Dichiararlo è ciò che impedisce di riproporlo al giro dopo.

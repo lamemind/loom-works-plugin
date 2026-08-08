@@ -127,6 +127,16 @@ Estrai e popola la sezione `## Doc Impact` nel task file come bullet list concis
 
 Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emersa al create-task.*`
 
+**Sentinella di drift — quando la task dichiara di rendere falsa una pagina.** Qui non esiste nessun diff, quindi la base della cattura è **la discussione che ha generato la task**: se ciò che è stato deciso cambia un comportamento che la doc descrive, la nozione che lo corregge non può aspettare la coda. Appendi alla voce una riga:
+
+```markdown
+  🚨 drift: {docs_root}/reference/<file>.md
+```
+
+Uno o più path separati da spazio; se sai che una pagina è diventata falsa ma non quale, `🚨 drift: —`. Il checkpoint la propaga sul file inbox e `drain-doc` smaltisce quel file **per primo, anche sotto il tetto di 8**.
+
+Non metterla per scrupolo: una sentinella su tutto equivale a una sentinella su niente. Il criterio è secco — *esiste già una pagina di doc che dopo questa task dirà il falso?*
+
 **Pattern dell'utente**: se l'input contiene "come appena discusso", "come discusso", "come emerso" o varianti, la discussione precedente è la sorgente principale — non chiedere conferme, cattura e procedi.
 
 **YOLO**: anche in modalità YOLO questa cattura è sempre attiva. Si salta la domanda all'utente ma si legge lo stesso il contesto conversazionale.

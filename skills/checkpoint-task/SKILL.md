@@ -150,6 +150,20 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Zero voci sopravvissute al filtro → **nessun file**. Restano i marker `→ ✖️`, che vanno comunque committati (step 8).
 
+   **7.4b — Propaga la sentinella di drift, non dedurla.** Se almeno una delle voci entrate porta una riga `🚨 drift: <path...>` — scritta a monte da `create-task`, `preflight-task` o `run-task`, che erano nella stanza quando il drift è nato — scrivi sul file inbox, **esattamente sulla riga 4**:
+
+   ```markdown
+   > **PRIORITY**: 🚨 · drift: <l'unione dei path di tutte le voci entrate>
+   ```
+
+   Nessuna sentinella fra le voci entrate → **nessuna riga 4**, e la riga assente vale priorità normale. Non inventarne una: qui la decisione che ha generato il drift è già stata presa e il contesto che la riconosceva si è chiuso con la sessione. Dedurla significherebbe aprire `reference/` per giudicare, cioè rimettere dentro il costo che questa fase esiste per togliere — nessuno spawn di subagent, nessun criterio dipendente.
+
+   Due conseguenze del «propaga, non deduce»:
+   - **Una sentinella su una voce scartata non propaga niente.** Se la voce esce `→ ✖️ cronaca`, non entra nel file e la sirena muore con lei: la priorità ordina l'inbox, non forza l'ingresso.
+   - **La riga `🚨 drift:` resta nel task file** insieme al resto della voce, come record datato. Non è un secondo stato da tenere allineato: dopo il marker `→ ✔️ inbox` nessuno la rilegge più, e l'unico posto su cui `drain-doc` ordina è la riga 4 del file inbox.
+
+   Posizione fissa, non un grep sul corpo: `doc-metrics.sh --inbox` la legge con lo stesso `sed -n` del TLDR. E stando fuori dalla riga 3 non entra nell'INDEX, che è online — costo per-sessione zero.
+
    **7.5 — Rigenera l'indice**, solo se il file è nato:
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
@@ -182,7 +196,12 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --inbox
    ```
-   L'ultima riga dice quanti file inbox ci sono sul tetto (`- file inbox: N / 8`). **Oltre il tetto**, chiudi il feedback con una riga sola: quanti file, da quanti giorni è in coda il più vecchio, e l'invito a invocare `/loom-works:drain-doc`.
+   Due righe da leggere, e sono trigger indipendenti:
+
+   - `- file inbox: N / 8` — **oltre il tetto**, chiudi il feedback con una riga sola: quanti file, da quanti giorni è in coda il più vecchio, e l'invito a invocare `/loom-works:drain-doc`.
+   - `- con sentinella di drift: N` — **presente a qualunque conteggio**, anche a 1 file su 8: invita a `/loom-works:drain-doc urgenti`, che prende solo quelli. Aspettare la soglia è il difetto che la sentinella esiste per togliere — un drift è vivo dall'istante in cui il codice cambia, e ogni giro saltato è un giorno di doc bugiarda.
+
+   **Il checkpoint allerta, non invoca.** Auto-lanciare `drain-doc` da qui rimetterebbe dentro il costo che questa fase ha tolto; a smaltire è l'umano, o il driver notturno.
 
    L'allerta sta **qui** perché qui la soglia si supera — il checkpoint è l'unico produttore dell'inbox. Non è un gate e non blocca niente: il tetto è un trigger, mai un cap, e una nozione non si rifiuta perché la coda è lunga.
 

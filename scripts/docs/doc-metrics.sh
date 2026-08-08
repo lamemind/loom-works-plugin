@@ -18,14 +18,18 @@
 # entry hook SessionStart (misurate da check-injection-budget.sh). Le due voci
 # vanno lette insieme: gli @-import da soli sono circa il 70% del costo reale.
 #
-# `--inbox` emette SOLO la coda di smaltimento — i file di {docs_root}/inbox/ in
-# ordine di eta', il piu' vecchio per primo — ed e' l'inventario che drain-doc
-# consuma. L'eta' viene dal commit che ha AGGIUNTO il file (`git log
-# --diff-filter=A`, il piu' vecchio), non dall'mtime: un file inbox si riscrive
-# solo per errore, mentre un checkout ne azzera l'mtime di tutti insieme e
-# l'ordine a coda sparirebbe senza che nulla lo segnali. Fallback su mtime per un
-# file mai committato. Il flag NON altera l'output di default: doc-partition.sh
-# lo consuma.
+# `--inbox` emette SOLO la coda di smaltimento — i file di {docs_root}/inbox/ —
+# ed e' l'inventario che drain-doc consuma. L'ordine e' a due chiavi: prima i
+# file con SENTINELLA DI DRIFT (riga 4, vedi drift_of), poi l'eta' crescente
+# dentro ogni classe. Una sentinella dice che quella nozione sta curando una
+# pagina gia' falsa, e un drift e' vivo dall'istante in cui il codice cambia:
+# farla aspettare la coda significa tenere in piedi la bugia.
+# L'eta' viene dal commit che ha AGGIUNTO il file (`git log --diff-filter=A`, il
+# piu' vecchio), non dall'mtime: un file inbox si riscrive solo per errore,
+# mentre un checkout ne azzera l'mtime di tutti insieme e l'ordine a coda
+# sparirebbe senza che nulla lo segnali. Fallback su mtime per un file mai
+# committato. Il flag NON altera l'output di default: doc-partition.sh lo
+# consuma.
 #
 # Flag per file:
 #   SPLIT   char >= soglia split
@@ -116,9 +120,25 @@ tldr_of() {  # <file> — convenzione strict: riga 3, stessa di build-index.sh
     echo "${t%"${t##*[![:space:]]}"}"
 }
 
+# Sentinella di drift: riga 4 di un file inbox, subito sotto il TLDR.
+#   > **PRIORITY**: 🚨 · drift: <path> <path>
+# Riga assente = priorità normale, ed è il caso di maggioranza: i file nati prima
+# che le sentinelle esistessero non vanno ritoccati. Posizione fissa come il
+# TLDR, quindi si legge con un `sed -n` invece che con un grep sul corpo — e
+# fuori dalla riga 3 non entra nell'INDEX, che è online: costo per-sessione zero.
+drift_of() {  # <file> → i path candidati, o vuoto se la riga manca
+    local line
+    line="$(sed -n '4p' "$1" 2>/dev/null)" || return 0
+    [[ "$line" =~ ^\>\ \*\*PRIORITY\*\*:\ 🚨(.*)$ ]] || return 0
+    local rest="${BASH_REMATCH[1]}"
+    [[ "$rest" =~ drift:[[:space:]]*(.+)$ ]] && rest="${BASH_REMATCH[1]}" || rest="—"
+    echo "${rest%"${rest##*[![:space:]]}"}"
+}
+
 # --- Coda inbox (--inbox) -----------------------------------------------------
-# Ordine a coda: il piu' vecchio per primo. Le sentinelle di priorita' non
-# esistono ancora — quando esisteranno, si antepongono qui, non nel chiamante.
+# Ordine: i file con sentinella di drift per primi, poi a coda — il piu' vecchio
+# per primo dentro ogni classe. La priorita' si antepone QUI e non nel chiamante:
+# due lettori della stessa coda devono vedere lo stesso ordine.
 if [[ "$INBOX_ONLY" -eq 1 ]]; then
     INBOX_DIR="${PROJECT_ROOT}/${DOCS_ROOT}/inbox"
     NOW="$(date +%s)"
@@ -131,30 +151,41 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
             created="$(cd "$PROJECT_ROOT" && git log --diff-filter=A --format=%at -- "$rel" 2>/dev/null | tail -1)"
             [[ "$created" =~ ^[0-9]+$ ]] || created="$(stat -c %Y "$file")"
             tldr="$(tldr_of "$file")"
-            printf '%s\t%s\t%s\t%s\n' "$created" "$rel" "$(char_count "$file")" "${#tldr}" >> "$QTMP"
+            drift="$(drift_of "$file")"
+            if [[ -n "$drift" ]]; then rank=0; else rank=1; drift="—"; fi
+            printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$rank" "$created" "$rel" "$(char_count "$file")" "${#tldr}" "$drift" >> "$QTMP"
         done < <(find "$INBOX_DIR" -maxdepth 1 -type f -name '*.md' -print0)
     fi
 
-    n_q=0; c_q=0
-    while IFS=$'\t' read -r _ _ c _; do n_q=$((n_q+1)); c_q=$((c_q + c)); done < "$QTMP"
+    n_q=0; c_q=0; n_urg=0
+    while IFS=$'\t' read -r rk _ _ c _ _; do
+        n_q=$((n_q+1)); c_q=$((c_q + c)); (( rk == 0 )) && n_urg=$((n_urg+1))
+    done < "$QTMP"
 
     if [[ "$FORMAT" == "tsv" ]]; then
-        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tCREATED\n'
-        sort -t$'\t' -k1,1n "$QTMP" | while IFS=$'\t' read -r ts p c t; do
-            printf '%s\t%s\t%s\t%s\t%s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$ts"
+        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tPRIO\tDRIFT\tCREATED\n'
+        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr; do
+            (( rk == 0 )) && prio="urgente" || prio="normale"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$dr" "$ts"
         done
     else
-        echo "[doc-metrics] coda inbox: ${DOCS_ROOT}/inbox  ·  ordine: il più vecchio per primo"
+        echo "[doc-metrics] coda inbox: ${DOCS_ROOT}/inbox  ·  ordine: sentinelle prima, poi il più vecchio"
         echo
-        printf '%-56s %8s %6s %6s\n' "PATH" "CHAR" "AGE_D" "TLDR"
-        sort -t$'\t' -k1,1n "$QTMP" | while IFS=$'\t' read -r ts p c t; do
-            printf '%-56s %8s %6s %6s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t"
+        printf '%-52s %8s %6s %6s %5s\n' "PATH" "CHAR" "AGE_D" "TLDR" "PRIO"
+        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr; do
+            (( rk == 0 )) && prio="🚨" || prio="-"
+            printf '%-52s %8s %6s %6s %5s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio"
+            (( rk == 0 )) && echo "      drift: ${dr}"
         done
         echo
         if (( n_q > INBOX_CAP )); then
             echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}  → OLTRE IL TETTO, lo smaltimento non è più opzionale"
         else
             echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}"
+        fi
+        if (( n_urg > 0 )); then
+            echo "- con sentinella di drift: ${n_urg}  → smaltibili subito, il tetto non li riguarda"
         fi
     fi
     exit 0

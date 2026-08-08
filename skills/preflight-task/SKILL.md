@@ -110,6 +110,28 @@ Numerazione `D{N}` locale alla sezione, ripartendo da `D1` ad ogni esecuzione pr
 
 L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `start-task` legge come "preflight verificata, nessuna decisione" (distinto da "preflight mai eseguita" = blocco assente).
 
+## 3b. Le decisioni che rendono falsa una pagina di doc
+
+Una `D{N}` che sceglie di cambiare un comportamento **già descritto in doc** produce un drift nell'istante in cui viene congelata, non quando il codice arriva. Preflight è l'unico momento presidiato del ciclo: c'è un umano nella stanza e dirlo costa una riga. Ricavare lo stesso fatto più tardi, rileggendo la prosa di una `D{N}`, sarebbe un giudizio invece che un meccanismo.
+
+Per ogni decisione appena scritta, chiediti: *esiste una pagina di `{docs_root}/reference/` o un file @-importato da `CLAUDE.md` che dopo questa scelta dirà il falso?* Se sì, appendi una voce alla sezione `## Doc Impact` del task file:
+
+```markdown
+- **<la nozione: cosa diventa vero, non cosa si è deciso>**
+  Ancora: <trigger concreto — comando, keyword, pattern>
+  🚨 drift: {docs_root}/reference/<file>.md
+```
+
+Regole di scrittura, tutte già note e nessuna nuova:
+
+- **La sezione `## Doc Impact` sta fra `## Testing Notes` e `## Prod Validation`.** Se manca, creala lì. Se contiene solo il placeholder `*Nessuna nozione documentale emersa al create-task.*`, sostituiscilo con le tue voci.
+- **Appendi in coda, senza deduplicare** — stesso regime dei blocchi datati di `## Decisions`: preflight è ri-eseguibile, e due giri che decidono la stessa cosa lasciano due voci. Le scarta il checkpoint, che è chi le filtra.
+- **Nessun marker.** Una voce senza `→ ✔️ inbox` o `→ ✖️ <parola>` è per costruzione «non ancora lavorata»: la raccoglie il primo `checkpoint-task`. Metterlo qui la farebbe saltare.
+- **Non decidere il target doc.** La sentinella nomina i file *candidati a essere falsi*, che non sono il file dove la nozione atterrerà: quello lo decide `drain-doc`, in differita.
+- **Una voce senza sentinella è legittima.** Una decisione può produrre una nozione documentale senza rendere falso niente: entra in `## Doc Impact` normale, e va a coda.
+
+Se nessuna decisione tocca la doc, **non scrivere niente** — nessun placeholder, nessuna sezione vuota. `## Doc Impact` non è il registro delle decisioni, quello è `## Decisions`.
+
 ## 4. Commit del task file
 
 Appena scritte le decisioni, committa **subito** il solo task file (commit dedicato, separato dall'implementazione). Usa gli helper di `lib.sh`:
@@ -132,12 +154,14 @@ Dopo commit+push, mostra all'utente:
 ```
 ✅ Preflight completato: ${N} decisioni congelate in ${task_file}
    📌 Committate e pushate: task(${taskId}): preflight - ${N} decisioni congelate
+   🚨 ${M} sentinelle di drift in Doc Impact  ← solo se ${M} > 0
    Pronta per /loom-works:run-task
 ```
 
 ## Note
 
-- **Non esegue codice**: preflight è solo decisioni. Implementazione resta a `run-task`.
+- **Non esegue codice**: preflight congela decisioni e, quando una di quelle rende falsa una pagina di doc, ne cattura la sentinella (step 3b). Implementazione resta a `run-task`.
+- **Due sezioni, due mestieri.** `## Decisions` porta *cosa si è deciso* ed è cronaca datata: nessuno la legge a valle. `## Doc Impact` porta *cosa è diventato vero*, e il checkpoint la svuota in inbox. Scrivere la decisione in `## Doc Impact` è il modo tipico di sbagliare: quella riga andrebbe in inbox come intenzione e verrebbe scartata allo smaltimento.
 - **Idempotenza parziale**: ri-eseguire preflight su una task aggiunge un nuovo blocco datato. Lo storico delle decisioni resta intatto. Ogni giro produce il suo commit dedicato.
 - **Task piccole / nessuna ambiguità**: se l'analisi (step 1) non trova ambiguità reali, salta il Q&A ma **scrivi comunque il marker** in `## Decisions` (step 3, caso nessuna ambiguità) e committalo (step 4, messaggio `nessuna ambiguità`). Serve a `start-task` per distinguere "preflight già passata, niente da decidere" da "preflight mai eseguita". Mostra: `🛫 Nessuna ambiguità rilevata — marker registrato. Task pronta per run-task.`
 - **Commit + push automatici**: lo step 4 committa **solo** il task file (commit dedicato) e pusha, come le altre skill task-level. Decisioni tracciate separatamente dall'implementazione.
