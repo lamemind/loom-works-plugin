@@ -46,7 +46,7 @@ Da cui tre regole, che valgono per l'intera run:
 
 - **Guardia in ingresso.** Se `git diff --cached --quiet` esce non-zero, l'indice è già popolato da qualcun altro: **fermati** e dillo. Un commit con pathspec porterebbe via lavoro non tuo.
 - **La patch vive solo nel working tree.** Guardiani e `doc-verifier` leggono `git diff` **non-staged**. Nessun `git add` prima del momento del commit.
-- **Il commit è una catena sola**, con pathspec esplicita del gruppo: `git add -- <path...>` immediatamente seguito da `git commit -- <path...>`. La finestra scende a millisecondi, e non esiste mai un indice popolato in attesa di un giudizio.
+- **Il commit è una catena sola**, con pathspec esplicita del gruppo: `git add -- <path...>` immediatamente seguito da `git commit -m "..." -- <path...>`. La finestra scende a millisecondi, e non esiste mai un indice popolato in attesa di un giudizio.
 
 Il rollback è `git checkout -- <path>` sui `MOD` e `rm -- <path>` sui `NEW`, che non sono in HEAD e quindi `git checkout` non li toglie.
 
@@ -197,7 +197,7 @@ Il referto porta `OUTCOME: pass | rollback`. Una `LABEL: accodato` **non** bocci
 **`pass` → commit**, catena unica con pathspec esplicita:
 
 ```bash
-git add -- <path...> && git commit -- <path...> -m "docs(drain): <target>" -m "<corpo>"
+git add -- <path...> && git commit -m "docs(drain): <target>" -m "<corpo>" -- <path...>
 ```
 
 - La pathspec sono **tutti** i file di `APPLIED:` più `INDEX.md` se il rebuild l'ha toccato. Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file.
@@ -225,7 +225,7 @@ Un file è rimovibile quando nessuna delle sue rotte appartiene a un gruppo bocc
 git rm -- <file inbox interamente smaltiti>
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
 git add -- ${DOCS_ROOT}/reference/INDEX.md
-git commit -- <file inbox rimossi> ${DOCS_ROOT}/reference/INDEX.md -m "docs(drain): smaltiti <n> file inbox"
+git commit -m "docs(drain): smaltiti <n> file inbox" -- <file inbox rimossi> ${DOCS_ROOT}/reference/INDEX.md
 ```
 
 Il rebuild finale toglie dall'INDEX la sezione inbox — che `build-index.sh` emette solo se la cartella ha almeno un file indicizzabile, quindi su inbox svuotata sparisce da sola, e con essa la riga di precedenza.

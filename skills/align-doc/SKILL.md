@@ -41,7 +41,7 @@ Il gate umano che stava fra il registro e la patch è stato **rimosso**: era l'u
 
 **Guardia in ingresso, prima di qualunque altra cosa.** Se `git diff --cached --quiet` esce non-zero l'indice è già popolato da qualcun altro: **fermati e dillo**. Il commit di questa skill ha una pathspec esplicita, e con un indice sporco porterebbe via lavoro non tuo.
 
-**Mai staged fino al commit.** Lo stage git è uno per *worktree*, non per sessione: una patch lasciata nell'indice viene raccolta dal `git add -A` di qualunque altra sessione che committi nel frattempo. Le patch vivono quindi solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica — `git add -- <path...> && git commit -- <path...>`.
+**Mai staged fino al commit.** Lo stage git è uno per *worktree*, non per sessione: una patch lasciata nell'indice viene raccolta dal `git add -A` di qualunque altra sessione che committi nel frattempo. Le patch vivono quindi solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica — `git add -- <path...> && git commit -m "..." -- <path...>`.
 
 ## La fonte nativa non è sempre il codice
 
@@ -221,7 +221,7 @@ Solo su collaudo `pass`.
 - **Non stampare i diff** in chat: bruciano contesto e sono già ispezionabili nel pannello git. Stampa la lista file dal contratto `APPLIED:`.
 - **Committa**, catena unica con pathspec esplicita:
   ```bash
-  git add -- <path...> && git commit -- <path...> -m "docs(align): <perimetro>" -m "<corpo>"
+  git add -- <path...> && git commit -m "docs(align): <perimetro>" -m "<corpo>" -- <path...>
   ```
   La pathspec sono tutti i file di `APPLIED:`, più `INDEX.md` se il rebuild l'ha toccato e il task file se hai scritto i marker. Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file. Il **corpo** porta il blocco `DISCARDED:` del writer: è materiale che ha deciso di non scrivere, e il posto durevole di quel verdetto è il messaggio di commit.
 - **Non pusha.** Finché i commit restano locali l'undo è una riga; pushati, diventa un force-push su un ramo che altre sessioni possono già aver letto.

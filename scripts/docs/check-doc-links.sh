@@ -180,13 +180,19 @@ FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir) }
         tail = substr(rest, RSTART + RLENGTH)
 
         skip = 0
+        # La sintassi di link markdown `](x.md)` DICHIARA un puntatore, quindi vale
+        # come riferimento anche senza barra — ed e la forma naturale per citare un
+        # fratello nella stessa cartella, cioe la piu esposta a un regroup, che
+        # sposta i file e lascia i link dove stavano.
+        mdlink = (before ~ /\]\($/)
         if (before ~ /https?:\/\/[^ )]*$/) skip = 1        # URL
         if (before ~ /[}$]$/)              skip = 1        # ${VAR}/path.md
         if (length(tok) < 4)               skip = 1
         # Un basename NUDO (tasks.md, SKILL.md) e una MENZIONE, non un riferimento:
         # la prosa nomina un file per concetto, senza dire dove sta, e verificarlo
-        # come path produce solo rumore. Riferimento = almeno una barra nel token.
-        if (tok !~ /\//)                   skip = 1
+        # come path produce solo rumore. Riferimento = almeno una barra nel token,
+        # o la parentesi di un link markdown.
+        if (tok !~ /\// && !mdlink)        skip = 1
 
         if (!skip) {
             # Un path si prova prima relativo al file che lo cita, poi a project root:
@@ -197,6 +203,7 @@ FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir) }
             if (p ~ /^\//)                        abs = normpath(p)
             else if (exists(normpath(dir "/" p))) abs = normpath(dir "/" p)
             else if (p ~ /^\./)                   abs = normpath(dir "/" p)
+            else if (mdlink && p !~ /\//)         abs = normpath(dir "/" p)
             else                                  abs = normpath(ROOT "/" p)
 
             rel = abs; sub("^" ROOT "/", "", rel)

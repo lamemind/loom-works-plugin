@@ -101,7 +101,7 @@ git rev-parse --short HEAD
 
 **Non pusha, deliberatamente.** Finché i commit restano locali l'undo è una riga; pushati, diventa un force-push su un ramo che altre sessioni possono già aver letto. Il push è una decisione del chiamante, a valle.
 
-**Mai staged fino al commit.** Lo stage git è uno per *worktree*, non per sessione: una patch lasciata nell'indice viene raccolta dal `git add -A` di qualunque altra sessione che committi nel frattempo. Quindi le patch vivono solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica con pathspec esplicita — `git add -- <path...> && git commit -- <path...>`.
+**Mai staged fino al commit.** Lo stage git è uno per *worktree*, non per sessione: una patch lasciata nell'indice viene raccolta dal `git add -A` di qualunque altra sessione che committi nel frattempo. Quindi le patch vivono solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica con pathspec esplicita — `git add -- <path...> && git commit -m "..." -- <path...>`.
 
 Sequenza dei commit — il registro entra in cronologia **prima** delle patch che lo eseguono:
 
@@ -343,7 +343,7 @@ Il referto porta `OUTCOME: pass | rollback`, e ogni violazione una `LABEL:`.
 Su `pass`, il commit 3 della fase, catena unica con pathspec esplicita:
 
 ```bash
-git add -- <path...> && git commit -- <path...> -m "docs(lint): <fase>"
+git add -- <path...> && git commit -m "docs(lint): <fase>" -- <path...>
 ```
 
 Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file.

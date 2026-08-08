@@ -29,7 +29,7 @@ Il loop di review che stava qui — stage come approvazione, restore come rifiut
 Da cui, per l'intera esecuzione:
 
 - **Guardia in ingresso.** Se `git diff --cached --quiet` esce non-zero l'indice è già popolato da qualcun altro: **fermati e dillo**. Il commit ha una pathspec esplicita, e con un indice sporco porterebbe via lavoro non tuo.
-- **Mai staged fino al commit.** La patch vive solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica: `git add -- <path...> && git commit -- <path...>`.
+- **Mai staged fino al commit.** La patch vive solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica: `git add -- <path...> && git commit -m "..." -- <path...>`.
 
 ## Scope
 
@@ -149,7 +149,7 @@ Ritorna solo il referto.
 Solo su `pass`. Catena unica con pathspec esplicita:
 
 ```bash
-git add -- <path...> && git commit -- <path...> -m "docs(capture): <di cosa parla la nozione>" -m "<corpo>"
+git add -- <path...> && git commit -m "docs(capture): <di cosa parla la nozione>" -m "<corpo>" -- <path...>
 ```
 
 La pathspec sono tutti i file di `APPLIED:`, più `${DOCS_ROOT}/reference/INDEX.md` se il rebuild l'ha toccato. Il **corpo** porta i `drop` del registro col motivo e il blocco `DISCARDED:` del writer: sono nozioni che non atterrano da nessuna parte, e il messaggio di commit è dove quel verdetto resta greppabile.
