@@ -154,9 +154,14 @@ collect "$SCAN_DIR" "$TMP"
     echo "Indice della documentazione offline."
     echo ""
 
-    # Group by reldir
+    # Group by reldir. `LC_ALL=C sort -t'|' -k1,1` e non `sort`: sotto collazione
+    # locale la punteggiatura non pesa al livello primario, quindi il separatore `|`
+    # viene ignorato e le righe si ordinano sul testo intero — i figli diretti
+    # (reldir vuoto) finiscono sparsi fra le sottocartelle e la sezione `(root)`
+    # viene riaperta a ogni interruzione. Ordinare sul campo, in C, tiene un gruppo
+    # per directory e rende l'ordine indipendente dal locale di chi lancia.
     current_section=""
-    sort "$TMP" | while IFS='|' read -r reldir fname tldr; do
+    LC_ALL=C sort -t'|' -k1,1 -k2,2 "$TMP" | while IFS='|' read -r reldir fname tldr; do
         section="${reldir:-/}"
         if [[ "$section" != "$current_section" ]]; then
             [[ -n "$current_section" ]] && echo ""
@@ -180,7 +185,7 @@ collect "$SCAN_DIR" "$TMP"
         echo "> Precedenza: in caso di contraddizione con un file di \`reference/\`,"
         echo "> **prevale la voce inbox** — è più recente e nasce dal codice appena scritto."
         echo ""
-        sort "$INBOX_TMP" | while IFS='|' read -r reldir fname tldr; do
+        LC_ALL=C sort -t'|' -k1,1 -k2,2 "$INBOX_TMP" | while IFS='|' read -r reldir fname tldr; do
             echo "- \`${fname}\` — ${tldr}"
         done
     fi
