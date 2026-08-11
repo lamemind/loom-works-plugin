@@ -83,6 +83,14 @@ Coda vuota è un esito normale e va detto in una riga: nessun file inbox, niente
 
 **Un lotto urgente gira sotto il tetto, ed è il punto.** Il cap di 8 file dice quando lo smaltimento non è più *opzionale*; non dice quando è *permesso*. Una nozione con la sentinella sta curando una pagina già falsa, e farla aspettare la soglia tiene in piedi la bugia per tutto il tempo dell'attesa.
 
+**Risolvi il path del referto adesso, prima di spawnare qualunque router:**
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --skill drain-doc --perimeter inbox
+```
+
+Stampa una riga `REGISTRY_PATH=`: un file `.md` nudo in project root, mai sotto `{docs_root}/` — lì entrerebbe nella coda che questa stessa run sta svuotando, e `build-index.sh` gli chiederebbe un TLDR. Lo script **hard-erra** se quel path risulterebbe gitignorato: il referto vive un commit (§9), quindi un path ignorato lo cancellerebbe senza lasciarne traccia. Costa un'invocazione abortita ora, contro N router buttati dopo.
+
 ## 3. Routing — un `doc-router` per file inbox, in parallelo
 
 Un `Task` con `subagent_type: doc-router` per file preso in carico, **tutti nello stesso messaggio**. Read-only ⇒ nessun conflitto sul working tree, ed è l'unico passo che parallelizza.
@@ -237,15 +245,11 @@ Il rebuild finale toglie dall'INDEX la sezione inbox — che `build-index.sh` em
 
 Poi `check-doc-links.sh` deve uscire **0**: se esce 2 con voci nuove rispetto al baseline, elencale nel referto — non si chiude in silenzio.
 
-**`git push`** una volta, a fine run. Se fallisce (branch dietro, remote assente) riportalo e fermati lì: i commit sono locali e nessuno li perde. Non forzare niente.
+Il push non va qui: la run non è finita, e i due commit del referto (§9) resterebbero indietro.
 
 ## 9. Referto
 
-Su disco, non in chat — il contesto dell'orchestratore è l'unica risorsa che può far fallire il ciclo, e ri-echeggiare ciò che sta già su un file lo consuma per niente. Dove atterra lo risolve uno script:
-
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name drain-doc-referto.md
-```
+Su disco, non in chat — il contesto dell'orchestratore è l'unica risorsa che può far fallire il ciclo, e ri-echeggiare ciò che sta già su un file lo consuma per niente. Scrivilo al `REGISTRY_PATH` risolto al §2.
 
 Cosa contiene, una riga per voce:
 
@@ -255,7 +259,18 @@ Cosa contiene, una riga per voce:
 - **file inbox rimossi** e **file rimasti in coda**, questi ultimi col motivo
 - **lavoro accodato**: i file usciti col flag `SPLIT` o `MERGE?`, che `lint-doc` raccoglierà
 
-In chat va solo il consuntivo: quanti file drenati su quanti, quanti gruppi, quanti rollback, cosa resta in coda.
+**Il referto vive un commit**, come il registro delle gemelle: entra in cronologia e sparisce dal working tree.
+
+```bash
+git add -- <REGISTRY_PATH> && git commit -m "docs(drain): referto <n> file" -- <REGISTRY_PATH>
+git rm  -- <REGISTRY_PATH> && git commit -m "docs(drain): chiude smaltimento" -- <REGISTRY_PATH>
+```
+
+I due commit sono adiacenti e non è ridondanza: il primo è l'unico indirizzo da cui il referto si rilegge (`git show`), il secondo è ciò che lascia il working tree **pulito** — il solo sintomo osservabile che la run è finita davvero.
+
+**`git push`** una volta, adesso che non resta più niente da committare. Se fallisce (branch dietro, remote assente) riportalo e fermati lì: i commit sono locali e nessuno li perde. Non forzare niente.
+
+In chat va solo il consuntivo: quanti file drenati su quanti, quanti gruppi, quanti rollback, cosa resta in coda, e lo **SHA del commit del referto**.
 
 Poi il ping TTS:
 ```bash

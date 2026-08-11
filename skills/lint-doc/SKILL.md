@@ -103,6 +103,14 @@ git rev-parse --short HEAD
 
 **Mai staged fino al commit.** Lo stage git è uno per *worktree*, non per sessione: una patch lasciata nell'indice viene raccolta dal `git add -A` di qualunque altra sessione che committi nel frattempo. Quindi le patch vivono solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica con pathspec esplicita — `git add -- <path...> && git commit -m "..." -- <path...>`.
 
+**Risolvi il path del registro adesso, prima di spawnare qualunque subagent:**
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --skill lint-doc --perimeter <slug del perimetro dall'input, o `full` se è tutta la doc>
+```
+
+Stampa una riga `REGISTRY_PATH=`: un file `.md` nudo in project root, mai sotto `{docs_root}/` — lì il registro finirebbe nel perimetro che questa stessa skill sta misurando. Il timestamp nel nome lo rende unico fra run, quindi il registro si scrive **una volta per invocazione** e le tre fasi ci appendono una sezione ciascuna (§4).
+
 Sequenza dei commit — il registro entra in cronologia **prima** delle patch che lo eseguono:
 
 | # | dopo | contenuto | messaggio |
@@ -116,7 +124,7 @@ I commit 2 e 3 si ripetono per fase eseguita. Il commit 1 esiste perché **il pi
 
 Il commit 4 rimuove il registro (materiale di lavoro esaurito, la cronologia lo conserva comunque): serve `git add -A -- <path>`, o la cancellazione non entra nell'indice — stessa ragione del §10.
 
-**Se il registro è gitignorato** (in certi progetti le folder dot-prefixed lo sono), i commit 1, 2 e 4 non hanno niente da stagiare e `git commit` esce non-zero: verifica con `git check-ignore -q <REGISTRY_PATH>` prima del commit 1, e se è ignorato salta i tre commit del registro **dichiarandolo nel report**. Le patch (commit 3) restano.
+**Un registro gitignorato ferma la run**, e il controllo lo fa `resolve-registry-path.sh` qui sopra, prima di qualunque subagent. Non è più uno skip dichiarato nel report: i commit 1 e 2 sono l'unico custode dei finding, e il commit 4 rimuove comunque il file — saltarli li cancellerebbe senza lasciare traccia da nessuna parte.
 
 **Re-entrante senza bookkeeping.** Se la sessione muore a metà, si rilancia e riprende — non c'è stato da recuperare, perché **la misura è lo stato**: un file già ripulito è sotto soglia ed esce dalla partizione da solo alla rimisura del §1. È la stessa proprietà per cui la fase split ricalcola il perimetro invece di riusare la lista della fase clean (§8), applicata all'intera run invece che al solo passaggio fra fasi.
 
@@ -220,17 +228,7 @@ e' gia' passata, e una voce nuova qui e' materiale per la prossima esecuzione.
 
 ### 4. Consolida il registro
 
-Un unico file ordinato per severità, con **una sezione per fase** (`## FASE: clean`, `## FASE: split`, `## FASE: regroup`): ogni fase deve poter leggere cosa ha fatto la precedente, e file separati perdono il collegamento. Dove atterra lo risolve uno script, non una domanda:
-
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name lint-doc-findings.md
-```
-
-Cascata: task attiva con `**Folder**:` popolato → quella folder · task attiva senza folder → la crea (`set-task-folder.sh`, che riscrive il campo) · nessuna task → scratch `.YY-MM-DD-lint-doc-findings`. Usa la riga `REGISTRY_PATH=` che stampa.
-
-Mai dentro `{docs_root}/`: è materiale di lavoro, non doc di progetto.
-
-**Se il file esiste già** (esecuzione precedente, o più perimetri in parallelo sullo stesso giorno) appendi una sezione nuova invece di sovrascriverlo, intestata col perimetro: il path è lo stesso per ogni invocazione della giornata, e sovrascrivere perde il registro di chi ha girato prima.
+Un unico file al `REGISTRY_PATH` risolto a inizio run, ordinato per severità, con **una sezione per fase** (`## FASE: clean`, `## FASE: split`, `## FASE: regroup`): ogni fase deve poter leggere cosa ha fatto la precedente, e file separati perdono il collegamento.
 
 In chat **una riga per fase**, e il piano va scritto in testa al registro prima del suo primo commit (§Il regime di default). Ri-echeggiare ciò che è già su disco consuma l'unica risorsa che deve reggere fino in fondo al ciclo.
 

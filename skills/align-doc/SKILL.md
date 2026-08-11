@@ -93,6 +93,14 @@ Se una coppia non si chiude (doc senza fonte identificabile), **non inventarla**
 
 Se la fonte è viva e richiede un MCP, **interrogala ora**, prima del fan-out: raccogli le risposte alle domande che la doc pretende di sostituire (la forma di una tabella, l'elenco reale delle opzioni) e portale nel prompt dell'auditor.
 
+**Risolvi il path del registro adesso, prima di spawnare qualunque subagent:**
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --skill align-doc --perimeter <slug corto del perimetro, o `multi` se sono più d'uno>
+```
+
+Stampa una riga `REGISTRY_PATH=`: un file `.md` nudo in project root, mai sotto `{docs_root}/`. Lo script **hard-erra** se quel path risulterebbe gitignorato — il commit del §3 è l'unico custode dei finding, quindi proseguire li cancellerebbe. Costa un'invocazione abortita ora, contro N auditor buttati dopo.
+
 ### 2. Fan-out doc-auditor
 
 Un `Task` con `subagent_type: doc-auditor` **per perimetro**, tutti nello stesso messaggio → girano in parallelo. È possibile solo perché l'auditor è read-only: nessuno tocca il working tree, nessun conflitto.
@@ -123,15 +131,15 @@ Sul perimetro **task** (§0) il prompt cambia in tre punti: `Nozioni candidate:`
 
 ### 3. Consolida il registro
 
-Unisci i registri in **un unico file**, ordinato per severità (alta prima). Dove atterra lo risolve uno script, non una domanda:
+Unisci i registri in **un unico file**, ordinato per severità (alta prima), al `REGISTRY_PATH` risolto al §1.
+
+**Committalo subito, prima delle patch che lo eseguono** — catena unica, pathspec esplicita:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --name align-doc-findings.md
+git add -- <REGISTRY_PATH> && git commit -m "docs(align): registro <perimetro>" -- <REGISTRY_PATH>
 ```
 
-Cascata: task attiva con `**Folder**:` popolato → quella folder · task attiva senza folder → la crea (`set-task-folder.sh`, che riscrive il campo) · nessuna task → scratch `.YY-MM-DD-align-doc-findings`. Usa la riga `REGISTRY_PATH=` che stampa.
-
-Mai dentro `{docs_root}/`: è materiale di lavoro, non doc di progetto.
+`git show` su questo commit è il **custode nominato** dei finding: il registro non sopravvive alla run (§7), quindi è l'unico indirizzo da cui si rileggono le voci che non sono state applicate.
 
 Poi presenta in chat la **sintesi**, non il registro intero: una riga per finding (`ID · severità · file doc · claim → realtà · verdetto proposto`). Il dettaglio sta nel file.
 
@@ -209,27 +217,32 @@ Ritorna solo il referto.
 ```
 
 - **`LABEL: accodato` non boccia**: un file che dopo la patch supera la soglia di split o scende sotto il pavimento è topologia che la patch ha *rivelato*, non causato, e la raccoglie `lint-doc` alla prossima misura. Riportala e prosegui.
-- **`OUTCOME: rollback` annulla la patch**, per file secondo il marker: `MOD` → `git checkout -- <path>` · `NEW` → `rm -- <path>` · `DEL` → `git checkout -- <path>`. Le voci del registro tornano non applicate, col motivo — la `RULE:` della violazione — scritto sopra. Niente commit, e i marker `→ ✔️ align` del §0 **non** si scrivono: quelle nozioni non sono atterrate.
+- **`OUTCOME: rollback` annulla la patch**, per file secondo il marker: `MOD` → `git checkout -- <path>` · `NEW` → `rm -- <path>` · `DEL` → `git checkout -- <path>`. Le voci del registro tornano non applicate, col motivo — la `RULE:` della violazione — scritto sopra. Nessun commit di patch, e i marker `→ ✔️ align` del §0 **non** si scrivono: quelle nozioni non sono atterrate. Il commit di chiusura del §7 gira lo stesso.
 
 Se hai già rigenerato l'indice, dopo un rollback **rigeneralo di nuovo**: contiene la voce di un file che adesso non esiste più, ed è drift prodotto dal rollback stesso.
 
 ### 7. Chiudi e committa
 
-Solo su collaudo `pass`.
+**Il commit della patch è solo su collaudo `pass`; quello di chiusura gira sempre.**
 
 - Sul perimetro **task** (§0): marca `→ ✔️ align` le voci `## Doc Impact` integrate, nel task file. È l'unico file di runtime che questa skill tocca — e lo tocca lei, mai il `doc-writer`, che ha `{docs_root}/tasks/` fuori dal proprio perimetro.
 - **Non stampare i diff** in chat: bruciano contesto e sono già ispezionabili nel pannello git. Stampa la lista file dal contratto `APPLIED:`.
-- **Committa**, catena unica con pathspec esplicita:
+- **Commit della patch**, catena unica con pathspec esplicita:
   ```bash
   git add -- <path...> && git commit -m "docs(align): <perimetro>" -m "<corpo>" -- <path...>
   ```
   La pathspec sono tutti i file di `APPLIED:`, più `INDEX.md` se il rebuild l'ha toccato e il task file se hai scritto i marker. Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file. Il **corpo** porta il blocco `DISCARDED:` del writer: è materiale che ha deciso di non scrivere, e il posto durevole di quel verdetto è il messaggio di commit.
+- **Commit di chiusura, che rimuove il registro** — anche dopo un `rollback`:
+  ```bash
+  git rm -- <REGISTRY_PATH> && git commit -m "docs(align): chiude allineamento <perimetro>" -- <REGISTRY_PATH>
+  ```
+  Materiale di lavoro esaurito: la cronologia lo conserva al commit del §3. Il working tree resta **pulito** su entrambi gli esiti, ed è il solo sintomo osservabile che la run è finita davvero.
 - **Non pusha.** Finché i commit restano locali l'undo è una riga; pushati, diventa un force-push su un ramo che altre sessioni possono già aver letto.
-- Report finale: quanti finding per verdetto, quali file toccati, quali voci restano nel registro non applicate, e l'esito del collaudo. Su `rollback` la riga di chiusura dice **cosa** ha violato la patch, non «bocciata».
+- Report finale: quanti finding per verdetto, quali file toccati, quali voci restano nel registro non applicate **con lo SHA del commit del §3 da cui si rileggono**, e l'esito del collaudo. Su `rollback` la riga di chiusura dice **cosa** ha violato la patch, non «bocciata».
 
 ## Note
 
-- **Il registro sopravvive all'esecuzione.** Le voci non applicate (severità bassa, verdetto rinviato) restano nel file: la prossima esecuzione sullo stesso perimetro parte da lì invece di riscoprirle.
+- **Re-entrante senza bookkeeping.** Il registro vive un commit e sparisce: le voci non applicate (severità bassa, verdetto rinviato) si **riscoprono** alla prossima esecuzione invece di essere recuperate da disco. Il costo è il delta fra *trovare* e *rileggere*, non una passata in più — l'auditor gira comunque sul perimetro. Chi le vuole rileggere adesso ha `git show` sul commit del §3, che è un indirizzo apribile e non una promessa.
 - **Non fondere con `discover`**: quella presuppone doc **zero** e scansiona la struttura per produrre lo scaffold; questa presuppone doc **esistente** e la mette a confronto con la fonte.
 - **Perimetro task vs `capture-doc`**: stessa destinazione, momento diverso. `capture-doc` integra una nozione **calda**, mentre la task è aperta e il codice si muove ancora; il §0 la integra **dopo**, con più fonti e la nozione ferma. Il secondo non rimpiazza il primo — lo rende non obbligatorio.
 - Un perimetro pulito che risulta pulito è l'esito migliore. Se un auditor torna con `FINDINGS: 0`, riportalo così — non rilanciarlo con istruzioni più aggressive per trovare qualcosa.
