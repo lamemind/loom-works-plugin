@@ -11,7 +11,7 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Confronta la doc di progetto con la **fonte nativa del suo layer** e trova i **drift**: fatti documentati che la fonte smentisce.
 
@@ -106,7 +106,7 @@ Perimetro:
 
 Fonte di verità: fonte-nativa
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 Prefisso ID: <sigla corta del perimetro, es. DECK>
@@ -158,7 +158,7 @@ WRITE: <cosa deve diventare la sezione — per fix-doc la realtà as-is; per rel
 Contesto:
 <le voci del registro per questo file: CLAIM / REALITY / EVIDENCE / FIX>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md — il TLDR resta invariato salvo che un fix cambi il trigger del file.
 
@@ -197,7 +197,7 @@ File toccati (dai contratti APPLIED: dei writer):
 Registro dei verdetti che hanno ordinato questa patch:
 <le voci del registro: claim / realtà / verdetto / target>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 
 Esiti dei guardiani (fatti deterministici, non ricontarli):

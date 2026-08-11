@@ -11,4 +11,4 @@ Manuali, convenzioni e riferimenti tecnici del sistema che il plugin implementa.
 
 **Iniettato a `UserPromptSubmit`**: `restamp.md` — nocciolo di ogni contratto (scrittura, chat, doc, task) ri-timbrato a ogni turno contro il drift. Unica entry a costo moltiplicativo, tetto 4.500 char scritto nel file stesso.
 
-**On-demand, letti da path**: `doc-criteria.md` — razionale dei criteri dipendenti, delle soglie e della manutenzione · `task-management-technical.md` — naming, esempi di comando, dettaglio workflow.
+**On-demand, letti da path**: `doc-criteria.md` — razionale dei criteri dipendenti, delle soglie e della manutenzione · `task-management-technical.md` — naming, esempi di comando, dettaglio workflow · `tldr-formats.md` — le due formule del TLDR, `reference/` e `inbox/` · `path-conventions.md` — da dove parte un path scritto in un sorgente del plugin, e quale grafia porta un segnaposto.

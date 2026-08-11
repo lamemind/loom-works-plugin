@@ -11,7 +11,7 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Cattura **estemporanea** di una nozione documentale (fuori dal ciclo task). Leggi il contesto conversazionale corrente + eventuale hint dell'utente, spawna `doc-router` che **giudica** dove va, `doc-writer` che **applica la patch**, `doc-verifier` che la **collauda**; poi committa.
 
@@ -75,7 +75,7 @@ Nozioni non collocate:
 Contesto:
 <estratto rilevante della conversazione, 10-30 righe max>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — i criteri dipendenti sono il tuo mestiere.
 Prefisso ID: CAP
@@ -99,7 +99,7 @@ Rotte da applicare — verdetto e target sono già decisi e vincolanti, non riva
 Contesto:
 <estratto rilevante della conversazione, 10-30 righe max>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md
 
@@ -130,7 +130,7 @@ File toccati (dal contratto APPLIED: del writer):
 Registro delle rotte che hanno ordinato questa patch:
 <le voci del registro di doc-router>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 
 Esiti dei guardiani (fatti deterministici, non ricontarli):
@@ -152,7 +152,7 @@ Solo su `pass`. Catena unica con pathspec esplicita:
 git add -- <path...> && git commit -m "docs(capture): <di cosa parla la nozione>" -m "<corpo>" -- <path...>
 ```
 
-La pathspec sono tutti i file di `APPLIED:`, più `${DOCS_ROOT}/reference/INDEX.md` se il rebuild l'ha toccato. Il **corpo** porta i `drop` del registro col motivo e il blocco `DISCARDED:` del writer: sono nozioni che non atterrano da nessuna parte, e il messaggio di commit è dove quel verdetto resta greppabile.
+La pathspec sono tutti i file di `APPLIED:`, più `{docs_root}/reference/INDEX.md` se il rebuild l'ha toccato. Il **corpo** porta i `drop` del registro col motivo e il blocco `DISCARDED:` del writer: sono nozioni che non atterrano da nessuna parte, e il messaggio di commit è dove quel verdetto resta greppabile.
 
 **Non pusha.** Il push è una decisione del chiamante.
 

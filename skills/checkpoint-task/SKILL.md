@@ -11,9 +11,9 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna task/tasks.md, committa e pusha.
+Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna il task file e `{docs_root}/tasks.md`, committa e pusha.
 
 ## Note utente
 ~~~human
@@ -34,11 +34,11 @@ Il `TASK_SRC` che lo script stampa **determina la modalità** — non la presenz
 - `env` (`$LOOM_TASK`) → **detached**. Binding di *sessione*: N sessioni parallele nello stesso worktree, una task ciascuna. Un `git add -A` da qui rastrellerebbe nel commit i file su cui stanno lavorando le altre, in silenzio.
 - `arg` → **detached**. Chi nomina una task esplicita non sta dichiarando di essere solo nel worktree.
 
-Detached = analisi diff saltata (i deliverables li deriva l'agente dal contesto della conversazione) + stage selettivo. Vedi `docs/task-management.md` §Detached.
+Detached = analisi diff saltata (i deliverables li deriva l'agente dal contesto della conversazione) + stage selettivo. Vedi `${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Detached.
 
 Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argomento grezzo.
 
-`Read` di `TASK_FILE`, poi leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `${DOCS_ROOT}/tasks/`.
+`Read` di `TASK_FILE`, poi leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `{docs_root}/tasks/`.
 
 ## Flusso checkpoint
 
@@ -74,14 +74,14 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 4. **Task completata?**
    Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
    1. Imposta Progress a `✔️ Done` (nel file task)
-   2. Se il symlink `${DOCS_ROOT}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
+   2. Se il symlink `{docs_root}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
    3. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
-      - Risolvi task parent: `${DOCS_ROOT}/tasks/T{N}-*.md`
+      - Risolvi task parent: `{docs_root}/tasks/T{N}-*.md`
       - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera** — `doc-task` la scrive con la maniglia (`- [ ] D07 (unificare docs-root) chiusa`), quindi cercare `- [ ] D{taskId} chiusa` alla lettera non trova mai nulla e il flag-back muore nel ramo warning qui sotto. Riscrivi solo il box, lasciando maniglia e testo intatti.
       - Se nessuna riga porta l'id, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
 
-5. **Aggiorna ${DOCS_ROOT}/tasks.md**
-   1. Leggi `${DOCS_ROOT}/tasks.md`
+5. **Aggiorna {docs_root}/tasks.md**
+   1. Leggi `{docs_root}/tasks.md`
    2. Nella sezione Tasks Overview (formato: `| ID | Pri | K | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
    3. Aggiorna la colonna Prog (solo emoji):
       - Se task completata (step 4): `✔️`
@@ -99,7 +99,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Lo script partiziona comunque i file staged in due commit:
    - **Commit 1** `checkpoint(${taskId}): ${descrizione}` → codice + task tracking (task file, `tasks.md`).
-   - **Commit 2** `docs(${taskId}): …` → file doc-nozione (sotto `${DOCS_ROOT}/` **tranne** `tasks.md` e `tasks/`). In questa fase ne esistono solo se la doc era già stata toccata **prima** del checkpoint: passa `--doc-message` che li descrive, oppure ometti il flag se l'analisi (step 1) non ne ha mostrati.
+   - **Commit 2** `docs(${taskId}): …` → file doc-nozione (sotto `{docs_root}/` **tranne** `tasks.md` e `tasks/`). In questa fase ne esistono solo se la doc era già stata toccata **prima** del checkpoint: passa `--doc-message` che li descrive, oppure ometti il flag se l'analisi (step 1) non ne ha mostrati.
 
    **Linked**:
    ```bash
@@ -138,11 +138,11 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    **7.4 — Scrivi il file inbox.**
 
    ```bash
-   mkdir -p "${DOCS_ROOT}/inbox"
+   mkdir -p "{docs_root}/inbox"
    ```
    `init.sh` la crea, ma un progetto registrato prima che esistesse non ce l'ha.
 
-   Path: `${DOCS_ROOT}/inbox/${taskId}-<slug>-<N>.md` — `<slug>` è quello del task file, `<N>` il numero dell'avanzamento che hai scritto allo step 3.
+   Path: `{docs_root}/inbox/${taskId}-<slug>-<N>.md` — `<slug>` è quello del task file, `<N>` il numero dell'avanzamento che hai scritto allo step 3.
 
    **Un file per checkpoint, immutabile una volta scritto.** Mai appendere a un file inbox esistente: `drain-doc` lo elabora e poi lo rimuove, quindi un append arrivato nel frattempo sparirebbe senza essere mai stato letto.
 
@@ -178,7 +178,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Stagia ciò che hai scritto — il file inbox e l'`INDEX.md` rigenerato:
    ```bash
-   git add -- "${DOCS_ROOT}/inbox/${taskId}-<slug>-<N>.md" "${DOCS_ROOT}/reference/INDEX.md"
+   git add -- "{docs_root}/inbox/${taskId}-<slug>-<N>.md" "{docs_root}/reference/INDEX.md"
    ```
 
    Poi, **identico in linked e detached**:

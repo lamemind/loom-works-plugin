@@ -11,7 +11,7 @@ model: opus
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Bootstrap documentale per un progetto **freshly installed** senza doc o con doc minimale. Pipeline a tre step: static scan → interview → delega a `doc-writer` per produrre la prima generazione di doc.
 
@@ -91,8 +91,8 @@ Invoca `doc-writer` via `Task` con un prompt strutturato che contenga **tutto il
 ```
 Nozione da documentare:
 - **Nozione**: Bootstrap documentale del progetto. Produrre
-  `${DOCS_ROOT}/project/overview.md` (vision/scope + mappa sub-progetti + fulcri)
-  ed eventualmente stub in `${DOCS_ROOT}/reference/<area>/<fulcro>.md` per i fulcri principali.
+  `{docs_root}/project/overview.md` (vision/scope + mappa sub-progetti + fulcri)
+  ed eventualmente stub in `{docs_root}/reference/<area>/<fulcro>.md` per i fulcri principali.
 - **Ancora primaria**: n/a (overview è online, stub offline hanno ancore dedicate)
 
 Contesto:
@@ -108,19 +108,19 @@ Fulcri nominati dall'utente:
 - <nome> — <ruolo (1 riga)>
 - ...
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 
 Applica i file direttamente (Write/Edit), non committare, non rigenerare l'indice. Ritorna il contratto APPLIED: (marker NEW/MOD per file) + INDEX_REBUILD_NEEDED.
 
 Istruzioni:
-1. Se già esiste `<docs root>/project/overview.md` o un CLAUDE.md corposo, NON duplicare —
+1. Se già esiste `{docs_root}/project/overview.md` o un CLAUDE.md corposo, NON duplicare —
    fai invece un EXTEND mirato o segnala overlap.
 2. `overview.md` deve avere: paragrafo cos'è il progetto (dal tuo meglio, basato
    su nome/manifesti/struttura), tabella sub-progetti con scope 1-riga, sezione
    "Fulcri" con bullet per ogni fulcro nominato.
-3. Per ogni fulcro nominato, crea uno stub in `${DOCS_ROOT}/reference/<area>/<fulcro>.md`:
+3. Per ogni fulcro nominato, crea uno stub in `{docs_root}/reference/<area>/<fulcro>.md`:
    solo header + TLDR ancorato + sezione "Ruolo" (2-3 righe) + sezione
    "Da documentare" bullet list con "TODO" — è uno stub, non una doc completa.
 4. Se crei file online (overview.md), applica anche la patch a CLAUDE.md per aggiungere
@@ -149,7 +149,7 @@ Opzioni (path assoluti, `cwd` = project root):
 
 ### 6. Rebuild INDEX se serve
 
-Solo su `ok` e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `${DOCS_ROOT}/reference/`):
+Solo su `ok` e se il contratto `APPLIED:` porta `INDEX_REBUILD_NEEDED: yes` (o sai che ha toccato `{docs_root}/reference/`):
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"

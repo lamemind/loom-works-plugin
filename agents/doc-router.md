@@ -74,7 +74,7 @@ Su `online` il target è un file già `@-import`ato in `CLAUDE.md`, o `NEW` più
 ## Workflow
 
 1. **`Read` del contratto doc e dei criteri** ai path ricevuti. Prima di tutto il resto: le soglie e i confini vincolanti stanno lì, non in questo prompt.
-2. **`Read CLAUDE.md`** (project root) → cosa è online, via `@-imports`. E **`Read ${docs_root}/reference/INDEX.md`** → cosa è offline, coi TLDR. Sono la mappa dei target possibili: senza, ogni verdetto `NEW` è cieco.
+2. **`Read CLAUDE.md`** (project root) → cosa è online, via `@-imports`. E **`Read {docs_root}/reference/INDEX.md`** → cosa è offline, coi TLDR. Sono la mappa dei target possibili: senza, ogni verdetto `NEW` è cieco.
 3. **Per ogni nozione, apri la fonte.** È il passo che giustifica la tua esistenza. Dall'ancora al simbolo: `Grep` del nome, `Read` del punto, e per una fonte viva il comando (`--help`, una query) se `Bash` ci arriva. Sono i criteri dipendenti, e senza questa lettura stai indovinando.
 4. **Misura i candidati** che stai per proporre come target (`wc -c`), o fidati delle misure ricevute.
 5. **Registro** in output. Nient'altro.

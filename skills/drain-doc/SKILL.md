@@ -11,9 +11,9 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Porta le nozioni di `${DOCS_ROOT}/inbox/` nei quattro layer: verdetto, file target, patch, collaudo, commit.
+Porta le nozioni di `{docs_root}/inbox/` nei quattro layer: verdetto, file target, patch, collaudo, commit.
 
 Input utente (perimetro: nomi di file inbox, un numero, `tutto`, `urgenti` · più il token `plan`):
 ~~~human
@@ -92,7 +92,7 @@ Nozioni non collocate — dal file inbox <path del file>:
 
 <il contenuto del file inbox, dalla riga dopo il TLDR in giù>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — i criteri dipendenti sono il tuo mestiere.
 Prefisso ID: INBOX<n>
@@ -143,7 +143,7 @@ Rotte da applicare — verdetto e target sono già decisi e vincolanti, non riva
 Contesto:
 <il testo integrale delle nozioni dai file inbox di provenienza>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md
 
@@ -181,7 +181,7 @@ File toccati (dal contratto APPLIED: del writer):
 Registro delle rotte che hanno ordinato questa patch:
 <le voci del registro del router per questo gruppo>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 
 Esiti dei guardiani (fatti deterministici, non ricontarli):
@@ -229,8 +229,8 @@ Un file è rimovibile quando nessuna delle sue rotte appartiene a un gruppo bocc
 ```bash
 git rm -- <file inbox interamente smaltiti>
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
-git add -- ${DOCS_ROOT}/reference/INDEX.md
-git commit -m "docs(drain): smaltiti <n> file inbox" -- <file inbox rimossi> ${DOCS_ROOT}/reference/INDEX.md
+git add -- {docs_root}/reference/INDEX.md
+git commit -m "docs(drain): smaltiti <n> file inbox" -- <file inbox rimossi> {docs_root}/reference/INDEX.md
 ```
 
 Il rebuild finale toglie dall'INDEX la sezione inbox — che `build-index.sh` emette solo se la cartella ha almeno un file indicizzabile, quindi su inbox svuotata sparisce da sola, e con essa la riga di precedenza.
@@ -266,5 +266,5 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "inbox drained"
 
 - **Re-entrante senza bookkeeping.** Se la sessione muore a metà, si rilancia: i file inbox già rimossi non sono più in coda, quelli bocciati ci sono ancora. Non c'è stato da recuperare perché **la misura è lo stato** — la stessa proprietà per cui `lint-doc` non tiene un registro di ciò che ha già fatto.
 - **Nessun undo oltre il commit.** Lo smaltimento non conserva copie: un file inbox rimosso vive in git come qualunque altra cosa, e questo basta.
-- **Non toccare i file di runtime**: `${DOCS_ROOT}/tasks/`, `${DOCS_ROOT}/current-task.md`. Non sono doc, e nessuna rotta può puntarci.
+- **Non toccare i file di runtime**: `{docs_root}/tasks/`, `{docs_root}/current-task.md`. Non sono doc, e nessuna rotta può puntarci.
 - **Il primo `build-index.sh` su un progetto con un INDEX scritto a mano lo riscrive per intero**, da tabella a bullet list. Non è un guasto — è il formato che il generatore produce — ma su un progetto terzo quella migrazione arriva dentro un commit di smaltimento che parla d'altro. Dichiaralo nel referto.

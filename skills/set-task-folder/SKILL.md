@@ -11,7 +11,7 @@ model: haiku
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 > **NOTA**: lo script `set-task-folder.sh` popola **da sé** il campo `**Folder**:` nel task file e fa `git add` di folder + task file. La skill non deve editare il task file a mano.
 
@@ -42,7 +42,7 @@ Cascata `arg → $LOOM_TASK → symlink`. Exit non-zero = nessun binding: chiedi
 
 ### 2. Crea (o riusa) la folder canonical
 
-Naming canonico `.YY-MM-DD-slug` **in project root** (mai sotto `${DOCS_ROOT}/tasks/`: il nome dotted è solo il nome, il parent è la root):
+Naming canonico `.YY-MM-DD-slug` **in project root** (mai sotto `{docs_root}/tasks/`: il nome dotted è solo il nome, il parent è la root):
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${TASK_ID} [--slug <slug>]
@@ -63,7 +63,7 @@ Lo script:
 ```
 ✅ Task folder impostata per ${taskId}
    Folder: ${folder_name}/
-   Task file aggiornato: ${DOCS_ROOT}/tasks/${taskId}-*.md
+   Task file aggiornato: {docs_root}/tasks/${taskId}-*.md
 ```
 
 ## Note

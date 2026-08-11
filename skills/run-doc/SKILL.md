@@ -11,7 +11,7 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Workflow adattivo per task documentali. Complementa `run-task` (che resta code-only).
 
@@ -33,8 +33,8 @@ Architettura **option B** (DESIGN §6): la main session non fa lavoro editoriale
 
 ## Prerequisiti
 
-- Task file deve esistere in `${DOCS_ROOT}/tasks/D{N}-*.md` con il template doc-task
-- Progetto inizializzato (`${DOCS_ROOT}/reference/INDEX.md` presente); altrimenti il primo subagent doc-writer segnala di lanciare `/loom-works:init`
+- Task file deve esistere in `{docs_root}/tasks/D{N}-*.md` con il template doc-task
+- Progetto inizializzato (`{docs_root}/reference/INDEX.md` presente); altrimenti il primo subagent doc-writer segnala di lanciare `/loom-works:init`
 
 ## 0. Risolvi la task
 
@@ -73,7 +73,7 @@ Leggi dal task file:
 
 Leggi per overview del landscape (no deep read — quello lo fa il subagent per chunk):
 - `CLAUDE.md` del progetto
-- `${DOCS_ROOT}/reference/INDEX.md`
+- `{docs_root}/reference/INDEX.md`
 - `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md` (contratto doc: convenzioni e soglie numeriche)
 - `${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md` (criteri di selezione: otto test, sette tipologie offline)
 
@@ -160,7 +160,7 @@ PATCHES: <lista file toccati, uno per riga>
 DISCARDED: <nozioni scartate col motivo, una per riga — omesso se nessuna>
 BLOCK_REASON: <presente solo se STATUS=blocked>
 
-Docs root: ${PROJECT_ROOT}/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 ```
@@ -194,7 +194,7 @@ Nel task file:
 
 ### 3.5 Rigenera INDEX se serve
 
-Se nei PATCHES compaiono file in `${DOCS_ROOT}/reference/`, rigenera l'indice offline:
+Se nei PATCHES compaiono file in `{docs_root}/reference/`, rigenera l'indice offline:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"

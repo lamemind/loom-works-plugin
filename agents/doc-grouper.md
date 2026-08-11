@@ -28,7 +28,7 @@ Apri un file solo quando il suo TLDR è illeggibile o assente, e solo quello. Se
 ## Input che ricevi
 
 - **Cartella**: il path da partizionare (es. `runtime/reference/`).
-- **INDEX**: path al file indice che copre quella cartella (tipicamente `${docs_root}/reference/INDEX.md`). È la tua fonte.
+- **INDEX**: path al file indice che copre quella cartella (tipicamente `{docs_root}/reference/INDEX.md`). È la tua fonte.
 - **Misure**: opzionale — char per file e totale di cartella. Servono a dire *se* la soglia è superata, non *dove* tagliare; se non ci sono, `wc -c` sulla cartella.
 - **Soglia**: **60.000 char** di figli diretti, salvo diverso valore dal chiamante. Il trigger è **ricorsivo**: una sottocartella che tu proponi e che resta sopra soglia verrà ri-triggerata a una passata successiva — non è un tuo problema da risolvere adesso, ma dichiaralo.
 

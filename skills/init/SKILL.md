@@ -11,7 +11,7 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Inizializza un progetto vergine (o verifica/ripara un progetto esistente) creando la struttura minima che le altre skill loom-works si aspettano.
 
@@ -23,11 +23,11 @@ $ARGUMENTS
 ## Cosa crea
 
 Solo se **assenti** (idempotente):
-- `${DOCS_ROOT}/tasks.md` — dal template `tasks-skeleton.md` (Tasks Overview + Execution Plan)
-- `${DOCS_ROOT}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
-- `${DOCS_ROOT}/tasks/` — directory per i file task
-- `${DOCS_ROOT}/reference/` — directory per doc offline
-- `${DOCS_ROOT}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-doc` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
+- `{docs_root}/tasks.md` — dal template `tasks-skeleton.md` (Tasks Overview + Execution Plan)
+- `{docs_root}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
+- `{docs_root}/tasks/` — directory per i file task
+- `{docs_root}/reference/` — directory per doc offline
+- `{docs_root}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-doc` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`
 
 **CLAUDE.md**: init **propone** (non forza) l'aggiunta degli `@-import` base — vedi step 3. **Non tocca**: file git, config, dipendenze.
@@ -39,7 +39,7 @@ Solo se **assenti** (idempotente):
 Prima di eseguire, mostra all'utente il valore che sarà usato:
 
 ```
-📁 Docs folder: ${DOCS_ROOT}
+📁 Docs folder: {docs_root}
    (default "docs" — per cambiarla: campo "docsRoot" in .claude/loom-works.json)
 ```
 
@@ -57,7 +57,7 @@ Se l'input contiene `--force`, passa il flag (rigenera `tasks.md` e `INDEX.md` a
 
 Identità del progetto per l'ecosistema loom (compass/deck). Modello: `project-config-architecture.md`. Il file `.claude/loom-works.json` è la **source of truth config** (portabile, committabile); il registry dconf `/org/lamemind/loom/` è il **runtime** (macchina-locale). La `label` (`{emoji} {name}`) e gli UUID profilo sono **derivati**, mai nel file.
 
-Controlla `<project-root>/.claude/loom-works.json`.
+Controlla `{project_root}/.claude/loom-works.json`.
 
 **Se ASSENTE → bootstrap interattivo.** `id` e `name` = basename della project root (mostralo). Raccogli il resto via `AskUserQuestion`, una domanda per volta; **prima di ciascuna** esegui il ping TTS (vedi §Convenzione TTS in altre skill):
 ```bash
@@ -98,23 +98,23 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/config/materialize-profiles.sh "<id>"
 
 ### 2. Integrazione CLAUDE.md
 
-`CLAUDE.md` è il punto di ingresso: se non referenzia `tasks.md` e `reference/INDEX.md`, le skill task-level e il doc-writer partono ciechi. Propone (non forza):
+`CLAUDE.md` è il punto di ingresso: se non referenzia `{docs_root}/tasks.md` e `{docs_root}/reference/INDEX.md`, le skill task-level e il doc-writer partono ciechi. Propone (non forza):
 
 **Formato riga @-import** (sia `@-import` che ancora cliccabile MD, sulla stessa riga):
 
 ```markdown
-- @${DOCS_ROOT}/tasks.md [Tasks](${DOCS_ROOT}/tasks.md)
-- @${DOCS_ROOT}/reference/INDEX.md [Reference Index](${DOCS_ROOT}/reference/INDEX.md)
+- @{docs_root}/tasks.md [Tasks]({docs_root}/tasks.md)
+- @{docs_root}/reference/INDEX.md [Reference Index]({docs_root}/reference/INDEX.md)
 ```
 
 **`current-task.md` non va @-importato**, mai — nemmeno "per comodità". La task attiva la scrive in contesto **solo** l'hook `SessionStart` (`inject-task.sh`), che risolve la cascata `$LOOM_TASK → symlink`. Un `@-import` la farebbe entrare in parallelo per conto proprio: in una sessione con `$LOOM_TASK` il modello si troverebbe **due** task attive divergenti, l'iniettata e quella (stale) a cui punta il symlink del worktree. Il symlink resta una primitiva di *risoluzione*, non un canale di *iniezione*.
 
 Caso A — **`CLAUDE.md` assente**:
-- Usa `AskUserQuestion` → "Creo `CLAUDE.md` con skeleton minimo (@-import a tasks.md e reference/INDEX.md)?"
+- Usa `AskUserQuestion` → "Creo `CLAUDE.md` con skeleton minimo (@-import a {docs_root}/tasks.md e {docs_root}/reference/INDEX.md)?"
 - Su **yes** → `Write` di uno skeleton con heading progetto placeholder + blocco `@-import` sopra.
 - Su **no** → stampa lo snippet, l'utente lo aggiunge a mano.
 
-Caso B — **`CLAUDE.md` presente ma manca almeno uno tra `@${DOCS_ROOT}/tasks.md` e `@${DOCS_ROOT}/reference/INDEX.md`**:
+Caso B — **`CLAUDE.md` presente ma manca almeno uno tra `@{docs_root}/tasks.md` e `@{docs_root}/reference/INDEX.md`**:
 - Usa `AskUserQuestion` mostrando quali righe mancano → "Aggiungo le righe mancanti in fondo a `CLAUDE.md`?"
 - Su **yes** → `Edit` append delle sole righe mancanti (nel formato sopra, `@-import` + ancora MD cliccabile).
 - Su **no** → stampa lo snippet, l'utente lo aggiunge a mano.

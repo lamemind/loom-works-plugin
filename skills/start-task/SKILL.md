@@ -11,7 +11,7 @@ model: haiku
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Attiva una task con approccio "checkpoint di progresso".
 
@@ -23,14 +23,14 @@ Da `raw` estrai:
 - **DETACH**: `1` se `raw` contiene una delle parole `detach`, `detached`, `--detach` (case-insensitive); altrimenti `0`
 - **taskFilter**: `raw` con il token detach rimosso, trimmed
 
-Modalità detached: la task viene attivata SENZA creare il symlink `${DOCS_ROOT}/current-task.md`. Serve quando vuoi più task in parallelo nello stesso worktree (sessioni Claude separate, ognuna con il proprio task ID esplicito). Vedi `docs/task-management.md` §Detached.
+Modalità detached: la task viene attivata SENZA creare il symlink `{docs_root}/current-task.md`. Serve quando vuoi più task in parallelo nello stesso worktree (sessioni Claude separate, ognuna con il proprio task ID esplicito). Vedi `${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Detached.
 
 ## Flusso
 
 1. **Identifica task**
-   1. Se taskFilter è vuoto, leggi `${DOCS_ROOT}/tasks.md` e prendi la prima task incompleta (status non "✔️ Done")
+   1. Se taskFilter è vuoto, leggi `{docs_root}/tasks.md` e prendi la prima task incompleta (status non "✔️ Done")
    2. Se taskFilter è un ID (es. T01, T319), usa quello
-   3. Se è testo, cerca nella tabella Tasks Overview di `${DOCS_ROOT}/tasks.md`
+   3. Se è testo, cerca nella tabella Tasks Overview di `{docs_root}/tasks.md`
 
 2. **Esegui script**
    ```bash
@@ -39,10 +39,10 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${DOCS_ROOT}
    (passa `--detach` solo se DETACH=1)
 
    Lo script:
-   - Trova il file task in `${DOCS_ROOT}/tasks/`
+   - Trova il file task in `{docs_root}/tasks/`
    - Aggiorna Progress a 🟡 0% (nel file task)
-   - Aggiorna `${DOCS_ROOT}/tasks.md`: Progress 🟡 In Progress nella Tasks Overview + emoji nel grafo lane
-   - Crea symlink `${DOCS_ROOT}/current-task.md` (skippato in detached)
+   - Aggiorna `{docs_root}/tasks.md`: Progress 🟡 In Progress nella Tasks Overview + emoji nel grafo lane
+   - Crea symlink `{docs_root}/current-task.md` (skippato in detached)
 
 3. **Presenta task**
    1. Leggi il file task appena attivato
@@ -68,7 +68,7 @@ Modalità detached: la task viene attivata SENZA creare il symlink `${DOCS_ROOT}
 
 ## Note
 
-- **tasks.md update**: lo script aggiorna direttamente `${DOCS_ROOT}/tasks.md`. Eventuali divergenze tra branch vengono riconciliate da `reconcile-tasks` in `merge-lane`.
+- **tasks.md update**: lo script aggiorna direttamente `{docs_root}/tasks.md`. Eventuali divergenze tra branch vengono riconciliate da `reconcile-tasks` in `merge-lane`.
 - **Checkpoint approach**: la finestra di diff non si inizializza qui — `checkpoint-task` la deriva dalla history del task file (ultimo `### Avanzamento`, o commit di creazione).
 - **Working tree può essere sporco**: Normale durante sviluppo
 - **Detached mode**: niente symlink, task ID va passato esplicitamente a run-task e checkpoint-task. Esempio: `/loom-works:start-task T102 detach`. Più task detached possono coesistere nello stesso worktree (sessioni separate). In detached, checkpoint-task NON usa l'analisi diff: l'agente deriva i deliverables completati dal contesto della conversazione e fa staging selettivo.

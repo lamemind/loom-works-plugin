@@ -11,7 +11,7 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 ## Note utente
 ~~~human
@@ -42,9 +42,9 @@ Stampa SEMPRE un riassunto compatto prima di qualsiasi altra azione:
 
 ## Artefatti e materiale di lavoro
 
-Output intermedi che non sono codice del progetto (dump, analisi, findings, script di supporto) → dentro la **task folder**, mai sparsi nel repo né sotto `${DOCS_ROOT}/tasks/`.
+Output intermedi che non sono codice del progetto (dump, analisi, findings, script di supporto) → dentro la **task folder**, mai sparsi nel repo né sotto `{docs_root}/tasks/`.
 
-- La task folder vive in **project root**, dot-prefixed; il campo `📁 Folder` la mostra root-relative (`./.YY-MM-DD-slug`). Sotto `${DOCS_ROOT}/tasks/` stanno **solo** i task file `.md` — **mai** una folder.
+- La task folder vive in **project root**, dot-prefixed; il campo `📁 Folder` la mostra root-relative (`./.YY-MM-DD-slug`). Sotto `{docs_root}/tasks/` stanno **solo** i task file `.md` — **mai** una folder.
 - **Non creare folder a mano** (`mkdir`). Crearla/agganciarla solo via skill:
   - task senza folder che ora serve → `/loom-works:set-task-folder ${taskId}` (la colloca giusta in root + popola il campo Folder)
   - materiale fuori dal ciclo task → `/loom-works:scratch-new <slug>`

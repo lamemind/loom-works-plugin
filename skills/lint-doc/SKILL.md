@@ -11,7 +11,7 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Confronta la doc di progetto col **contratto editoriale** (`${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md`) e trova le **violazioni**.
 
@@ -173,7 +173,7 @@ Perimetro:
 Fonte di verità: contratto
 Fase: <clean | split>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
 Prefisso ID: <la colonna PREFIX del gruppo>
@@ -264,7 +264,7 @@ WRITE: <cosa deve diventare la sezione>
 Contesto:
 <le voci del registro per questo file: violazione / evidenza / FIX>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
 Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md
 
@@ -324,7 +324,7 @@ File toccati (dai contratti APPLIED: dei writer di questa fase):
 Registro dei verdetti che hanno ordinato questa patch:
 <le voci del registro della fase: violazione / verdetto / target>
 
-Docs root: <PROJECT_ROOT>/${DOCS_ROOT}
+Docs root: {project_root}/{docs_root}
 Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
 
 Esiti dei guardiani (fatti deterministici, non ricontarli):
@@ -373,7 +373,7 @@ Un `Task` con `subagent_type: doc-grouper` per cartella oltre soglia. Read-only,
 
 ```
 Cartella da partizionare: <path>
-INDEX: <PROJECT_ROOT>/${DOCS_ROOT}/reference/INDEX.md
+INDEX: {project_root}/{docs_root}/reference/INDEX.md
 Soglia: 60000 char di figli diretti
 
 Misure (fidati di queste, non ricontare):
@@ -389,11 +389,11 @@ Ritorna solo la proposta.
 Lo spostamento non passa da un writer: è movimento di file, non scrittura.
 
 ```bash
-mkdir -p "${DOCS_ROOT}/reference/<categoria>"
-git mv "${DOCS_ROOT}/reference/<nome>.md" "${DOCS_ROOT}/reference/<categoria>/<nome>.md"
+mkdir -p "{docs_root}/reference/<categoria>"
+git mv "{docs_root}/reference/<nome>.md" "{docs_root}/reference/<categoria>/<nome>.md"
 ```
 
-**Il nome del file resta intero** — `loom-deck/loom-deck-spawn.md`, mai `loom-deck/spawn.md`. La ripetizione è brutta da leggere e costa poco; togliere il prefisso rompe un'ancora, e non tutti i riferimenti vivono dentro la doc: ci sono i `SKILL.md` del plugin, i task file, i messaggi di commit — perimetri che `check-doc-links.sh` non scandisce e che quindi nessuno sweep ripara. Vale anche al contrario: non aggiungere un prefisso a un file che non ce l'ha.
+**Il nome del file resta intero** — `{docs_root}/reference/loom-deck/loom-deck-spawn.md`, mai accorciato in `loom-deck/spawn.md`. La ripetizione è brutta da leggere e costa poco; togliere il prefisso rompe un'ancora, e non tutti i riferimenti vivono dentro la doc: ci sono i `SKILL.md` del plugin, i task file, i messaggi di commit — perimetri che `check-doc-links.sh` non scandisce e che quindi nessuno sweep ripara. Vale anche al contrario: non aggiungere un prefisso a un file che non ce l'ha.
 
 `git mv` e non `mv`: il rename resta tale nella cronologia, e `git log --follow` continua a seguire il file.
 

@@ -11,7 +11,7 @@ model: opus
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `${DOCS_ROOT}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
 Crea una nuova task documentale. I deliverable sono editoriali (sezioni di doc approvate, aggiornate o create), non code. La task vive nel task-system esistente come qualsiasi altra, con prefix `D{N}` e template dedicato.
 
@@ -119,11 +119,11 @@ Chiedi solo se:
 - L'input utente contiene indicazioni di lane ("nella lane X", "per la lane Y")
 - La discussione precedente implica isolamento pesante
 
-Se serve selezionare, leggi il grafo da `${DOCS_ROOT}/tasks.md` e proponi le lane esistenti via `AskUserQuestion` (come fa `create-task`), più opzione "Nessuna (task spot)" e "Nuova lane".
+Se serve selezionare, leggi il grafo da `{docs_root}/tasks.md` e proponi le lane esistenti via `AskUserQuestion` (come fa `create-task`), più opzione "Nessuna (task spot)" e "Nuova lane".
 
 ### 4. Creazione file task
 
-Crea `${DOCS_ROOT}/tasks/${TASK_ID}-${taskName}.md` copiando il template:
+Crea `{docs_root}/tasks/${TASK_ID}-${taskName}.md` copiando il template:
 
 ```
 ${CLAUDE_PLUGIN_ROOT}/templates/doc-task-template.md
@@ -158,7 +158,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh \
 
 Lo script:
 - Deriva automaticamente `K=📝` dal prefix `D` (⚙️ per altri prefix)
-- Aggiunge la riga alla tabella `## Tasks Overview` di `${DOCS_ROOT}/tasks.md`
+- Aggiunge la riga alla tabella `## Tasks Overview` di `{docs_root}/tasks.md`
 - Committa e pusha (senza remote il push avvisa su stderr e prosegue)
 
 ### 6. Feedback finale
