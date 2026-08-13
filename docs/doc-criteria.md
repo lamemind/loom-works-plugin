@@ -184,12 +184,6 @@ Tre regole della partizione, ognuna contro un modo tipico di sbagliarla:
 
 Corollario controintuitivo: **meglio una cartella con un solo file che una da dieci**. Una cartella non è un premio alla numerosità, è un confine di ricerca; se un dominio ne merita uno, lo merita anche da solo.
 
-## Origine D-task
-
-Soglia per aprire una `D{N}`: il lavoro dev'essere **multi-chunk**, cioè partizionabile in scope che `run-doc` esegue a giri con un `doc-writer` fresco per chunk. Una nozione singola resta `capture-doc`, che è one-shot — aprire una D per essa paga il ciclo (task file, planning, checkpoint per giro) per un lavoro che non lo ammortizza.
-
-Col `parent=T{N}` passato a mano il D-file porta `**Parent Task**: T{N}`, e il parent va corredato di `- [ ] D{N} (<maniglia>) chiusa` in Acceptance: alla chiusura della D il suo checkpoint flagga indietro la checkbox.
-
 ## Nota per l'auditor
 
 Un verdetto di scarto è un **verdetto**, non un'omissione: va dichiarato. Il posto durevole è il corpo del messaggio di commit dell'integrazione, greppabile con `git log --grep`, coerente col principio che la cronaca sta in git e non nella doc.

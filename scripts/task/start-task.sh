@@ -74,12 +74,32 @@ echo "-> Task file aggiornato: Progress 🟡 0%"
 # -----------------------------------------------------------------------------
 
 if [[ -f "$TASKS_FILE" ]]; then
-    sed -i "s/^\(| ${TASK_ID} |[^|]*| \)🔵[^|]*\( |.*\)$/\1🟡 \2/" "$TASKS_FILE"
-    sed -i "s/^\(| ${TASK_ID} |[^|]*| \)✔️[^|]*\( |.*\)$/\1🟡 \2/" "$TASKS_FILE"
+    # La colonna Prog si localizza dall'HEADER, mai per posizione: un pattern che
+    # conta le celle fra ID e glifo smette di matchare al primo cambio di forma
+    # della tabella e non aggiorna piu' nulla, USCENDO 0 — un no-op muto che
+    # nessuno vede finche' non confronta tasks.md con la realta'. Da qui anche il
+    # ramo else: riga non trovata e' un WARN, non un silenzio.
+    TMP_TASKS=$(mktemp)
+    if awk -v id="$TASK_ID" -F'|' -v OFS='|' '
+        function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+        prog == 0 && /^[ \t]*\|/ && trim($2) == "ID" {
+            for (i = 2; i <= NF; i++) if (trim($i) == "Prog") prog = i
+            print; next
+        }
+        prog > 0 && /^[ \t]*\|/ && trim($2) == id {
+            $prog = " 🟡 "; hit = 1; print; next
+        }
+        { print }
+        END { exit(hit ? 0 : 1) }
+    ' "$TASKS_FILE" > "$TMP_TASKS"; then
+        mv "$TMP_TASKS" "$TASKS_FILE"
+        echo "-> tasks.md aggiornato: ${TASK_ID} 🟡"
+    else
+        rm -f "$TMP_TASKS"
+        echo "WARN: nessuna riga ${TASK_ID} sotto un header con colonna Prog in ${TASKS_FILE} — Prog NON aggiornata" >&2
+    fi
 
     perl -i -pe "s/→ ${TASK_ID}(?![0-9])/→ 🟡${TASK_ID}/ if /^Lane/" "$TASKS_FILE"
-
-    echo "-> tasks.md aggiornato: ${TASK_ID} 🟡"
 fi
 
 # -----------------------------------------------------------------------------

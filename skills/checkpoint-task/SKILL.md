@@ -75,14 +75,14 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
    1. Imposta Progress a `✔️ Done` (nel file task)
    2. Se il symlink `{docs_root}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
-   3. **Se task corrente è una doc task (K=📝)** e nel task file esiste il campo `**Parent Task**: T{N}`:
+   3. **Se nel task file esiste il campo `**Parent Task**: T{N}`** (scritto a mano su qualunque task, non c'è un kind che lo gatei):
       - Risolvi task parent: `{docs_root}/tasks/T{N}-*.md`
-      - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera** — `doc-task` la scrive con la maniglia (`- [ ] D07 (unificare docs-root) chiusa`), quindi cercare `- [ ] D{taskId} chiusa` alla lettera non trova mai nulla e il flag-back muore nel ramo warning qui sotto. Riscrivi solo il box, lasciando maniglia e testo intatti.
+      - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera** — la riga si scrive con la maniglia (`- [ ] T07 (unificare docs-root) chiusa`), quindi cercare `- [ ] T{taskId} chiusa` alla lettera non trova mai nulla e il flag-back muore nel ramo warning qui sotto. Riscrivi solo il box, lasciando maniglia e testo intatti.
       - Se nessuna riga porta l'id, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
 
 5. **Aggiorna {docs_root}/tasks.md**
    1. Leggi `{docs_root}/tasks.md`
-   2. Nella sezione Tasks Overview (formato: `| ID | Pri | K | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
+   2. Nella sezione Tasks Overview (formato: `| ID | Pri | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
    3. Aggiorna la colonna Prog (solo emoji):
       - Se task completata (step 4): `✔️`
       - Altrimenti: `🟡` (emoji sola, niente percentuali)
@@ -118,8 +118,6 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 7. **Fase doc — le voci `## Doc Impact` in inbox**
 
    Leggi la sezione `## Doc Impact` del task file. Se **vuota**, assente, o con tutte le voci già marcate → skip questo step e lo step 8.
-
-   **Doc task (K=📝)**: step **saltato**. La doc è il loro obiettivo, non un side-effect.
 
    Nessuna domanda all'utente, nessuno spawn di subagent: la nozione la scrive questa sessione, che ha già il contesto della task in memoria. Un subagent dovrebbe ricostruirlo, ed è il costo che questa fase esiste per togliere.
 
@@ -231,4 +229,4 @@ Topic = argomento concreto della domanda. NO generici.
 - **Baseline del diff**: derivato, mai storato. `checkpoint-task-analyze.sh` (solo linked) lo prende dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD` — zero avanzamenti → commit di creazione del task file.
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
 - **Niente gate sulla fase doc**: serviva a decidere *quando* pagare il costo del consolidamento, e senza quel costo non resta una decisione da prendere. Tutto ciò che passa i criteri indipendenti va in inbox, sempre; dove atterri lo decide `drain-doc`, in differita.
-- **Ogni voce lavorata porta un marker**, `→ ✔️ inbox` o `→ ✖️ <parola>`: è l'unico stato che distingue «già deciso» da «non ancora guardato», e senza il secondo marker una voce scartata tornerebbe a ogni checkpoint. Il flag-back della checkbox `- [ ] D{N} (<maniglia>) chiusa` (step 4.3) è un meccanismo distinto e resta: vale per le D create a mano con `parent=`.
+- **Ogni voce lavorata porta un marker**, `→ ✔️ inbox` o `→ ✖️ <parola>`: è l'unico stato che distingue «già deciso» da «non ancora guardato», e senza il secondo marker una voce scartata tornerebbe a ogni checkpoint. Il flag-back della checkbox `- [ ] T{N} (<maniglia>) chiusa` (step 4.3) è un meccanismo distinto e resta: scatta su qualunque task che porti `**Parent Task**`, scritto a mano.

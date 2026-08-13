@@ -53,12 +53,7 @@ esac
 
 TASK_DESC_TRUNCATED=$(printf '%s' "$TASK_DESC" | cut -c1-100)
 
-case "$TASK_ID" in
-    D*) KIND_EMOJI="📝" ;;
-    *)  KIND_EMOJI="⚙️" ;;
-esac
-
-NEW_ROW="| ${TASK_ID} | ${PRIORITY_EMOJI} | ${KIND_EMOJI} | 🔵 | ${TASK_DESC_TRUNCATED} |"
+NEW_ROW="| ${TASK_ID} | ${PRIORITY_EMOJI} | 🔵 | ${TASK_DESC_TRUNCATED} |"
 
 awk -v new_row="$NEW_ROW" '
     /^\| ---/ && in_tasks_section {

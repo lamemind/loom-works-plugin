@@ -37,7 +37,7 @@ Il raggio taglia il **contorno**, mai la comprensione: le tre cose che il North 
 
 In chat **ri-dire l'indirizzo è obbligatorio**; in un file basta puntarlo una volta. Non è una preferenza di stile: il terminale è lineare e non ha random access, quindi ogni rimando indietro è un'azione fisica del lettore, mentre chi legge un file può saltare. Stessa preoccupazione — il costo che paga chi legge — con soluzione opposta per medium.
 
-- **Coordinata opaca** — sigla o numero senza contenuto proprio (`T60`, `D02`, `F7`): **mai nuda**, sempre con una maniglia verbo+oggetto — `T38 (unificare docs-root)`.
+- **Coordinata opaca** — sigla o numero senza contenuto proprio (`T60`, `T02`, `F7`): **mai nuda**, sempre con una maniglia verbo+oggetto — `T38 (unificare docs-root)`.
 - **Etichetta parlante** — il nome *è* il contenuto (`capture-doc`, `build-index.sh`): va nuda.
 - **Namespace non condiviso = inesistente.** Un codice che vive in un file non aperto in questa conversazione si espande al primo uso, anche se l'hai coniato tu in una sessione precedente.
 - **Etichetta coniata da te**: valida entro lo schermo. Oltre una schermata porta il proprio contenuto — non `F7` ma `F7 · README stale`.

@@ -82,7 +82,7 @@ say_auto() {
     fi
 }
 
-# Trims leading zeros from task/doc ID for TTS readability: T05 → T5, D02 → D2.
+# Trims leading zeros from task ID for TTS readability: T05 → T5.
 say_id() {
-    echo "$1" | sed -E 's/^([TD])0+([0-9])/\1\2/'
+    echo "$1" | sed -E 's/^(T)0+([0-9])/\1\2/'
 }

@@ -1,6 +1,6 @@
 ---
 name: doc-router
-description: Giudica dove va una nozione non ancora collocata — verdetto (online, offline, puntatore al codice, puntatore a una fonte viva, drop), file target ed evidenza. READ-ONLY, non scrive mai su disco. Paga i criteri dipendenti aprendo codice, fonti vive e resto della doc. Usato da drain-doc (un router per file inbox), capture-doc e run-doc; align-doc e lint-doc giudicano invece con doc-auditor, perché misurano doc già collocata.
+description: Giudica dove va una nozione non ancora collocata — verdetto (online, offline, puntatore al codice, puntatore a una fonte viva, drop), file target ed evidenza. READ-ONLY, non scrive mai su disco. Paga i criteri dipendenti aprendo codice, fonti vive e resto della doc. Usato da drain-doc (un router per file inbox) e capture-doc; align-doc e lint-doc giudicano invece con doc-auditor, perché misurano doc già collocata.
 tools: Read, Glob, Grep, Bash
 model: sonnet
 ---
@@ -30,7 +30,6 @@ N router girano **in parallelo sulla stessa working copy** — uno per file inbo
 - **Perimetro di fonte**: opzionale — dove sta il codice o la fonte viva che riguarda queste nozioni (dir, glob, submodule, comando). Se manca, lo cerchi tu dalle ancore.
 - **Misure pre-calcolate**: opzionale, char per file doc. Se ci sono **fidati di quelle**; altrimenti misuri tu con `wc -c` i soli candidati che stai valutando.
 - **Prefisso ID**: stringa corta per numerare le rotte (es. `INBOX3`). Serve a non collidere coi router paralleli.
-- **Target dichiarato**: opzionale, solo da `run-doc`. Il `## Target` di un task file è una **previsione fatta prima di lavorare**: la verifichi contro il materiale reale, non la erediti.
 
 ## I cinque verdetti
 

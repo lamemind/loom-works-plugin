@@ -63,7 +63,7 @@ Se diff A modifica T250 e diff B modifica T255 → applica entrambe, nessun conf
 
 **Emoji additive**: 🚀📋 sono additive — mantieni se presenti in almeno un diff.
 
-### Tasks Overview (tabella `| ID | Pri | K | Prog | Task |`)
+### Tasks Overview (tabella `| ID | Pri | Prog | Task |`)
 - Applica modifiche colonna Prog da entrambi i diff
 - Task aggiunte in un diff → aggiungi
 - Task rimosse in un diff → rispetta la rimozione

@@ -18,7 +18,7 @@ $ARGUMENTS
 - L'utente vuole **autovalidarsi** prima di mettere mano a un'area (doc o codice).
 - L'utente vuole **stress-testare** la doc di una strategia/feature prima dell'implementazione.
 
-NON usarla per: produrre doc (→ `capture-doc`, `doc-task`, `discover`), validare doc vs codice in modalità autonoma (→ futuro `doc-probe`).
+NON usarla per: produrre doc (→ `capture-doc`, `discover`), validare doc vs codice in modalità autonoma (→ futuro `doc-probe`).
 
 ## Filosofia
 
@@ -171,7 +171,7 @@ In **working memory** (non scrivere file):
 - **Atomi presentati**: lista
 - **Atomi fragili**: dove l'utente ha esitato, sbagliato, o richiesto re-spiegazione
 - **Drift candidati**: discrepanze tra fonte e realtà (vedi sotto)
-- **Nozioni nuove emerse**: concetti chiariti durante la lezione che il progetto **non ha ancora documentato** — candidati `capture-doc` / `doc-task`
+- **Nozioni nuove emerse**: concetti chiariti durante la lezione che il progetto **non ha ancora documentato** — candidati `capture-doc`
 
 Un **drift candidato** è una discrepanza tra "ciò che la fonte dice" e "ciò che sembra plausibile/corretto":
 
@@ -220,12 +220,12 @@ A valle del riepilogo, **proponi** (non lanciare) come gestire drift e nozioni:
 
 - A) Niente — drift incerti o materiale già coperto altrove.
 - B) Cattura singola: lancia `/loom-works:capture-doc` su <nozione specifica>. Adatto per nozioni puntuali, file reference esistente.
-- C) Refactor doc / doc-task: apri `/loom-works:doc-task` per coprire materiale ampio o correlato su <area>. Adatto quando il blocco di sapere emerso è sostanzioso.
+- C) Task dedicata: apri `/loom-works:create-task` per coprire materiale ampio o correlato su <area>. Adatto quando il blocco di sapere emerso è sostanzioso.
 ```
 
 Distinzione chiave:
 - `capture-doc` → singola nozione, costa poco, integra in doc esistente
-- `doc-task` → materiale ampio, merita una task documentale dedicata
+- `create-task` → materiale ampio, merita una task dedicata col proprio ciclo
 
 La skill **non spawna** altre skill: l'utente decide se e quando lanciarle.
 

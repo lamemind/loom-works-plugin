@@ -2,15 +2,15 @@
 
 # =============================================================================
 # get-next-task-id.sh - Genera il prossimo ID task
-# Usage: get-next-task-id.sh [--prefix <T|D|...>]
+# Usage: get-next-task-id.sh
 # Env:   PROJECT_ROOT (default: $PWD)
-# Output: ID completo (es: T04, T319, D01)
+# Output: ID completo (es: T04, T319)
 #
-# Il prefix determina il counter: T (code, default) e D (doc) sono counter
-# indipendenti. Il max e' calcolato sull'UNIONE di due sorgenti:
-#   1. i FILE in docs/tasks/ (PREFIX + numero)
+# Counter unico: gli ID task sono una sola famiglia, prefisso `T`. Il max e'
+# calcolato sull'UNIONE di due sorgenti:
+#   1. i FILE in docs/tasks/ (T + numero)
 #   2. le RIGHE della tabella Tasks Overview in tasks.md
-# Restituisce PREFIX + (max + 1) zero-padded a 2 cifre.
+# Restituisce T + (max + 1) zero-padded a 2 cifre.
 #
 # La sorgente 2 e' necessaria: una task Done puo' avere il file rimosso ma
 # la riga ancora viva in tasks.md (orfana). Guardare solo i file riallocherebbe
@@ -23,10 +23,6 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --docs-root)
             LOOM_DOCS_ROOT="$2"
-            shift 2
-            ;;
-        --prefix)
-            PREFIX="$2"
             shift 2
             ;;
         *)
@@ -59,7 +55,7 @@ if [[ -d "$TASKS_DIR" ]]; then
     done
 fi
 
-# Sorgente 2: righe della tabella in tasks.md (ID nella prima cella: '| D03 |').
+# Sorgente 2: righe della tabella in tasks.md (ID nella prima cella: '| T03 |').
 # Cattura gli ID le cui righe sopravvivono al file (orfane/tombstone).
 if [[ -f "$TASKS_FILE" ]]; then
     while IFS= read -r NUM; do

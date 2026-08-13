@@ -65,7 +65,7 @@ Cosa cerchi, in ordine di resa:
 - **file sotto il pavimento di merge** (flag `MERGE?` nelle misure) — il numero dice solo «guarda qui». Il giudizio è uno solo: **il suo perimetro di ricerca è genuinamente distinto?** Se sì il file sopravvive e lo dichiari con `VERDICT: fix-doc` (o nessun finding) più la riga di motivo; se è un residuo che nessuno cercherebbe da solo, `VERDICT: merge` e in `FIX` **quale** file lo assorbe — il vicino di perimetro, non il vicino di cartella. Senza questa lente lo split è a senso unico: la doc si frammenta a ogni passata e un file che si è svuotato non ha nessuno che se ne accorga.
 - **layer sbagliato** — una nozione collocata dove non le compete, e il contratto basta a stabilirlo senza aprire niente: un inventario in prosa (campi, colonne, flag, opzioni di un comando) appartiene al codice o alla fonte viva, non alla doc; il *perché* di una scelta appartiene a offline, non a un file online. Verdetto `relayer`.
 - **costo online ingiustificato** — sezioni di dettaglio consultabile dentro file `@-import`ati, che si pagano a ogni sessione.
-- **coordinate opache** — id nudi (`T60`, `D02`) senza maniglia verbo+oggetto accanto.
+- **coordinate opache** — id nudi (`T60`, `T02`) senza maniglia verbo+oggetto accanto.
 - **formato** — tabelle dove una lista basta, gerarchie a heading dove basta l'indentazione.
 
 ## Workflow

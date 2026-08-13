@@ -69,7 +69,7 @@ La riga «costosa o sorprendente» ne mescola due: il costo di scoperta è indip
 
 - **Solo as-is**: presente indicativo, stato corrente. Niente date, task, PR inline.
 - **Sostituisci, non appendere**: riscrivi la sezione toccata, non stratificare versioni. È così che un TLDR diventa un secondo documento.
-- **Coordinate non opache**: ogni id porta una maniglia verbo+oggetto — `D07 (unificare docs-root)`, mai `D07` nudo.
+- **Coordinate non opache**: ogni id porta una maniglia verbo+oggetto — `T38 (unificare docs-root)`, mai `T38` nudo.
 - **Token-efficiente**: liste `- chiave: valore` invece di tabelle · niente separatori `---` · gerarchia per indentazione, non per heading annidati · header ogni 2-3 righe = rumore.
 - I pattern di scrittura (claim in grassetto d'apertura, un'idea per blocco, nessun livello che ri-afferma) sono in `writing-patterns.md` e valgono qui senza essere ricopiati.
 
@@ -103,7 +103,3 @@ Tre skill, distinte da cosa fanno alla doc — `align-doc` **misura** contro la 
 **Tre operazioni topologiche**, due verticali e una orizzontale: **split** (un file oltre soglia diventa N) · **merge** (N file sotto il pavimento tornano uno) · **regroup** (N file in una sottocartella). Il regroup è la terza fase di `lint-doc`, in coda e **mai prima**: una categorizzazione dimensionata su file che stanno per essere spezzati nasce stale.
 
 **Doc segue codice, stesso commit.** Nuovo file in `reference/` o in `inbox/` → rigenera l'indice con `scripts/docs/build-index.sh`.
-
-## Origine D-task
-
-Le task documentali (`D{N}`) nascono **solo on-demand**, via `/loom-works:doc-task`: nessun automatismo le genera. Soglia per aprirne una, e contratto parent-child: `doc-criteria.md` §Origine D-task.

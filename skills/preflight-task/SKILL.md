@@ -147,7 +147,7 @@ lw_git_push
 - Committa **solo** il task file, non altri file pending nel working tree.
 - Messaggio: `task(${taskId}): preflight - ${N} decisioni congelate` se `${N}` ≥ 1, altrimenti `task(${taskId}): preflight - nessuna ambiguità`.
 - `${N}` = numero decisioni di **questo** giro preflight (0 nel caso nessuna ambiguità).
-- Push subito dopo il commit, coerente con `create-task` / `doc-task` / `checkpoint-task` (tutte pushano). Senza remote `lw_git_push` avvisa su stderr ed esce 0: la skill prosegue, il commit resta locale.
+- Push subito dopo il commit, coerente con `create-task` / `checkpoint-task` (tutte pushano). Senza remote `lw_git_push` avvisa su stderr ed esce 0: la skill prosegue, il commit resta locale.
 
 Dopo commit+push, mostra all'utente:
 

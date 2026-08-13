@@ -49,8 +49,6 @@ Then bootstrap the project structure:
 | `/loom-works:list-worktrees` | List worktrees with branch, dirty count and active task |
 | `/loom-works:reindex` | Regenerate the reference INDEX.md from file TLDRs |
 | `/loom-works:capture-doc` | Capture ad-hoc doc notions outside of tasks |
-| `/loom-works:doc-task` | Create a documentary task (D{N} prefix) |
-| `/loom-works:run-doc` | Multi-round workflow for documentary tasks |
 | `/loom-works:discover` | Doc bootstrap for a project with zero existing docs |
 | `/loom-works:tutor` | Interactive topic tutor with comprehension checkpoints |
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |

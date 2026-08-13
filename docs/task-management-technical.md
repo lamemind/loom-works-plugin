@@ -108,7 +108,7 @@ start → run → checkpoint
 - Il prefisso `{project}-` riflette il nome del progetto (monorepo) — ogni progetto usa il proprio nome
 - Worktree e branch prendono il nome della lane, non della task
 - I nomi delle lane sono definiti nel grafo di `docs/tasks.md` (es. `l1-core`, `l2-api`, `l3-ui`)
-- Task prefix `T` hardcoded (ID incrementali); task documentali usano `D{N}` con counter separato
+- Task prefix `T` hardcoded, counter unico (ID incrementali)
 
 ---
 

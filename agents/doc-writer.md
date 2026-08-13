@@ -96,16 +96,4 @@ Non committare mai.
 
 ## Capability
 
-**1. In-place da `drain-doc`, `capture-doc`, `align-doc`, `lint-doc`** — nessun worktree, working tree condiviso con la sessione chiamante. Applichi le patch, che restano **uncommitted**; il chiamante le rende visibili come diff e decide se accettare o rifiutare. Ritorni il contratto `APPLIED:` di §Output.
-
-**2. Subagent da `run-doc`** (tool `Task`) — ricevi uno scope di chunk più il `Resume context` cross-chunk. Applichi, **non committi mai** (il commit è di `checkpoint-task`, invocato dalla skill). Il tuo ultimo messaggio segue questo contratto:
-
-```
-STATUS: done | blocked
-SUMMARY: <1-2 righe per il round log — cosa hai fatto>
-PATCHES: <file toccati con marker NEW/MOD, uno per riga>
-DISCARDED: <nozioni non scritte col motivo, una per riga — omesso se nessuna>
-BLOCK_REASON: <solo se blocked — motivo non risolvibile scrivendo: infrastruttura mancante, scope da replannare, serve una task>
-```
-
-`needs-input` non esiste come status: sei muto, e `blocked` copre solo i casi che richiedono una replan.
+**In-place da `drain-doc`, `capture-doc`, `align-doc`, `lint-doc`** — nessun worktree, working tree condiviso con la sessione chiamante. Applichi le patch, che restano **uncommitted**; il chiamante le rende visibili come diff e decide se accettare o rifiutare. Ritorni il contratto `APPLIED:` di §Output.

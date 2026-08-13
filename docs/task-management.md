@@ -19,7 +19,7 @@ Una singola fonte di verità: `docs/tasks.md`. Contiene:
 - **Tasks Overview** (tabella): ID, Priority, Progress, descrizione
 - **Execution Plan** (grafo lane con cross-deps)
 
-Task prefix `T` (hardcoded), ID incrementali (T01, T02, …). Le task documentali usano prefix `D{N}` con counter separato.
+Task prefix `T` (hardcoded), counter unico, ID incrementali (T01, T02, …).
 
 I task file stanno in `docs/tasks/T{N}-{slug}.md`. Materiale di supporto (design docs, findings, analisi estemporanee) va in **task folder dedicata** — vive in **project root**, dot-prefixed `.YY-MM-DD-slug`, **mai** sotto `docs/tasks/` (lì stanno solo i task *file* `.md`) — vedi §Task Folder; o scratch folder per attività estemporanee.
 
@@ -81,6 +81,8 @@ Le task si gestiscono dal worktree lane o direttamente da main (task spot). Coma
 
 Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-lane (next)`. Le lane lavorano in parallelo, ognuna nel proprio worktree.
 
+**Parentela fra task**: il campo `**Parent Task**: T{N}` si scrive a mano nella figlia, e il parent porta `- [ ] T{N} (<maniglia>) chiusa` in Acceptance. Alla chiusura della figlia il suo `checkpoint-task` flagga indietro quella checkbox — matchando l'id, non la frase.
+
 ### Detached (più task in parallelo, stesso worktree)
 
 Più task piccole in parallelo nello stesso worktree, una per sessione Claude. Due modi di entrarci, stesso regime: `/loom-works:start-task T102 detach` (task ID esplicito in ogni comando) oppure una sessione spawnata dal deck, che porta `$LOOM_TASK`.
@@ -100,13 +102,11 @@ Vincoli:
 
 ### Doc Impact al checkpoint
 
-Ogni `checkpoint-task` su code task (K=⚙️) legge le voci `## Doc Impact` non marcate, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta in un file `{docs_root}/inbox/` e le marca — `→ ✔️ inbox` se entrano, `→ ✖️ <parola>` se una delle sei le tiene fuori. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
+Ogni `checkpoint-task` legge le voci `## Doc Impact` non marcate, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta in un file `{docs_root}/inbox/` e le marca — `→ ✔️ inbox` se entrano, `→ ✖️ <parola>` se una delle sei le tiene fuori. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
 
 **Niente gate**: c'era per decidere *quando* pagare il costo del consolidamento, e senza costo non resta niente da decidere. Dove la nozione atterri lo decide `drain-doc`, in differita.
 
 **La fase doc gira dopo il commit e il push del codice**, mai prima: il push è ciò che rende il lavoro visibile alle altre sessioni, che ripartono mentre questa finisce. Committare per primo il codice toglie anche il `git add -A` dalla finestra della scrittura doc — la working copy resta usabile, e un fallimento della fase doc non porta con sé il codice.
-
-Doc task (K=📝) non passano di qui: la doc è l'obiettivo, non un side-effect.
 
 ## Task Folder
 
