@@ -24,6 +24,10 @@
 # dentro ogni classe. Una sentinella dice che quella nozione sta curando una
 # pagina gia' falsa, e un drift e' vivo dall'istante in cui il codice cambia:
 # farla aspettare la coda significa tenere in piedi la bugia.
+# Le colonne CAPPELLO e STATO dicono se il file e' drenabile: un file inbox e'
+# WIP finche' la task che lo possiede non e' chiusa. Il verdetto e' un dato, non
+# un giudizio — drain-doc filtra su un valore, per la stessa ragione per cui
+# l'ordine lo decide questo script e non il chiamante.
 # L'eta' viene dal commit che ha AGGIUNTO il file (`git log --diff-filter=A`, il
 # piu' vecchio), non dall'mtime: un file inbox si riscrive solo per errore,
 # mentre un checkout ne azzera l'mtime di tutti insieme e l'ordine a coda
@@ -38,7 +42,11 @@
 #   TLDR>N  TLDR oltre il cap
 #   NOTLDR  file sotto reference/ o inbox/ senza TLDR su riga 3 (fuori dall'INDEX)
 #   ONLINE  file @-importato da CLAUDE.md (si paga a ogni sessione)
-#   INBOX   nozione non ancora collocata — si smaltisce, non si mantiene
+#   INBOX   nozione non ancora collocata — si smaltisce, non si mantiene, ed e'
+#           esente da SPLIT e MERGE: un file inbox aggrega un cappello e nasce
+#           per morire al drain, quindi spezzarlo lo riporterebbe alle N voci
+#           d'INDEX che il file per cappello esiste per chiudere. Il tetto
+#           dell'inbox resta sul CONTEGGIO dei file.
 #   GEN     artefatto generato (INDEX.md) — mai splittato a mano
 #
 # Tre layer, contati separatamente perche' hanno regimi di costo diversi: ONLINE si
@@ -135,6 +143,43 @@ drift_of() {  # <file> → i path candidati, o vuoto se la riga manca
     echo "${rest%"${rest##*[![:space:]]}"}"
 }
 
+# --- Cappello di un file inbox ------------------------------------------------
+# L'ID sta nel NOME del file (`T74-<slug>.md` → `T74`), quindi si legge senza
+# aprirlo, e il taglio sul primo `-` regge anche i legacy col suffisso numerico
+# (`T89-<slug>-2.md`). Lo STATO viene dalla colonna Prog di tasks.md: `done` solo
+# su ✔️, tutto il resto e' WIP.
+declare -A TASK_PROG=()
+load_task_prog() {
+    local tasks_md="${PROJECT_ROOT}/${DOCS_ROOT}/tasks.md" id prog
+    [[ -f "$tasks_md" ]] || return 0
+    while IFS=$'\t' read -r id prog; do
+        TASK_PROG["$id"]="$prog"
+    # La colonna Prog si localizza dall'header, non per indice fisso: le colonne di
+    # tasks.md sono gia' cambiate una volta (drop della K a T93) e un parse
+    # posizionale non lo segnala — leggerebbe Pri al posto di Prog e chiamerebbe
+    # WIP l'intera coda. Header assente → fallback sulla 4a.
+    done < <(awk -F'|' '
+        /^[[:space:]]*\|/ {
+            for (i = 2; i <= NF; i++) { f[i] = $i; gsub(/^[ \t]+|[ \t]+$/, "", f[i]) }
+            if (f[2] == "ID") { for (i = 2; i <= NF; i++) if (f[i] == "Prog") col = i; next }
+            if (f[2] ~ /^[A-Za-z]+[0-9]+$/) print f[2] "\t" f[col ? col : 4]
+        }' "$tasks_md")
+}
+
+cappello_of() {  # <basename> → ID, o — se il nome non ne porta uno
+    [[ "$1" =~ ^([A-Za-z]+[0-9]+)- ]] && echo "${BASH_REMATCH[1]}" || echo "—"
+}
+
+# Cappello SENZA riga in tasks.md → done. `clean-tasks` purga solo le task chiuse,
+# quindi un cappello che non esiste piu' e' chiuso; il ramo opposto terrebbe il
+# file bloccato in coda per sempre, e nessuno potrebbe piu' sbloccarlo.
+stato_of() {  # <cappello> → done | wip
+    local prog
+    [[ "$1" == "—" ]] && { echo "done"; return; }
+    prog="${TASK_PROG[$1]-}"
+    [[ -z "$prog" || "$prog" == *✔* ]] && echo "done" || echo "wip"
+}
+
 # --- Coda inbox (--inbox) -----------------------------------------------------
 # Ordine: i file con sentinella di drift per primi, poi a coda — il piu' vecchio
 # per primo dentro ogni classe. La priorita' si antepone QUI e non nel chiamante:
@@ -145,6 +190,8 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
     QTMP="$(mktemp)"
     trap 'rm -f "$QTMP"' EXIT
 
+    load_task_prog
+
     if [[ -d "$INBOX_DIR" ]]; then
         while IFS= read -r -d '' file; do
             rel="${file#"$PROJECT_ROOT"/}"
@@ -152,30 +199,35 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
             [[ "$created" =~ ^[0-9]+$ ]] || created="$(stat -c %Y "$file")"
             tldr="$(tldr_of "$file")"
             drift="$(drift_of "$file")"
+            cap="$(cappello_of "$(basename "$file")")"
             if [[ -n "$drift" ]]; then rank=0; else rank=1; drift="—"; fi
-            printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-                "$rank" "$created" "$rel" "$(char_count "$file")" "${#tldr}" "$drift" >> "$QTMP"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$rank" "$created" "$rel" "$(char_count "$file")" "${#tldr}" "$drift" \
+                "$cap" "$(stato_of "$cap")" >> "$QTMP"
         done < <(find "$INBOX_DIR" -maxdepth 1 -type f -name '*.md' -print0)
     fi
 
-    n_q=0; c_q=0; n_urg=0
-    while IFS=$'\t' read -r rk _ _ c _ _; do
+    n_q=0; c_q=0; n_urg=0; n_wip=0
+    while IFS=$'\t' read -r rk _ _ c _ _ _ st; do
         n_q=$((n_q+1)); c_q=$((c_q + c)); (( rk == 0 )) && n_urg=$((n_urg+1))
+        [[ "$st" == "wip" ]] && n_wip=$((n_wip+1))
     done < "$QTMP"
 
     if [[ "$FORMAT" == "tsv" ]]; then
-        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tPRIO\tDRIFT\tCREATED\n'
-        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr; do
+        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tPRIO\tDRIFT\tCREATED\tCAPPELLO\tSTATO\n'
+        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st; do
             (( rk == 0 )) && prio="urgente" || prio="normale"
-            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$dr" "$ts"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$dr" "$ts" "$cp" "$st"
         done
     else
         echo "[doc-metrics] coda inbox: ${DOCS_ROOT}/inbox  ·  ordine: sentinelle prima, poi il più vecchio"
         echo
-        printf '%-52s %8s %6s %6s %5s\n' "PATH" "CHAR" "AGE_D" "TLDR" "PRIO"
-        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr; do
+        printf '%-52s %8s %6s %6s %5s %9s %6s\n' "PATH" "CHAR" "AGE_D" "TLDR" "PRIO" "CAPPELLO" "STATO"
+        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st; do
             (( rk == 0 )) && prio="🚨" || prio="-"
-            printf '%-52s %8s %6s %6s %5s\n' "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio"
+            printf '%-52s %8s %6s %6s %5s %9s %6s\n' \
+                "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$cp" "$st"
             (( rk == 0 )) && echo "      drift: ${dr}"
         done
         echo
@@ -184,6 +236,7 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
         else
             echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}"
         fi
+        echo "- drenabili: $(( n_q - n_wip ))  ·  bloccati da un cappello ancora aperto: ${n_wip}"
         if (( n_urg > 0 )); then
             echo "- con sentinella di drift: ${n_urg}  → smaltibili subito, il tetto non li riguarda"
         fi
@@ -226,11 +279,15 @@ while IFS= read -r -d '' file; do
     flags=""
     if [[ "$(basename "$file")" == "INDEX.md" ]]; then
         flags="GEN"
+    elif [[ "$layer" == "inbox" ]]; then
+        # Né split né merge: il verdetto su un file inbox è «smaltiscilo». Sotto il
+        # pavimento perché nasce piccolo, sopra la soglia perché aggrega un cappello
+        # intero — e spezzarlo lo riporterebbe alle N voci d'INDEX che il file per
+        # cappello esiste per chiudere. Il tetto dell'inbox è sul conteggio dei file.
+        :
     elif (( chars >= SPLIT_THRESHOLD )); then
         flags="SPLIT"; n_split=$((n_split+1))
-    elif (( chars <= MERGE_THRESHOLD )) && [[ "$layer" != "inbox" ]]; then
-        # Il pavimento di merge non si applica all'inbox: un file inbox nasce piccolo
-        # per contratto, e il verdetto su di lui è «smaltiscilo», non «fondilo».
+    elif (( chars <= MERGE_THRESHOLD )); then
         flags="MERGE?"; n_merge=$((n_merge+1))
     fi
     if [[ -n "$tldr" ]]; then

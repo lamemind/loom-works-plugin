@@ -1,6 +1,6 @@
 # Task Management
 
-Sistema a Lane e Task con worktree Git isolati. Una sola task list (`docs/tasks.md`) per progetto.
+Sistema a Lane e Task con worktree Git isolati.
 
 ## Struttura
 
@@ -21,7 +21,7 @@ Una singola fonte di verità: `docs/tasks.md`. Contiene:
 
 Task prefix `T` (hardcoded), counter unico, ID incrementali (T01, T02, …).
 
-I task file stanno in `docs/tasks/T{N}-{slug}.md`. Materiale di supporto (design docs, findings, analisi estemporanee) va in **task folder dedicata** — vive in **project root**, dot-prefixed `.YY-MM-DD-slug`, **mai** sotto `docs/tasks/` (lì stanno solo i task *file* `.md`) — vedi §Task Folder; o scratch folder per attività estemporanee.
+I task file stanno in `docs/tasks/T{N}-{slug}.md`; il materiale di supporto va in una **task folder**, o in una scratch folder se non ha una task — §Task Folder.
 
 ## Quale task è attiva
 
@@ -47,8 +47,6 @@ Le lane sono **design**, non emergono dagli script: definite nel grafo di `docs/
 - **Ciclo di vita**: ① `spawn-lane` crea worktree da main, avvia prima task → ② `start-task` → `run-task` → `checkpoint-task` nel worktree → ③ `merge-lane` mergia in main, aggiorna grafo, ricopia tasks nel worktree → ④ `spawn-lane` riusa worktree, crea solo nuovo branch task → ⑤ `merge-lane` chiede conferma rimozione worktree all'ultima task.
 - **Comandi** (da main): `/loom-works:spawn-lane {lane}` crea/riusa worktree e avvia task · `/loom-works:merge-lane {lane}` merge in main, aggiorna grafo.
 
-> **Stato**: `spawn-lane` e `merge-lane` pianificati (Fase 1).
-
 ### Grafo dipendenze
 
 `docs/tasks.md` contiene il grafo lane con cross-deps. Source of truth per gli script.
@@ -66,9 +64,9 @@ Cross-deps:
 | 🔒T11 | T10    | ✔️T02, T09  |
 ```
 
-Icone: ✔️ done · 🟡 in corso · 🔒 cross-deps non soddisfatte (sempre mostrato) · nessuna = wait/ready. 🔒 esclusiva del grafo (non compare in task table).
+🔒 = cross-deps non soddisfatte, sempre mostrato ed esclusivo del grafo (non compare in task table); nessuna emoji = wait/ready.
 
-**Aggiornamenti**: `start-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella · `merge-lane` → su conflitto git invoca `/loom-works:reconcile-tasks` (operational transformation: merge-base + diff da entrambi i lati via git history, LLM applica le ops al base per il risultato riconciliato — pianificato con `merge-lane`, Fase 1).
+**Aggiornamenti**: `start-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella · `merge-lane` → su conflitto git invoca `/loom-works:reconcile-tasks`.
 
 ## Task
 
@@ -102,7 +100,9 @@ Vincoli:
 
 ### Doc Impact al checkpoint
 
-Ogni `checkpoint-task` legge le voci `## Doc Impact` non marcate, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta in un file `{docs_root}/inbox/` e le marca — `→ ✔️ inbox` se entrano, `→ ✖️ <parola>` se una delle sei le tiene fuori. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
+Ogni `checkpoint-task` legge le voci `## Doc Impact` **da lavorare**, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta nel file inbox del **cappello** — il parent se la task ne dichiara uno ancora aperto, la task stessa altrimenti — e le marca: `→ ✔️ inbox` se entrano, `→ ✖️ <parola>` se una delle sei le tiene fuori, `⏳ <evento>` se la nozione è vera ma il suo referente si sta ancora muovendo. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
+
+**`⏳` è l'unico marker non terminale**, quindi «da lavorare» sono le voci senza marker **e** quelle `⏳`. L'evento è una condizione verificabile (`⏳ F7`), mai un momento, e cade dentro il ciclo di vita della task: il checkpoint che la chiude forza ogni residuo a decisione, o l'attesa resta senza nessuno che la rilegga.
 
 **Niente gate**: c'era per decidere *quando* pagare il costo del consolidamento, e senza costo non resta niente da decidere. Dove la nozione atterri lo decide `drain-doc`, in differita.
 

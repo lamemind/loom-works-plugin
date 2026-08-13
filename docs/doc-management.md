@@ -17,11 +17,12 @@ Nei primi due la doc **è** la verità. Negli altri due la verità sta altrove, 
 
 ## Il terzo layer — inbox
 
-`{docs_root}/inbox/` tiene le nozioni **vere ma non ancora collocate**: un file per checkpoint, col TLDR sulla riga 3, indicizzato nell'INDEX come tutto il resto. Non è un quinto verdetto — è uno **stato di transizione** verso i quattro.
+`{docs_root}/inbox/` tiene le nozioni **vere ma non ancora collocate**: un file per **cappello** — l'epica se la task ne dichiara una, la task stessa se è spot — col TLDR sulla riga 3, indicizzato nell'INDEX come tutto il resto. Non è un quinto verdetto: è uno **stato di transizione** verso i quattro.
 
 - **indicizzata** — senza TLDR resta fuori dall'INDEX, e un file inbox non indicizzato non ha ragione di esistere.
-- **temporanea per contratto** — nasce per sparire. Un file inbox fermo da mesi è un fallimento del sistema, non uno stato stabile.
-- **ha precedenza sul drift** — se contraddice un file di `reference/`, **vince l'inbox**: è più recente e nasce dal codice appena scritto. La regola non è scritta qui né dentro i file inbox — la cabla `build-index.sh` in testa alla sezione, così sparisce da sola quando l'inbox si svuota.
+- **WIP finché il cappello non è Done** — ogni checkpoint fonde in place e riscrive il TLDR, `drain-doc` non lo tocca prima: il trigger dello smaltimento è «il soggetto ha smesso di muoversi», non un comando. Da lì nasce per sparire, e un file fermo *a cappello chiuso* è un fallimento del sistema, non uno stato stabile.
+- **esente da split e merge** — spezzare un file che aggrega un'epica lo riporterebbe alle N voci d'INDEX che il file per cappello esiste per chiudere. Il tetto resta sul **conteggio**.
+- **ha precedenza sul drift** — se contraddice un file di `reference/`, **vince l'inbox**: è più recente e nasce dal codice appena scritto. La regola la cabla `build-index.sh` in testa alla sezione, così sparisce da sola quando l'inbox si svuota.
 
 **La ridondanza in inbox è ammessa**: «è già scritto altrove» è un criterio dipendente (§Imbuto), e pretenderlo alla transizione rimetterebbe la lettura dell'intera doc dentro il checkpoint — il costo che l'inbox esiste per togliere.
 
@@ -41,7 +42,7 @@ Nove parole per il materiale che ha un custode legittimo altrove:
 
 Due coppie sono la stessa nozione a due stadi di maturazione: **scarto → sentenza** e **ipotesi → referto**. Confonderle fa entrare in doc materiale che non ha finito di muoversi.
 
-Offline è poliedrico e ha **sette tipologie, ognuna col proprio confine** — referto · sentenza · trappola · manuale dell'estraneo · invariante · snodo · complemento della fonte viva. Servono a chi **colloca**, non a chi cattura: per esteso in `doc-criteria.md` §Le sette tipologie offline.
+Offline è poliedrico: **sette tipologie, ognuna col proprio confine**, che servono a chi **colloca** e non a chi cattura — `doc-criteria.md` §Le sette tipologie offline.
 
 ## Imbuto di selezione
 
@@ -96,10 +97,10 @@ Perché ogni numero è quello e non un altro: `doc-criteria.md` §Le cinque sogl
 
 ## Manutenzione
 
-Tre skill, distinte da cosa fanno alla doc — `align-doc` **misura** contro la fonte nativa del layer (i **drift**) · `lint-doc` **misura** contro questo contratto (le violazioni) · `drain-doc` **colloca**, svuotando l'inbox e pagando i criteri dipendenti una volta per batch. Le due che misurano giudicano con `doc-auditor` read-only, `drain-doc` con `doc-router`; tutte applicano con `doc-writer` e chiudono uguale — guardiani deterministici, `doc-verifier` sul diff, commit. Le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime. Perimetri, ordine delle fasi e regole del regroup: `doc-criteria.md` §Manutenzione.
+Tre skill, distinte da cosa **misurano** — `align-doc` contro la fonte nativa del layer (i **drift**) · `lint-doc` contro questo contratto (le violazioni) · `drain-doc` non misura: colloca, e paga i criteri dipendenti una volta per batch. Le prime due giudicano con `doc-auditor` read-only, `drain-doc` con `doc-router`; tutte applicano con `doc-writer` e chiudono uguale — guardiani deterministici, `doc-verifier` sul diff, commit. Le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime. Perimetri, ordine delle fasi e regole del regroup: `doc-criteria.md` §Manutenzione.
 
 **Nessun man-in-the-loop.** Le quattro skill di scrittura non chiedono di approvare una patch e non lasciano niente staged: il collaudo è `doc-verifier`, che etichetta ogni violazione `rollback` (l'ha causata questa patch) o `accodato` (l'ha solo rivelata — topologia, e la raccoglie la misura successiva).
 
-**Tre operazioni topologiche**, due verticali e una orizzontale: **split** (un file oltre soglia diventa N) · **merge** (N file sotto il pavimento tornano uno) · **regroup** (N file in una sottocartella). Il regroup è la terza fase di `lint-doc`, in coda e **mai prima**: una categorizzazione dimensionata su file che stanno per essere spezzati nasce stale.
+**Il regroup è la terza fase di `lint-doc`, in coda e mai prima**: una categorizzazione dimensionata su file che stanno per essere spezzati nasce stale.
 
 **Doc segue codice, stesso commit.** Nuovo file in `reference/` o in `inbox/` → rigenera l'indice con `scripts/docs/build-index.sh`.

@@ -117,7 +117,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
 7. **Fase doc — le voci `## Doc Impact` in inbox**
 
-   Leggi la sezione `## Doc Impact` del task file. Se **vuota**, assente, o con tutte le voci già marcate → skip questo step e lo step 8.
+   Leggi la sezione `## Doc Impact` del task file. Da lavorare sono le voci **senza marker** e quelle col marker `⏳` (7.3): la terminalità si legge dal marker, non dalla sua presenza. Sezione vuota, assente, o nessuna voce da lavorare → skip questo step e lo step 8.
 
    Nessuna domanda all'utente, nessuno spawn di subagent: la nozione la scrive questa sessione, che ha già il contesto della task in memoria. Un subagent dovrebbe ricostruirlo, ed è il costo che questa fase esiste per togliere.
 
@@ -130,28 +130,49 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    **7.3 — Marca ogni voce lavorata**, in coda alla voce nel task file:
    - entra → `→ ✔️ inbox`
    - non entra → `→ ✖️ <parola>`, una delle sei (es. `→ ✖️ cronaca`)
+   - aspetta → `⏳ <evento>`, l'unico marker **non terminale**
+
+   `⏳` vale quando la nozione è vera ma il suo referente si sta ancora muovendo. L'evento è una **condizione verificabile** (`⏳ F7`, `⏳ rubrica`), mai un momento (`⏳ dopo`), e deve cadere **dentro il ciclo di vita di questa task**: un'attesa che la sfora resta senza nessuno che la rilegga.
+
+   **Se questo checkpoint chiude la task** (step 4), nessuna voce può restare `⏳`: forza ogni residuo a `→ ✔️ inbox` o `→ ✖️ <parola>`, evento arrivato o no. Da qui in poi non ripassa nessuno, e un'attesa lasciata aperta è materiale che si perde in silenzio.
 
    Il marker impedisce al checkpoint successivo di riscansionare ciò che hai già deciso. Una voce senza marker è per costruzione «non ancora lavorata», ed è così che `align-doc` la ripesca sul perimetro task.
 
-   **7.4 — Scrivi il file inbox.**
+   **7.4 — Risolvi il cappello.** Il file inbox è **per cappello, non per checkpoint**: tutti i checkpoint dello stesso cappello scrivono nello stesso file, e un'epica esce in un file solo invece che in uno per fase.
+
+   Leggi `**Parent Task**: T{N}` dal task file. Il cappello è `T{N}` se reggono tutte e tre:
+   - il campo c'è
+   - `{docs_root}/tasks/T{N}-*.md` esiste
+   - la Prog di `T{N}` in `{docs_root}/tasks.md` **non** è `✔️`
+
+   Altrimenti il cappello è la **task corrente**, `${taskId}` — e **dichiaralo in output**, con quale dei tre rami è scattato. Il campo si scrive a mano e nessuno script lo valida (`${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Parentela), quindi il degrado è il ramo di maggioranza, non un caso limite.
+
+   Il terzo ramo — parent già `✔️ Done` — non è ridondante con gli altri due: scrivere nel file di un cappello chiuso lo fa **rinascere** dopo che `drain-doc` l'ha rimosso, e consegna al drain le nozioni di una task ancora in movimento.
+
+   **7.5 — Scrivi o fondi il file inbox.**
 
    ```bash
    mkdir -p "{docs_root}/inbox"
    ```
    `init.sh` la crea, ma un progetto registrato prima che esistesse non ce l'ha.
 
-   Path: `{docs_root}/inbox/${taskId}-<slug>-<N>.md` — `<slug>` è quello del task file, `<N>` il numero dell'avanzamento che hai scritto allo step 3.
+   Path: `{docs_root}/inbox/<cappello>-<slug>.md`, con `<slug>` quello del task file **del cappello**. Nessun suffisso numerico: il nome è funzione del solo cappello, o due checkpoint non ricadrebbero sullo stesso file.
 
-   **Un file per checkpoint, immutabile una volta scritto.** Mai appendere a un file inbox esistente: `drain-doc` lo elabora e poi lo rimuove, quindi un append arrivato nel frattempo sparirebbe senza essere mai stato letto.
+   **File assente** → crealo. Forma: `# Titolo`, poi **esattamente sulla riga 3** `> **TLDR**: <perimetro>`, poi una voce per nozione. Fuori dalla riga 3 il file resta fuori dall'INDEX, e un file inbox non indicizzato non serve a nessuno. La formula del TLDR inbox è **perimetro**, non ancora, e sta in `${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md`: leggilo prima di scrivere.
 
-   Forma: `# Titolo`, poi **esattamente sulla riga 3** `> **TLDR**: <perimetro>`, poi una voce per nozione. Fuori dalla riga 3 il file resta fuori dall'INDEX, e un file inbox non indicizzato non serve a nessuno. La formula del TLDR inbox è **perimetro**, non ancora, e sta in `${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md`: leggilo prima di scrivere.
+   **File già presente** → **fondi in place**, tre mosse in quest'ordine:
+   1. **Riconcilia** — leggi le voci già scritte e riscrivi o rimuovi quelle che il lavoro di questo checkpoint ha superato. **Un fatto, una voce.** Due voci che dicono l'opposto sullo stesso fatto arrivano al router come rotte pari, e nessuna delle due sa di essere vecchia: metterle nello stesso file non le riconcilia da sé.
+   2. **Appendi** le nozioni nuove.
+   3. **Riscrivi il TLDR** di riga 3 sull'intero contenuto, entro i 600 char. Più il file cresce, più il perimetro diventa grosso-grana: nomina le materie, non le singole nozioni.
 
-   Zero voci sopravvissute al filtro → **nessun file**. Restano i marker `→ ✖️`, che vanno comunque committati (step 8).
+   **Perché l'append non corre più contro il drain**: `drain-doc` rifiuta un file il cui cappello non è Done, e il checkpoint non scrive mai nel file di un cappello Done (7.4). I due non toccano mai lo stesso file, quindi un append non può più sparire dentro uno smaltimento già in corso.
 
-   **7.4b — Propaga la sentinella di drift, non dedurla.** Se almeno una delle voci entrate porta una riga `🚨 drift: <path...>` — scritta a monte da `create-task`, `preflight-task` o `run-task`, che erano nella stanza quando il drift è nato — scrivi sul file inbox, **esattamente sulla riga 4**:
+   Zero voci sopravvissute al filtro → **nessuna scrittura**, né file nuovo né fusione. Restano i marker `→ ✖️` e `⏳`, che vanno comunque committati (step 8).
+
+   **7.5b — Propaga la sentinella di drift, non dedurla.** Se almeno una delle voci entrate porta una riga `🚨 drift: <path...>` — scritta a monte da `create-task`, `preflight-task` o `run-task`, che erano nella stanza quando il drift è nato — scrivi sul file inbox, **esattamente sulla riga 4**:
 
    ```markdown
-   > **PRIORITY**: 🚨 · drift: <l'unione dei path di tutte le voci entrate>
+   > **PRIORITY**: 🚨 · drift: <unione dei path già in riga 4 e di quelli delle voci appena entrate>
    ```
 
    Nessuna sentinella fra le voci entrate → **nessuna riga 4**, e la riga assente vale priorità normale. Non inventarne una: qui la decisione che ha generato il drift è già stata presa e il contesto che la riconosceva si è chiuso con la sessione. Dedurla significherebbe aprire `reference/` per giudicare, cioè rimettere dentro il costo che questa fase esiste per togliere — nessuno spawn di subagent, nessun criterio dipendente.
@@ -162,7 +183,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Posizione fissa, non un grep sul corpo: `doc-metrics.sh --inbox` la legge con lo stesso `sed -n` del TLDR. E stando fuori dalla riga 3 non entra nell'INDEX, che è online — costo per-sessione zero.
 
-   **7.5 — Rigenera l'indice**, solo se il file è nato:
+   **7.6 — Rigenera l'indice**, dopo ogni scrittura sul file inbox — creazione o fusione, perché il TLDR indicizzato cambia in entrambe:
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
    ```
@@ -176,7 +197,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Stagia ciò che hai scritto — il file inbox e l'`INDEX.md` rigenerato:
    ```bash
-   git add -- "{docs_root}/inbox/${taskId}-<slug>-<N>.md" "{docs_root}/reference/INDEX.md"
+   git add -- "{docs_root}/inbox/<cappello>-<slug>.md" "{docs_root}/reference/INDEX.md"
    ```
 
    Poi, **identico in linked e detached**:
@@ -184,20 +205,21 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): marker Doc Impact"
    ```
 
-   Nessun file inbox nato → salta il `git add` e **ometti `--doc-message`**: restano solo i marker `→ ✖️`, che sono task tracking e vanno nel commit `checkpoint(...)`.
+   Nessuna scrittura sul file inbox → salta il `git add` e **ometti `--doc-message`**: restano solo i marker `→ ✖️` e `⏳`, che sono task tracking e vanno nel commit `checkpoint(...)`.
 
    Due flag obbligatori, per due motivi distinti:
    - **`--no-add`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo. Lo stage lo fai tu, riga sopra; il task file coi marker lo aggiunge lo script da sé.
    - **`--task`** — anche in linked, dove di norma basterebbe il symlink: se la task si è chiusa allo step 4 il symlink è già stato rimosso, e senza `--task` lo script non risolverebbe il task file su cui hai appena appeso i marker.
 
-9. **Allerta inbox** — solo se lo step 7 ha scritto un file:
+9. **Allerta inbox** — solo se lo step 7 ha scritto sul file inbox:
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --inbox
    ```
-   Due righe da leggere, e sono trigger indipendenti:
+   Tre righe da leggere, e le prime due sono trigger indipendenti:
 
    - `- file inbox: N / 8` — **oltre il tetto**, chiudi il feedback con una riga sola: quanti file, da quanti giorni è in coda il più vecchio, e l'invito a invocare `/loom-works:drain-doc`.
    - `- con sentinella di drift: N` — **presente a qualunque conteggio**, anche a 1 file su 8: invita a `/loom-works:drain-doc urgenti`, che prende solo quelli. Aspettare la soglia è il difetto che la sentinella esiste per togliere — un drift è vivo dall'istante in cui il codice cambia, e ogni giro saltato è un giorno di doc bugiarda.
+   - `- drenabili: X · bloccati…` — **gatea entrambi gli inviti**: a `X = 0` non c'è niente da drenare e l'invito manderebbe l'utente a una skill che si ferma alla prima riga. Un file bloccato è WIP per contratto, non arretrato: non conta come debito e non va segnalato come tale.
 
    **Il checkpoint allerta, non invoca.** Auto-lanciare `drain-doc` da qui rimetterebbe dentro il costo che questa fase ha tolto; a smaltire è l'umano, o il driver notturno.
 
@@ -229,4 +251,5 @@ Topic = argomento concreto della domanda. NO generici.
 - **Baseline del diff**: derivato, mai storato. `checkpoint-task-analyze.sh` (solo linked) lo prende dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD` — zero avanzamenti → commit di creazione del task file.
 - **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
 - **Niente gate sulla fase doc**: serviva a decidere *quando* pagare il costo del consolidamento, e senza quel costo non resta una decisione da prendere. Tutto ciò che passa i criteri indipendenti va in inbox, sempre; dove atterri lo decide `drain-doc`, in differita.
-- **Ogni voce lavorata porta un marker**, `→ ✔️ inbox` o `→ ✖️ <parola>`: è l'unico stato che distingue «già deciso» da «non ancora guardato», e senza il secondo marker una voce scartata tornerebbe a ogni checkpoint. Il flag-back della checkbox `- [ ] T{N} (<maniglia>) chiusa` (step 4.3) è un meccanismo distinto e resta: scatta su qualunque task che porti `**Parent Task**`, scritto a mano.
+- **Ogni voce lavorata porta un marker**, `→ ✔️ inbox` · `→ ✖️ <parola>` · `⏳ <evento>`: è l'unico stato che distingue «già deciso» da «non ancora guardato», e senza il marker di scarto una voce rifiutata tornerebbe a ogni checkpoint. `⏳` torna apposta, ed è il motivo per cui la scansione non può guardare la sola presenza di un marker.
+- **`**Parent Task**` alimenta due meccanismi con condizioni diverse**: il flag-back della checkbox `- [ ] T{N} (<maniglia>) chiusa` (step 4.3), che scatta sul solo campo, e la risoluzione del cappello (step 7.4), che pretende anche un parent esistente e non ancora chiuso. Chiuderne uno non chiude l'altro.

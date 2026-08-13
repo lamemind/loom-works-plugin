@@ -36,7 +36,7 @@ Il tuo mestiere sono i criteri **dipendenti**: *eco*, *sorpresa* e *sopravvive a
 
 Col token la skill esegue §1 e §2, stampa il piano e **si ferma lì**: niente router, niente writer, niente commit. Il costo sono due chiamate bash e nessun subagent.
 
-Stampa la coda con char, età e priorità, quanti file la presa in carico raccoglierebbe, e le righe di comando dei router che partirebbero. **Non stampa i gruppi**: il raggruppamento per target è calcolabile solo *dopo* il routing, che è l'unico passo che sa dove ogni nozione va a finire.
+Stampa la coda con char, età, priorità e cappello, i file che il cancello esclude col loro cappello aperto, quanti file la presa in carico raccoglierebbe, e le righe di comando dei router che partirebbero. **Non stampa i gruppi**: il raggruppamento per target è calcolabile solo *dopo* il routing, che è l'unico passo che sa dove ogni nozione va a finire.
 
 ## Mai staged fino al commit
 
@@ -56,9 +56,11 @@ Il rollback è `git checkout -- <path>` sui `MOD` e `rm -- <path>` sui `NEW`, ch
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --inbox --format tsv
 ```
 
-Ritorna la coda **già ordinata e già triata**: i file con sentinella di drift in testa, poi il più vecchio per primo dentro ogni classe. Colonne `PRIO` (`urgente` | `normale`) e `DRIFT` (i file doc che quella nozione dovrebbe correggere). L'età viene dal commit che ha aggiunto il file, non dall'mtime.
+Ritorna la coda **già ordinata e già triata**: i file con sentinella di drift in testa, poi il più vecchio per primo dentro ogni classe. Colonne `PRIO` (`urgente` | `normale`), `DRIFT` (i file doc che quella nozione dovrebbe correggere), `CAPPELLO` (la task che possiede il file) e `STATO` (`done` | `wip`). L'età viene dal commit che ha aggiunto il file, non dall'mtime.
 
 **L'ordine lo decide lo script, non tu.** Due lettori della stessa coda devono vederla nello stesso ordine, e la riga `> **PRIORITY**: 🚨` sulla riga 4 di un file inbox è un dato che il produttore ha scritto — non si rivaluta qui. Un file senza quella riga vale priorità normale: è il caso di maggioranza, e i file nati prima che le sentinelle esistessero non vanno ritoccati.
+
+**Anche `STATO` è un dato, non un giudizio.** Lo script lo deriva dalla Prog del cappello in `tasks.md`; tu ci filtri sopra (§2) e non lo rivaluti — nemmeno aprendo il task file, che direbbe la stessa cosa a un costo maggiore.
 
 Servono altre due misure, e vanno prese **adesso** perché sono baseline:
 
@@ -72,14 +74,20 @@ Servono altre due misure, e vanno prese **adesso** perché sono baseline:
 
 ## 2. Presa in carico
 
-Dal perimetro nell'input:
+**Il cappello è un cancello, e viene prima del perimetro.** Un file con `STATO: wip` non si prende in carico **in nessun caso** — né nominato per nome, né sotto `tutto`, né perché porta la sentinella. Le sue nozioni appartengono a una task che si sta ancora muovendo: collocarle in doc significa scrivere un fatto che il prossimo checkpoint può riscrivere o rimuovere, ed è precisamente ciò che il file per cappello esiste per impedire.
+
+**Ogni file escluso va dichiarato**, con path e cappello, nel piano e nel referto. Saltarlo in silenzio è il modo in cui una coda che sembra vuota nasconde lavoro vivo, e chi ha nominato quel file per nome deve sapere perché non è successo niente.
+
+La sentinella **non buca il cancello**: dice che una pagina è già falsa, non che il rimedio abbia smesso di muoversi. Quel file resta in testa alla coda e parte al primo giro dopo la chiusura del cappello.
+
+Poi, dal perimetro nell'input — sempre sulla coda già filtrata:
 
 - **vuoto o `tutto`** → l'intera coda
 - **`urgenti`** → i soli file con `PRIO: urgente`
 - **un numero** (`3`) → i primi N della coda, che sono gli urgenti se ce ne sono e i più vecchi altrimenti
 - **uno o più nomi** → quei file, nell'ordine della coda
 
-Coda vuota è un esito normale e va detto in una riga: nessun file inbox, niente da smaltire, stop. Non è un fallimento e non va cercato altrove il lavoro. Lo stesso vale per `urgenti` su una coda senza sentinelle: dillo e fermati, non ripiegare sulla coda intera — chi ha chiesto gli urgenti sta pagando un giro corto apposta.
+Coda vuota è un esito normale e va detto in una riga: nessun file inbox, niente da smaltire, stop. Non è un fallimento e non va cercato altrove il lavoro. Lo stesso vale per una coda dove tutto è bloccato dal cancello, e per `urgenti` su una coda senza sentinelle: dillo, elenca cosa hai escluso e fermati, non ripiegare sulla coda intera — chi ha chiesto gli urgenti sta pagando un giro corto apposta.
 
 **Un lotto urgente gira sotto il tetto, ed è il punto.** Il cap di 8 file dice quando lo smaltimento non è più *opzionale*; non dice quando è *permesso*. Una nozione con la sentinella sta curando una pagina già falsa, e farla aspettare la soglia tiene in piedi la bugia per tutto il tempo dell'attesa.
 
@@ -228,7 +236,9 @@ Torna al §5a. Se un gruppo ha fatto rollback, i successivi girano lo stesso: so
 
 Le nozioni di un file inbox possono finire in gruppi diversi, e un gruppo può essere bocciato mentre gli altri passano. In quel caso **il file resta intero in coda**, nozioni già committate comprese.
 
-Al giro successivo il router ripaga il routing su tutte, e scarta come «già scritto altrove» quelle che sono atterrate — è un criterio dipendente, cioè esattamente il suo mestiere. Costa un re-routing sprecato, non perde niente, e non muta il file: **un file inbox è immutabile, o si rimuove o resta com'è.**
+Al giro successivo il router ripaga il routing su tutte, e scarta come «già scritto altrove» quelle che sono atterrate — è un criterio dipendente, cioè esattamente il suo mestiere. Costa un re-routing sprecato, non perde niente, e non muta il file: **per te un file inbox è immutabile, o si rimuove o resta com'è.**
+
+A mutarlo è solo il checkpoint, che fonde in place a ogni avanzamento — ma solo finché il cappello è aperto, cioè solo su file che il cancello (§2) ti tiene fuori dalle mani. I due non toccano mai lo stesso file.
 
 Un file è rimovibile quando nessuna delle sue rotte appartiene a un gruppo bocciato. Le rotte senza target (`drop`, `→ codice`, `→ fonte viva`) non bloccano: il loro verdetto è già entrato in un commit.
 
@@ -253,7 +263,7 @@ Su disco, non in chat — il contesto dell'orchestratore è l'unica risorsa che 
 
 Cosa contiene, una riga per voce:
 
-- **coda in ingresso**: file, char, età, priorità
+- **coda in ingresso**: file, char, età, priorità, cappello — e i file esclusi dal cancello, col cappello che li tiene fermi
 - **un blocco per gruppo**: target · quante nozioni · quanti char di materiale · esito del collaudo · le violazioni con etichetta e regola
 - **rotte non atterrate**: `drop`, `→ codice`, `→ fonte viva`, col motivo
 - **file inbox rimossi** e **file rimasti in coda**, questi ultimi col motivo
