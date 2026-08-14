@@ -126,7 +126,7 @@ Regole di scrittura, tutte già note e nessuna nuova:
 
 - **La sezione `## Doc Impact` sta fra `## Testing Notes` e `## Prod Validation`.** Se manca, creala lì. Se contiene solo il placeholder `*Nessuna nozione documentale emersa al create-task.*`, sostituiscilo con le tue voci.
 - **Appendi in coda, senza deduplicare** — stesso regime dei blocchi datati di `## Decisions`: preflight è ri-eseguibile, e due giri che decidono la stessa cosa lasciano due voci. Le scarta il checkpoint, che è chi le filtra.
-- **Nessun marker.** Una voce senza `→ ✔️ inbox` o `→ ✖️ <parola>` è per costruzione «non ancora lavorata»: la raccoglie il primo `checkpoint-task`. Metterlo qui la farebbe saltare.
+- **Nessun marker di esito.** `→ ✔️ inbox` e `→ ✖️ <parola>` li scrive solo `checkpoint-task`: una voce senza è per costruzione «non ancora lavorata», e metterli qui la farebbe saltare. `⏳ <evento di sblocco>` è l'eccezione — puoi scriverlo tu quando la nozione è vera ma il suo referente non esiste ancora, e non è terminale: il checkpoint la ripesca comunque.
 - **Non decidere il target doc.** La sentinella nomina i file *candidati a essere falsi*, che non sono il file dove la nozione atterrerà: quello lo decide `drain-doc`, in differita.
 - **Una voce senza sentinella è legittima.** Una decisione può produrre una nozione documentale senza rendere falso niente: entra in `## Doc Impact` normale, e va a coda.
 

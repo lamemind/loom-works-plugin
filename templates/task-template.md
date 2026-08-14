@@ -29,7 +29,9 @@
 *Criteri di test e validazione*
 
 ## Doc Impact
-*Nozione + ancora primaria. Marker: `→ ✔️ inbox` · `→ ✖️ <parola>` · `🚨 drift: <path>`.*
+*Chi cattura (`create-task`, `preflight-task`, `run-task`) scrive: **nozione + ancora primaria**; se una pagina in esercizio diventa falsa aggiungere `🚨 drift: <path>`.*
+*`⏳ <evento di sblocco>` lo scrive chiunque, per trattenere una nozione il cui referente non è ancora materializzato (`⏳ publish`, `⏳ deploy`, `⏳ F7`): è l'unico marker non terminale.*
+*Solo `checkpoint-task` marca l'esito — `→ ✔️ inbox` · `→ ✖️ <parola>` — e sono terminali: scriverli qui significa che nessuno ripassa più sulla voce.*
 
 {{doc_impact}}
 

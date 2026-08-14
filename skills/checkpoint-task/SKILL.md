@@ -132,9 +132,11 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    - non entra → `→ ✖️ <parola>`, una delle sei (es. `→ ✖️ cronaca`)
    - aspetta → `⏳ <evento>`, l'unico marker **non terminale**
 
-   `⏳` vale quando la nozione è vera ma il suo referente si sta ancora muovendo. L'evento è una **condizione verificabile** (`⏳ F7`, `⏳ rubrica`), mai un momento (`⏳ dopo`), e deve cadere **dentro il ciclo di vita di questa task**: un'attesa che la sfora resta senza nessuno che la rilegga.
+   `⏳` vale quando la nozione è vera ma il suo referente si sta ancora muovendo. L'evento è una **condizione verificabile** (`⏳ F7`, `⏳ publish`), mai un momento (`⏳ dopo`).
 
-   **Se questo checkpoint chiude la task** (step 4), nessuna voce può restare `⏳`: forza ogni residuo a `→ ✔️ inbox` o `→ ✖️ <parola>`, evento arrivato o no. Da qui in poi non ripassa nessuno, e un'attesa lasciata aperta è materiale che si perde in silenzio.
+   **`⏳` è l'unico dei tre che puoi trovare già scritto**: lo mette anche chi cattura (`create-task`, `preflight-task`, `run-task`) per trattenere una nozione non ancora materializzata. Trovarlo non vuol dire «già lavorata» — verifichi l'evento e risolvi, oppure lo riscrivi con l'evento aggiornato. `→ ✔️ inbox` e `→ ✖️ <parola>` restano invece tuoi in esclusiva: nessun altro attore li scrive.
+
+   **Se questo checkpoint chiude la task** (step 4), nessuna voce può restare `⏳`: forza ogni residuo a `→ ✔️ inbox` o `→ ✖️ <parola>`, evento arrivato o no. Da qui in poi non ripassa nessuno, e un'attesa lasciata aperta è materiale che si perde in silenzio. Vale anche per un evento che cade **oltre** la vita della task (`⏳ deploy` su una task che chiude prima): non compra tempo, arriva comunque a decisione qui, senza l'evento.
 
    Il marker impedisce al checkpoint successivo di riscansionare ciò che hai già deciso. Una voce senza marker è per costruzione «non ancora lavorata», ed è così che `align-doc` la ripesca sul perimetro task.
 

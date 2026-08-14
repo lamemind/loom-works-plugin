@@ -143,6 +143,8 @@ Se durante run-task emergono nozioni documentali (decisioni di design, pattern n
 
 Non decidere il target doc qui: il checkpoint porta la voce in `{docs_root}/inbox/` e la marca, e dove atterri lo decide `drain-doc` in differita.
 
+**Trattenere una nozione il cui referente non è ancora materializzato**: appendi `⏳ <evento di sblocco>` in coda alla voce (`⏳ publish`, `⏳ deploy`, `⏳ F7`). È l'unico marker che puoi scrivere — `→ ✔️ inbox` e `→ ✖️ <parola>` sono del checkpoint, e scriverli qui significa che nessuno ripassa più sulla voce. `⏳` non è terminale: ogni checkpoint la riprende finché l'evento non arriva, e quello di chiusura la forza comunque a decisione.
+
 ### Sentinelle di drift — prima di chiudere
 
 `run-task` è l'unica delle tre skill produttrici in cui i file toccati esistono davvero, quindi è l'unica dove il rilevamento è **meccanico**. Passa allo script i path che hai modificato — la lista la conosci tu, non gliela far dedurre da un `git diff`: in detached il working tree porta anche i file delle altre sessioni.

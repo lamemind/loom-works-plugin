@@ -127,6 +127,8 @@ Estrai e popola la sezione `## Doc Impact` nel task file come bullet list concis
 
 Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emersa al create-task.*`
 
+**Nessun marker di esito.** `→ ✔️ inbox` e `→ ✖️ <parola>` li scrive solo `checkpoint-task`; qui farebbero saltare la voce. L'unico che puoi scrivere è `⏳ <evento di sblocco>`, e qui va usato con parsimonia: a create-task **tutto** deve ancora essere fatto, quindi `⏳` non è per il lavoro che non è ancora iniziato — è per la nozione già vera il cui referente si sta muovendo mentre la scrivi.
+
 **Sentinella di drift — quando la task dichiara di rendere falsa una pagina.** Qui non esiste nessun diff, quindi la base della cattura è **la discussione che ha generato la task**: se ciò che è stato deciso cambia un comportamento che la doc descrive, la nozione che lo corregge non può aspettare la coda. Appendi alla voce una riga:
 
 ```markdown
