@@ -29,6 +29,7 @@ Solo se **assenti** (idempotente):
 - `{docs_root}/reference/` — directory per doc offline
 - `{docs_root}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-doc` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`
+- `.claude/settings.json` — solo la regola `Read(~/.claude/plugins/cache/…/**)`, aggiunta in coda alle esistenti senza toccare il resto del file. Serve agli agent doc, che aprono i propri contratti dalla cache del plugin: senza, la `Read` cade sotto approvazione e l'agent **prosegue senza contratto** invece di fermarsi. Il path è sul segmento stabile, mai sulla versione — una regola concessa a mano da un «non chiedere più» nasce version-pinned e muore al primo bump
 
 **CLAUDE.md**: init **propone** (non forza) due blocchi — gli `@-import` base e la sezione `Competenze utente` — vedi step 2. **Non tocca**: file git, config, dipendenze.
 

@@ -11,6 +11,7 @@
 #   {docs_root}/tasks/                (dir)
 #   {docs_root}/reference/            (dir)
 #   {docs_root}/inbox/                (dir, vuota e senza .gitkeep)
+#   .claude/settings.json             (solo la regola di permesso sulla cache plugin)
 #
 # L'inbox nasce vuota e non si versiona: ogni lettore ne tollera già l'assenza —
 # la ricrea il primo checkpoint che ci scrive.
@@ -73,6 +74,57 @@ copy_template() {
     log "wrote: $label"
 }
 
+# =============================================================================
+# Regola di permesso sulla cache del plugin
+# =============================================================================
+# Gli agent doc (doc-router, doc-writer, doc-auditor, doc-grouper, doc-verifier)
+# aprono da sé i propri contratti sotto ${CLAUDE_PLUGIN_ROOT}/docs/. Quel path sta
+# nella cache del plugin, cioè FUORI dalla working directory del progetto: senza una
+# regola che lo copra la Read cade sotto approvazione, e l'agent NON si ferma — chiude
+# con un verdetto che si legge come legittimo, avendo giudicato senza il contratto.
+#
+# IL PATH NON DEVE PORTARE IL NUMERO DI VERSIONE. Una regola concessa a mano da un
+# «non chiedere più» nasce version-pinned (…/loom-works/7.1.2/**) e muore al primo
+# bump, riportando il guasto dopo che sembrava risolto. Si scrive quindi sul segmento
+# stabile, e la tilde resta letterale: Claude Code la espande, così la regola non porta
+# l'home di chi ha lanciato init e resta valida per ogni utente del repo.
+ensure_cache_permission() {
+    local settings="${PROJECT_ROOT}/.claude/settings.json"
+    local regola
+
+    # Derivata dal plugin root vivo, non cablata: se il marketplace o il nome del
+    # plugin cambiano, la regola li segue. Fuori dalla cache (esecuzione dal repo
+    # sorgente) il path derivato non avrebbe senso → si usa quello canonico.
+    if [[ "$PLUGIN_ROOT" == */plugins/cache/* ]]; then
+        regola="Read($(dirname "${PLUGIN_ROOT#"$HOME"}" | sed 's|^|~|')/**)"
+    else
+        regola='Read(~/.claude/plugins/cache/lamemind/loom-works/**)'
+    fi
+
+    if ! command -v jq > /dev/null; then
+        log "WARN jq assente: aggiungi a mano in .claude/settings.json → $regola"
+        return 0
+    fi
+
+    mkdir -p "${PROJECT_ROOT}/.claude"
+    [[ -f "$settings" ]] || echo '{}' > "$settings"
+
+    if jq -e --arg r "$regola" '.permissions.allow // [] | index($r)' "$settings" > /dev/null; then
+        log "permission exists (skip): $regola"
+        return 0
+    fi
+
+    local tmp="${settings}.tmp.$$"
+    if jq --arg r "$regola" '.permissions.allow = ((.permissions.allow // []) + [$r])' \
+         "$settings" > "$tmp"; then
+        mv "$tmp" "$settings"
+        log "permission added: $regola"
+    else
+        rm -f "$tmp"
+        log "WARN .claude/settings.json non parsabile: aggiungi a mano → $regola"
+    fi
+}
+
 log "project root: $PROJECT_ROOT"
 log "plugin root:  $PLUGIN_ROOT"
 
@@ -83,6 +135,8 @@ create_dir "${PROJECT_ROOT}/${DOCS_ROOT}/inbox"
 
 copy_template "${TEMPLATES}/tasks-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/tasks.md"
 copy_template "${TEMPLATES}/reference-index-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/reference/INDEX.md"
+
+ensure_cache_permission
 
 # Identità di progetto + marker root: .claude/loom-works.json, creato dallo
 # step 1b della skill (bootstrap interattivo owner/emoji/surfaces). Non qui.
