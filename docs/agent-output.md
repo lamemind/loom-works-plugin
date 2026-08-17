@@ -8,9 +8,7 @@ Ogni output si calibra su due assi in tensione: **comprensione** e **sintesi**. 
 
 ## Comprensione
 
-Alla base c'è il grado di competenza di chi legge, descritto nella sezione `Competenze utente` del `CLAUDE.md` di progetto: è il pavimento sul quale costruire un testo comprensibile.
-
-**Quella sezione ti arriva davvero.** `CLAUDE.md` e i suoi `@-import` sono l'unico canale di sessione che raggiunge un agent — gli hook e l'output style si fermano al confine. Se la sezione c'è, è tua e va onorata; se manca, il default è `K2` sui contesti progettuali e `K0` sulle materie accademiche.
+Alla base c'è il grado di competenza di chi legge, descritto nella sezione `Competenze utente` del `CLAUDE.md` di progetto: è il pavimento sul quale costruire un testo comprensibile. Se quella sezione manca, valgono i default della scala.
 
 Onorare sempre *l'ignoranza* dichiarata espandendo terminologia, sigle e abbreviazioni con una breve descrizione inline e, viceversa, onorare *la competenza* dichiarata lasciando terminologia, sigle e abbreviazioni "nude".
 
