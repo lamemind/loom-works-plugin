@@ -176,7 +176,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    - **Una sentinella su una voce scartata non propaga niente.** Se la voce esce `→ ✖️ cronaca`, non entra nel file e la sirena muore con lei: la priorità ordina l'inbox, non forza l'ingresso.
    - **La riga `🚨 drift:` resta nel task file** insieme al resto della voce, come record datato. Non è un secondo stato da tenere allineato: dopo il marker `→ ✔️ inbox` nessuno la rilegge più, e l'unico posto su cui `drain-doc` ordina è la riga 4 del file inbox.
 
-   Posizione fissa, non un grep sul corpo: `doc-metrics.sh --inbox` la legge con lo stesso `sed -n` del TLDR. E stando fuori dalla riga 3 non entra nell'INDEX, che è online — costo per-sessione zero.
+   **La riga 4 è l'unica posizione valida, e sbagliarla non produce nessun errore.** `doc-metrics.sh --inbox` estrae il dato con lo stesso `sed -n` a posizione fissa del TLDR: una riga vuota di troppo, e il file entra in coda a priorità normale **senza** la sentinella — perde due dati insieme, non uno. Lo script lo segnala (colonna `PRIO_FORM`, che misura la posizione con un grep separato dall'estrazione), ma il segnale arriva a chi drena, non a te: contala tu, la riga. E stando fuori dalla riga 3 non entra nell'INDEX, che è online — costo per-sessione zero.
 
    **6.6 — Rigenera l'indice**, dopo ogni scrittura sul file inbox — creazione o fusione, perché il TLDR indicizzato cambia in entrambe:
    ```bash
