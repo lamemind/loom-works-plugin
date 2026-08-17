@@ -1,6 +1,6 @@
 # Gestione Documentazione
 
-Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive è `writing-patterns.md`, che vale ovunque e non si ripete qui. Razionale, esempi e i criteri che richiedono di aprire una fonte: `${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md` — aprilo quando un verdetto non è ovvio.
+Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive non sta qui: alla chat lo dà l'output style, a un agent il file `agent-output.md` che risolve da sé. Razionale, esempi e i criteri che richiedono di aprire una fonte: `${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md` — aprilo quando un verdetto non è ovvio.
 
 ## I quattro layer
 
@@ -72,7 +72,7 @@ La riga «costosa o sorprendente» ne mescola due: il costo di scoperta è indip
 - **Sostituisci, non appendere**: riscrivi la sezione toccata, non stratificare versioni. È così che un TLDR diventa un secondo documento.
 - **Coordinate non opache**: ogni id porta una maniglia verbo+oggetto — `T38 (unificare docs-root)`, mai `T38` nudo.
 - **Token-efficiente**: liste `- chiave: valore` invece di tabelle · niente separatori `---` · gerarchia per indentazione, non per heading annidati · header ogni 2-3 righe = rumore.
-- I pattern di scrittura (claim in grassetto d'apertura, un'idea per blocco, nessun livello che ri-afferma) sono in `writing-patterns.md` e valgono qui senza essere ricopiati.
+- I pattern di scrittura (claim in grassetto d'apertura, un'idea per blocco, nessun livello che ri-afferma) arrivano dal contratto di scrittura del proprio binario e valgono qui senza essere ricopiati.
 
 ## Soglie
 

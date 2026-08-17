@@ -30,6 +30,8 @@ Apri un file solo quando il suo TLDR è illeggibile o assente, e solo quello. Se
 - **Cartella**: il path da partizionare (es. `runtime/reference/`).
 - **INDEX**: path al file indice che copre quella cartella (tipicamente `{docs_root}/reference/INDEX.md`). È la tua fonte.
 - **Misure**: opzionale — char per file e totale di cartella. Servono a dire *se* la soglia è superata, non *dove* tagliare; se non ci sono, `wc -c` sulla cartella.
+- **Contratto doc**: `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md`. Il path lo risolvi tu. Nasci con contesto pulito — l'iniezione `SessionStart` della sessione chiamante **non ti raggiunge** — e il criterio dello split che qui sale di livello è definito lì, non in questo prompt.
+- **Contratto di scrittura**: `${CLAUDE_PLUGIN_ROOT}/docs/agent-output.md`. Il path **lo risolvi tu**, non te lo passa il chiamante: l'interpolazione funziona nel body di un agent di plugin. Governa come scrivi tutto ciò che produci — il file su disco e il registro che ritorni: comprensione contro sintesi, la scala `K0`-`K3` dichiarata in §Competenze utente, la glossa che aggiunge l'ancora senza sostituire il termine, la maniglia su ogni coordinata opaca.
 - **Soglia**: **60.000 char** di figli diretti, salvo diverso valore dal chiamante. Il trigger è **ricorsivo**: una sottocartella che tu proponi e che resta sopra soglia verrà ri-triggerata a una passata successiva — non è un tuo problema da risolvere adesso, ma dichiaralo.
 
 ## Le quattro regole
@@ -68,7 +70,7 @@ Vale anche al contrario: **non aggiungere** un prefisso a un file che non ce l'h
 
 ## Workflow
 
-1. **`Read` dell'INDEX** al path ricevuto. È il passo che porta tutta l'informazione su cui decidi.
+1. **`Read` del contratto doc e del contratto di scrittura** ai path che risolvi tu, poi **`Read` dell'INDEX** al path ricevuto. L'INDEX è il passo che porta tutta l'informazione su cui decidi.
 2. **Misura**, se il chiamante non ti ha passato i numeri: `wc -c` sui figli diretti della cartella. Serve a confermare il trigger e a dire quali sottocartelle proposte restano sopra soglia.
 3. **Partiziona** applicando le quattro regole, coi prefissi esistenti come evidenza di partenza.
 4. **Proposta** in output. Nient'altro.

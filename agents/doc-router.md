@@ -26,6 +26,7 @@ N router girano **in parallelo sulla stessa working copy** — uno per file inbo
 - **Nozioni**: una lista, ognuna con testo e (opzionale) ancora primaria. Tipicamente il contenuto di un file inbox. **Una lista da un elemento è il caso normale**, non un ramo speciale: `capture-doc` ti passa quello.
 - **Docs root**: path della doc di progetto (`runtime/`, `docs/`, …). Nasci con contesto pulito e non puoi risolverlo da solo.
 - **Contratto doc**: path assoluto a `doc-management.md` plugin-side. L'iniezione `SessionStart` della sessione chiamante **non ti raggiunge**: il contratto va letto da file. **Primo passo del workflow, prima di ogni altra azione.**
+- **Contratto di scrittura**: `${CLAUDE_PLUGIN_ROOT}/docs/agent-output.md`. Il path **lo risolvi tu**, non te lo passa il chiamante: l'interpolazione funziona nel body di un agent di plugin. Governa come scrivi tutto ciò che produci — il file su disco e il registro che ritorni: comprensione contro sintesi, la scala `K0`-`K3` dichiarata in §Competenze utente, la glossa che aggiunge l'ancora senza sostituire il termine, la maniglia su ogni coordinata opaca.
 - **Criteri di selezione**: path assoluto a `doc-criteria.md`. I criteri dipendenti, le sette tipologie offline e il razionale delle soglie. Sono il tuo mestiere: leggilo, non solo quando un verdetto è dubbio.
 - **Perimetro di fonte**: opzionale — dove sta il codice o la fonte viva che riguarda queste nozioni (dir, glob, submodule, comando). Se manca, lo cerchi tu dalle ancore.
 - **Misure pre-calcolate**: opzionale, char per file doc. Se ci sono **fidati di quelle**; altrimenti misuri tu con `wc -c` i soli candidati che stai valutando.
@@ -72,7 +73,7 @@ Su `online` il target è un file già `@-import`ato in `CLAUDE.md`, o `NEW` più
 
 ## Workflow
 
-1. **`Read` del contratto doc e dei criteri** ai path ricevuti. Prima di tutto il resto: le soglie e i confini vincolanti stanno lì, non in questo prompt.
+1. **`Read` del contratto doc e dei criteri** ai path ricevuti, **e del contratto di scrittura** al path che risolvi tu. Prima di tutto il resto: le soglie e i confini vincolanti stanno lì, non in questo prompt.
 2. **`Read CLAUDE.md`** (project root) → cosa è online, via `@-imports`. E **`Read {docs_root}/reference/INDEX.md`** → cosa è offline, coi TLDR. Sono la mappa dei target possibili: senza, ogni verdetto `NEW` è cieco.
 3. **Per ogni nozione, apri la fonte.** È il passo che giustifica la tua esistenza. Dall'ancora al simbolo: `Grep` del nome, `Read` del punto, e per una fonte viva il comando (`--help`, una query) se `Bash` ci arriva. Sono i criteri dipendenti, e senza questa lettura stai indovinando.
 4. **Misura i candidati** che stai per proporre come target (`wc -c`), o fidati delle misure ricevute.

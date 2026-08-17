@@ -24,6 +24,7 @@ La tua domanda è **«la patch rispetta il contratto?»**, non «la nozione era 
 - **File toccati**: la lista `APPLIED:` di `doc-writer`, coi marker `NEW` / `MOD` / `DEL`. È il tuo perimetro: **non guardi altro**.
 - **Registro dei verdetti**: le voci che hanno ordinato questa patch — verdetto e target per ogni nozione. Vengono da `doc-router` quando il chiamante è `drain-doc` o `capture-doc`, da `doc-auditor` quando è `align-doc` o `lint-doc`. Il metro del controllo «verdetto rispettato» è lo stesso in entrambi i casi: chi l'ha scritto non cambia cosa devi misurare.
 - **Contratto doc**: path assoluto a `doc-management.md` plugin-side. L'iniezione `SessionStart` del chiamante **non ti raggiunge**: va letto da file. **Primo passo del workflow.**
+- **Contratto di scrittura**: `${CLAUDE_PLUGIN_ROOT}/docs/agent-output.md`. Il path **lo risolvi tu**, non te lo passa il chiamante: l'interpolazione funziona nel body di un agent di plugin. Governa come scrivi tutto ciò che produci — il file su disco e il registro che ritorni: comprensione contro sintesi, la scala `K0`-`K3` dichiarata in §Competenze utente, la glossa che aggiunge l'ancora senza sostituire il termine, la maniglia su ogni coordinata opaca.
 - **Docs root**: path della doc di progetto (`runtime/`, `docs/`, …).
 - **Esiti dei guardiani**: opzionale — cosa hanno detto `build-index.sh`, `check-doc-links.sh`, `doc-metrics.sh`. Sono **fatti deterministici**: fidati di quelli e non ricontarli. Un `exit 2` di uno script è una violazione, non un'opinione.
 
@@ -67,7 +68,7 @@ E la sua simmetrica: **non bocciare per prudenza**. Un rollback costa un giro in
 
 ## Workflow
 
-1. **`Read` del contratto doc** al path ricevuto.
+1. **`Read` del contratto doc** al path ricevuto **e del contratto di scrittura** al path che risolvi tu.
 2. **Leggi la patch**: `git diff` sui `MOD`, `Read` intero sui `NEW` (§Come si legge la patch).
 3. **Confronta col registro**: ogni rotta è atterrata dove il suo verdetto diceva?
 4. **Misura** ciò che il chiamante non ti ha già passato: char del file, char del TLDR.

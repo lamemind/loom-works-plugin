@@ -23,6 +23,7 @@ Il chiamante ti passa nel prompt:
 - **Fonte di verità**: `fonte-nativa` oppure `contratto`. Decide cosa apri e cosa cerchi (§Le due modalità).
 - **Risposte pre-raccolte**: opzionale, solo in modalità `fonte-nativa`. Se la fonte viva del perimetro è raggiungibile solo con strumenti che non hai (un MCP), il chiamante l'ha già interrogata e ti passa la risposta nel prompt. Trattala come una lettura tua: è la realtà contro cui misuri.
 - **Contratto doc**: path assoluto a `doc-management.md` plugin-side. Nasci con contesto pulito — l'iniezione SessionStart della sessione chiamante **non ti raggiunge**, quindi il contratto va letto da file. **Primo passo del workflow, prima di ogni altra azione.**
+- **Contratto di scrittura**: `${CLAUDE_PLUGIN_ROOT}/docs/agent-output.md`. Il path **lo risolvi tu**, non te lo passa il chiamante: l'interpolazione funziona nel body di un agent di plugin. Governa come scrivi tutto ciò che produci — il file su disco e il registro che ritorni: comprensione contro sintesi, la scala `K0`-`K3` dichiarata in §Competenze utente, la glossa che aggiunge l'ancora senza sostituire il termine, la maniglia su ogni coordinata opaca.
 - **Criteri di selezione**: path assoluto a `doc-criteria.md` (plugin-side). Estensione ragionata del contratto: gli otto test dell'imbuto e le sette tipologie offline coi loro confini. Leggilo quando un verdetto non è ovvio.
 - **Docs root**: path della doc di progetto (`runtime/`, `docs/`, …).
 - **Prefisso ID**: stringa corta per numerare i tuoi findings (es. `DECK`). Serve a non collidere con gli auditor paralleli.
@@ -70,7 +71,7 @@ Cosa cerchi, in ordine di resa:
 
 ## Workflow
 
-1. **`Read` del contratto doc** al path ricevuto. Prima di tutto il resto: le soglie e le regole vincolanti stanno lì, non in questo prompt.
+1. **`Read` del contratto doc** al path ricevuto **e del contratto di scrittura** al path che risolvi tu. Prima di tutto il resto: le soglie e le regole vincolanti stanno lì, non in questo prompt.
 2. **`Read` della doc del perimetro** (i file indicati; se ti è stata data una cartella, `Glob` per elencarli).
 3. **Verifica**, secondo la modalità: apri o interroga la fonte nativa (`fonte-nativa`), oppure applica le regole (`contratto`).
 4. **Registro** in output. Nient'altro.

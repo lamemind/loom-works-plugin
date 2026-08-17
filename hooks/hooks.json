@@ -9,10 +9,6 @@
           },
           {
             "type": "command",
-            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md\""
-          },
-          {
-            "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context/inject-task.sh\""
           }
         ]
