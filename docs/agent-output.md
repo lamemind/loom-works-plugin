@@ -2,7 +2,7 @@
 
 Contratto di scrittura di ogni agent di loom-works. Governa **tutto ciò che produci**: il file che scrivi su disco e il registro che ritorni al chiamante.
 
-Non dice *cosa* è doc né *dove* va — quello è `doc-management.md`, che leggi a parte e che ha la parola finale su convenzioni, layer e soglie. Qui c'è come si scrive quello che hai già deciso di scrivere.
+Non dice *cosa* è doc né *dove* va: quello è `doc-management.md`, che ha la parola finale su convenzioni, layer e soglie.
 
 Ogni output si calibra su due assi in tensione: **comprensione** e **sintesi**. Quando confliggono vince la comprensione — la sintesi accorcia solo fin dove la comprensione lo permette.
 
@@ -24,9 +24,9 @@ Esempi di espansione
 
 Le Competenze utente sono un set di **settori** (insiemi di vocaboli, ossia **materie accademiche** o **contesti progettuali**) ognuno accoppiato a un grado di conoscenza specifico, nella forma `settore: grado` — es `java: K3`, `quant trading: K0`, `immunologia: K1`, `loom doc system: K3`.
 
-La scala è costituita dai suoi 4 gradi, `K0` `K1` `K2` `K3`. Ogni grado si legge su tre voci, sempre nello stesso ordine — **termini**, **ancore**, **implicazioni** — e le voci si spengono man mano che il grado sale: nessun grado riaccende ciò che il precedente ha spento.
+Ogni grado si legge su tre voci, sempre nello stesso ordine — **termini**, **ancore**, **implicazioni** — e le voci si spengono man mano che il grado sale: nessun grado riaccende ciò che il precedente ha spento.
 
-**Ne discende che l'espansione cala da K0 a K3.** Ogni gradino spegne una classe di aggiunte, quindi a parità di concetti coperti il testo si accorcia. A calare è lo spazio, mai il numero di cose dette — a K0 lo spazio va nelle glosse e nelle ancore, a K3 tutto sul punto che chi legge non sa già.
+**A calare da `K0` a `K3` è lo spazio, mai il numero di cose dette**: a K0 va nelle glosse e nelle ancore, a K3 tutto sul punto che chi legge non sa già.
 
 Dettaglio dei 4 gradi:
 
@@ -35,13 +35,13 @@ Dettaglio dei 4 gradi:
 - **K2 — possiede il vocabolario, non le implicazioni.** (DEFAULT contesti progettuali) *Termini*: tutti nudi. *Ancore*: no. *Implicazioni*: esplicitate, ed è lì che sta il contenuto — cosa cambia, cosa si rompe, quale prezzo si paga scegliendo una strada invece dell'altra.
 - **K3 — possiede vocabolario e implicazioni.** *Termini*: tutti nudi, esattamente come a K2. *Ancore*: no. *Implicazioni*: date per acquisite — si parte da dopo e si va dritti al punto non ovvio. Qui una glossa non è una cortesia, è rumore, e segnala a chi legge che non hai creduto a quello che ti ha detto di sapere.
 
-**Il grado dichiarato descrive il lettore, non l'autore.** Vale su ciò che scrivi su disco esattamente come su ciò che ritorni al chiamante: la doc di progetto ha per lettore la stessa persona che ha scritto quella sezione.
+**Il grado vale anche su ciò che scrivi su disco**, non solo sul registro che ritorni: la doc di progetto ha per lettore la stessa persona che ha dichiarato quel grado.
 
-**Non ricevi override.** Il grado dichiarato al volo dentro una conversazione non attraversa il confine dell'agent, e non deve: scade dentro quella conversazione, mentre un file di `reference/` lo rilegge qualcuno fra sei mesi. Se nel materiale che ricevi compare una notazione tipo `[K0:...]`, è cronaca del contesto di chi ti ha invocato — non un'istruzione per te.
+**Non ricevi override.** Se nel materiale che ricevi compare una notazione tipo `[K0:...]`, descrive il contesto di chi ti ha invocato e non è un'istruzione per te: vale la sola dichiarazione permanente.
 
 ### Cosa il grado non tocca
 
-Le tre voci sopra sono l'unica cosa che il grado governa. Il resto va mantenuto a ogni grado:
+Le tre voci sopra sono l'unica cosa che il grado governa. Il resto:
 
 - **l'esempio costruito** — nome, cifra, esito — vale a ogni grado, K0 compreso. A grado basso serve *di più*, non di meno: è l'unica cosa che regge quando il vocabolario non c'è. Un esempio che sparisce perché «era troppo tecnico» ha portato via il contenuto e lasciato la cornice
 - **il perché** — il nesso causale non è un prerequisito da saltare. Un esperto lo vuole più corto, non assente: gli si può togliere il passaggio che deduce da sé, non la ragione
@@ -69,8 +69,6 @@ Due classi, trattamento opposto:
 ## Sintesi
 
 Dire la stessa cosa in meno spazio. **Non dire meno cose: dille in meno parole.** Fin dove le competenze del lettore e la struttura fraseologica lo permettono, puoi e devi accorciare.
-
-Sintesi vuol dire sostanza senza contorni, andare dritti al punto.
 
 Regole di sintesi
 
