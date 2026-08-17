@@ -36,7 +36,7 @@ Il tuo mestiere sono i criteri **dipendenti**: *eco*, *sorpresa* e *sopravvive a
 
 Col token la skill esegue §1 e §2, stampa il piano e **si ferma lì**: niente router, niente writer, niente commit. Il costo sono due chiamate bash e nessun subagent.
 
-Stampa la coda con char, età, priorità e cappello, i file che il cancello esclude col loro cappello aperto, quanti file la presa in carico raccoglierebbe, e le righe di comando dei router che partirebbero. **Non stampa i gruppi**: il raggruppamento per target è calcolabile solo *dopo* il routing, che è l'unico passo che sa dove ogni nozione va a finire.
+Stampa la coda con char, età, priorità e cappello, **i file che i cancelli escludono col motivo di ciascuno** — cappello aperto, `modificato`, `untracked` — i file con la riga `PRIORITY` fuori posto, quanti file la presa in carico raccoglierebbe, e le righe di comando dei router che partirebbero. **Non stampa i gruppi**: il raggruppamento per target è calcolabile solo *dopo* il routing, che è l'unico passo che sa dove ogni nozione va a finire.
 
 ## Mai staged fino al commit
 
@@ -44,9 +44,11 @@ Lo stage git è uno **per worktree, non per sessione**: un file lasciato nell'in
 
 Da cui tre regole, che valgono per l'intera run:
 
-- **Guardia in ingresso.** Se `git diff --cached --quiet` esce non-zero, l'indice è già popolato da qualcun altro: **fermati** e dillo. Un commit con pathspec porterebbe via lavoro non tuo.
+- **Guardia sull'indice.** Se `git diff --cached --quiet` esce non-zero, l'indice è già popolato da qualcun altro: **fermati** e dillo. Un commit con pathspec porterebbe via lavoro non tuo.
 - **La patch vive solo nel working tree.** Guardiani e `doc-verifier` leggono `git diff` **non-staged**. Nessun `git add` prima del momento del commit.
 - **Il commit è una catena sola**, con pathspec esplicita del gruppo: `git add -- <path...>` immediatamente seguito da `git commit -m "..." -- <path...>`. La finestra scende a millisecondi, e non esiste mai un indice popolato in attesa di un giudizio.
+
+**Questa guardia protegge il commit, non la lettura.** L'operazione pericolosa di questa skill è un'altra — leggere un file inbox e poi **rimuoverlo** — e vive sul **working tree**, che l'indice non fotografa: un file che un'altra sessione sta editando senza averlo committato lascia l'indice pulito, quindi questa guardia passa. Il presidio della lettura è un secondo cancello, sul dato `WT` della coda (§2). Sono due canali distinti e nessuno dei due copre l'altro — una guardia sul canale sbagliato non è mezza protezione, è zero protezione con l'apparenza di una.
 
 Il rollback è `git checkout -- <path>` sui `MOD` e `rm -- <path>` sui `NEW`, che non sono in HEAD e quindi `git checkout` non li toglie.
 
@@ -56,11 +58,13 @@ Il rollback è `git checkout -- <path>` sui `MOD` e `rm -- <path>` sui `NEW`, ch
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --inbox --format tsv
 ```
 
-Ritorna la coda **già ordinata e già triata**: i file con sentinella di drift in testa, poi il più vecchio per primo dentro ogni classe. Colonne `PRIO` (`urgente` | `normale`), `DRIFT` (i file doc che quella nozione dovrebbe correggere), `CAPPELLO` (la task che possiede il file) e `STATO` (`done` | `wip`). L'età viene dal commit che ha aggiunto il file, non dall'mtime.
+Ritorna la coda **già ordinata e già triata**: i file con sentinella di drift in testa, poi il più vecchio per primo dentro ogni classe. Colonne `PRIO` (`urgente` | `normale`), `DRIFT` (i file doc che quella nozione dovrebbe correggere), `CAPPELLO` (la task che possiede il file), `STATO` (`done` | `wip`), `WT` (`pulito` | `modificato` | `untracked`) e `PRIO_FORM` (`ok` | `none` | `malformed:<riga>`). L'età viene dal commit che ha aggiunto il file, non dall'mtime.
 
 **L'ordine lo decide lo script, non tu.** Due lettori della stessa coda devono vederla nello stesso ordine, e la riga `> **PRIORITY**: 🚨` sulla riga 4 di un file inbox è un dato che il produttore ha scritto — non si rivaluta qui. Un file senza quella riga vale priorità normale: è il caso di maggioranza, e i file nati prima che le sentinelle esistessero non vanno ritoccati.
 
-**Anche `STATO` è un dato, non un giudizio.** Lo script lo deriva dalla Prog del cappello in `tasks.md`; tu ci filtri sopra (§2) e non lo rivaluti — nemmeno aprendo il task file, che direbbe la stessa cosa a un costo maggiore.
+**Anche `STATO` e `WT` sono dati, non giudizi.** Il primo lo deriva dalla Prog del cappello in `tasks.md`, il secondo da `git status` sulla cartella inbox; tu ci filtri sopra (§2) e non li rivaluti — non aprire il task file per il primo, non fare un secondo `git status` per il secondo.
+
+**`PRIO_FORM: malformed:<riga>` non ferma niente e non si ripara qui.** Dice che il file porta una riga `> **PRIORITY**:` fuori dalla riga 4, quindi ha **perso due dati insieme** — la priorità e i path della sentinella — e sta in coda come un file normale mentre il suo autore lo credeva urgente. La posizione è strict per scelta: una finestra di ricerca lascerebbe due grafie in circolazione. Riportalo nel referto col path e la riga trovata; correggerlo è una modifica al file inbox, e per te un file inbox è immutabile (§7).
 
 Servono altre due misure, e vanno prese **adesso** perché sono baseline:
 
@@ -74,11 +78,22 @@ Servono altre due misure, e vanno prese **adesso** perché sono baseline:
 
 ## 2. Presa in carico
 
-**Il cappello è un cancello, e viene prima del perimetro.** Un file con `STATO: wip` non si prende in carico **in nessun caso** — né nominato per nome, né sotto `tutto`, né perché porta la sentinella. Le sue nozioni appartengono a una task che si sta ancora muovendo: collocarle in doc significa scrivere un fatto che il prossimo checkpoint può riscrivere o rimuovere, ed è precisamente ciò che il file per cappello esiste per impedire.
+**Due cancelli, entrambi prima del perimetro.** Filtrano su un valore della coda — non su un tuo giudizio — e nessuno dei due si può bucare: né nominando il file per nome, né sotto `tutto`, né perché il file porta la sentinella.
 
-**Ogni file escluso va dichiarato**, con path e cappello, nel piano e nel referto. Saltarlo in silenzio è il modo in cui una coda che sembra vuota nasconde lavoro vivo, e chi ha nominato quel file per nome deve sapere perché non è successo niente.
+**Cancello del cappello — `STATO: wip`.** Le nozioni di quel file appartengono a una task che si sta ancora muovendo: collocarle in doc significa scrivere un fatto che il prossimo checkpoint può riscrivere o rimuovere, ed è precisamente ciò che il file per cappello esiste per impedire.
 
-La sentinella **non buca il cancello**: dice che una pagina è già falsa, non che il rimedio abbia smesso di muoversi. Quel file resta in testa alla coda e parte al primo giro dopo la chiusura del cappello.
+**Cancello del working tree — `WT` diverso da `pulito`.** Tu **leggi** quel file e poi lo **rimuovi** (§8): su un file in scrittura leggeresti una versione a metà edit e cancelleresti il resto. I due valori hanno motivi diversi, e vanno dichiarati diversi:
+
+- **`modificato`** — un'altra sessione lo sta editando, o un `checkpoint-task` ci ha appena appeso un lotto che non è ancora committato. Il file non è finito: quello che leggeresti non è ciò che l'autore intende consegnare.
+- **`untracked`** — il file esiste solo nel working tree. Qui il perimetro non è una scelta di prudenza ma un vincolo dell'uscita: `git rm` su un untracked esce **non-zero**, quindi §8 si romperebbe a prescindere dalla guardia. Il caso tipico è un `checkpoint-task` morto fra la scrittura del file inbox e il suo commit.
+
+**Escludere non è fermarsi.** Salta il singolo file e **prosegui sul resto della coda**: una run notturna che si arresta alla prima riga non drena niente, sentinelle urgenti comprese. Il secondo custode del dato è il file stesso, che resta in coda e parte al primo giro in cui risulta pulito — nessuna perdita, nessuno da svegliare.
+
+**Ogni file escluso va dichiarato**, con path e motivo — cappello aperto, `modificato`, `untracked` — nel piano del token `plan` e nel referto. Saltarlo in silenzio è il modo in cui una coda che sembra vuota nasconde lavoro vivo, e chi ha nominato quel file per nome deve sapere perché non è successo niente.
+
+**«Un file inbox è immutabile una volta scritto» è un'assunzione presidiata, non una convenzione sperata.** È la colonna `WT` a presidiarla, e serve perché l'assunzione è **falsa per contratto**: il file inbox è uno per cappello e `checkpoint-task` lo fonde in place a ogni avanzamento. Immutabile lo è solo rispetto a **te**, e solo sui file che i due cancelli ti lasciano in mano.
+
+La sentinella **non buca nessuno dei due cancelli**: dice che una pagina è già falsa, non che il rimedio abbia smesso di muoversi. Quel file resta in testa alla coda e parte al primo giro utile.
 
 Poi, dal perimetro nell'input — sempre sulla coda già filtrata:
 
@@ -87,7 +102,7 @@ Poi, dal perimetro nell'input — sempre sulla coda già filtrata:
 - **un numero** (`3`) → i primi N della coda, che sono gli urgenti se ce ne sono e i più vecchi altrimenti
 - **uno o più nomi** → quei file, nell'ordine della coda
 
-Coda vuota è un esito normale e va detto in una riga: nessun file inbox, niente da smaltire, stop. Non è un fallimento e non va cercato altrove il lavoro. Lo stesso vale per una coda dove tutto è bloccato dal cancello, e per `urgenti` su una coda senza sentinelle: dillo, elenca cosa hai escluso e fermati, non ripiegare sulla coda intera — chi ha chiesto gli urgenti sta pagando un giro corto apposta.
+Coda vuota è un esito normale e va detto in una riga: nessun file inbox, niente da smaltire, stop. Non è un fallimento e non va cercato altrove il lavoro. Lo stesso vale per una coda dove tutto è bloccato dai cancelli, e per `urgenti` su una coda senza sentinelle: dillo, elenca cosa hai escluso col motivo di ciascuno e fermati, non ripiegare sulla coda intera — chi ha chiesto gli urgenti sta pagando un giro corto apposta.
 
 **Un lotto urgente gira sotto il tetto, ed è il punto.** Il cap di 8 file dice quando lo smaltimento non è più *opzionale*; non dice quando è *permesso*. Una nozione con la sentinella sta curando una pagina già falsa, e farla aspettare la soglia tiene in piedi la bugia per tutto il tempo dell'attesa.
 
@@ -114,6 +129,7 @@ Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — i criteri d
 Prefisso ID: INBOX<n>
 Sentinella di drift: <i path della colonna DRIFT, se il file ne porta — altrimenti ometti la riga>
   Sono le pagine che chi ha catturato la nozione ritiene già FALSE. Aprile: se la nozione le corregge, sono il target naturale. Non è un ordine — un candidato ancora vero non le rende tali.
+  Su questi path la §Regola del target sopra soglia non si applica: restano target legittimi anche oltre i 15.000 char.
 
 Misure pre-calcolate (fidati di queste, non ricontare):
 <le righe PATH / CHAR / TLDR / FLAGS di doc-metrics.sh>
@@ -129,12 +145,13 @@ Il **prefisso è diverso per ogni router** (`INBOX1`, `INBOX2`, …): girano in 
 
 Questo passo non è un agente e non è una valutazione: è una regola meccanica sui registri che hai in mano.
 
+- **Solo `online` e `offline` formano gruppi.** Discrimina sul **`VERDICT:`**, non sulla presenza del `TARGET:` — è una whitelist di due valori, e un verdetto nuovo nel vocabolario del router cade fuori invece di entrare per default nel ramo sbagliato. Gli altri quattro non vanno a nessun writer e li riporti tu nel corpo del commit e nel referto: `→ codice` e `→ fonte viva` col puntatore, `drop` col motivo e il custode, `già scritto` col file che già lo dice.
+- **`già scritto` porta un `TARGET:` pieno e non forma gruppo.** È il caso per cui la regola è scritta in positivo: quel target è **evidenza, non destinazione** — la nozione sta già lì e non c'è delta da applicare. Discriminare su «target diverso da `—`» lo manderebbe a un writer, che pagherebbe un'invocazione piena per non scrivere niente, ed è precisamente il costo che quel verdetto esiste per togliere.
 - **Chiave di gruppo = il path del `TARGET:`**, normalizzato — via il `§Sezione`, via il prefisso `NEW `. `foo.md §A` e `NEW foo.md` sono lo **stesso** gruppo.
-- **Solo `online` e `offline` formano gruppi.** Le rotte `→ codice`, `→ fonte viva` e `drop` hanno `TARGET: —`: non atterrano da nessuna parte, non vanno a nessun writer, e le riporti tu nel corpo del commit e nel referto.
 - **Rotte da file inbox diversi con lo stesso target finiscono nello stesso gruppo.** È la ragione per cui questo passo esiste: due writer sullo stesso file si sovrascrivono a vicenda, e il sintomo è una nozione persa senza nessun errore.
 - **Nessun cap alla taglia del gruppo**, ma la taglia si misura: quante nozioni e quanti char di materiale, nel referto accanto all'esito del collaudo.
 
-Zero gruppi con rotte non vuote è un esito legittimo — un lotto interamente `drop` è il filtro che funziona. Salta a §8: i file inbox si rimuovono lo stesso, il verdetto è nel commit.
+Zero gruppi con rotte non vuote è un esito legittimo — un lotto interamente `drop` è il filtro che funziona, uno interamente `già scritto` è doc che c'era già. Salta a §8: i file inbox si rimuovono lo stesso, il verdetto è nel commit.
 
 ## 5. Il ciclo per gruppo è sequenziale
 
@@ -222,7 +239,7 @@ git add -- <path...> && git commit -m "docs(drain): <target>" -m "<corpo>" -- <p
 ```
 
 - La pathspec sono **tutti** i file di `APPLIED:` più `INDEX.md` se il rebuild l'ha toccato. Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file.
-- Il **corpo** porta le rotte non atterrate di questo lotto — i `drop` col motivo e il custode, i `→ codice` e `→ fonte viva` col puntatore. È lì che il verdetto resta greppabile, coerente col principio che la cronaca sta in git e non nella doc.
+- Il **corpo** porta le rotte non atterrate di questo lotto — i `drop` col motivo e il custode, i `→ codice` e `→ fonte viva` col puntatore, i `già scritto` col file che già lo dice. È lì che il verdetto resta greppabile, coerente col principio che la cronaca sta in git e non nella doc.
 
 **`rollback` → annulla il gruppo**, per file secondo il marker: `MOD` → `git checkout -- <path>` · `NEW` → `rm -- <path>` · `DEL` → `git checkout -- <path>`. Poi **rigenera l'indice**: il rebuild del §5b ha già scritto la voce di un file che adesso non esiste più, e lasciarla lì è drift prodotto dal rollback stesso.
 
@@ -236,11 +253,11 @@ Torna al §5a. Se un gruppo ha fatto rollback, i successivi girano lo stesso: so
 
 Le nozioni di un file inbox possono finire in gruppi diversi, e un gruppo può essere bocciato mentre gli altri passano. In quel caso **il file resta intero in coda**, nozioni già committate comprese.
 
-Al giro successivo il router ripaga il routing su tutte, e scarta come «già scritto altrove» quelle che sono atterrate — è un criterio dipendente, cioè esattamente il suo mestiere. Costa un re-routing sprecato, non perde niente, e non muta il file: **per te un file inbox è immutabile, o si rimuove o resta com'è.**
+Al giro successivo il router ripaga il routing su tutte, e quelle già atterrate escono col verdetto **`già scritto`** — è un criterio dipendente, cioè esattamente il suo mestiere. Costa un re-routing sprecato, non perde niente, e non muta il file: **per te un file inbox è immutabile, o si rimuove o resta com'è.**
 
-A mutarlo è solo il checkpoint, che fonde in place a ogni avanzamento — ma solo finché il cappello è aperto, cioè solo su file che il cancello (§2) ti tiene fuori dalle mani. I due non toccano mai lo stesso file.
+A mutarlo è il checkpoint, che fonde in place a ogni avanzamento — ma solo finché il cappello è aperto, cioè solo su file che il cancello dello `STATO` (§2) ti tiene fuori dalle mani; e la finestra fra la scrittura del lotto e il suo commit la chiude il cancello del `WT`. I due non toccano mai lo stesso file.
 
-Un file è rimovibile quando nessuna delle sue rotte appartiene a un gruppo bocciato. Le rotte senza target (`drop`, `→ codice`, `→ fonte viva`) non bloccano: il loro verdetto è già entrato in un commit.
+Un file è rimovibile quando nessuna delle sue rotte appartiene a un gruppo bocciato. **Discrimina sul verdetto**, non sulla presenza del target: non bloccano `drop`, `→ codice`, `→ fonte viva` e `già scritto` — i primi tre perché il loro verdetto è già entrato in un commit, il quarto perché la nozione è **in doc**, che è la condizione di smaltimento nella sua forma più piena. Un file interamente `già scritto` si rimuove, e leggere la sua rimovibilità dal `TARGET:` invece che dal verdetto lo terrebbe in coda per sempre.
 
 ## 8. Chiudi
 
@@ -263,9 +280,10 @@ Su disco, non in chat — il contesto dell'orchestratore è l'unica risorsa che 
 
 Cosa contiene, una riga per voce:
 
-- **coda in ingresso**: file, char, età, priorità, cappello — e i file esclusi dal cancello, col cappello che li tiene fermi
+- **coda in ingresso**: file, char, età, priorità, cappello — e i file esclusi dai cancelli, ognuno col suo motivo (cappello aperto, `modificato`, `untracked`)
+- **file con la riga `PRIORITY` fuori posizione**: path e riga trovata, più cosa hanno perso — priorità **e** sentinella
 - **un blocco per gruppo**: target · quante nozioni · quanti char di materiale · esito del collaudo · le violazioni con etichetta e regola
-- **rotte non atterrate**: `drop`, `→ codice`, `→ fonte viva`, col motivo
+- **rotte non atterrate**: `drop`, `→ codice`, `→ fonte viva` e `già scritto`, col motivo. **I `già scritto` con un conteggio** — quante su quante rotte del lotto: è la misura del costo della riscoperta fra due run, e serve come somma, non come righe da contare a mano
 - **file inbox rimossi** e **file rimasti in coda**, questi ultimi col motivo
 - **lavoro accodato**: i file usciti col flag `SPLIT` o `MERGE?`, che `lint-doc` raccoglierà
 

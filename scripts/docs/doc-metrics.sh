@@ -28,6 +28,16 @@
 # WIP finche' la task che lo possiede non e' chiusa. Il verdetto e' un dato, non
 # un giudizio — drain-doc filtra su un valore, per la stessa ragione per cui
 # l'ordine lo decide questo script e non il chiamante.
+# Lo stesso vale per WT (working tree): pulito | modificato | untracked. Un file
+# inbox che un'altra sessione sta ancora scrivendo non e' drenabile — drain-doc
+# lo LEGGE e poi lo RIMUOVE, quindi leggerebbe una versione a meta' edit e
+# cancellerebbe il resto. La guardia sull'indice (`git diff --cached`) non vede
+# questo caso: protegge il commit con pathspec, che e' un'altra operazione.
+# I due esclusi hanno motivi diversi da dichiarare, e su untracked il perimetro
+# non e' una scelta di prudenza — `git rm` su un untracked esce non-zero, quindi
+# la chiusura di drain-doc si romperebbe a prescindere dalla guardia.
+# PRIO_FORM dice se la riga `> **PRIORITY**:` sta dove il lettore la cerca:
+# ok | none | malformed:<riga>. Vedi prio_form_of.
 # L'eta' viene dal commit che ha AGGIUNTO il file (`git log --diff-filter=A`, il
 # piu' vecchio), non dall'mtime: un file inbox si riscrive solo per errore,
 # mentre un checkout ne azzera l'mtime di tutti insieme e l'ordine a coda
@@ -143,6 +153,49 @@ drift_of() {  # <file> → i path candidati, o vuoto se la riga manca
     echo "${rest%"${rest##*[![:space:]]}"}"
 }
 
+# Un lettore a posizione fissa collassa «riga assente» e «riga malformata» nello
+# stesso esito, e quando l'assenza e' il caso legittimo di maggioranza il guasto
+# diventa invisibile: drift_of() ritorna vuoto sia sul file nato prima che le
+# sentinelle esistessero sia sulla riga scritta con una riga vuota di troppo.
+# Le due uscite si separano QUI, nel lettore: il produttore non ha modo di
+# dichiarare «qui la riga ci dovrebbe essere». La posizione resta strict — una
+# finestra di ricerca lascerebbe due grafie in circolazione senza che nessuno le
+# riconcili — quindi il rimedio e' il segnale, non la tolleranza.
+prio_form_of() {  # <file> → ok | none | malformed:<riga trovata>
+    local n
+    n="$(grep -n -m1 -F '**PRIORITY**' "$1" 2>/dev/null | cut -d: -f1)"
+    [[ -z "$n" ]] && { echo "none"; return; }
+    # Riga 4 che matcha il pattern strict: e' l'unico caso conforme. Riga 4 con la
+    # forma sbagliata (🚨 assente) e' malformata quanto una riga 5 ben scritta.
+    [[ "$n" -eq 4 && -n "$(drift_of "$1")" ]] && { echo "ok"; return; }
+    echo "malformed:${n}"
+}
+
+# --- Stato working tree dei file inbox ----------------------------------------
+# Una sola invocazione git per l'intera cartella, non una per file. `-uall` e'
+# obbligatorio: col default `normal`, una inbox interamente untracked collassa in
+# una riga sola `?? <dir>/` e i singoli file diventano invisibili.
+declare -A WT_STATE=()
+load_wt_state() {
+    local xy path
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        xy="${line:0:2}"
+        path="${line:3}"
+        [[ "$path" == *" -> "* ]] && path="${path##* -> }"
+        path="${path%\"}"; path="${path#\"}"
+        if [[ "$xy" == "??" ]]; then
+            WT_STATE["$path"]="untracked"
+        else
+            WT_STATE["$path"]="modificato"
+        fi
+    done < <(cd "$PROJECT_ROOT" && git status --porcelain -uall -- "${DOCS_ROOT}/inbox" 2>/dev/null)
+}
+
+wt_of() {  # <rel-to-project-root> → pulito | modificato | untracked
+    echo "${WT_STATE[$1]-pulito}"
+}
+
 # --- Cappello di un file inbox ------------------------------------------------
 # L'ID sta nel NOME del file (`T74-<slug>.md` → `T74`), quindi si legge senza
 # aprirlo, e il taglio sul primo `-` regge anche i legacy col suffisso numerico
@@ -191,6 +244,7 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
     trap 'rm -f "$QTMP"' EXIT
 
     load_task_prog
+    load_wt_state
 
     if [[ -d "$INBOX_DIR" ]]; then
         while IFS= read -r -d '' file; do
@@ -201,34 +255,41 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
             drift="$(drift_of "$file")"
             cap="$(cappello_of "$(basename "$file")")"
             if [[ -n "$drift" ]]; then rank=0; else rank=1; drift="—"; fi
-            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                 "$rank" "$created" "$rel" "$(char_count "$file")" "${#tldr}" "$drift" \
-                "$cap" "$(stato_of "$cap")" >> "$QTMP"
+                "$cap" "$(stato_of "$cap")" "$(wt_of "$rel")" "$(prio_form_of "$file")" >> "$QTMP"
         done < <(find "$INBOX_DIR" -maxdepth 1 -type f -name '*.md' -print0)
     fi
 
-    n_q=0; c_q=0; n_urg=0; n_wip=0
-    while IFS=$'\t' read -r rk _ _ c _ _ _ st; do
+    n_q=0; c_q=0; n_urg=0; n_wip=0; n_dirty=0; n_badprio=0
+    while IFS=$'\t' read -r rk _ _ c _ _ _ st wt pf; do
         n_q=$((n_q+1)); c_q=$((c_q + c)); (( rk == 0 )) && n_urg=$((n_urg+1))
         [[ "$st" == "wip" ]] && n_wip=$((n_wip+1))
+        [[ "$wt" != "pulito" ]] && n_dirty=$((n_dirty+1))
+        [[ "$pf" == malformed:* ]] && n_badprio=$((n_badprio+1))
     done < "$QTMP"
 
     if [[ "$FORMAT" == "tsv" ]]; then
-        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tPRIO\tDRIFT\tCREATED\tCAPPELLO\tSTATO\n'
-        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st; do
+        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tPRIO\tDRIFT\tCREATED\tCAPPELLO\tSTATO\tWT\tPRIO_FORM\n'
+        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st wt pf; do
             (( rk == 0 )) && prio="urgente" || prio="normale"
-            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-                "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$dr" "$ts" "$cp" "$st"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$dr" "$ts" "$cp" "$st" "$wt" "$pf"
         done
     else
         echo "[doc-metrics] coda inbox: ${DOCS_ROOT}/inbox  ·  ordine: sentinelle prima, poi il più vecchio"
         echo
+        # WT e PRIO_FORM come riga di dettaglio: una colonna in piu' allargherebbe la
+        # tabella oltre il terminale per dire `pulito` su ogni riga.
         printf '%-52s %8s %6s %6s %5s %9s %6s\n' "PATH" "CHAR" "AGE_D" "TLDR" "PRIO" "CAPPELLO" "STATO"
-        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st; do
+        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st wt pf; do
             (( rk == 0 )) && prio="🚨" || prio="-"
             printf '%-52s %8s %6s %6s %5s %9s %6s\n' \
                 "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$cp" "$st"
             (( rk == 0 )) && echo "      drift: ${dr}"
+            [[ "$wt" != "pulito" ]] && echo "      ⚠ working tree: ${wt} — fuori dal perimetro di drain-doc"
+            [[ "$pf" == malformed:* ]] && \
+                echo "      ⚠ riga PRIORITY sulla ${pf#malformed:} invece della 4 — il file perde LA PRIORITÀ e LA SENTINELLA DI DRIFT (i path della riga 4 sono invisibili)"
         done
         echo
         if (( n_q > INBOX_CAP )); then
@@ -236,9 +297,12 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
         else
             echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}"
         fi
-        echo "- drenabili: $(( n_q - n_wip ))  ·  bloccati da un cappello ancora aperto: ${n_wip}"
+        echo "- drenabili: $(( n_q - n_wip - n_dirty ))  ·  bloccati da un cappello ancora aperto: ${n_wip}  ·  in scrittura nel working tree: ${n_dirty}"
         if (( n_urg > 0 )); then
             echo "- con sentinella di drift: ${n_urg}  → smaltibili subito, il tetto non li riguarda"
+        fi
+        if (( n_badprio > 0 )); then
+            echo "- con riga PRIORITY fuori posizione: ${n_badprio}  → da correggere a mano sulla riga 4, o restano senza priorità e senza sentinella"
         fi
     fi
     exit 0

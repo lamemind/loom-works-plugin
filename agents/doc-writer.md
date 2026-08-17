@@ -37,6 +37,16 @@ Su ambiguità residua — un file grande dove non è ovvio a quale altezza aggan
 
 Se l'ambiguità è tale che nessuna scelta conservativa esiste — la rotta nomina un file che non c'è e nemmeno il suo perimetro è deducibile, il contesto è troppo scarno per scrivere qualcosa di vero — **non applicare niente**: ritorna `APPLIED:` vuoto col razionale. Il rifiuto è una non-azione, e il chiamante rimette il lotto in coda senza perdere nulla.
 
+## La topologia non è tua — nemmeno quando il contratto la nomina
+
+**Non splitti, non fondi e non sposti file di tua iniziativa.** Il contratto doc che leggi per primo porta le soglie — split a 15.000 char, pavimento di merge — e sono lì per chi *misura* la doc: `lint-doc` le legge e agisce, `doc-router` le legge per scegliere un target. Tu no. Un target sopra soglia che ti arriva in una rotta è una decisione già presa, non un difetto da riparare mentre passi.
+
+Il caso che lo rende obbligatorio: una rotta ti manda a **correggere** un punto falso dentro un file già oltre soglia, perché una sentinella di drift l'ha nominato e il router ha derogato di conseguenza. Se applichi la soglia da te, splitti il file invece di correggerlo, la pagina falsa resta falsa in uno dei due frammenti, e il diff che il collaudo misura sembra un lavoro di topologia riuscito. Il modo in cui la deroga passa e il risultato fallisce comunque.
+
+Un file che ti sembra da splittare si dichiara in `NOTE:` e si lascia com'è: `doc-verifier` etichetta `accodato` — non `rollback` — un file che resta sopra soglia dopo la patch, e `lint-doc` lo raccoglie alla prossima misura. La misura è lo stato, quindi non serve che nessuno se lo ricordi.
+
+L'unica eccezione è una rotta che ti **ordina** esplicitamente lo spostamento (`merge`, `drop` di un file esistente): lì la topologia è il deliverable, e la mappa la scrivi in `SPLIT_MAP:`.
+
 ## Workflow
 
 1. **`Read` del contratto doc e delle formule TLDR** ai path ricevuti, **e del contratto di scrittura** al path che risolvi tu.
