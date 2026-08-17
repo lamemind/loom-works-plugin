@@ -89,7 +89,7 @@ Ritorna solo il registro.
 
 Al writer passano **solo le rotte `online` e `offline`**, raggruppate per file target — un writer per gruppo, mai due sullo stesso file: si sovrascrivono a vicenda. Il subagent **applica** le patch al working tree e ritorna il contratto `APPLIED:` — lista file con marker `NEW`/`MOD` + `INDEX_REBUILD_NEEDED`.
 
-**La regola è una whitelist di due verdetti, non un'esclusione.** Gli altri quattro — `→ codice`, `→ fonte viva`, `già scritto`, `drop` — non passano di qui: il loro verdetto è già nel registro e li riporti tu allo step 5. Scritta in negativo («passano tutte tranne quelle senza target») la regola manderebbe al writer proprio `già scritto`, che **porta un target pieno** ma è evidenza e non destinazione: un'invocazione intera per non scrivere niente. Una whitelist fallisce chiusa e si nota subito; un'esclusione per proprietà del target fallisce aperta, e un verdetto nuovo del router cade nel ramo sbagliato senza che niente lo segnali.
+**La regola è una whitelist di due verdetti, non un'esclusione.** Gli altri cinque — `→ codice`, `→ fonte viva`, `già scritto`, `noto`, `drop` — non passano di qui: il loro verdetto è già nel registro e li riporti tu allo step 5. Scritta in negativo («passano tutte tranne quelle senza target») la regola manderebbe al writer proprio `già scritto`, che **porta un target pieno** ma è evidenza e non destinazione: un'invocazione intera per non scrivere niente. Una whitelist fallisce chiusa e si nota subito; un'esclusione per proprietà del target fallisce aperta, e un verdetto nuovo del router cade nel ramo sbagliato senza che niente lo segnali.
 
 Zero rotte in whitelist significa **nessun writer**: riporta i verdetti e fermati, invece di rilanciare il router con istruzioni più aggressive.
 
@@ -154,7 +154,7 @@ Solo su `pass`. Catena unica con pathspec esplicita:
 git add -- <path...> && git commit -m "docs(capture): <di cosa parla la nozione>" -m "<corpo>" -- <path...>
 ```
 
-La pathspec sono tutti i file di `APPLIED:`, più `{docs_root}/reference/INDEX.md` se il rebuild l'ha toccato. Il **corpo** porta le rotte fuori whitelist col motivo — i `drop`, i due puntatori, i `già scritto` col file che già lo dice — più il blocco `DISCARDED:` del writer: sono nozioni che non atterrano da nessuna parte, e il messaggio di commit è dove quel verdetto resta greppabile.
+La pathspec sono tutti i file di `APPLIED:`, più `{docs_root}/reference/INDEX.md` se il rebuild l'ha toccato. Il **corpo** porta le rotte fuori whitelist col motivo — i `drop`, i due puntatori, i `già scritto` col file che già lo dice, i `noto` con la ragione — più il blocco `DISCARDED:` del writer: sono nozioni che non atterrano da nessuna parte, e il messaggio di commit è dove quel verdetto resta greppabile.
 
 **Non pusha.** Il push è una decisione del chiamante.
 
@@ -167,7 +167,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "doc captured"
 
 **Non stampare il diff in chat** — un file reference `NEW` è 200+ righe e brucia contesto; è già ispezionabile, meglio, nel pannello git. Stampa la **lista file** dal contratto `APPLIED:` col marker, lo SHA del commit, e le rotte fuori whitelist col motivo.
 
-Una lista applicata vuota è un esito legittimo — con dei `drop` pieni, o con dei `già scritto` che dicono che la nozione era già in doc. Non rilanciare nessuno dei subagent per far scrivere comunque qualcosa.
+Una lista applicata vuota è un esito legittimo — con dei `drop` pieni, con dei `già scritto` che dicono che la nozione era già in doc, o con dei `noto` che dicono che è un fatto generale della materia. Non rilanciare nessuno dei subagent per far scrivere comunque qualcosa.
 
 ## Convenzione TTS
 

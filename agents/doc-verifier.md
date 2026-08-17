@@ -46,7 +46,7 @@ Il discriminante è **se la patch l'ha causata o solo rivelata**. Ogni violazion
 
 - **TLDR oltre il cap** di 600 char su un file toccato, o **TLDR-riassunto**: prosa discorsiva che riassume il contenuto invece di dare trigger concreti separati da `·`. Il cap è un numero e lo verifica lo script; la forma la giudichi tu. Il contratto le dichiara **bloccanti** entrambe, e non si declassano.
 - **Riferimenti appesi introdotti dalla patch**: un path o una `§` citati e inesistenti. Solo quelli **introdotti** — un `DANGLING` che c'era già non è opera di questa patch.
-- **Verdetto del router non rispettato**: la nozione è atterrata in un file diverso dal `TARGET:` della sua rotta, o è stata scritta in doc con verdetto `→ codice` / `→ fonte viva` / `drop`, o è stata scartata con verdetto `online` / `offline`. È il controllo che rende vincolante la separazione dei mestieri: senza, il writer torna a giudicare in silenzio.
+- **Verdetto del router non rispettato**: la nozione è atterrata in un file diverso dal `TARGET:` della sua rotta, o è stata scritta in doc con verdetto `→ codice` / `→ fonte viva` / `drop` / `noto`, o è stata scartata con verdetto `online` / `offline`. È il controllo che rende vincolante la separazione dei mestieri: senza, il writer torna a giudicare in silenzio.
 - **Residui storici introdotti**: cronologia, «prima era X ora Y», date, id di task o PR inline. La doc è una fotografia dell'as-is; la storia sta in git.
 
 ### `accodato` — la patch l'ha solo rivelata: si tiene, e il lavoro resta in coda

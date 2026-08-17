@@ -145,13 +145,13 @@ Il **prefisso è diverso per ogni router** (`INBOX1`, `INBOX2`, …): girano in 
 
 Questo passo non è un agente e non è una valutazione: è una regola meccanica sui registri che hai in mano.
 
-- **Solo `online` e `offline` formano gruppi.** Discrimina sul **`VERDICT:`**, non sulla presenza del `TARGET:` — è una whitelist di due valori, e un verdetto nuovo nel vocabolario del router cade fuori invece di entrare per default nel ramo sbagliato. Gli altri quattro non vanno a nessun writer e li riporti tu nel corpo del commit e nel referto: `→ codice` e `→ fonte viva` col puntatore, `drop` col motivo e il custode, `già scritto` col file che già lo dice.
+- **Solo `online` e `offline` formano gruppi.** Discrimina sul **`VERDICT:`**, non sulla presenza del `TARGET:` — è una whitelist di due valori, e un verdetto nuovo nel vocabolario del router cade fuori invece di entrare per default nel ramo sbagliato. Gli altri cinque non vanno a nessun writer e li riporti tu nel corpo del commit e nel referto: `→ codice` e `→ fonte viva` col puntatore, `drop` col motivo e il custode, `già scritto` col file che già lo dice, `noto` con la ragione.
 - **`già scritto` porta un `TARGET:` pieno e non forma gruppo.** È il caso per cui la regola è scritta in positivo: quel target è **evidenza, non destinazione** — la nozione sta già lì e non c'è delta da applicare. Discriminare su «target diverso da `—`» lo manderebbe a un writer, che pagherebbe un'invocazione piena per non scrivere niente, ed è precisamente il costo che quel verdetto esiste per togliere.
 - **Chiave di gruppo = il path del `TARGET:`**, normalizzato — via il `§Sezione`, via il prefisso `NEW `. `foo.md §A` e `NEW foo.md` sono lo **stesso** gruppo.
 - **Rotte da file inbox diversi con lo stesso target finiscono nello stesso gruppo.** È la ragione per cui questo passo esiste: due writer sullo stesso file si sovrascrivono a vicenda, e il sintomo è una nozione persa senza nessun errore.
 - **Nessun cap alla taglia del gruppo**, ma la taglia si misura: quante nozioni e quanti char di materiale, nel referto accanto all'esito del collaudo.
 
-Zero gruppi con rotte non vuote è un esito legittimo — un lotto interamente `drop` è il filtro che funziona, uno interamente `già scritto` è doc che c'era già. Salta a §8: i file inbox si rimuovono lo stesso, il verdetto è nel commit.
+Zero gruppi con rotte non vuote è un esito legittimo — un lotto interamente `drop` è il filtro che funziona, uno interamente `già scritto` è doc che c'era già, uno interamente `noto` è materia che il lettore possiede. Salta a §8: i file inbox si rimuovono lo stesso, il verdetto è nel commit.
 
 ## 5. Il ciclo per gruppo è sequenziale
 
@@ -239,7 +239,7 @@ git add -- <path...> && git commit -m "docs(drain): <target>" -m "<corpo>" -- <p
 ```
 
 - La pathspec sono **tutti** i file di `APPLIED:` più `INDEX.md` se il rebuild l'ha toccato. Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file.
-- Il **corpo** porta le rotte non atterrate di questo lotto — i `drop` col motivo e il custode, i `→ codice` e `→ fonte viva` col puntatore, i `già scritto` col file che già lo dice. È lì che il verdetto resta greppabile, coerente col principio che la cronaca sta in git e non nella doc.
+- Il **corpo** porta le rotte non atterrate di questo lotto — i `drop` col motivo e il custode, i `→ codice` e `→ fonte viva` col puntatore, i `già scritto` col file che già lo dice, i `noto` con la ragione. È lì che il verdetto resta greppabile, coerente col principio che la cronaca sta in git e non nella doc.
 
 **`rollback` → annulla il gruppo**, per file secondo il marker: `MOD` → `git checkout -- <path>` · `NEW` → `rm -- <path>` · `DEL` → `git checkout -- <path>`. Poi **rigenera l'indice**: il rebuild del §5b ha già scritto la voce di un file che adesso non esiste più, e lasciarla lì è drift prodotto dal rollback stesso.
 
@@ -257,7 +257,12 @@ Al giro successivo il router ripaga il routing su tutte, e quelle già atterrate
 
 A mutarlo è il checkpoint, che fonde in place a ogni avanzamento — ma solo finché il cappello è aperto, cioè solo su file che il cancello dello `STATO` (§2) ti tiene fuori dalle mani; e la finestra fra la scrittura del lotto e il suo commit la chiude il cancello del `WT`. I due non toccano mai lo stesso file.
 
-Un file è rimovibile quando nessuna delle sue rotte appartiene a un gruppo bocciato. **Discrimina sul verdetto**, non sulla presenza del target: non bloccano `drop`, `→ codice`, `→ fonte viva` e `già scritto` — i primi tre perché il loro verdetto è già entrato in un commit, il quarto perché la nozione è **in doc**, che è la condizione di smaltimento nella sua forma più piena. Un file interamente `già scritto` si rimuove, e leggere la sua rimovibilità dal `TARGET:` invece che dal verdetto lo terrebbe in coda per sempre.
+Un file è rimovibile quando nessuna delle sue rotte appartiene a un gruppo bocciato. **Discrimina sul verdetto**, non sulla presenza del target: bloccano solo `online` e `offline`, e solo quando il gruppo è stato bocciato. Non blocca nessuno degli altri —
+
+- `drop`, `→ codice`, `→ fonte viva` e `noto` perché il verdetto è già entrato in un commit, che è il loro custode;
+- `già scritto` perché la nozione è **in doc**, che è la condizione di smaltimento nella sua forma più piena.
+
+Un file interamente `già scritto` o interamente `noto` si rimuove. **Un verdetto che non entra in questa lista rende eterno il file inbox che lo porta**, e il sintomo è una coda che non cala senza che niente fallisca: leggere la rimovibilità dal `TARGET:` invece che dal verdetto produce esattamente quel guasto su `già scritto`, che il target ce l'ha pieno.
 
 ## 8. Chiudi
 
@@ -283,7 +288,7 @@ Cosa contiene, una riga per voce:
 - **coda in ingresso**: file, char, età, priorità, cappello — e i file esclusi dai cancelli, ognuno col suo motivo (cappello aperto, `modificato`, `untracked`)
 - **file con la riga `PRIORITY` fuori posizione**: path e riga trovata, più cosa hanno perso — priorità **e** sentinella
 - **un blocco per gruppo**: target · quante nozioni · quanti char di materiale · esito del collaudo · le violazioni con etichetta e regola
-- **rotte non atterrate**: `drop`, `→ codice`, `→ fonte viva` e `già scritto`, col motivo. **I `già scritto` con un conteggio** — quante su quante rotte del lotto: è la misura del costo della riscoperta fra due run, e serve come somma, non come righe da contare a mano
+- **rotte non atterrate**: `drop`, `→ codice`, `→ fonte viva`, `già scritto` e `noto`, col motivo. **I `già scritto` e i `noto` con un conteggio** — quante su quante rotte del lotto. Il primo misura il costo della riscoperta fra due run, il secondo il risparmio del triage: ogni `noto` è una nozione che non ha aperto nessuna fonte, e senza la somma non si sa se il passo ha pagato. Servono come numero, non come righe da contare a mano
 - **file inbox rimossi** e **file rimasti in coda**, questi ultimi col motivo
 - **lavoro accodato**: i file usciti col flag `SPLIT` o `MERGE?`, che `lint-doc` raccoglierà
 
