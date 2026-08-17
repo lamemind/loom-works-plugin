@@ -5,9 +5,7 @@ allowed-tools: Bash(*), Read, Edit
 model: sonnet
 ---
 
-Merge della lane corrente in main. Eseguire dal worktree base (branch main).
-Auto-rileva tutti i worktrees `*-{lane}` in WORKTREE_BASE.
-Default: mantiene i worktrees dopo il merge. `--cleanup` per rimuoverli.
+Merge della lane corrente in main. Eseguire dal worktree base (branch main). Auto-rileva tutti i worktrees `*-{lane}` in WORKTREE_BASE. Default: mantiene i worktrees dopo il merge. `--cleanup` per rimuoverli.
 
 Input utente:
 ~~~human
@@ -55,14 +53,9 @@ Cattura **sia stdout che exit code** (`echo "EXIT_CODE=$?"` dopo il `;`).
 
 ### 3. Sezione LANES in tasks.md (automatica)
 
-`merge-lane.sh` invoca `render-lanes.sh` alla fine: rigenera la sezione gestita
-`<!-- LANES:START -->...<!-- LANES:END -->` in `tasks.md` (add-or-replace), creandola
-prima di `## Execution Plan` se assente. **Nessuna azione LLM richiesta.**
+`merge-lane.sh` invoca `render-lanes.sh` alla fine: rigenera la sezione gestita `<!-- LANES:START -->...<!-- LANES:END -->` in `tasks.md` (add-or-replace), creandola prima di `## Execution Plan` se assente. **Nessuna azione LLM richiesta.**
 
-Detection branch-agnostica (D3, git=verità): scansiona i worktree via `list-worktrees.sh`,
-aggrega per lane e include la task in esecuzione (letta dal symlink `current-task.md` nel
-worktree, presente in single-project). Con `--cleanup` i worktree rimossi spariscono dalla
-vista automaticamente.
+Detection branch-agnostica (D3, git=verità): scansiona i worktree via `list-worktrees.sh`, aggrega per lane e include la task in esecuzione (letta dal symlink `current-task.md` nel worktree, presente in single-project). Con `--cleanup` i worktree rimossi spariscono dalla vista automaticamente.
 
 ## Note
 
