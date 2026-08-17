@@ -9,5 +9,6 @@ Plugin source repository. Install via `/plugin install loom-works@lamemind`.
 - `agents/` — Subagent definitions
 - `hooks/` — Plugin hooks (auto-loaded) and optional hooks
 - `docs/` — Methodology documentation (injected at SessionStart)
+- `output-styles/` — Output style imposto ai client (`force-for-plugin`), auto-caricata
 - `templates/` — Task and doc templates
 - `.claude-plugin/` — Plugin manifest (plugin.json, marketplace.json)
