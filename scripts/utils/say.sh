@@ -6,53 +6,11 @@
 _LOOM_SAY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 _LOOM_SAY_BIN="${_LOOM_SAY_ROOT}/scripts/say-it"
 
-_resolve_session_tag() {
-    local tty match
-    tty="$(ps -o tty= -p "$PPID" 2>/dev/null | tr -d ' ')"
-    match=""
-
-    if [[ -n "$tty" ]]; then
-        for d in "$HOME/.claude/session-env"/*/; do
-            [[ -r "$d/tty" ]] || continue
-            if [[ "$(head -n1 "$d/tty" | tr -d '\n\r ')" == "$tty" ]]; then
-                match="$d"
-                break
-            fi
-        done
-    fi
-
-    if [[ -z "$match" ]]; then
-        local cwd
-        cwd="$(pwd)"
-        match="$(for d in "$HOME/.claude/session-env"/*/; do
-            [[ -r "$d/cwd" ]] || continue
-            [[ "$(cat "$d/cwd")" == "$cwd" ]] || continue
-            [[ -r "$d/started" ]] || continue
-            printf '%s %s\n' "$(cat "$d/started")" "$d"
-        done | sort -rn | head -n1 | cut -d' ' -f2-)"
-    fi
-
-    if [[ -z "$match" ]]; then
-        match="$(ls -1dt "$HOME/.claude/session-env"/*/ 2>/dev/null | head -n1)"
-    fi
-
-    [[ -z "$match" ]] && { echo ""; return 0; }
-    local tag_file="$match/tag"
-    [[ -r "$tag_file" ]] && cat "$tag_file" || echo ""
-}
-
 _say_core() {
     local model="$1" text="$2"
     [[ -x "$_LOOM_SAY_BIN" ]] || return 0
     [[ -f "$model" ]] || return 0
-    local tag full_text
-    tag="$(_resolve_session_tag)"
-    if [[ -n "$tag" ]]; then
-        full_text="${tag} — ${text}"
-    else
-        full_text="${text}"
-    fi
-    SAY_IT_MODEL="$model" "$_LOOM_SAY_BIN" "$full_text" 2>/dev/null || true
+    SAY_IT_MODEL="$model" "$_LOOM_SAY_BIN" "$text" 2>/dev/null || true
 }
 
 say_it() {

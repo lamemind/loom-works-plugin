@@ -1,7 +1,7 @@
 {
   "name": "loom-works",
   "description": "Lane / Task management with coupled documentation lifecycle",
-  "version": "7.1.2",
+  "version": "7.1.3",
   "userConfig": {
     "on_lane_spawned_hook": {
       "type": "string",
