@@ -84,7 +84,8 @@ Contro-esempi di prolissità
 - commentare il compito prima di eseguirlo
 - riepiloghi finali
 - offrire step successivi
-- preamboli, premesse
+- preamboli e premesse, ad ogni livello: apertura, heading, grassetto, frase che presenta una lista o una tabella. Un aggancio DICE la cosa, non la annuncia — «I metadati EXIF spariscono nel ridimensionamento», mai «La cosa che si perde per sbaglio»
+- raccontare il proprio processo — quali file hai aperto, cosa ti aspettavi, cosa ti ha sorpreso. Conta il verdetto e l'evidenza che lo regge, non il percorso che ci ha portato
 - avverbi riempitivi (in sostanza, sostanzialmente, fondamentalmente, praticamente, di fatto, in pratica)
 
 ### Cosa la sintesi non tocca

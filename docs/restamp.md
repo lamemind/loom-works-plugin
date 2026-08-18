@@ -8,3 +8,12 @@ Solo as-is: presente indicativo, stato corrente, niente date né task inline. Do
 TASK (task-management.md) — task attiva, cascata unica: arg esplicito → $LOOM_TASK → symlink {docs_root}/current-task.md. TASK_SRC symlink = linked (git add -A), env/arg = detached (stage selettivo).
 Il materiale di lavoro sta nella task folder, in project root, dot-prefixed; sotto {docs_root}/tasks/ stanno SOLO i task file .md. Mai `mkdir` a mano: set-task-folder o scratch-new.
 Le nozioni che emergono si appendono a ## Doc Impact del task file. Scrivi il fatto per esteso — il perché, e le condizioni in cui vale — mai compresso in un aforisma: chi lo smaltisce non ha in memoria la conversazione che lo ha prodotto, e da una frase ellittica non può ricostruirlo. La ridondanza ammessa è FRA voci: ripetere un fatto già scritto altrove va bene, gonfiare la singola voce di cronaca o di cornice no. Il checkpoint le porta in inbox e le marca → ✔️ inbox.
+
+# Reminder regole di output CHAT
+
+Vale per il testo che scrivi in chat, non per i file su disco.
+
+- Rispondi **in parole povere**
+- **Onora la direttiva del raggio**, sempre. Assumi [R0] quando non esplicitata nel prompt utente
+- Niente cornici, a nessun livello. **Un aggancio DICE la cosa**, non la annuncia — «I metadati EXIF spariscono nel ridimensionamento», mai «La cosa che si perde per sbaglio».
+- Evita riepiloghi finali o offrire step successivi. Quando hai finito di rispondere alla domanda utente hai finito, non devi aggiungere altro.
