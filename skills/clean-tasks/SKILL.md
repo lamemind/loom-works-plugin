@@ -28,6 +28,16 @@ Interpreta `$ARGUMENTS` e scegli **uno** dei modi:
 
 In Modo B estrai `DAYS` dal linguaggio naturale (default `60`).
 
+## Conferma già raccolta dal chiamante — token `yolo`
+
+Se `$ARGUMENTS` contiene **`yolo`** (o **"no domande"**, **"senza domande"** — stesso rilevamento di `create-task`), il chiamante dichiara di aver **già raccolto la conferma**: salta **ogni** `AskUserQuestion` di questa skill — quella sui target NON-Done (§2) e quella sul gate `--ignored-files` (§3b) — e vai diretto all'apply. Il token non cambia nient'altro: il dry-run si esegue e si mostra lo stesso, l'esito si verifica lo stesso.
+
+Il canale esiste perché **una skill che chiede conferma con `AskUserQuestion` non è invocabile da un consumer headless**: in `claude -p` non c'è nessuno che risponda, la sessione resta appesa finché non la si uccide, e per chi la osserva dall'esterno (evento `result` che non arriva mai) è indistinguibile da un'operazione lenta. Un consumer che vuole tenere la conferma dalla propria parte — come il modale `CANC` di loom-deck — deve poterlo **dire** alla skill, o la conferma resta doppia e la seconda blocca.
+
+Col token, se il gate `--ignored-files` scatta (§3b) e il chiamante non ha passato `keep|purge`, **non chiedere**: riporta il blocco `ERROR` con folder e file superstiti e chiudi non-zero. Scegliere al posto di chi non ha risposto significherebbe decidere in silenzio se dei file si perdono.
+
+Chiamante headless che passa già la direttiva: `--ignored-files keep` o `--ignored-files purge` compaiono in `$ARGUMENTS` accanto agli ID → inoltrali tali e quali al comando di apply, senza chiedere.
+
 ## Flusso — dry-run → conferma → apply
 
 Passa l'intero SPEC/range in **una sola invocazione**: lo script espande i range da solo (gli ID inesistenti finiscono `[missing]`, non bloccano).
@@ -58,6 +68,7 @@ Nessun candidato e nessuna riga orfana → niente da rimuovere, chiudi.
 
 - **Modo A**: salta la conferma se `non_done == 0` (tutti Done) e vai diretto all'apply. Se `non_done > 0`, conferma obbligatoria.
 - **Modo B**: conferma sempre, se ci sono candidati.
+- **Token `yolo`**: conferma già raccolta dal chiamante → salta in entrambi i modi.
 
 Quando serve, TTS ping poi `AskUserQuestion`:
 
@@ -98,7 +109,7 @@ ERROR: task folder con file che 'git rm' non rimuove (ignored/untracked):
 
 Il dry-run le anticipa marcando il candidato con `[⚠ N ignored/untracked]`.
 
-Quando l'apply esce con quel blocco `ERROR`, sei tu (chiamante) a decidere. TTS ping + `AskUserQuestion`, elenca folder e file, chiedi **come gestirli**. In **entrambi** i casi la folder sparisce dal disco locale — la scelta riguarda solo se preservarli in git:
+Quando l'apply esce con quel blocco `ERROR`, sei tu (chiamante) a decidere — **salvo token `yolo` senza `--ignored-files`**, dove riporti il blocco e chiudi non-zero. TTS ping + `AskUserQuestion`, elenca folder e file, chiedi **come gestirli**. In **entrambi** i casi la folder sparisce dal disco locale — la scelta riguarda solo se preservarli in git:
 
 - **Preserva (keep)** → commit-snapshot dedicato che salva quei file in git **prima** del purge; poi la folder viene comunque rimossa dal disco (i file restano recuperabili da quel commit).
 - **Elimina (purge)** → nessuno snapshot; `rm` secco della folder (path assoluto, guardato dentro project root — nessun disastro). File persi.
