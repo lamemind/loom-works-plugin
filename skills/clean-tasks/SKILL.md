@@ -34,7 +34,9 @@ Se `$ARGUMENTS` contiene **`yolo`** (o **"no domande"**, **"senza domande"** —
 
 Il canale esiste perché **una skill che chiede conferma con `AskUserQuestion` non è invocabile da un consumer headless**: in `claude -p` non c'è nessuno che risponda, la sessione resta appesa finché non la si uccide, e per chi la osserva dall'esterno (evento `result` che non arriva mai) è indistinguibile da un'operazione lenta. Un consumer che vuole tenere la conferma dalla propria parte — come il modale `CANC` di loom-deck — deve poterlo **dire** alla skill, o la conferma resta doppia e la seconda blocca.
 
-Col token, se il gate `--ignored-files` scatta (§3b) e il chiamante non ha passato `keep|purge`, **non chiedere**: riporta il blocco `ERROR` con folder e file superstiti e chiudi non-zero. Scegliere al posto di chi non ha risposto significherebbe decidere in silenzio se dei file si perdono.
+Col token, se il gate `--ignored-files` scatta (§3b) e il chiamante non ha passato `keep|purge`, **non chiedere**: riporta il blocco `ERROR` con folder e file superstiti. Scegliere al posto di chi non ha risposto significherebbe decidere in silenzio se dei file si perdono.
+
+In quel caso la **prima riga** della risposta finale deve nominare le task NON rimosse, in chiaro e per ID: un consumer headless legge quel testo (`{type:"result"}`) e non ha altro modo di sapere *quali* sono sopravvissute. `is_error` non basta e non va usato come segnale — una spiegazione ben scritta di un blocco chiude comunque `is_error: false`, cioè un successo dichiarato su zero rimozioni.
 
 Chiamante headless che passa già la direttiva: `--ignored-files keep` o `--ignored-files purge` compaiono in `$ARGUMENTS` accanto agli ID → inoltrali tali e quali al comando di apply, senza chiedere.
 
