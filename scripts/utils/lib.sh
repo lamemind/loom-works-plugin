@@ -164,6 +164,51 @@ lw_resolve_task() {   # [<task-id>]
     printf 'TASK_ID=%q\nTASK_FILE=%q\nTASK_SRC=%q\n' "$id" "$file" "$src"
 }
 
+# ---- Figlie di un cappello ---------------------------------------------------
+#
+# La parentela la dichiara la FIGLIA (`**Parent Task**: T74`), quindi il padre non
+# sa di averne: l'elenco si ricava solo scandagliando tutti i task file. Il calcolo
+# sta qui e non in prosa nei body delle skill perche' il match ha un dettaglio che
+# diverge in silenzio quando lo si riscrive: `grep 'Parent Task.*T7'` matcha anche
+# `**Parent Task**: T74`. Serve un'ancora di fine-token, e la riga reale porta
+# spesso testo dopo l'id — `**Parent Task**: T74 (asfaltamento del sistema doc)`.
+#
+# Ortogonale al marker di cappello (`Size: Epic`, dichiarato dal padre su di se'):
+# quello dice "sono un cappello", questo dice "chi sono le mie figlie".
+#
+# Stampa una riga per figlia, ordinate per id numerico (T9 prima di T10):
+#
+#   TASK_CHILD=T76 /abs/path/runtime/tasks/T76-slug.md
+#
+# Nessuna figlia -> nessuna riga, exit 0.
+# Exit: 0 = ok · 1 = id malformato
+lw_task_children() {   # <task-id>
+    local id="${1:-}" root docs dir f cid rows=""
+
+    if [[ ! "$id" =~ ^T[0-9]+$ ]]; then
+        echo "ERROR: id task malformato: '${id}' (atteso T<numero>)" >&2
+        return 1
+    fi
+
+    root="$(lw_find_project_root)"
+    docs="$(lw_docs_root)"
+    dir="${root}/${docs}/tasks"
+
+    for f in "${dir}"/*.md; do
+        [[ -f "$f" ]] || continue
+        grep -qE "^[[:space:]]*-?[[:space:]]*\*\*Parent Task\*\*:[[:space:]]*${id}([^0-9]|\$)" "$f" || continue
+        cid="$(basename "$f" .md)"
+        cid="${cid%%-*}"
+        rows+="${cid#T}|${cid}|${f}"$'\n'
+    done
+
+    [[ -n "$rows" ]] || return 0
+
+    printf '%s' "$rows" | sort -t'|' -k1,1n | while IFS='|' read -r _ cid f; do
+        printf 'TASK_CHILD=%s %s\n' "$cid" "$f"
+    done
+}
+
 # ---- Baseline del diff di checkpoint -----------------------------------------
 #
 # Da dove parte la finestra <base>..HEAD che checkpoint-task-analyze.sh mostra.

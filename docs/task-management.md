@@ -11,8 +11,6 @@ MAIN ({project}/)                ← branch base, home di docs/tasks.md, task sp
   └── task spot                  ← direttamente su main, senza lane
 ```
 
-Task = unità di lavoro, vive in `docs/tasks/{id}-*.md`.
-
 ## Task List
 
 Una singola fonte di verità: `docs/tasks.md`. Contiene:
@@ -41,15 +39,13 @@ Implementata **una volta**: `lw_resolve_task` in `scripts/utils/lib.sh`, e per c
 
 Percorso di task sequenziali con worktree condiviso: creato una volta, riusato. Senza lane: worktree nuovo ad ogni task (npm install, build, setup) poi distrutto al merge.
 
-Le lane sono **design**, non emergono dagli script: definite nel grafo di `docs/tasks.md` in pianificazione. Bulk: grafo intero con cross-deps. Incrementale: `create-task` chiede in quale lane (o ne crea una). Task spot piccole vanno su main senza lane.
+Le lane sono **design**, non emergono dagli script: si definiscono nel grafo di `docs/tasks.md` in pianificazione, in blocco o una alla volta (`create-task` chiede in quale lane). Task spot piccole vanno su main senza lane.
 
-- **Naming**: worktree `{project}-{lane}` (es. `myproject-l1-feature`) · branch `feat/{lane}` · terminale/tmux stabile per lane.
+- **Naming**: worktree `{project}-{lane}` (es. `myproject-l1-feature`) · branch `feat/{lane}`.
 - **Ciclo di vita**: ① `spawn-lane` crea worktree da main, avvia prima task → ② `start-task` → `run-task` → `checkpoint-task` nel worktree → ③ `merge-lane` mergia in main, aggiorna grafo, ricopia tasks nel worktree → ④ `spawn-lane` riusa worktree, crea solo nuovo branch task → ⑤ `merge-lane` chiede conferma rimozione worktree all'ultima task.
 - **Comandi** (da main): `/loom-works:spawn-lane {lane}` crea/riusa worktree e avvia task · `/loom-works:merge-lane {lane}` merge in main, aggiorna grafo.
 
 ### Grafo dipendenze
-
-`docs/tasks.md` contiene il grafo lane con cross-deps. Source of truth per gli script.
 
 ```
 Legend: ✔️ Done  🟡 In Progress  🔒 Locked
@@ -81,6 +77,8 @@ Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-la
 
 **Parentela fra task**: il campo `**Parent Task**: T{N}` si scrive a mano nella figlia, e il parent porta `- [ ] T{N} (<maniglia>) chiusa` in Acceptance. Alla chiusura della figlia il suo `checkpoint-task` flagga indietro quella checkbox — matchando l'id, non la frase.
 
+**Epiche (task cappello)**: `Size: Epic` marca il cappello. Serve un marker suo perché la parentela la scrive la **figlia** — il padre non sa di averne senza scandagliare gli altri task file. Nel cappello: visione, perimetro, ordine delle fasi, una checkbox per figlia in Acceptance. Nelle figlie: il lavoro eseguibile, coi propri DLV e AC. `run-task` **non esegue** un'epica, lo dichiara e si ferma. Figlie: `resolve-task.sh <id> --children` (word boundary sull'id, `T7` non matcha `T74`).
+
 **Materiale della task**: la sezione `## Materiale` dichiara i file di **alto rilievo**, non l'inventario della folder. Voce = glifo + path + maniglia verbo+oggetto. 📖 fonte · 🔬 analisi · 📤 prodotto · `📁/` = radice della task folder (campo `Folder`).
 
 ### Detached (più task in parallelo, stesso worktree)
@@ -106,24 +104,15 @@ Ogni `checkpoint-task` legge le voci `## Doc Impact` **da lavorare**, le riscriv
 
 **`⏳` è l'unico marker non terminale**, quindi «da lavorare» sono le voci senza marker **e** quelle `⏳`. L'evento è una condizione verificabile (`⏳ F7`), mai un momento, e cade dentro il ciclo di vita della task: il checkpoint che la chiude forza ogni residuo a decisione, o l'attesa resta senza nessuno che la rilegga.
 
-**Niente gate**: c'era per decidere *quando* pagare il costo del consolidamento, e senza costo non resta niente da decidere. Dove la nozione atterri lo decide `drain-doc`, in differita.
+**Nessun gate all'utente**: dove la nozione atterri lo decide `drain-doc`, in differita.
 
 **La fase doc gira dopo il commit e il push del codice**, mai prima: il push è ciò che rende il lavoro visibile alle altre sessioni, che ripartono mentre questa finisce. Committare per primo il codice toglie anche il `git add -A` dalla finestra della scrittura doc — la working copy resta usabile, e un fallimento della fase doc non porta con sé il codice.
 
 ## Task Folder
 
-Folder dedicata per task con molto materiale (artefatti, dump, analisi, script).
+Dove sta il materiale di una task (artefatti, dump, analisi, script), quando ce n'è molto. Naming `.YY-MM-DD-{slug}` (dot-prefix → sort top, slug = task slug). **Posizione = project root, sempre** — mai sotto `docs/tasks/`, che tiene solo i task file `.md`; il nome dotted è solo il nome, il parent è la root. Non crearla a mano (`mkdir`): usa `set-task-folder` / `scratch-new`, che la collocano giusta.
 
-```
-{project}/
-├── .26-05-22-brt-invoice-error/   ← task folder (size L)   [project ROOT]
-├── docs/tasks/                    ← qui SOLO i task file .md (NO folder)
-└── ...                            ← codice progetto
-```
-
-Naming `.YY-MM-DD-{slug}` (dot-prefix → sort top, slug = task slug). **Posizione = project root, sempre** — mai sotto `docs/tasks/`; il nome dotted è solo il nome, il parent è la root. Non crearla a mano (`mkdir`): usa `set-task-folder` / `scratch-new`, che la collocano giusta.
-
-- **Quando esiste**: auto-creata da `create-task` per size **L**; S/M solo se specificato (`"with folder"` / `"con folder"` nelle Note utente).
+- **Quando esiste**: auto-creata da `create-task` per size **L** ed **Epic**; S/M solo se specificato (`"with folder"` / `"con folder"` nelle Note utente).
 - Campo `**Folder**:` nel task file: sempre presente, vuoto se no folder.
 - **Comandi**: folder retroattiva (riusa se esiste) `/loom-works:set-task-folder {taskId}` · folder orfana senza task `/loom-works:scratch-new <slug>`.
 - **CWD invariato**: le skill workflow non cambiano mai `cwd`; resta sempre project root (dove sta `CLAUDE.md`). Il campo Folder (📁) è informativo: lavoro dentro la folder su scelta esplicita dell'utente.

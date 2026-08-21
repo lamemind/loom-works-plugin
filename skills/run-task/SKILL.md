@@ -59,8 +59,24 @@ Leggi il campo **Size** dalla mappa proprietà della task.
 | **S** | Express | Vai dritto all'esecuzione. Niente validazione incrociata, niente scomposizione, niente piano. Leggi la task, capisci cosa fare, fallo. |
 | **M** | Standard | Validazione leggera (requisiti chiari? dipendenze presenti?). Scomposizione con TodoWrite solo se servono >3 step. Esecuzione. |
 | **L** | Full | Workflow completo: validazione profonda, scomposizione, pianificazione top-down, checkpoint intermedi. |
+| **Epic** | **Nessuna — ferma** | Task cappello: non si esegue. Vedi sotto. |
 
-Se il campo Size è assente, tratta come **M**.
+Se il campo Size è assente, tratta come **M**. `Epic` va intercettato **prima** di questo fallback, o un cappello verrebbe eseguito come una task media.
+
+### Gate `Size: Epic` — dichiara e fermati
+
+Una task `Size: Epic` è un cappello, e un cappello non ha lavoro eseguibile proprio: sta tutto nelle figlie. Non aprire nessun deliverable, non scrivere codice. Stampa invece:
+
+- che `${taskId}` è un'epica e che `run-task` non la esegue
+- l'elenco delle figlie con la loro Prog, da:
+
+  ```bash
+  ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --children
+  ```
+
+- l'invito a eseguire una figlia (`/loom-works:run-task T{N}`) o a chiedere il quadro con `/loom-works:recap-status-epic ${taskId}`
+
+Poi termina. Nessun ping TTS di completamento, nessuna fase Doc Impact: non è stato fatto lavoro.
 
 ---
 

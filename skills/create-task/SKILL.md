@@ -33,7 +33,7 @@ Cerca keyword nell'input: **"yolo"**, **"no domande"**, **"senza domande"**
 Decisione binaria `CREATE_FOLDER=yes|no`:
 - Trigger esplicito da input utente: `"con task folder"`, `"con folder"`, ecc → `CREATE_FOLDER=yes`
 - In alternativa determinare da Size task:
-  - **Size = L** → `CREATE_FOLDER=yes`
+  - **Size = L | Epic** → `CREATE_FOLDER=yes`
   - **Size = S | M** → `CREATE_FOLDER=no`
 
 Nel template file, il campo `**Folder**:` viene popolato automaticamente dallo script (step 3b) col path root-relative `./.YY-MM-DD-slug`.
@@ -47,7 +47,7 @@ Nel template file, il campo `**Folder**:` viene popolato automaticamente dallo s
 Quando attiva, deduce automaticamente:
 - **Nome task**: dalla descrizione → kebab-case (prime 3-4 parole significative)
 - **Priorità**: Med (default)
-- **Size**: M (default). Valori: S (express), M (standard), L (full validation)
+- **Size**: M (default). Valori: S (express), M (standard), L (full validation), Epic (task cappello, non eseguibile)
 - **Durata**: 1-2 ore (default)
 - **Lane**: nessuna (task spot)
 - **Dipendenze**: nessuna
@@ -70,7 +70,7 @@ Output: ID completo pronto all'uso (es: T319, T320). Prefix `T` hardcoded.
 ### 2. Raccolta dettagli (solo modalità interattiva)
 1. **Nome task**: valida formato kebab-case
 2. **Priorità**: High/Med/Low
-3. **Size**: S/M/L (S = express, M = standard, L = full validation)
+3. **Size**: S/M/L/Epic (S = express, M = standard, L = full validation, Epic = task cappello che non si esegue — il lavoro sta nelle figlie, vedi `docs/task-management.md` §Epiche)
 4. **Durata stimata**
 5. **Servizi coinvolti**: bridge, runner, scheduler, pocketbase, xvfb, vnc
 6. **File critici**

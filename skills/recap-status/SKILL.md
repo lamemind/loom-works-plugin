@@ -1,7 +1,7 @@
 ---
 name: recap-status
-description: Project status overview — cross-check doc↔git/fs, flag inconsistencies, propose next step.
-allowed-tools: Bash(*), Read, Glob
+description: Recap dispatcher — risolve la task attiva, classifica e passa a recap-status-project|task|epic. Da usare quando si chiede un recap senza nominare il livello.
+allowed-tools: Bash(*), Read, Skill
 model: opus
 ---
 
@@ -13,52 +13,42 @@ model: opus
 
 Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Panoramica dello stato corrente del progetto per riorientarsi all'inizio di una sessione o dopo un context-switch. **Read-only**: non scrive né modifica nessun file.
+## Note utente
+~~~human
+$ARGUMENTS
+~~~
 
-## Fase 1 — Raccolta dati
+**Questa skill non produce il recap.** Classifica e passa la palla. L'unico testo che scrivi per l'utente è la riga di dispatch dello step 3 — tutto il resto lo scrive la sotto-skill, che eredita contesto di sessione e output style perché gira nello stesso turno.
 
-**1a. Stato git/fs** — esegui:
+## 1. Risolvi la task attiva
+
+Se le Note utente nominano un ID task (`T113`), passalo come argomento; altrimenti omettilo.
+
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/recap-git-status.sh
+${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
-**1b. Doc** — leggi in parallelo dove possibile:
-- `{docs_root}/tasks.md` → Tasks Overview + Execution Plan
-- L'output script dice `active: <path>` o `none` per current-task
-  - Se attivo: leggi il task file puntato (path relativo alla repo root)
-- Glob `{docs_root}/tasks/*.md` → leggi tutti i file task che non hanno `Progress: ✔️` nella loro intestazione (al più 8-10 task — non serve leggere i completati se ce ne sono molti)
+Cascata di famiglia `arg → $LOOM_TASK → symlink {docs_root}/current-task.md`. Exit non-zero significa «nessuna task attiva»: è un caso normale e previsto, non un errore da riportare all'utente.
 
-## Fase 2 — Verifica incrociata
+## 2. Classifica
 
-Confronta stato *dichiarato* nei doc vs stato *reale* da git/fs. Segnala esplicitamente:
+| Esito della risoluzione | Sotto-skill |
+|---|---|
+| exit non-zero — nessuna task risolta | `loom-works:recap-status-project` |
+| task risolta con `Size: Epic` | `loom-works:recap-status-epic` |
+| task risolta con qualunque altro `Size` | `loom-works:recap-status-task` |
 
-- **Progress stale**: `🟡 0%` (o bassa %) ma commit recenti mostrano lavoro su quella task
-- **Da chiudere**: tutti gli AC/deliverable `[x]` ma Progress < 100%
-- **Gap deliverable**: file dichiarato nel Deliverables Checklist assente su fs (usa Bash `test -f` o Glob se utile)
-- **Symlink stale**: `current-task.md` punta a task con `Progress: ✔️`
-- **Lavoro non tracciato**: task `🔵 Todo` ma cartella Folder già popolata o commit rilevanti già presenti
+Il `Size` si legge facendo `Read` di `TASK_FILE`, non da ciò che l'iniezione ha portato in contesto: il fill del budget può averlo troncato.
 
-## Fase 3 — Sintesi adattiva
+Se l'utente ha nominato lui la sotto-skill (`/loom-works:recap-status-project` invocata a mano) questa skill non è nemmeno in mezzo — non c'è niente da dispacciare.
 
-Output in **layout visivo facilitatore**: emoji, tabelle, grassetti, ASCII block. Tono: colloquiale, diretto — non un report formale.
+## 3. Invoca
 
-Blocchi disponibili — **seleziona e adatta** in base al progetto reale. Non tutti sono sempre presenti; non usare template fissi.
+Tool `Skill`:
 
-| Blocco | Quando includerlo |
-|--------|-------------------|
-| **Identità** | se stack deducibile da CLAUDE.md o README |
-| **Stato git** | sempre — branch, HEAD commit, worktree/lane, lavorazioni uncommitted |
-| **Task attiva** | se symlink presente — focus sullo stato REALE (confronto AC/deliverable vs git) |
-| **Tabella task** | sempre —  ID / Stato / Titolo / preflight. Aggiungi Pri / Size dove aggiungono valore |
-| **Fondamenta consolidate** | su progetti maturi (≥5 task done) — cosa è già a terra, raggruppato per area |
-| **⚠️ Incongruenze** | se ce ne sono — sezione separata, evidenziata |
-| **Gap / residui** | se task attiva ha lavoro non chiuso — checklist prima di completare |
-| **Filo conduttore** | se ci sono deps implicite tra task — priorità nascosta, cross-deps concettuali |
+- `skill` = il nome scelto allo step 2
+- `args` = **le Note utente verbatim**, senza riassumerle, tradurle, riordinarle o interpretarle
 
-**Non fare un dump di tasks.md.** Il valore è il giudizio interpretativo: cosa è davvero completo, cosa è bloccato, cosa va chiuso prima, cosa si può fare ora. Ma includi sempre titolo task (ID nudo non parlante).
+Verbatim non è pignoleria: l'input porta spesso più richieste distinte più un `[Kx]` inline, e un dispatcher che riassume prima di passare butta via proprio la parte che la sotto-skill deve onorare.
 
-## Fase 4 — Chiusura operativa
-
-- Proponi il **next step naturale**: chiudere task X, partire con Y, committare modifiche pending, riconciliare doc stale
-- **Chiudi con una domanda diretta** all'utente su cosa aprire/fare — tono colloquiale, coerente col progetto
-- **No `AskUserQuestion`** — domanda inline in markdown
+Prima di invocare stampa **una riga sola**, nella forma `→ recap-status-{project|task|epic}` più l'id della task risolta quando c'è. Poi passa la palla e non aggiungere altro.

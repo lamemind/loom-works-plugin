@@ -45,7 +45,10 @@ Then bootstrap the project structure:
 | `/loom-works:spawn-lane` | Create a persistent git worktree lane |
 | `/loom-works:merge-lane` | Merge lane into main, keep worktree |
 | `/loom-works:drop-lane` | Destroy a lane without merging |
-| `/loom-works:recap-status` | Project status overview with doc↔git cross-check |
+| `/loom-works:recap-status` | Recap dispatcher: resolves the active task and routes to one of the three below |
+| `/loom-works:recap-status-project` | Whole-project recap with doc↔git cross-check — no next-step proposal |
+| `/loom-works:recap-status-task` | Single-task recap: open DLV/AC, material produced, one named next step |
+| `/loom-works:recap-status-epic` | Umbrella-task recap: children with DLV/AC figures, deps, two-level entry point |
 | `/loom-works:list-worktrees` | List worktrees with branch, dirty count and active task |
 | `/loom-works:reindex` | Regenerate the reference INDEX.md from file TLDRs |
 | `/loom-works:capture-doc` | Capture ad-hoc doc notions outside of tasks |
