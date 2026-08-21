@@ -65,14 +65,16 @@ Il materiale prodotto è **parte dello stato della task**, non un allegato: su u
 
 **Se `## Materiale` è popolata**, è la fonte: onora i glifi (`📖` fonte · `🔬` analisi · `📤` prodotto) e risolvi la radice `📁/` contro il campo `**Folder**:`. Riporta le voci con la loro maniglia, non i path nudi.
 
-**Se manca o è vuota — ed è il caso di maggioranza**, nessuna skill la popola in automatico e non c'è retrofit sulle task già aperte. Ricostruisci l'insieme da due sedi:
+**Se manca o è vuota**, ricostruisci l'insieme da due sedi:
 
-- la **task folder**, se il campo `Folder` è popolato
-- i **path citati** nel task file: `Description`, `Deliverables Checklist`, `Doc Impact`
+- i **path citati** nel resto del task file: `Description`, `Deliverables Checklist`, `Doc Impact`
+- la **task folder**, se il campo `Folder` è popolato — scandiscila per altri riferimenti di rilievo
 
 Elenca solo ciò che è di rilievo — un documento che porta contenuto — non l'inventario della cartella.
 
 ## 4. Il recap — in quest'ordine
+
+**Apri con la sostanza.** Docs-root risolta, cascata che ha risolto la task, conteggio delle figlie, nome degli script girati: sono passi di lavoro tuoi, non contenuto per chi legge. Niente riga di intestazione tecnica prima del quadro — se un dato di risoluzione conta davvero (una task risolta da un ID esplicito diverso da quella attiva), dillo dentro il blocco dove pesa.
 
 **4a. Quadro d'insieme, prima del dettaglio.** Cosa vuole ottenere la task, a che punto è davvero, cosa è cambiato rispetto a quello che il file dichiara. Poche righe, e vengono per prime anche quando l'utente chiede «zoom alto»: zoom alto non chiede meno copertura, chiede che il quadro preceda il dettaglio, che arriva comunque dopo.
 

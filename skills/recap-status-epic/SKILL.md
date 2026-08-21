@@ -66,6 +66,8 @@ Più `{docs_root}/tasks.md` per la Prog di ogni figlia e per l'Execution Plan, s
 
 L'ordine non è cosmetico: una proposta emessa prima delle dipendenze non ha i dati per essere quella giusta.
 
+**Apri con la sostanza.** Docs-root risolta, cascata che ha risolto il cappello, conteggio delle figlie, nome degli script girati: sono passi di lavoro tuoi, non contenuto per chi legge. Niente riga di intestazione tecnica prima del quadro — se un dato di risoluzione conta davvero (figlie zero, cappello senza `Size: Epic`), dillo dentro il blocco dove pesa.
+
 **3a. Il cappello, a zoom alto.** Cosa vuole ottenere l'epica, dove è arrivata nel suo insieme, cosa resta. Prima le figlie non si nominano nemmeno: chi legge deve avere il quadro, non ricostruirlo da un elenco.
 
 Distingui lo **stato del cappello** da quello delle figlie: i DLV e gli AC propri del cappello (compresa la checkbox per figlia in Acceptance) sono cose sue, e possono essere aperti mentre le figlie corrono.

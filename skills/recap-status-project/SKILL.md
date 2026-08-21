@@ -64,6 +64,8 @@ Confronta stato *dichiarato* nei doc vs stato *reale* da git/fs. Segnala esplici
 
 Output in **layout visivo facilitatore**: emoji, tabelle, grassetti, ASCII block. Tono: colloquiale, diretto — non un report formale.
 
+**Apri con la sostanza.** Docs-root risolta, cascata di risoluzione, nome degli script girati, conteggio dei file letti: sono passi di lavoro tuoi, non contenuto per chi legge. Niente riga di intestazione tecnica prima del primo blocco — se un dato di risoluzione conta davvero, dillo dentro il blocco dove pesa.
+
 Blocchi disponibili — **seleziona e adatta** in base al progetto reale. Non tutti sono sempre presenti; non usare template fissi.
 
 | Blocco | Quando includerlo |
