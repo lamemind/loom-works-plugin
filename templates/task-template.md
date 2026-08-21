@@ -22,6 +22,9 @@
 ## Deliverables Checklist
 {{checklist_deliverables_raccolta}}
 
+## Materiale
+*📖 fonte · 🔬 analisi · 📤 prodotto · 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
+
 ## Implementation Notes
 *Note tecniche e considerazioni implementative*
 

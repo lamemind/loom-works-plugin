@@ -53,6 +53,7 @@ if [ -n "$f" ] && [ -f "$f" ]; then
     if (n ~ /^description/)         return "Description"
     if (n ~ /^acceptance/)          return "Acceptance Criteria"
     if (n ~ /^deliverables/)        return "Deliverables Checklist"
+    if (n ~ /^materiale/)           return "Materiale"
     if (n ~ /^decision/)            return "Decisions"
     if (n ~ /^dependenc/)           return "Dependencies"
     if (n ~ /^implementation note/) return "Implementation Notes"
@@ -64,7 +65,7 @@ if [ -n "$f" ] && [ -f "$f" ]; then
   }
   BEGIN {
     nsec = 0
-    nprio = split("Acceptance Criteria|Deliverables Checklist|Decisions|Dependencies|Implementation Notes|Testing Notes|Doc Impact|Prod Validation|Progress Log", prio, "|")
+    nprio = split("Acceptance Criteria|Deliverables Checklist|Materiale|Decisions|Dependencies|Implementation Notes|Testing Notes|Doc Impact|Prod Validation|Progress Log", prio, "|")
   }
   /^## / {
     nsec++

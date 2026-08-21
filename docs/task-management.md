@@ -81,6 +81,8 @@ Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-la
 
 **Parentela fra task**: il campo `**Parent Task**: T{N}` si scrive a mano nella figlia, e il parent porta `- [ ] T{N} (<maniglia>) chiusa` in Acceptance. Alla chiusura della figlia il suo `checkpoint-task` flagga indietro quella checkbox — matchando l'id, non la frase.
 
+**Materiale della task**: la sezione `## Materiale` dichiara i file di **alto rilievo**, non l'inventario della folder. Voce = glifo + path + maniglia verbo+oggetto. 📖 fonte · 🔬 analisi · 📤 prodotto · `📁/` = radice della task folder (campo `Folder`).
+
 ### Detached (più task in parallelo, stesso worktree)
 
 Più task piccole in parallelo nello stesso worktree, una per sessione Claude. Due modi di entrarci, stesso regime: `/loom-works:start-task T102 detach` (task ID esplicito in ogni comando) oppure una sessione spawnata dal deck, che porta `$LOOM_TASK`.
@@ -110,7 +112,7 @@ Ogni `checkpoint-task` legge le voci `## Doc Impact` **da lavorare**, le riscriv
 
 ## Task Folder
 
-Folder dedicata per task con molto materiale (artefatti, dump, analisi, script). Affianca (non sostituisce) `docs/` per contenuto AI-meta strutturato.
+Folder dedicata per task con molto materiale (artefatti, dump, analisi, script).
 
 ```
 {project}/
