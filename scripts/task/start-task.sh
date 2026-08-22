@@ -99,7 +99,10 @@ if [[ -f "$TASKS_FILE" ]]; then
         echo "WARN: nessuna riga ${TASK_ID} sotto un header con colonna Prog in ${TASKS_FILE} — Prog NON aggiornata" >&2
     fi
 
-    perl -i -pe "s/→ ${TASK_ID}(?![0-9])/→ 🟡${TASK_ID}/ if /^Lane/" "$TASKS_FILE"
+    # Il prefisso 🟢 e' opzionale perche' preflight-task puo' aver gia' promosso
+    # il nodo: senza prevederlo qui la sostituzione non aggancerebbe, il verde
+    # resterebbe sul grafo a task avviata e nessun errore lo segnalerebbe.
+    perl -i -pe "s/→ 🟢?${TASK_ID}(?![0-9])/→ 🟡${TASK_ID}/ if /^Lane/" "$TASKS_FILE"
 fi
 
 # -----------------------------------------------------------------------------

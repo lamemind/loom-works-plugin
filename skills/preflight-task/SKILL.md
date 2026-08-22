@@ -185,19 +185,31 @@ Regole di scrittura, tutte già note e nessuna nuova:
 
 Se nessuna decisione tocca la doc, **non scrivere niente** — nessun placeholder, nessuna sezione vuota. `## Doc Impact` non è il registro delle decisioni, quello è `## Decisions`.
 
+## 3c. Promozione a 🟢 Ready
+
+Scritte le decisioni, porta la task allo stato **🟢 Ready** — «preflight fatto, zero codice», il gradino fra `🔵` e `🟡`. Serve perché il preflight è un investimento già pagato, e senza un glifo suo resta leggibile solo aprendo il task file per vedere se `## Decisions` è popolata.
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/promote-ready.sh" ${taskId}
+```
+
+Lo script promuove **solo da 🔵** e tace altrimenti: la skill è ri-eseguibile, e rifare il preflight su una task già `🟡` o `✔️` non deve riaprirla. Il confronto legge la cella `Prog` di `tasks.md`, non il campo `Progress` del task file, che è testo libero. Aggiorna riga di tabella, nodo del grafo lane e campo `Progress`.
+
+Vale anche nel caso «nessuna ambiguità»: il marker in `## Decisions` dice che il preflight è passato, e la Prog deve dire la stessa cosa.
+
 ## 4. Commit del task file
 
-Appena scritte le decisioni, committa **subito** il solo task file (commit dedicato, separato dall'implementazione). Usa gli helper di `lib.sh`:
+Appena promossa la Prog, committa **subito** task file e `tasks.md` (commit dedicato, separato dall'implementazione). Usa gli helper di `lib.sh`:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
-lw_git_add "${task_file}"
+lw_git_add "${task_file}" "${tasks_md}"
 # N≥1 → "...- ${N} decisioni congelate" | N=0 (nessuna ambiguità) → "...- nessuna ambiguità"
 lw_git_commit "task(${taskId}): preflight - ${N} decisioni congelate"
 lw_git_push
 ```
 
-- Committa **solo** il task file, non altri file pending nel working tree.
+- Committa **solo** quei due file, non altri file pending nel working tree. `tasks.md` entra perché lo step 3c può averne cambiato la riga; se la promozione non è scattata il file è pulito e non produce diff.
 - Messaggio: `task(${taskId}): preflight - ${N} decisioni congelate` se `${N}` ≥ 1, altrimenti `task(${taskId}): preflight - nessuna ambiguità`.
 - `${N}` = numero di `D{N}` scritte da **questa** esecuzione, le non-decise comprese: hanno un esito dichiarato come le altre (0 nel caso nessuna ambiguità).
 - Push subito dopo il commit, coerente con `create-task` / `checkpoint-task` (tutte pushano). Senza remote `lw_git_push` avvisa su stderr ed esce 0: la skill prosegue, il commit resta locale.

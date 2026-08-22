@@ -1,7 +1,7 @@
 {
   "name": "loom-works",
   "description": "Lane / Task management with coupled documentation lifecycle",
-  "version": "7.12.0",
+  "version": "7.13.0",
   "settings": {
     "permissions": {
       "allow": [

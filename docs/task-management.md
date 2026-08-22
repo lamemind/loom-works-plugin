@@ -31,7 +31,7 @@ Una sola cascata, per ogni consumer: **`arg esplicito → $LOOM_TASK → symlink
 
 Implementata **una volta**: `lw_resolve_task` in `scripts/utils/lib.sh`, e per chi non può sourcare bash (il markdown delle skill) il wrapper `scripts/task/resolve-task.sh`. Restituisce `TASK_ID` · `TASK_FILE` · `TASK_SRC` ∈ `arg|env|symlink`. `TASK_SRC` non è cosmetico: rende la provenienza dichiarata invece che silenziosa, ed è ciò che decide linked vs detached (§Detached), cioè `git add -A` contro stage selettivo.
 
-**Un solo canale scrive la task in contesto**: l'hook `SessionStart` (`inject-task.sh`). Il symlink **non va @-importato** in `CLAUDE.md` — entrerebbe in parallelo all'iniezione e in una sessione con `$LOOM_TASK` il modello vedrebbe due task attive divergenti, l'iniettata e quella stale del worktree. È una primitiva di *risoluzione*, non un canale di *iniezione*.
+**Un solo canale scrive la task in contesto**: l'hook `SessionStart` (`inject-task.sh`). Il symlink **non va @-importato** in `CLAUDE.md` — entrerebbe in parallelo all'iniezione e in una sessione con `$LOOM_TASK` il modello vedrebbe due task attive divergenti, l'iniettata e quella stale del worktree.
 
 `start-task` **rifiuta di girare** quando `$LOOM_TASK` è settata, anche sullo stesso ID: scriverebbe un symlink che la sessione corrente ignora (l'env lo batte), cioè lo stale che la cascata esiste per non produrre.
 
@@ -48,7 +48,7 @@ Le lane sono **design**, non emergono dagli script: si definiscono nel grafo di 
 ### Grafo dipendenze
 
 ```
-Legend: ✔️ Done  🟡 In Progress  🔒 Locked
+Legend: 🟢 Ready  🟡 In Progress  ✔️ Done  🔒 Locked
 
 Lane 1 (nome):   ✔️T01 → ✔️T02 → 🟡T03 → T04 → T05
 Lane 2 (nome):   ✔️T06 → 🟡T07 → T08 → T09
@@ -60,9 +60,9 @@ Cross-deps:
 | 🔒T11 | T10    | ✔️T02, T09  |
 ```
 
-🔒 = cross-deps non soddisfatte, sempre mostrato ed esclusivo del grafo (non compare in task table); nessuna emoji = wait/ready.
+Ciclo di vita: `🔵 → 🟢 preflight fatto → 🟡 → ✔️`. Tabella e grafo restano due alfabeti: 🔒 è esclusivo del grafo, 🔵 della tabella — nel grafo l'assenza di emoji marca la task in attesa.
 
-**Aggiornamenti**: `start-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella · `merge-lane` → su conflitto git invoca `/loom-works:reconcile-tasks`.
+**Aggiornamenti**: `preflight-task` → Prog 🟢 + emoji grafo, solo da 🔵 · `start-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella · `merge-lane` → su conflitto git invoca `/loom-works:reconcile-tasks`.
 
 ## Task
 
@@ -96,7 +96,6 @@ Vincoli:
 - **Task piccole**: ogni sessione fa una task auto-contenuta. Se diventa grande, non usare detached.
 - **No file overlap**: se due task detached toccano gli stessi file, evita conflitti tu (sequenza, non parallelismo reale).
 - **Checkpoint sequenziali**: due `checkpoint-task` simultanei possono fare race su `tasks.md` e `git`. Coordinali tu.
-- **Tasks.md row**: ogni task detached ha la sua riga 🟡 normalmente. Più 🟡 contemporanei = scenario voluto.
 
 ### Doc Impact al checkpoint
 

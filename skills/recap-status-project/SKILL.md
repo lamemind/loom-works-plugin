@@ -58,7 +58,7 @@ Confronta stato *dichiarato* nei doc vs stato *reale* da git/fs. Segnala esplici
 - **Da chiudere**: tutti gli AC/deliverable `[x]` ma Progress < 100%
 - **Gap deliverable**: file dichiarato nel Deliverables Checklist assente su fs (usa Bash `test -f` o Glob se utile)
 - **Symlink stale**: `current-task.md` punta a task con `Progress: ✔️`
-- **Lavoro non tracciato**: task `🔵 Todo` ma cartella Folder già popolata o commit rilevanti già presenti
+- **Lavoro non tracciato**: task `🔵 Todo` o `🟢 Ready` ma cartella Folder già popolata o commit rilevanti già presenti — il verde dichiara design congelato e zero codice, quindi anche lì un commit di implementazione è uno scarto
 
 ## Fase 3 — Sintesi adattiva
 

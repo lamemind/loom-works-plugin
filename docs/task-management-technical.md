@@ -139,8 +139,13 @@ Marcatori standard per tracking nelle task table.
 | Emoji | Significato |
 | ----- | ----------- |
 | 🔵 | Non iniziata |
+| 🟢 | Preflight fatto (design congelato, zero codice) |
 | 🟡 | In corso |
 | ✔️ | Completata |
+
+Il ciclo di vita è `🔵 → 🟢 → 🟡 → ✔️`. Il verde lo scrive `preflight-task`, e solo su una task `🔵`: da qualunque altro stato la cella resta intatta, perché la skill è ri-eseguibile e rifare il preflight su una task chiusa non deve riaprirla.
+
+`🔒` (bloccata da cross-deps) resta **esclusivo del grafo Execution Plan** e non compare mai in tabella.
 
 ### Pri (colonna emoji-only)
 
@@ -160,4 +165,5 @@ Formato standard per `docs/tasks.md` (Task max 100 caratteri).
 | ---- | --- | ---- | ---------------------------------------------------------------------------------------------------- |
 | T319 | 🔥 | ✔️   | Task completata              |
 | T321 | ⚡ | 🟡   | Task in corso                |
-| T322 | ⚡ | 🔵   | Task non iniziata            |
+| T322 | ⚡ | 🟢   | Task col preflight fatto     |
+| T323 | ⚡ | 🔵   | Task non iniziata            |

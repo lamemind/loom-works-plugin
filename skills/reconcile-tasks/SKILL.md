@@ -59,7 +59,9 @@ Se diff A modifica T250 e diff B modifica T255 → applica entrambe, nessun conf
 
 ### Conflitto sullo stesso task ID
 **Precedenza stati** (il più avanzato vince):
-`✔️ Done > 🟡 In Progress > 🔵 Todo > vuoto`
+`✔️ Done > 🟡 In Progress > 🟢 Ready > 🔵 Todo > vuoto`
+
+Un merge non deve mai riportare indietro una task: 🟢 (preflight fatto) sta sopra 🔵 e sotto 🟡, come nel ciclo di vita.
 
 **Emoji additive**: 🚀📋 sono additive — mantieni se presenti in almeno un diff.
 
@@ -69,7 +71,7 @@ Se diff A modifica T250 e diff B modifica T255 → applica entrambe, nessun conf
 - Task rimosse in un diff → rispetta la rimozione
 
 ### Execution Plan (grafo lane nel blocco ```)
-- Applica modifiche emoji (✔️, 🟡) da entrambi i diff
+- Applica modifiche emoji (✔️, 🟡, 🟢) da entrambi i diff
 - Preserva struttura frecce e nomi lane
 - Task rimosse dalla tabella → rimuovi anche dal grafo
 

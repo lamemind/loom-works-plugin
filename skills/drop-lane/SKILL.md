@@ -64,7 +64,7 @@ Lo script: rimuove profilo Ptyxis (best-effort) → `git worktree remove --force
 
 Se esiste la sezione `<!-- LANES:START -->...<!-- LANES:END -->` in `{docs_root}/tasks.md`, rimuovi la riga della lane distrutta con Edit tool.
 
-Inoltre, nel grafo Execution Plan, rimuovi eventuali marker 🟡 davanti ai task ID che erano in lavorazione su questa lane (tornano allo stato precedente). Se non sei certo dello stato pregresso, lascia il task come 🔵 Todo e segnalalo all'utente.
+Inoltre, nel grafo Execution Plan, rimuovi eventuali marker 🟡 davanti ai task ID che erano in lavorazione su questa lane (tornano allo stato precedente). Lo stato precedente è 🟢 Ready se il task file porta un blocco `### Preflight` in `## Decisions`, 🔵 Todo altrimenti. Se non sei certo, lascia 🔵 Todo e segnalalo all'utente.
 
 ### 5. Feedback + TTS
 

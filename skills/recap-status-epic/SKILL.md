@@ -60,7 +60,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/recap-git-status.sh
 
 Più `{docs_root}/tasks.md` per la Prog di ogni figlia e per l'Execution Plan, se l'epica sta su una lane.
 
-**La Prog di `tasks.md` non basta** a dire dove sta una figlia: separa tre stati che il recap deve invece distinguere, e li appiattisce tutti su `🔵 Todo`.
+**La Prog di `tasks.md` non basta** a dire dove sta una figlia. Il glifo `🟢 Ready` distingue ormai il preflight fatto dall'intatta, ma lo scrive solo `preflight-task`, e solo dalle esecuzioni successive al suo rilascio: una figlia preflightata prima resta `🔵` senza che niente lo segnali. Il verdetto sullo stato lo dà quindi il task file — blocco `### Preflight` in `## Decisions` — con la Prog come conferma, non come fonte.
 
 ## 3. Il recap — in quest'ordine
 
@@ -77,7 +77,7 @@ Distingui lo **stato del cappello** da quello delle figlie: i DLV e gli AC propr
 **3c. Le figlie, una per una, con una cifra.** «In corso» da solo non dice se una figlia è a un passo dalla chiusura o appena aperta. Per ognuna:
 
 - quanti **DLV** spuntati su quanti, quanti **AC** spuntati su quanti
-- quale dei **tre stati di avanzamento** è: lavoro in corso · **solo il preflight fatto** (sezione `## Decisions` popolata, design congelato, zero codice) · intatta
+- quale dei **tre stati di avanzamento** è: lavoro in corso · **solo il preflight fatto** (sezione `## Decisions` popolata, design congelato, zero codice — Prog `🟢` se promossa) · intatta
 
 Il preflight fatto è un investimento già pagato, ed è il discriminante che più pesa sulla scelta di dove ripartire.
 
