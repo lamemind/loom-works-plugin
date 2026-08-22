@@ -28,7 +28,7 @@ Solo se **assenti** (idempotente):
 - `{docs_root}/tasks/` — directory per i file task
 - `{docs_root}/reference/` — directory per doc offline
 - `{docs_root}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-doc` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
-- `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`
+- `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`. Unico file che init tocca anche quando esiste già: su un progetto registrato lo step 1b ripropone i campi non identitari coi valori attuali, per far crescere un file scritto prima che un campo esistesse
 - `.claude/settings.json` — solo la regola `Read(~/.claude/plugins/cache/…/**)`, aggiunta in coda alle esistenti senza toccare il resto del file. Serve agli agent doc, che aprono i propri contratti dalla cache del plugin: senza, la `Read` cade sotto approvazione e l'agent **prosegue senza contratto** invece di fermarsi. Il path è sul segmento stabile, mai sulla versione — una regola concessa a mano da un «non chiedere più» nasce version-pinned e muore al primo bump
 
 **CLAUDE.md**: init **propone** (non forza) due blocchi — gli `@-import` base e la sezione `Competenze utente` — vedi step 2. **Non tocca**: file git, config, dipendenze.
@@ -58,20 +58,42 @@ Se l'input contiene `--force`, passa il flag (rigenera `tasks.md` e `INDEX.md` a
 
 Identità del progetto per l'ecosistema loom (compass/deck). Modello: `project-config-architecture.md`. Il file `.claude/loom-works.json` è la **source of truth config** (portabile, committabile); il registry dconf `/org/lamemind/loom/` è il **runtime** (macchina-locale). La `label` (`{emoji} {name}`) e gli UUID profilo sono **derivati**, mai nel file.
 
-Controlla `{project_root}/.claude/loom-works.json`.
+**Deroga dichiarata a `output-styles/regole-output.md` §Domande all'utente.** Quella sezione prescrive «una chiamata per domanda»; qui non vale, e vale solo qui. I campi di questo step sono un blocco anagrafico omogeneo — chi è il progetto e come si apre — e chiederli uno per chiamata costringe l'utente a sei context-switch su un argomento solo, cioè l'affaticamento che quella regola esiste per ridurre. Le chiamate sotto sono **tre**, tagliate per oggetto.
 
-**Se ASSENTE → bootstrap interattivo.** `id` e `name` = basename della project root (mostralo). Raccogli il resto via `AskUserQuestion`, una domanda per volta; **prima di ciascuna** esegui il ping TTS (vedi §Convenzione TTS in altre skill):
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic>"
-```
+**Nessun ping TTS in questo step**: niente `say_auto` prima delle chiamate né prima della domanda aperta finale. L'utente ha lanciato `init` lui e sta guardando lo schermo. Costo accettato: la domanda finale chiude il turno, quindi compass segnala `done` invece di `ask`.
+
+Controlla `{project_root}/.claude/loom-works.json`:
+
+- **ASSENTE** → esegui Ask 1, Ask 2, Ask 3 e la domanda aperta. `id` e `name` = basename della project root (mostralo).
+- **PRESENTE** → salta **Ask 1** (l'identità non si tocca: `id`, `name`, `owner`, `emoji` restano quelli del file) ed esegui **Ask 2, Ask 3 e la domanda aperta**, mettendo il valore attuale del file come **prima opzione di ogni domanda, marcata `(attuale)`**. Serve ad allineare un progetto registrato prima che un campo esistesse: `register.sh` e il refresh propagano nel registry **solo ciò che il file contiene**, quindi un file incompleto resta incompleto per sempre se `init` non torna a chiedere. Alla scrittura **preserva ogni campo non chiesto** (`docsRoot`, `order`, e qualunque altro presente): riscrivere il file da zero perderebbe la docs-root del progetto.
+
+**Ask 1 — identità** (una chiamata, due domande):
+
 1. **owner** — metadato organizzativo (a chi appartiene il progetto). Non entra nella label né nei titoli di tab: nessun consumer lo legge, resta come classificazione. Opzioni: `LOCAL`, `LAMEMIND`, `COFACE`, `SHADOW`, `BBETTER` + Other (custom).
 2. **emoji** — emoji del **cappello** (progetto). Proponi 3-4 default comuni + Other (l'utente incolla l'emoji che vuole).
-3. **surfaces tracked** — multi-select (`multiSelect: true`): SOLO `claude`, `deck` (surface rigide, con match finestra + stato). Default suggerito: entrambe.
-4. **launch** — surface custom (bottoni "apri app @project-root"). Chiedi se l'utente ne vuole aggiungere; proponi come default comuni `codium` (`codium .`) e, per progetti Java, `idea` (`idea .`). Per ogni voce raccogli: **emoji** della voce, **label** leggibile, **command** shell (girato con cwd=project root; può contenere una subdir come target, es. `idea ud-maven-parent`, o flag arbitrari). Nessuna voce = `launch: []`.
-5. **defaultSurface** — quale surface apre il click sul **nome** del progetto nella riga compass (focus-or-launch). Opzioni: `terminal` (default suggerito, shell @project-root), `claude`, `deck`. Offri solo le tracked che l'utente ha appena abilitato al punto 3. Se sceglie `terminal`, **ometti il campo** dal file: è già il fallback, scriverlo aggiunge rumore.
-6. **permissionMode** — con quale permission mode parte una sessione della surface `claude` spawnata dal deck. Chiedilo **solo se** `claude` è fra le tracked abilitate al punto 3. Opzioni da offrire: `manual` (default suggerito — ogni azione chiede conferma), `acceptEdits` (accetta le modifiche a file senza chiedere), `auto`, `plan` (parte in planning, non esegue). Gli altri due valori del CLI — `dontAsk` e `bypassPermissions` — **non vanno proposti in lista**: restano raggiungibili via Other, perché `bypassPermissions` disattiva i controlli e non deve essere una scelta a un click. Se sceglie `manual`, **ometti il campo** (stessa regola di `defaultSurface`: è già il fallback).
 
-Poi scrivi il file con `Write` — `surfaces` = solo i tracked selezionati (bool), `launch` = array delle voci custom raccolte (label opzionale, fallback = command), `defaultSurface` solo se ≠ `terminal`, `permissionMode` solo se ≠ `manual`:
+**Ask 2 — surface e regime** (una chiamata, tre domande):
+
+1. **surfaces tracked** — multi-select (`multiSelect: true`): SOLO `claude`, `deck` (surface rigide, con match finestra + stato). Default suggerito: entrambe.
+2. **defaultSurface** — quale surface apre il click sul **nome** del progetto nella riga compass (focus-or-launch). Offri **le tre opzioni piene**: `terminal` (default suggerito, shell @project-root), `claude`, `deck` — senza restringerle sulle surface della domanda accanto, che nella stessa schermata non è ancora stata risposta. Una scelta incoerente (`deck` con `deck` non abilitato) si scrive **com'è**: `cfg_validate` rifiuta i valori fuori dominio, mai le incoerenze incrociate, e il consumer degrada a `terminal`.
+3. **permissionMode** — con quale permission mode parte una sessione `claude` spawnata dal deck. **Si chiede sempre**, anche se `claude` non finisce fra le tracked: è una preferenza su *come* si lancia quella surface, valida se e quando viene abilitata, e condizionarla alla domanda accanto la renderebbe non ponibile nella stessa schermata. Opzioni: `manual` (default suggerito — ogni azione chiede conferma), `acceptEdits` (accetta le modifiche a file senza chiedere), `auto`, `plan` (parte in planning, non esegue). Gli altri due valori del CLI — `dontAsk` e `bypassPermissions` — **non vanno proposti in lista**: restano raggiungibili via Other, perché `bypassPermissions` disattiva i controlli e non deve essere una scelta a un click.
+
+**Ask 3 — launch preconfezionati** (una chiamata, tre domande sì/no). Ogni sì produce una voce `launch` con emoji, label e comando già fissati qui — niente da digitare:
+
+| Label | Emoji | Command |
+|---|---|---|
+| Vs Code | 📝 | `codium .` |
+| IntelliJ | ☕ | `idea .` |
+| File Manager | 📁 | `xdg-open .` |
+
+`xdg-open .` apre il file manager registrato dal sistema, così la voce non è legata a un desktop specifico.
+
+**Domanda aperta — launch custom** (scritta in chat, **non** col tool). Non è aggregabile per costruzione: dominio aperto, numero di voci ignoto in anticipo, e per ciascuna tre campi di testo libero che il tool non ha una forma per raccogliere. Scrivi in chat le tre variabili di una voce — **emoji**, **label** leggibile, **command** shell (girato con cwd = project root; può portare una subdir come target, es. `idea ud-maven-parent`, o flag arbitrari) — più due o tre esempi liberi (una connessione `ssh`, un tail di log remoto, un altro editor), poi chiedi se ne vuole aggiungere. Nessuna voce = solo quelle di Ask 3, o `launch: []` se anche quelle sono tutte no.
+
+**Se lo schema di `AskUserQuestion` non accetta un gruppo intero**, spezza quel gruppo tenendo insieme i campi indipendenti e rimandando a una chiamata successiva quelli che dipendono da una risposta della stessa schermata (`defaultSurface` e `permissionMode` dipendono da `surfaces`). Il criterio di taglio è la dipendenza, mai l'ordine in cui i campi compaiono qui.
+
+Poi scrivi il file con `Write`. **Tutti i campi si scrivono sempre**, anche quando il valore coincide col fallback del consumer (`defaultSurface: terminal`, `permissionMode: manual`): l'omissione cancella la differenza fra «qualcuno ha scelto» e «nessuno ha mai deciso», e senza il campo scritto non c'è modo di sapere quali domande siano già state poste. Il significato dell'assenza non cambia — per ogni consumer un campo assente vale il fallback.
+
 ```json
 {
   "id": "<basename>",
@@ -80,14 +102,12 @@ Poi scrivi il file con `Write` — `surfaces` = solo i tracked selezionati (bool
   "name": "<basename>",
   "surfaces": { "claude": true, "deck": true },
   "launch": [
-    { "emoji": "📝", "label": "codium", "command": "codium ." }
+    { "emoji": "📝", "label": "Vs Code", "command": "codium ." }
   ],
   "defaultSurface": "claude",
   "permissionMode": "auto"
 }
 ```
-
-**Se PRESENTE:** salta il bootstrap (non sovrascrivere — è committato).
 
 **In entrambi i casi**, registra e materializza (idempotente; noop silenzioso su macchine senza dconf/Ptyxis):
 ```bash
@@ -140,7 +160,7 @@ Caso C — **`CLAUDE.md` presente e già completo** su entrambi i blocchi: nessu
 
 ### 3. Report
 
-Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CLAUDE.md` **per blocco** (`@-import`: creato / righe aggiunte / già completo / snippet stampato da copiare — `Competenze utente`: idem), e la **config progetto** (`.claude/loom-works.json` creato interattivamente o già presente; esito di `register`/`materialize`: registrato in dconf, profili adottati/generati, oppure noop se dconf/Ptyxis assenti).
+Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CLAUDE.md` **per blocco** (`@-import`: creato / righe aggiunte / già completo / snippet stampato da copiare — `Competenze utente`: idem), e la **config progetto** (`.claude/loom-works.json` creato interattivamente o aggiornato, coi campi cambiati rispetto al file precedente; esito di `register`/`materialize`: registrato in dconf, profili adottati/generati, oppure noop se dconf/Ptyxis assenti).
 
 ## Note
 
