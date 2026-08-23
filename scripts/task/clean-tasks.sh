@@ -257,7 +257,7 @@ if [[ ${#ORPHANS[@]} -gt 0 ]]; then
         echo ""
         echo "--- reconcile orphan ${id} ---"
         remove_task_from_tasksmd "$id"
-        git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): reconcile orphan row %s (file already absent)' "$id")"
+        lw_git_add_n_commit "$(printf 'chore(tasks): reconcile orphan row %s (file already absent)' "$id")" "$TASKS_FILE"
         echo "-> riga orfana rimossa + commit: ${id}"
     done
 fi
@@ -278,7 +278,7 @@ for c in "${CANDIDATES[@]}"; do
         rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
         if [[ -n "$(lw_folder_survivors "$rel_fp")" ]]; then
             git -C "$PROJECT_ROOT" add -f -- "$rel_fp"
-            git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): keep ignored files of %s before purge (%s)' "$id" "$rel_fp")"
+            git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): keep ignored files of %s before purge (%s)' "$id" "$rel_fp")" -- "$rel_fp"
             echo "-> keep: snapshot file ignored/untracked in commit dedicato (${rel_fp}/)"
         fi
     fi
@@ -332,7 +332,11 @@ ${folder_line}"
     msg="${msg}
 Status at purge: ${status_label}"
 
-    git -C "$PROJECT_ROOT" commit -m "$msg"
+    # Pathspec: task file, folder se rimossa, tasks.md. Un `git rm` stagia la
+    # cancellazione, ma il commit la prende dal perimetro, non dall'indice intero.
+    purge_paths=("$rel_tf" "$TASKS_FILE")
+    [[ -n "$folder_line" ]] && purge_paths+=("$rel_fp")
+    lw_git_add_n_commit "$msg" "${purge_paths[@]}"
     echo "-> commit: ${subject}"
 done
 

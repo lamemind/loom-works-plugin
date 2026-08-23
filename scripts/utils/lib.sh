@@ -287,19 +287,50 @@ lw_git_add() {
     git -C "$(lw_find_project_root)" add "$@"
 }
 
-lw_git_commit() {
-    git -C "$(lw_find_project_root)" commit -m "$1"
-}
-
-# Commit dei soli file attualmente in stage. Exit code parlante:
-#   0 = committato
-#   1 = commit fallito
-#   2 = niente in stage (nessun commit fatto, no-op silenzioso)
-lw_git_commit_staged() {
-    local root
+# Stage + commit in una catena sola, limitata alla pathspec. Lo stage da solo non
+# protegge niente: `git commit -m` SENZA pathspec committa l'intero indice, quindi
+# un `lw_git_add <path>` seguito da un commit nudo portava dentro anche cio' che
+# altre sessioni avevano lasciato in stage (un `git mv` stagia da se'). L'indice
+# e' una zona comune del worktree: il perimetro lo fissa il COMMIT, non l'add.
+#
+# La pathspec e' obbligatoria: senza path la funzione rifiuta, perche' la forma
+# senza path e' esattamente quella che produceva il guasto.
+#
+# Add e commit insieme perche' un commit parziale su un file che git non ha mai
+# visto fallisce ("pathspec did not match"); `add -A` sulla pathspec registra
+# creazioni, modifiche e cancellazioni solo su quei path. L'add salta i path che
+# non esistono ne' su disco ne' nell'indice (gia' `git rm`-ati: l'add li rifiuta,
+# il commit con pathspec li accetta perche' HEAD li conosce).
+#
+# `-m` sta PRIMA di `--`: `--` chiude le opzioni, un `-m` dopo finirebbe fra i path.
+#
+# Exit: 0 = committato · 1 = add o commit falliti · 2 = nessuna modifica sui path
+#       (no-op, nessun commit) · 3 = nessuna pathspec passata
+lw_git_add_n_commit() {  # <msg> <path>...
+    local msg="${1:-}" root p
+    local -a to_add=()
+    if [[ -z "$msg" ]]; then
+        echo "ERROR: lw_git_add_n_commit: messaggio di commit mancante" >&2
+        return 3
+    fi
+    shift
+    if [[ $# -eq 0 ]]; then
+        echo "ERROR: lw_git_add_n_commit: nessuna pathspec — un commit senza path committa l'intero indice, anche cio' che altre sessioni hanno in stage" >&2
+        return 3
+    fi
     root="$(lw_find_project_root)"
-    git -C "$root" diff --cached --quiet && return 2
-    git -C "$root" commit -m "$1" || return 1
+    for p in "$@"; do
+        # i comandi git girano con -C root: un path relativo si risolve da li', non da $PWD
+        if [[ -e "$p" || -L "$p" || -e "$root/$p" || -L "$root/$p" ]] \
+           || [[ -n "$(git -C "$root" ls-files --cached -- "$p" 2>/dev/null)" ]]; then
+            to_add+=("$p")
+        fi
+    done
+    if [[ ${#to_add[@]} -gt 0 ]]; then
+        git -C "$root" add -A -- "${to_add[@]}" || return 1
+    fi
+    git -C "$root" diff --cached --quiet -- "$@" && return 2
+    git -C "$root" commit -m "$msg" -- "$@" || return 1
     return 0
 }
 

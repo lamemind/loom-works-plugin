@@ -31,7 +31,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 Il `TASK_SRC` che lo script stampa **determina la modalità** — non la presenza dell'argomento:
 
 - `symlink` → **linked**. Binding di *worktree*: la task è una sola, tutto il movimento del repo le appartiene → analisi diff + `git add -A`.
-- `env` (`$LOOM_TASK`) → **detached**. Binding di *sessione*: N sessioni parallele nello stesso worktree, una task ciascuna. Un `git add -A` da qui rastrellerebbe nel commit i file su cui stanno lavorando le altre, in silenzio.
+- `env` (`$LOOM_TASK`) → **detached**. Binding di *sessione*: N sessioni parallele nello stesso worktree, una task ciascuna. Un `git add -A` da qui rastrellerebbe nel commit i file su cui stanno lavorando le altre, in silenzio → la lista dei file la passi tu come pathspec, e il commit resta dentro quella lista.
 - `arg` → **detached**. Chi nomina una task esplicita non sta dichiarando di essere solo nel worktree.
 
 Detached = analisi diff saltata (i deliverables li deriva l'agente dal contesto della conversazione) + stage selettivo. Vedi `${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Detached.
@@ -94,15 +94,13 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh "checkpoint(${taskId}): ${descrizione}"
    ```
-   Lo script: `git add -A` → split staged → commit(s) → push. Non tocca il task file dopo il commit: il working tree resta pulito.
+   Lo script: `git add -A` → split doc/codice sulla lista staged → commit(s) con pathspec → push. Non tocca il task file dopo il commit: il working tree resta pulito.
 
-   **Detached**:
-   1. Stage selettivo: `git add <file1> <file2> ...` solo per i file **codice** della task corrente (identificati al punto 1).
-   2. Esegui:
-      ```bash
-      ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --no-add "checkpoint(${taskId}): ${descrizione}"
-      ```
-   `--task` fissa il task file all'ID risolto, `--no-add` salta `git add -A` (lo staging l'hai fatto tu). Lo split doc/codice opera sul set che hai messo in stage. Con `TASK_SRC=env` lo script forza comunque `--no-add` da sé: la contaminazione fra sessioni parallele è silenziosa e si scopre a push fatto, quindi il default sicuro non è delegato al chiamante.
+   **Detached** — passa la lista dei file **codice** della task (identificati al punto 1) come pathspec dopo `--`, nessuno stage a mano:
+   ```bash
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} "checkpoint(${taskId}): ${descrizione}" -- <file1> <file2> ...
+   ```
+   `--task` fissa il task file all'ID risolto; lo script lo aggiunge da sé alla pathspec. Lo split doc/codice opera sulla lista passata. Ogni commit porta la propria pathspec: ciò che altre sessioni hanno in stage nello stesso worktree **resta in stage**, non entra. Con `TASK_SRC=env` e nessuna pathspec lo script esce in errore — l'indice è uno per worktree e lo script non può distinguere i tuoi file da quelli altrui: l'unica fonte della lista sei tu.
 
 6. **Fase doc — le voci `## Doc Impact` in inbox**
 
@@ -217,20 +215,15 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Output vuoto → salta lo step: il push della fase codice ha già chiuso il checkpoint, e un commit senza delta esce in errore.
 
-   Stagia `tasks.md`, più — solo se lo step 6 ha scritto — il file inbox e l'`INDEX.md` rigenerato:
+   Pathspec: `tasks.md`, più — solo se lo step 6 ha scritto — il file inbox e l'`INDEX.md` rigenerato. **Identico in linked e detached**, nessuno stage a mano:
    ```bash
-   git add -- "{docs_root}/tasks.md" "{docs_root}/inbox/<cappello>-<slug>.md" "{docs_root}/reference/INDEX.md"
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): Prog + marker Doc Impact" -- "{docs_root}/tasks.md" "{docs_root}/inbox/<cappello>-<slug>.md" "{docs_root}/reference/INDEX.md"
    ```
 
-   Poi, **identico in linked e detached**:
-   ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --no-add --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): Prog + marker Doc Impact"
-   ```
+   Nessuna scrittura sul file inbox → pathspec col solo `tasks.md` e **ometti `--doc-message`**: `tasks.md` e i marker `→ ✖️` / `⏳` sono task tracking e vanno tutti nel commit `checkpoint(...)`. La partizione dello script è path-based e tiene `tasks.md` fuori dai file doc-nozione da sé.
 
-   Nessuna scrittura sul file inbox → stagia il solo `tasks.md` e **ometti `--doc-message`**: `tasks.md` e i marker `→ ✖️` / `⏳` sono task tracking e vanno tutti nel commit `checkpoint(...)`. La partizione dello script è path-based e tiene `tasks.md` fuori dai file doc-nozione da sé.
-
-   Due flag obbligatori, per due motivi distinti:
-   - **`--no-add`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo. Lo stage lo fai tu, riga sopra; il task file coi marker lo aggiunge lo script da sé.
+   Due cose obbligatorie, per due motivi distinti:
+   - **la pathspec dopo `--`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo, e anche in linked lo script la pretende. Il task file coi marker lo aggiunge lo script da sé.
    - **`--task`** — anche in linked, dove di norma basterebbe il symlink: se la task si è chiusa allo step 4 il symlink è già stato rimosso, e senza `--task` lo script non risolverebbe il task file su cui hai appena appeso i marker.
 
 9. **Allerta inbox** — solo se lo step 6 ha scritto sul file inbox:
@@ -267,7 +260,7 @@ Topic = argomento concreto della domanda. NO generici.
 ## Note
 
 - **Due script**: analyze per raccogliere info (solo linked), commit per eseguire
-- **Due fasi di commit**: la fase codice (step 5) chiude e **pusha** il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e la doc con `--no-add`, e gira **sempre**. Dentro ogni fase lo script separa comunque codice+tracking (`checkpoint(...)`) da doc-nozione (`docs(...)`) — partizione path-based: doc-nozione = sotto `docs-root/` ma fuori da `tasks.md` e `tasks/`. Zero file doc in stage → commit singolo.
+- **Due fasi di commit**: la fase codice (step 5) chiude e **pusha** il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e la doc con pathspec esplicita, e gira **sempre**. Dentro ogni fase lo script separa comunque codice+tracking (`checkpoint(...)`) da doc-nozione (`docs(...)`) — partizione path-based: doc-nozione = sotto `docs-root/` ma fuori da `tasks.md` e `tasks/`. Zero file doc nel perimetro → commit singolo.
 - **La Prog di `tasks.md` si scrive per ultima** (step 7), dopo la fase doc: è il dato su cui `drain-doc` legge se un cappello è chiuso, e lo legge dal working tree. Scriverla prima apre una finestra in cui la coda dichiara drenabile un file inbox il cui ultimo lotto non è ancora appeso. Il campo `**Progress**` del *task file* resta invece allo step 4 — nessun consumatore lo legge per quella decisione.
 - **Perché la fase doc sta dopo il commit**: il `git add -A` finale cadeva su una working copy ancora in scrittura — working copy inutilizzabile nel frattempo, lavoro di codice non ancora al sicuro. Committare e pushare per primo il codice è il commit di transazione che sblocca le altre sessioni; la doc arriva dopo, e un fallimento lì non porta con sé il codice.
 - **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)

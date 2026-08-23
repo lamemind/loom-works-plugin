@@ -2,13 +2,26 @@
 
 # =============================================================================
 # checkpoint-task-commit.sh - Commit e push per checkpoint-task
-# Usage: checkpoint-task-commit.sh [--task <id>] [--no-add] [--doc-message "<msg>"] "commit message"
+# Usage: checkpoint-task-commit.sh [--task <id>] [--doc-message "<msg>"] "commit message" [-- <path>...]
 # Env:   PROJECT_ROOT (default: $PWD)
 #
 # Doppio commit: i file doc-nozione (sotto <docs-root>/ ma fuori da tasks.md e
 # tasks/) finiscono in un commit separato "docs(...)". Codice + task tracking
 # (task file, tasks.md) restano nel commit "checkpoint(...)". Se non ci sono
 # file doc-nozione il comportamento resta a commit singolo.
+#
+# Perimetro del commit — due regimi, decisi dalla pathspec:
+#   - pathspec dopo `--`  → SCOPED. Entrano solo quei path piu' il task file; e'
+#     l'unico regime ammesso in detached (TASK_SRC=env), dove l'indice del worktree
+#     ospita anche lo stage di altre sessioni e lo script non puo' distinguere il
+#     suo dal loro: l'unica fonte della lista e' il chiamante.
+#   - nessuna pathspec → LINKED (TASK_SRC=symlink): `git add -A`, il worktree
+#     appartiene a questa task e il rastrellamento e' legittimo.
+# In entrambi i regimi ogni commit porta la propria pathspec (lw_git_add_n_commit):
+# cio' che era in stage prima e fuori perimetro resta in stage, non entra.
+#
+# `--no-add` e' accettato per compatibilita' ma non ha effetto proprio: lo stage
+# selettivo e' implicato dalla pathspec. `--no-add` senza pathspec e' un errore.
 # =============================================================================
 
 NO_ADD=0
@@ -24,7 +37,17 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-COMMIT_MESSAGE="${1:?Usage: checkpoint-task-commit.sh [--task <id>] [--no-add] \"commit message\"}"
+COMMIT_MESSAGE="${1:?Usage: checkpoint-task-commit.sh [--task <id>] [--doc-message \"<msg>\"] \"commit message\" [-- <path>...]}"
+shift
+
+SCOPE_SPEC=()
+if [[ "${1:-}" == "--" ]]; then
+    shift
+    SCOPE_SPEC=("$@")
+elif [[ $# -gt 0 ]]; then
+    echo "ERROR: argomenti dopo il messaggio: la pathspec va introdotta da '--'" >&2
+    exit 1
+fi
 
 PROJECT_ROOT="${PROJECT_ROOT:-$PWD}"
 
@@ -46,14 +69,15 @@ elif [[ -n "$TASK_ID_ARG" ]]; then
     exit 1
 fi
 
-# $LOOM_TASK = N sessioni parallele sullo stesso worktree, una task ciascuna. Li'
-# `git add -A` rastrella dentro questo commit i file su cui stanno lavorando le
-# altre — in silenzio, senza errore, e il danno si scopre a push fatto. Lo stage
-# selettivo diventa quindi obbligatorio a prescindere da cosa ha passato il
-# chiamante: peggio che possa succedere ora e' un "niente in stage", visibile.
-if [[ "$TASK_SRC" == "env" && $NO_ADD -eq 0 ]]; then
-    NO_ADD=1
-    echo "-> binding via \$LOOM_TASK=${TASK_ID}: forzato --no-add (stage selettivo, il worktree puo' ospitare altre sessioni)"
+# Regime. Senza pathspec l'unico perimetro conoscibile e' "tutto" (git add -A), e
+# "tutto" e' lecito solo quando il worktree appartiene a questa task (symlink).
+SCOPED=0
+if [[ ${#SCOPE_SPEC[@]} -gt 0 ]]; then
+    SCOPED=1
+elif [[ "$TASK_SRC" == "env" || $NO_ADD -eq 1 ]]; then
+    echo "ERROR: stage selettivo senza pathspec. In detached (\$LOOM_TASK=${TASK_ID:-?}) il worktree ospita altre sessioni e lo script non sa quali file sono tuoi: passali dopo '--'." >&2
+    echo "       es: checkpoint-task-commit.sh --task ${TASK_ID:-Txx} \"msg\" -- src/a.ts src/b.ts" >&2
+    exit 1
 fi
 
 CURRENT_BRANCH=$(lw_current_branch)
@@ -77,53 +101,74 @@ fi
 
 cd "$PROJECT_ROOT" || exit 1
 
-if [[ $NO_ADD -eq 0 ]]; then
+# --- Perimetro: lista di path root-relative, deduplicata -----------------------
+declare -A SEEN=()
+SCOPE=()
+add_scope() {  # <path>
+    local p="$1"
+    [[ -z "$p" ]] && return 0
+    if [[ "$p" == /* ]]; then
+        p="$(realpath -m --relative-to="$PROJECT_ROOT" "$p")"
+    fi
+    p="${p#./}"
+    [[ -n "${SEEN[$p]:-}" ]] && return 0
+    SEEN["$p"]=1
+    SCOPE+=("$p")
+}
+
+if [[ $SCOPED -eq 1 ]]; then
+    for p in "${SCOPE_SPEC[@]}"; do add_scope "$p"; done
+    # Il task file entra sempre: porta la timbratura Done at e i marker Doc Impact,
+    # e il chiamante non deve ricordarsi di elencarlo.
+    if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
+        add_scope "$TASK_FILE"
+    fi
+    echo "-> perimetro dichiarato: ${#SCOPE[@]} path (detached, l'indice altrui resta in stage)"
+else
     lw_git_add -A
-elif [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
-    # --no-add: lo stage l'ha fatto il chiamante PRIMA della normalizzazione
-    # Progress qui sopra -> senza questo add la timbratura "Done at <data>" resta
-    # fuori dall'index e il working tree resta dirty per sempre (il sed e' ancorato
-    # a "Done$", non ri-scatta ai checkpoint successivi).
-    git -C "$PROJECT_ROOT" add -- "$TASK_FILE"
+    # --no-renames: con la rename detection attiva --name-only mostra solo la
+    # destinazione, e la cancellazione della sorgente resterebbe fuori dal commit.
+    while IFS= read -r -d '' f; do add_scope "$f"; done \
+        < <(git -C "$PROJECT_ROOT" diff --cached --name-only --no-renames -z)
 fi
 
-# --- Partizione file staged: doc-nozione vs codice+tracking ------------------
+# --- Partizione: doc-nozione vs codice+tracking --------------------------------
 # Doc-nozione = sotto <docs-root>/ ma NON tasks.md e NON tasks/ (quelli sono
 # tracking, restano col codice nel commit 1).
 DOCS_ROOT="$(lw_docs_root)"
 DOC_FILES=()
-while IFS= read -r f; do
-    [[ -z "$f" ]] && continue
+CODE_FILES=()
+for f in "${SCOPE[@]}"; do
     if [[ "$f" == "${DOCS_ROOT}/"* \
           && "$f" != "${DOCS_ROOT}/tasks.md" \
           && "$f" != "${DOCS_ROOT}/tasks/"* ]]; then
         DOC_FILES+=("$f")
+    else
+        CODE_FILES+=("$f")
     fi
-done < <(git -C "$PROJECT_ROOT" diff --cached --name-only)
-
-# Sgancia i file doc-nozione dallo stage: andranno nel commit 2
-if [[ ${#DOC_FILES[@]} -gt 0 ]]; then
-    git -C "$PROJECT_ROOT" reset -q HEAD -- "${DOC_FILES[@]}" 2>/dev/null
-fi
+done
 
 # --- Commit 1: codice + tracking (task file, tasks.md) -----------------------
 COMMIT1_DONE=0
-lw_git_commit_staged "$COMMIT_MESSAGE"
-case $? in
-    0) COMMIT1_SHA=$(lw_current_sha); COMMIT1_DONE=1 ;;
-    2) echo "-> nessun file codice/tracking da committare" ;;
-    *) echo "ERROR: Commit (codice+tracking) fallito" >&2; exit 1 ;;
-esac
+if [[ ${#CODE_FILES[@]} -gt 0 ]]; then
+    lw_git_add_n_commit "$COMMIT_MESSAGE" "${CODE_FILES[@]}"
+    case $? in
+        0) COMMIT1_SHA=$(lw_current_sha); COMMIT1_DONE=1 ;;
+        2) echo "-> nessuna modifica sui file codice/tracking" ;;
+        *) echo "ERROR: Commit (codice+tracking) fallito" >&2; exit 1 ;;
+    esac
+else
+    echo "-> nessun file codice/tracking nel perimetro"
+fi
 
 # --- Commit 2: doc-nozione (reference/*.md, overview.md, ...) -----------------
 COMMIT2_DONE=0
 if [[ ${#DOC_FILES[@]} -gt 0 ]]; then
     DOC_MESSAGE="${DOC_MESSAGE:-docs(${TASK_ID:-task}): capture nozioni documentali}"
-    git -C "$PROJECT_ROOT" add -- "${DOC_FILES[@]}"
-    lw_git_commit_staged "$DOC_MESSAGE"
+    lw_git_add_n_commit "$DOC_MESSAGE" "${DOC_FILES[@]}"
     case $? in
         0) COMMIT2_SHA=$(lw_current_sha); COMMIT2_DONE=1 ;;
-        2) echo "-> nessun file doc-nozione in stage (skip commit doc)" ;;
+        2) echo "-> nessuna modifica sui file doc-nozione (skip commit doc)" ;;
         *) echo "ERROR: Commit (doc-nozione) fallito" >&2; exit 1 ;;
     esac
 fi
@@ -139,8 +184,8 @@ if ! lw_git_push "$CURRENT_BRANCH"; then
 fi
 
 if [[ $COMMIT1_DONE -eq 1 ]]; then
-    echo "-> commit 1 (codice+tracking): ${COMMIT1_SHA}"
+    echo "-> commit 1 (codice+tracking, ${#CODE_FILES[@]} path): ${COMMIT1_SHA}"
 fi
 if [[ $COMMIT2_DONE -eq 1 ]]; then
-    echo "-> commit 2 (doc-nozione, ${#DOC_FILES[@]} file): ${COMMIT2_SHA}"
+    echo "-> commit 2 (doc-nozione, ${#DOC_FILES[@]} path): ${COMMIT2_SHA}"
 fi

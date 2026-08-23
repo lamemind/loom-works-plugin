@@ -10,7 +10,7 @@
 # loom-works-plugin/. Il ciclo che colma la distanza e' sempre lo stesso, e questo script
 # lo esegue per intero:
 #
-#   1. GATE   check-injection-budget.sh — esce non-zero e ferma tutto
+#   1. GATE   check-injection-budget.sh + check-commit-scope.sh — uno rosso ferma tutto
 #   2. BUMP   version in .claude-plugin/plugin.json
 #   3. COMMIT il messaggio passato + " + bump vX.Y.Z", versione nello STESSO commit
 #   4. PUSH   origin main (repo del plugin)
@@ -93,9 +93,11 @@ echo "sorgente $ROOT"
 echo "progetto $PROJECT   (perimetro del gate)"
 
 # ── 1. GATE ──────────────────────────────────────────────────────────────────
-step "1/7 gate — budget di iniezione"
+step "1/7 gate — budget di iniezione + perimetro dei commit"
 "$ROOT/scripts/dev/check-injection-budget.sh" --project "$PROJECT" \
   || die "una hook entry sfora il budget. Pota, poi ripubblica. Niente e' stato committato."
+"$ROOT/scripts/dev/check-commit-scope.sh" \
+  || die "un commit di skill task porta path che non sono suoi. Niente e' stato committato."
 
 # ── 2. BUMP ──────────────────────────────────────────────────────────────────
 step "2/7 bump — $CUR → $NEW"

@@ -89,7 +89,7 @@ Più task piccole in parallelo nello stesso worktree, una per sessione Claude. D
 
 Differenze vs linked:
 - **Analisi diff** (`checkpoint-task-analyze.sh`, finestra `<baseline>..HEAD`): **skippata** — il diff raccoglierebbe anche il lavoro delle altre task. Deliverables dal contesto conversazione
-- **Staging commit**: stage selettivo manuale + `--no-add` (linked: `git add -A` da script). Su `TASK_SRC=env` lo script forza `--no-add` da sé: la contaminazione è silenziosa e si scopre a push fatto
+- **Staging commit**: la lista dei file passa allo script come pathspec (linked: `git add -A` da script). Ogni commit porta la propria pathspec: lo stage altrui resta in stage. Su `TASK_SRC=env` senza pathspec lo script esce in errore: la contaminazione è silenziosa e si scopre a push fatto
 - **Concorrenza**: N task per worktree, sessioni separate (linked: 1 task per worktree)
 
 Vincoli:

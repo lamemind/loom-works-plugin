@@ -81,9 +81,12 @@ echo "-> Aggiunta task ${TASK_ID} alla tabella"
 
 cd "$PROJECT_ROOT" || exit 1
 
-lw_git_add "$TASK_FILE"
-lw_git_add "$TASKS_FILE"
-lw_git_commit "task(${TASK_ID}): create - ${TASK_DESC}"
+# Pathspec esplicita: solo task file e tasks.md entrano nel commit; cio' che altre
+# sessioni hanno lasciato in stage nello stesso worktree resta li'.
+if ! lw_git_add_n_commit "task(${TASK_ID}): create - ${TASK_DESC}" "$TASK_FILE" "$TASKS_FILE"; then
+    echo "ERROR: commit di creazione fallito per ${TASK_ID}" >&2
+    exit 1
+fi
 lw_git_push
 
 echo "-> ✔️task=${TASK_ID} file=$(lw_docs_root)/tasks/${TASK_ID}-${TASK_NAME}.md"

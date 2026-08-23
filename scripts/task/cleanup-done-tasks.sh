@@ -250,7 +250,7 @@ for id in "${ORPHANS[@]}"; do
     echo ""
     echo "--- reconcile orphan ${id} ---"
     remove_task_from_tasksmd "$id"
-    git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): reconcile orphan row %s (file already absent)' "$id")"
+    lw_git_add_n_commit "$(printf 'chore(tasks): reconcile orphan row %s (file already absent)' "$id")" "$TASKS_FILE"
     echo "-> riga orfana rimossa + commit: ${id}"
 done
 
@@ -275,7 +275,7 @@ for c in "${CANDIDATES[@]}"; do
         rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
         if [[ -n "$(lw_folder_survivors "$rel_fp")" ]]; then
             git -C "$PROJECT_ROOT" add -f -- "$rel_fp"
-            git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): keep ignored files of %s before purge (%s)' "$id" "$rel_fp")"
+            git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): keep ignored files of %s before purge (%s)' "$id" "$rel_fp")" -- "$rel_fp"
             echo "-> keep: snapshot file ignored/untracked in commit dedicato (${rel_fp}/)"
         fi
     fi
@@ -315,7 +315,11 @@ for c in "${CANDIDATES[@]}"; do
   - ${rel_tf}
 ${folder_info_body}Done commit: ${tracked_sha:-unknown} (${done_date:-unknown})"
 
-    git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): purge done %s (%s) — Done >%sdays\n\n%s' "$id" "$slug" "$age" "$COMMIT_BODY")"
+    # Pathspec: task file, folder se rimossa, tasks.md. Un `git rm` stagia la
+    # cancellazione, ma il commit la prende dal perimetro, non dall'indice intero.
+    purge_paths=("$rel_tf" "$TASKS_FILE")
+    [[ -n "$folder_info_body" ]] && purge_paths+=("$rel_fp")
+    lw_git_add_n_commit "$(printf 'chore(tasks): purge done %s (%s) — Done >%sdays\n\n%s' "$id" "$slug" "$age" "$COMMIT_BODY")" "${purge_paths[@]}"
     echo "-> commit: chore(tasks): purge done ${id}"
 done
 

@@ -203,13 +203,12 @@ Appena promossa la Prog, committa **subito** task file e `tasks.md` (commit dedi
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
-lw_git_add "${task_file}" "${tasks_md}"
 # N≥1 → "...- ${N} decisioni congelate" | N=0 (nessuna ambiguità) → "...- nessuna ambiguità"
-lw_git_commit "task(${taskId}): preflight - ${N} decisioni congelate"
+lw_git_add_n_commit "task(${taskId}): preflight - ${N} decisioni congelate" "${task_file}" "${tasks_md}"
 lw_git_push
 ```
 
-- Committa **solo** quei due file, non altri file pending nel working tree. `tasks.md` entra perché lo step 3c può averne cambiato la riga; se la promozione non è scattata il file è pulito e non produce diff.
+- Committa **solo** quei due file: `lw_git_add_n_commit` stagia e committa con la stessa pathspec, quindi ciò che altre sessioni hanno lasciato in stage nello stesso worktree resta fuori. Non usare `git commit -m` nudo — senza pathspec committa l'intero indice. `tasks.md` entra perché lo step 3c può averne cambiato la riga; se la promozione non è scattata il file è pulito e non produce diff.
 - Messaggio: `task(${taskId}): preflight - ${N} decisioni congelate` se `${N}` ≥ 1, altrimenti `task(${taskId}): preflight - nessuna ambiguità`.
 - `${N}` = numero di `D{N}` scritte da **questa** esecuzione, le non-decise comprese: hanno un esito dichiarato come le altre (0 nel caso nessuna ambiguità).
 - Push subito dopo il commit, coerente con `create-task` / `checkpoint-task` (tutte pushano). Senza remote `lw_git_push` avvisa su stderr ed esce 0: la skill prosegue, il commit resta locale.
