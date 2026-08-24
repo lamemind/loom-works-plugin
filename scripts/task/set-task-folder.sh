@@ -1,13 +1,22 @@
 #!/bin/bash
 
 # =============================================================================
-# set-task-folder.sh - Crea folder canonico per una task esistente
+# set-task-folder.sh - Assegna il folder canonico a una task esistente
 # Usage: set-task-folder.sh [<task-id>] [--slug <slug>] [--docs-root <path>]
 # Env:   PROJECT_ROOT (default: $PWD), LOOM_TASK
 # =============================================================================
 #
 # Naming canonico: .YY-MM-DD-{slug}
-# Permissivo: se la folder canonica esiste la riusa, altrimenti la crea.
+#
+# Assegna il NOME, non crea la directory: il campo **Folder** del task file dice
+# dove andra' il materiale, e la folder nasce sul disco col primo file che ci
+# scrive qualcuno (`Write` crea le dir intermedie; da bash `mkdir -p` del path
+# gia' dichiarato). Una folder vuota non e' materiale di nessuno e git non la
+# traccia comunque: creandola in anticipo si sporca la project root con
+# directory che nella maggior parte dei casi restano vuote fino alla purge.
+#
+# Se la folder canonica esiste gia' (rilancio, o folder riempita a mano) la
+# riusa e la stagia.
 # Stampa il folder name (relativo a PROJECT_ROOT).
 #
 # task-id omesso -> cascata $LOOM_TASK -> symlink current-task.md (lw_resolve_task).
@@ -63,12 +72,10 @@ FOLDER_PATH="${PROJECT_ROOT}/${FOLDER_NAME}"
 # parent explicit (project root) so readers never re-derive it as docs/tasks/.
 FOLDER_FIELD="./${FOLDER_NAME}"
 
-# Permissive: reuse the canonical folder if it already exists, else create it.
-if [[ -d "$FOLDER_PATH" ]]; then
-    echo "-> task folder già esistente, riuso: ${FOLDER_NAME}/"
-else
-    "${SCRIPT_DIR}/../utils/folder-create.sh" "$FOLDER_PATH"
-fi
+# Lazy: the directory is NOT created here. Only an already-existing folder (a
+# rerun, or one filled by hand) is reused and staged below.
+FOLDER_EXISTS=no
+[[ -d "$FOLDER_PATH" ]] && FOLDER_EXISTS=yes
 
 # Update **Folder** field in task file (unconditional replace).
 if ! grep -q '^- \*\*Folder\*\*:' "$TASK_FILE"; then
@@ -78,10 +85,16 @@ fi
 sed -i "s|^- \*\*Folder\*\*:.*\$|- **Folder**: ${FOLDER_FIELD}|" "$TASK_FILE"
 echo "-> updated **Folder** field in $(basename "$TASK_FILE")"
 
-# Stage folder + task file so callers' next commit includes them.
-lw_git_add "$FOLDER_PATH"
+# Stage the task file, plus the folder when it is already on disk with content.
+[[ "$FOLDER_EXISTS" == yes ]] && lw_git_add "$FOLDER_PATH"
 lw_git_add "$TASK_FILE"
 
-echo "-> created task folder: ${FOLDER_NAME}/"
-echo "   folder + task file staged (commit deferred to caller)"
+if [[ "$FOLDER_EXISTS" == yes ]]; then
+    echo "-> task folder già su disco, riuso: ${FOLDER_NAME}/"
+    echo "   folder + task file staged (commit deferred to caller)"
+else
+    echo "-> task folder assegnata: ${FOLDER_NAME}/ (non creata)"
+    echo "   nasce sul disco col primo file che ci scrivi"
+    echo "   task file staged (commit deferred to caller)"
+fi
 echo "FOLDER_NAME=${FOLDER_NAME}"

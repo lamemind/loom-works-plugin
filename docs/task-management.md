@@ -109,9 +109,9 @@ Ogni `checkpoint-task` legge le voci `## Doc Impact` **da lavorare**, le riscriv
 
 ## Task Folder
 
-Dove sta il materiale di una task (artefatti, dump, analisi, script), quando ce n'è molto. Naming `.YY-MM-DD-{slug}` (dot-prefix → sort top, slug = task slug). **Posizione = project root, sempre** — mai sotto `docs/tasks/`, che tiene solo i task file `.md`; il nome dotted è solo il nome, il parent è la root. Non crearla a mano (`mkdir`): usa `set-task-folder` / `scratch-new`, che la collocano giusta.
+Dove sta il materiale di una task (artefatti, dump, analisi, script). Naming `.YY-MM-DD-{slug}` (dot-prefix → sort top). **Posizione = project root, sempre** — mai sotto `docs/tasks/`, che tiene solo i task file `.md`. Nome e posizione le assegnano `set-task-folder` / `scratch-new`.
 
-- **Quando esiste**: auto-creata da `create-task` per size **L** ed **Epic**; S/M solo se specificato (`"with folder"` / `"con folder"` nelle Note utente).
-- Campo `**Folder**:` nel task file: sempre presente, vuoto se no folder.
-- **Comandi**: folder retroattiva (riusa se esiste) `/loom-works:set-task-folder {taskId}` · folder orfana senza task `/loom-works:scratch-new <slug>`.
-- **CWD invariato**: le skill workflow non cambiano mai `cwd`; resta sempre project root (dove sta `CLAUDE.md`). Il campo Folder (📁) è informativo: lavoro dentro la folder su scelta esplicita dell'utente.
+- **Assegnata, non creata**: `create-task` e `set-task-folder` scrivono il campo `**Folder**:` senza `mkdir` — la directory nasce col primo file che ci scrivi (`Write` crea le dir intermedie; da bash `mkdir -p` sul path del campo). Campo popolato + directory assente = materiale non ancora prodotto, mai un errore. Il campo è sempre presente, vuoto se la task non ha folder.
+- **Quando**: `create-task` la assegna a size **L**/**Epic**; S/M solo se chiesto (`"con folder"` nelle Note utente).
+- **Comandi**: retroattiva `/loom-works:set-task-folder {taskId}` · orfana senza task `/loom-works:scratch-new <slug>`.
+- **CWD invariato**: le skill workflow non fanno mai `cd`: il cwd resta project root. Dentro la folder si lavora solo su scelta esplicita dell'utente.

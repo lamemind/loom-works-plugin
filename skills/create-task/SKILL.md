@@ -38,7 +38,9 @@ Decisione binaria `CREATE_FOLDER=yes|no`:
 
 Nel template file, il campo `**Folder**:` viene popolato automaticamente dallo script (step 3b) col path root-relative `./.YY-MM-DD-slug`.
 
-> ⚠️ La task folder vive in **project root**, **mai** sotto `{docs_root}/tasks/` (lì solo i task file `.md`). Non crearla a mano: la crea `set-task-folder.sh` allo step 3b.
+`CREATE_FOLDER=yes` **assegna il nome**, non crea la directory: la folder nasce sul disco col primo file che ci scrive qualcuno. Il campo `**Folder**:` popolato è già la risposta a «dove va il materiale» — non serve una folder vuota per rispondere.
+
+> ⚠️ La task folder vive in **project root**, **mai** sotto `{docs_root}/tasks/` (lì solo i task file `.md`). Nome e posizione li decide `set-task-folder.sh` allo step 3b: non inventarli a mano.
 
 ---
 
@@ -154,7 +156,7 @@ Se `CREATE_FOLDER=yes` (vedi §Task Folder — Policy):
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh ${TASK_ID} --slug ${task-name}
 ```
 
-Lo script gestisce folder canonica `{project_root}/.${YYYY-MM-DD}-${task-name}` in autonomia (mkdir + campo Folder + git add). **Non** anticiparlo con `mkdir` manuali, e mai sotto `{docs_root}/tasks/`.
+Lo script assegna la folder canonica `{project_root}/.${YYYY-MM-DD}-${task-name}` in autonomia (campo Folder + git add del task file). **Nessun `mkdir`**: la directory non viene creata ora, nasce col primo file. Non anticiparla con `mkdir` manuali, e mai sotto `{docs_root}/tasks/`.
 
 ### 4. Finalizzazione
 ```bash

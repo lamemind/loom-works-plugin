@@ -57,7 +57,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/recap-git-status.sh
 
 Serve a misurare lo stato **reale** contro quello **dichiarato**: una checkbox aperta su un file che esiste già, o una checkbox chiusa su un file che non c'è, valgono più di qualunque riassunto.
 
-Poi, se il campo `**Folder**:` è popolato, lista la task folder (`ls -la`) — è lì che sta il materiale prodotto.
+Poi, se il campo `**Folder**:` è popolato, lista la task folder (`ls -la`) — è lì che sta il materiale prodotto. Il campo assegna il nome, la folder nasce col primo file: se la directory non esiste, la task non ha ancora prodotto materiale. È un dato del recap, non un errore da segnalare.
 
 ## 3. Documenti di rilievo
 
