@@ -111,7 +111,9 @@ Una sola forma, usata identica in tutte e tre le occorrenze — sotto le general
   *Strade viste (materiale, non un ventaglio da spuntare):* dentro `view.ts` · modulo nuovo `glyphs.ts` · inline nel renderer
 ```
 
-- **Nessuna forma corta.** La prima occorrenza porta maniglia, corpo per esteso e riga delle strade viste, esattamente come quella del blocco finale. Un id nudo accanto al recap costringerebbe a saltare in coda per leggere la domanda, cioè il salto che questo layout esiste per togliere.
+- **Le due occorrenze portano lo stesso testo, parola per parola.** Non «la stessa forma» in senso lato: maniglia, corpo e riga delle strade viste sono **identici** nelle due posizioni, e la seconda si ottiene ricopiando la prima, non riscrivendola. La regola è **simmetrica** e va letta nei due versi: nessuna delle due si accorcia in una forma breve, e nessuna delle due si arricchisce di qualcosa che l'altra non ha.
+
+  Il verso che cede è il secondo, non il primo. Riscrivere un testo già scritto lo comprime per gravità — la seconda stesura di una domanda esce più corta, con le strade viste ridotte a due parole ciascuna — e il risultato è un blocco finale che sembra un riepilogo del turno invece del posto dove si risponde. Chi risponde legge la versione povera e decide su meno materiale di quello che gli era stato mostrato dieci righe prima.
 - **Ogni `D{N}` porta una maniglia verbo+oggetto**, la prima citazione compresa. `D3` da solo è una coordinata opaca: non porta contenuto proprio, e un blocco di sette righe `D1`…`D7` nude costringe a rileggere per capire di cosa si parla — esattamente il costo che questo formato esiste per togliere.
 - **Le strade candidate stanno in riga separata sotto la domanda**, mai dentro il suo corpo, e sono dichiarate non vincolanti. Dentro la prosa si leggerebbero come il ventaglio delle possibilità; in riga a parte si leggono come materiale. Ometti la riga quando non hai candidati: nominarne di finti è peggio che tacere.
 - **La numerazione segue l'ordine di presentazione**: le generali prime, poi sottosistema per sottosistema nell'ordine in cui il giro li percorre. Non l'ordine in cui l'analisi ha trovato le ambiguità — chi legge incontra `D1`, `D2`, `D3` in fila, e un salto negli id qui si legge come una domanda persa.
@@ -146,9 +148,11 @@ Poi il sottosistema successivo. Il giro copre **tutti** i sottosistemi registrat
 
 ### 2e. Terzo tempo — il blocco finale, tutte le domande insieme
 
-Chiuso il giro, riscrivi **tutte** le domande in un blocco unico: le generali e quelle di ogni sottosistema, nell'ordine degli id, ognuna una volta sola anche se ne tocca due.
+Chiuso il giro, **ricopia** tutte le domande in un blocco unico: le generali e quelle di ogni sottosistema, nell'ordine degli id, ognuna una volta sola anche se ne tocca due.
 
-**È la seconda occorrenza, ed è quella su cui l'utente risponde.** Il blocco finale non è un riepilogo da comprimere né un indice di rimandi: porta la forma piena di §2a, perché chi risponde in fila deve poter leggere la domanda lì dove risponde, senza risalire al sottosistema che la conteneva. Ometterlo, o ridurlo a un elenco di id, rimette esattamente il costo che il resto del layout ha appena tolto.
+**Ricopia, non riassumere e non riscrivere.** Ogni voce arriva qui **verbatim** come l'hai scritta sopra — stessa maniglia, stesso corpo, stessa riga di strade viste (§2a). Se la voce in coda è più corta di quella sopra, il blocco è sbagliato anche quando si legge bene: hai prodotto un riepilogo del turno, e chi risponde decide sulla versione povera di una domanda che sopra era completa.
+
+**È la seconda occorrenza, ed è quella su cui l'utente risponde.** Non è un indice di rimandi: chi risponde in fila deve poter leggere la domanda intera lì dove risponde, senza risalire al sottosistema che la conteneva. Ometterlo, o ridurlo a un elenco di id, rimette esattamente il costo che il resto del layout ha appena tolto.
 
 ### 2f. Il turno finisce qui
 
@@ -160,7 +164,7 @@ Questo vincolo è un'istruzione, non un meccanismo. `AskUserQuestion` sospendeva
 
 L'utente risponde alle domande che ha in mente adesso e lascia le altre. Non è un caso degradato: è come funziona. Ma le risposte date **non lasciano intatte** le domande rimaste — alcune le risolvono per implicazione, altre ne riducono il dominio senza chiuderlo.
 
-Il giro successivo quindi **ricalcola** le domande aperte invece di ricopiarle:
+Il giro successivo quindi **ricalcola** le domande aperte invece di riproporle immutate — vincolo opposto a quello del blocco finale (§2e), e non è una contraddizione: dentro **un** turno la stessa domanda si ricopia verbatim, fra **due** turni si ricalcola su ciò che l'utente ha appena risposto.
 
 - **risolta per implicazione** → ripresentala con la risposta derivata **e il perché**, come proposta smentibile con una parola — es. *D6 — nome del flag → `--glyphs`, discende da D1*. Non chiuderla in silenzio: metterebbe nel file una decisione che nessuno ha preso, ed è un errore invisibile perché produce una voce ben formata come tutte le altre.
 - **solo ristretta** → ripresentala con meno strade, dichiarando quali sono cadute e per quale risposta.
