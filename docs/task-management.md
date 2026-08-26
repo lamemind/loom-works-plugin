@@ -97,15 +97,15 @@ Vincoli:
 - **No file overlap**: se due task detached toccano gli stessi file, evita conflitti tu (sequenza, non parallelismo reale).
 - **Checkpoint sequenziali**: due `checkpoint-task` simultanei possono fare race su `tasks.md` e `git`. Coordinali tu.
 
-### Doc Impact al checkpoint
+### Doc Impact — clessidra e trasloco
 
-Ogni `checkpoint-task` legge le voci `## Doc Impact` **da lavorare**, le riscrive applicando i **soli criteri indipendenti** (`doc-management.md` §Imbuto), le porta nel file inbox del **cappello** — il parent se la task ne dichiara uno ancora aperto, la task stessa altrimenti — e le marca: `→ ✔️ inbox` se entrano, `→ ✖️ <parola>` se una delle sei le tiene fuori, `⏳ <evento>` se la nozione è vera ma il suo referente si sta ancora muovendo. Nessuna scelta all'utente, nessuno spawn di subagent: la nozione la scrive la sessione che ha già il contesto della task in memoria.
+Le voci `## Doc Impact` restano nel task file, **vive** (clessidra): ogni `checkpoint-task` le manutiene — riscrive o elimina — applicando i soli criteri indipendenti (`doc-management.md` §Imbuto). Nessun marker di esito, nessun inbox automatico: **la doc segue il rilascio, non il commit**.
 
-**`⏳` è l'unico marker non terminale**, quindi «da lavorare» sono le voci senza marker **e** quelle `⏳`. L'evento è una condizione verificabile (`⏳ F7`), mai un momento, e cade dentro il ciclo di vita della task: il checkpoint che la chiude forza ogni residuo a decisione, o l'attesa resta senza nessuno che la rilegga.
+Il **trasloco** le muove in un file inbox nuovo, e scatta in tre casi: subito per le **nozioni di mondo** (gotcha, servizi esterni, fatti d'ambiente) · al **rilascio** rilevato in conversazione, per le voci della feature · alla **chiusura**, per tutto il residuo (materializzazione incerta → unica domanda ammessa: drainable sì/no). Ordine vincolante: commit del task file **con** le voci, poi il file inbox (`inbox.sh new`, cappello = parent aperto o task stessa), poi al posto delle voci resta `→ inbox <basename> · storia: <sha>`.
 
-**Nessun gate all'utente**: dove la nozione atterri lo decide `drain-doc`, in differita.
+Una task su branch dichiara `**Branch**:` nel task file (si scrive a mano come `Parent Task`; assente = `main`); il suo trasloco porta `branch:<nome>` e mai `drainable` — lo sblocco è di `pull-repos`, quando trova il file su main. Dove una nozione atterri lo decide `drain-notions`, in differita.
 
-**La fase doc gira dopo il commit e il push del codice**, mai prima: il push è ciò che rende il lavoro visibile alle altre sessioni, che ripartono mentre questa finisce. Committare per primo il codice toglie anche il `git add -A` dalla finestra della scrittura doc — la working copy resta usabile, e un fallimento della fase doc non porta con sé il codice.
+**La fase doc gira dopo il commit e il push del codice**, mai prima: il push rende il lavoro visibile alle altre sessioni, e un fallimento della fase doc non porta con sé il codice.
 
 ## Task Folder
 

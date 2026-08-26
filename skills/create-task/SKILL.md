@@ -129,17 +129,7 @@ Estrai e popola la sezione `## Doc Impact` nel task file come bullet list concis
 
 Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emersa al create-task.*`
 
-**Nessun marker di esito.** `→ ✔️ inbox` e `→ ✖️ <parola>` li scrive solo `checkpoint-task`; qui farebbero saltare la voce. L'unico che puoi scrivere è `⏳ <evento di sblocco>`, e qui va usato con parsimonia: a create-task **tutto** deve ancora essere fatto, quindi `⏳` non è per il lavoro che non è ancora iniziato — è per la nozione già vera il cui referente si sta muovendo mentre la scrivi.
-
-**Sentinella di drift — quando la task dichiara di rendere falsa una pagina.** Qui non esiste nessun diff, quindi la base della cattura è **la discussione che ha generato la task**: se ciò che è stato deciso cambia un comportamento che la doc descrive, la nozione che lo corregge non può aspettare la coda. Appendi alla voce una riga:
-
-```markdown
-  🚨 drift: {docs_root}/reference/<file>.md
-```
-
-Uno o più path separati da spazio; se sai che una pagina è diventata falsa ma non quale, `🚨 drift: —`. Il checkpoint la propaga sul file inbox e `drain-doc` smaltisce quel file **per primo, anche sotto il tetto di 8**.
-
-Non metterla per scrupolo: una sentinella su tutto equivale a una sentinella su niente. Il criterio è secco — *esiste già una pagina di doc che dopo questa task dirà il falso?*
+**Nessun marker.** La voce resta nel task file **viva** (clessidra): finché la task è attiva si riscrive e si elimina, e preflight, run e checkpoint la tengono allineata al codice. Il trasloco in inbox è del `checkpoint-task` — al rilascio o alla chiusura, subito per le nozioni di mondo — mai di questa skill.
 
 **Pattern dell'utente**: se l'input contiene "come appena discusso", "come discusso", "come emerso" o varianti, la discussione precedente è la sorgente principale — non chiedere conferme, cattura e procedi.
 

@@ -31,7 +31,7 @@ Solo se **assenti** (idempotente):
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`. Unico file che init tocca anche quando esiste già: su un progetto registrato lo step 1b ripropone i campi non identitari coi valori attuali, per far crescere un file scritto prima che un campo esistesse
 - `.claude/settings.json` — solo la regola `Read(~/.claude/plugins/cache/…/**)`, aggiunta in coda alle esistenti senza toccare il resto del file. Serve agli agent doc, che aprono i propri contratti dalla cache del plugin: senza, la `Read` cade sotto approvazione e l'agent **prosegue senza contratto** invece di fermarsi. Il path è sul segmento stabile, mai sulla versione — una regola concessa a mano da un «non chiedere più» nasce version-pinned e muore al primo bump
 
-**CLAUDE.md**: init **propone** (non forza) due blocchi — gli `@-import` base e la sezione `Competenze utente` — vedi step 2. **Non tocca**: file git, config, dipendenze.
+**CLAUDE.md**: init **propone** (non forza) due blocchi — gli `@-import` base e la sezione `User assumed knowledge` — vedi step 2. **Non tocca**: file git, config, dipendenze.
 
 ## Esecuzione
 
@@ -119,7 +119,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/config/materialize-profiles.sh "<id>"
 
 ### 2. Integrazione CLAUDE.md
 
-`CLAUDE.md` è il punto di ingresso, e init ci **propone** (non forza) due blocchi indipendenti: gli `@-import` della doc e la sezione `Competenze utente`. Il file può esistere già — il plugin si installa anche su un progetto maturo — con uno dei due blocchi, entrambi o nessuno: **ogni blocco si valuta per conto proprio, e ciò che c'è non si riscrive.**
+`CLAUDE.md` è il punto di ingresso, e init ci **propone** (non forza) due blocchi indipendenti: gli `@-import` della doc e la sezione `User assumed knowledge`. Il file può esistere già — il plugin si installa anche su un progetto maturo — con uno dei due blocchi, entrambi o nessuno: **ogni blocco si valuta per conto proprio, e ciò che c'è non si riscrive.**
 
 **Blocco 1 — `@-import` della doc.** Senza queste righe le skill task-level e il doc-writer partono ciechi, perché non sanno dove stiano `{docs_root}/tasks.md` e `{docs_root}/reference/INDEX.md`. Ogni riga porta insieme l'`@-import` e l'ancora MD cliccabile:
 
@@ -130,10 +130,10 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/config/materialize-profiles.sh "<id>"
 
 **`current-task.md` non va @-importato**, mai — nemmeno "per comodità". La task attiva la scrive in contesto **solo** l'hook `SessionStart` (`inject-task.sh`), che risolve la cascata `$LOOM_TASK → symlink`. Un `@-import` la farebbe entrare in parallelo per conto proprio: in una sessione con `$LOOM_TASK` il modello si troverebbe **due** task attive divergenti, l'iniettata e quella (stale) a cui punta il symlink del worktree. Il symlink resta una primitiva di *risoluzione*, non un canale di *iniezione*.
 
-**Blocco 2 — `Competenze utente`.** Dichiara, settore per settore, quanto l'utente ne sa, sulla scala `K0` (non possiede né vocabolario né implicazioni) → `K3` (possiede entrambi). È il pavimento su cui una risposta decide se un termine va glossato o resta nudo, e `CLAUDE.md` è l'unico posto dove la dichiarazione vale in permanenza — inline in chat si dichiara solo un override di conversazione.
+**Blocco 2 — `User assumed knowledge`.** Dichiara, settore per settore, quanto l'utente ne sa, sulla scala `K0` (non possiede né vocabolario né implicazioni) → `K3` (possiede entrambi). È il pavimento su cui una risposta decide se un termine va glossato o resta nudo, e `CLAUDE.md` è l'unico posto dove la dichiarazione vale in permanenza — inline in chat si dichiara solo un override di conversazione.
 
 ```markdown
-## Competenze utente
+## User assumed knowledge
 
 - rocket science: K0
 - loom-works plugin: K0
@@ -144,23 +144,23 @@ Le due voci sono **placeholder di forma**: mostrano la grafia `settore: grado` s
 **Rilevazione, un blocco per volta:**
 
 - **blocco 1** → le due righe `@{docs_root}/…` dentro `CLAUDE.md`.
-- **blocco 2** → l'heading `Competenze utente`, cercato in `CLAUDE.md` **e nei file che `CLAUDE.md` @-importa**: la sezione è lecita anche in un file importato, e cercarla solo nel file principale ne produrrebbe una seconda copia.
+- **blocco 2** → l'heading `User assumed knowledge`, cercato in `CLAUDE.md` **e nei file che `CLAUDE.md` @-importa**: la sezione è lecita anche in un file importato, e cercarla solo nel file principale ne produrrebbe una seconda copia.
 
 Caso A — **`CLAUDE.md` assente**:
-- Usa `AskUserQuestion` → "Creo `CLAUDE.md` con skeleton minimo (@-import a {docs_root}/tasks.md e {docs_root}/reference/INDEX.md + sezione Competenze utente)?"
-- Su **yes** → `Write` di uno skeleton: heading progetto placeholder, blocco `@-import` sopra, sezione `## Competenze utente` sotto.
+- Usa `AskUserQuestion` → "Creo `CLAUDE.md` con skeleton minimo (@-import a {docs_root}/tasks.md e {docs_root}/reference/INDEX.md + sezione User assumed knowledge)?"
+- Su **yes** → `Write` di uno skeleton: heading progetto placeholder, blocco `@-import` sopra, sezione `## User assumed knowledge` sotto.
 - Su **no** → stampa i due snippet, l'utente li aggiunge a mano.
 
-Caso B — **`CLAUDE.md` presente ma manca almeno una parte** — una delle due righe `@-import`, la sezione `Competenze utente`, o entrambe:
+Caso B — **`CLAUDE.md` presente ma manca almeno una parte** — una delle due righe `@-import`, la sezione `User assumed knowledge`, o entrambe:
 - Usa `AskUserQuestion` elencando cosa manca → "Aggiungo le parti mancanti in fondo a `CLAUDE.md`?"
-- Su **yes** → `Edit` append delle sole parti mancanti, nel formato sopra. Le righe già presenti non si toccano, e una sezione `Competenze utente` già popolata non si integra con le voci placeholder.
+- Su **yes** → `Edit` append delle sole parti mancanti, nel formato sopra. Le righe già presenti non si toccano, e una sezione `User assumed knowledge` già popolata non si integra con le voci placeholder.
 - Su **no** → stampa gli snippet mancanti, l'utente li aggiunge a mano.
 
 Caso C — **`CLAUDE.md` presente e già completo** su entrambi i blocchi: nessuna domanda, log "CLAUDE.md already wired".
 
 ### 3. Report
 
-Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CLAUDE.md` **per blocco** (`@-import`: creato / righe aggiunte / già completo / snippet stampato da copiare — `Competenze utente`: idem), e la **config progetto** (`.claude/loom-works.json` creato interattivamente o aggiornato, coi campi cambiati rispetto al file precedente; esito di `register`/`materialize`: registrato in dconf, profili adottati/generati, oppure noop se dconf/Ptyxis assenti).
+Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CLAUDE.md` **per blocco** (`@-import`: creato / righe aggiunte / già completo / snippet stampato da copiare — `User assumed knowledge`: idem), e la **config progetto** (`.claude/loom-works.json` creato interattivamente o aggiornato, coi campi cambiati rispetto al file precedente; esito di `register`/`materialize`: registrato in dconf, profili adottati/generati, oppure noop se dconf/Ptyxis assenti).
 
 ## Note
 

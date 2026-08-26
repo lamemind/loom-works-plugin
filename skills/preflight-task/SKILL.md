@@ -124,7 +124,7 @@ Una sola forma, usata identica in tutte e tre le occorrenze — sotto le general
 
 Il recap è il quadro di ciò su cui le decisioni cadranno. Serve a rendere presente in memoria ciò su cui si decide: una decisione si può prendere solo su ciò che si ha in mente. **Sta in pezzi, uno per sottosistema**, e ogni pezzo va scritto appena sopra le domande che risolve (§2d) — non raccolto in un blocco unico a inizio turno, che costringerebbe a rimappare a memoria quale paragrafo serviva a quale domanda.
 
-- **Grado: `K1`.** Fisso, non un decremento della competenza dichiarata in §Competenze utente — quella sezione non marca quali voci siano settori progettuali e quali materie, quindi un decremento relativo non è calcolabile. La scala vive nell'output style (`output-styles/regole-output.md` §La scala delle Competenze utente): qui si dichiara **a che grado scrivere e su cosa**, mai cosa `K1` significhi.
+- **Grado: `K1`.** Fisso, non un decremento della competenza dichiarata in §User assumed knowledge — quella sezione non marca quali voci siano settori progettuali e quali materie, quindi un decremento relativo non è calcolabile. La scala vive nell'output style (`output-styles/regole-output.md` §La scala di User assumed knowledge): qui si dichiara **a che grado scrivere e su cosa**, mai cosa `K1` significhi.
 - **Perimetro: tutti i sottosistemi che le domande toccano**, quelli registrati allo step 1, coperti per intero. Non il progetto intero — un preflight che recappa tutto ha sostituito l'affaticamento da context-switch con l'affaticamento da volume. Se le domande ne toccano cinque, il giro ne copre cinque.
 - **Nessun freno di volume.** Niente tetto in righe, niente riduzione al sottosistema dominante, niente criterio di sufficienza. Il recap è materiale da consultare, non un'introduzione alle domande: `K1` glossa i termini specialistici ed esplicita le implicazioni proprio per renderlo consultabile, e accorciarlo per brevità toglie la funzione per cui il grado è stato scelto.
 
@@ -227,25 +227,20 @@ Tre regole sulla scrittura del blocco:
 
 L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `start-task` legge come "preflight verificata, nessuna decisione" (distinto da "preflight mai eseguita" = blocco assente).
 
-## 3b. Le decisioni che rendono falsa una pagina di doc
+## 3b. Le decisioni che producono una nozione documentale
 
-Una `D{N}` che sceglie di cambiare un comportamento **già descritto in doc** produce un drift nell'istante in cui viene congelata, non quando il codice arriva. Preflight è l'unico momento presidiato del ciclo: c'è un umano nella stanza e dirlo costa una riga. Ricavare lo stesso fatto più tardi, rileggendo la prosa di una `D{N}`, sarebbe un giudizio invece che un meccanismo.
-
-Per ogni decisione appena scritta, chiediti: *esiste una pagina di `{docs_root}/reference/` o un file @-importato da `CLAUDE.md` che dopo questa scelta dirà il falso?* Se sì, appendi una voce alla sezione `## Doc Impact` del task file:
+Una `D{N}` che rende vero un fatto durevole — un comportamento nuovo, un vincolo scoperto, un trade-off risolto — produce una nozione. Appendila alla sezione `## Doc Impact` del task file:
 
 ```markdown
 - **<la nozione: cosa diventa vero, non cosa si è deciso>**
   Ancora: <trigger concreto — comando, keyword, pattern>
-  🚨 drift: {docs_root}/reference/<file>.md
 ```
 
 Regole di scrittura, tutte già note e nessuna nuova:
 
 - **La sezione `## Doc Impact` sta fra `## Testing Notes` e `## Prod Validation`.** Se manca, creala lì. Se contiene solo il placeholder `*Nessuna nozione documentale emersa al create-task.*`, sostituiscilo con le tue voci.
-- **Appendi in coda, senza deduplicare** — stesso regime dei blocchi datati di `## Decisions`: preflight è ri-eseguibile, e due giri che decidono la stessa cosa lasciano due voci. Le scarta il checkpoint, che è chi le filtra.
-- **Nessun marker di esito.** `→ ✔️ inbox` e `→ ✖️ <parola>` li scrive solo `checkpoint-task`: una voce senza è per costruzione «non ancora lavorata», e metterli qui la farebbe saltare. `⏳ <evento di sblocco>` è l'eccezione — puoi scriverlo tu quando la nozione è vera ma il suo referente non esiste ancora, e non è terminale: il checkpoint la ripesca comunque.
-- **Non decidere il target doc.** La sentinella nomina i file *candidati a essere falsi*, che non sono il file dove la nozione atterrerà: quello lo decide `drain-doc`, in differita.
-- **Una voce senza sentinella è legittima.** Una decisione può produrre una nozione documentale senza rendere falso niente: entra in `## Doc Impact` normale, e va a coda.
+- **La voce resta viva (clessidra).** Niente marker: finché la task è attiva la voce si riscrive e si elimina, e sei autorizzato a farlo tu su quelle esistenti quando una decisione di questo giro le smentisce. Il trasloco in inbox è del `checkpoint-task`, al rilascio o alla chiusura.
+- **Non decidere il target doc.** Dove la nozione atterri lo decide `drain-notions`, in differita.
 
 Se nessuna decisione tocca la doc, **non scrivere niente** — nessun placeholder, nessuna sezione vuota. `## Doc Impact` non è il registro delle decisioni, quello è `## Decisions`.
 
@@ -282,14 +277,14 @@ Dopo commit+push, mostra all'utente:
 ```
 ✅ Preflight completato: ${N} decisioni congelate in ${task_file}
    📌 Committate e pushate: task(${taskId}): preflight - ${N} decisioni congelate
-   🚨 ${M} sentinelle di drift in Doc Impact  ← solo se ${M} > 0
+   📝 ${M} nozioni in Doc Impact  ← solo se ${M} > 0
    Pronta per /loom-works:run-task
 ```
 
 ## Note
 
-- **Non esegue codice**: preflight congela decisioni e, quando una di quelle rende falsa una pagina di doc, ne cattura la sentinella (step 3b). Implementazione resta a `run-task`.
-- **Due sezioni, due mestieri.** `## Decisions` porta *cosa si è deciso* ed è cronaca datata: nessuno la legge a valle. `## Doc Impact` porta *cosa è diventato vero*, e il checkpoint la svuota in inbox. Scrivere la decisione in `## Doc Impact` è il modo tipico di sbagliare: quella riga andrebbe in inbox come intenzione e verrebbe scartata allo smaltimento.
+- **Non esegue codice**: preflight congela decisioni e cattura le nozioni che ne discendono (step 3b). Implementazione resta a `run-task`.
+- **Due sezioni, due mestieri.** `## Decisions` porta *cosa si è deciso* ed è cronaca datata: nessuno la legge a valle. `## Doc Impact` porta *cosa è diventato vero*, e il trasloco del checkpoint la porta in inbox. Scrivere la decisione in `## Doc Impact` è il modo tipico di sbagliare: quella riga arriverebbe al drain come intenzione e verrebbe scartata.
 - **Idempotenza parziale**: ri-eseguire preflight su una task aggiunge un nuovo blocco datato. Lo storico delle decisioni resta intatto. Ogni giro produce il suo commit dedicato.
 - **Task piccole / nessuna ambiguità**: se l'analisi (step 1) non trova ambiguità reali, salta l'intero step 2 — **recap compreso** — ma **scrivi comunque il marker** in `## Decisions` (step 3, caso nessuna ambiguità) e committalo (step 4, messaggio `nessuna ambiguità`). Serve a `start-task` per distinguere "preflight già passata, niente da decidere" da "preflight mai eseguita". Mostra: `🛫 Nessuna ambiguità rilevata — marker registrato. Task pronta per run-task.`
   Il recap esiste per rendere prendibile una decisione: senza domande non ha bersaglio e diventerebbe volume gratuito sul ramo di maggioranza. Chi vuole il quadro di una task senza decidere niente ha già `recap-status-task`.

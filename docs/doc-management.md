@@ -1,6 +1,10 @@
 # Gestione Documentazione
 
-Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive non sta qui: alla chat lo dà l'output style, a un agent il file `agent-output.md` che risolve da sé. Razionale, esempi e i criteri che richiedono di aprire una fonte: `${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md` — aprilo quando un verdetto non è ovvio.
+Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive non sta qui: alla chat lo dà l'output style, agli agent il contratto editoriale inline nel loro body.
+
+## Il paradigma: la doc è l'as-is di prod
+
+Il codice cambia da più fonti — le task, i merge altrui, i commit spot — e un commit non è un rilascio. **La doc descrive prod.** Le nozioni emerse restano nel task file finché la feature non è materializzata (clessidra); il rilascio le muove in inbox; il drain le colloca. La cronaca sta in git, l'intenzione nel task file, il cantiere nella task folder, lo sviluppo non rilasciato negli inbox di branch.
 
 ## I quattro layer
 
@@ -15,18 +19,17 @@ Nei primi due la doc **è** la verità. Negli altri due la verità sta altrove, 
 
 **Quattro verdetti**, uno per nozione: `online` · `offline` · `→ codice` · `→ fonte viva`. I due rimandi hanno forma diversa e non sono intercambiabili.
 
-## Il terzo layer — inbox
+## L'inbox — stato di transizione
 
-`{docs_root}/inbox/` tiene le nozioni **vere ma non ancora collocate**: un file per **cappello** — l'epica se la task ne dichiara una, la task stessa se è spot — col TLDR sulla riga 3, indicizzato nell'INDEX come tutto il resto. Non è un quinto verdetto: è uno **stato di transizione** verso i quattro.
+`{docs_root}/inbox/` tiene i file in attesa di smaltimento. Non è un quinto verdetto: è uno **stato di transizione** verso i quattro. Tre nature, dichiarate dal marker in riga 3 del file (`nozioni` · `derivazione` · `sweep`); il formato e il vocabolario dei token sono degli script (`scripts/docs/inbox.sh`), mai di un prompt.
 
-- **indicizzata** — senza TLDR resta fuori dall'INDEX, e un file inbox non indicizzato non ha ragione di esistere.
-- **WIP finché il cappello non è Done** — ogni checkpoint fonde in place e riscrive il TLDR, `drain-doc` non lo tocca prima: il trigger dello smaltimento è «il soggetto ha smesso di muoversi», non un comando. Da lì nasce per sparire, e un file fermo *a cappello chiuso* è un fallimento del sistema, non uno stato stabile.
-- **esente da split e merge** — spezzare un file che aggrega un'epica lo riporterebbe alle N voci d'INDEX che il file per cappello esiste per chiudere. Il tetto resta sul **conteggio**.
-- **ha precedenza sul drift** — se contraddice un file di `reference/`, **vince l'inbox**: è più recente e nasce dal codice appena scritto. La regola la cabla `build-index.sh` in testa alla sezione, così sparisce da sola quando l'inbox si svuota.
+- Un file inbox **nasce congelato**: il contenuto non cambia più. Le uniche scritture ammesse sono lo sblocco del marker (`pull-repos`) e il registro del drain (sub-bullet per nozione).
+- **Accumulo libero**: nessun cap, nessuna soglia, nessun warning. Un file non-drainable può restare a tempo indeterminato — è comunque indicizzato se `indexed`, quindi già utile.
+- **Precedenza**: se un file inbox contraddice un file di `reference/`, **vince l'inbox** — descrive un rilascio che la doc consolidata non ha ancora assorbito; **se porta `branch:<nome>`, la precedenza vale solo per chi lavora su quel branch** — per chi sta su prod non conta niente.
+- **Esente da split e merge**: un file inbox aggrega un trasloco e nasce per morire al drain.
+- La ridondanza in inbox è ammessa: «è già scritto altrove» è un criterio dipendente e si paga allo smaltimento, non alla transizione.
 
-**La ridondanza in inbox è ammessa**: «è già scritto altrove» è un criterio dipendente (§Imbuto), e pretenderlo alla transizione rimetterebbe la lettura dell'intera doc dentro il checkpoint — il costo che l'inbox esiste per togliere.
-
-## Cronaca — cosa non va in doc
+## Cosa non va in doc
 
 Nove parole per il materiale che ha un custode legittimo altrove:
 
@@ -38,69 +41,34 @@ Nove parole per il materiale che ha un custode legittimo altrove:
 - **eco** — la doc che ripete il sorgente → si cancella, resta il puntatore
 - **inventario** — elenchi, conteggi, colonne, campi, flag → codice o fonte viva
 - **calco** — copia di una fonte che continua a muoversi → fonte viva
-- **cornice** — preambolo che situa il documento invece di consegnarlo: negazione preventiva, auto-referenza, giustificazione del meccanismo → si cancella
+- **cornice** — preambolo che situa il documento invece di consegnarlo → si cancella
 
 Due coppie sono la stessa nozione a due stadi di maturazione: **scarto → sentenza** e **ipotesi → referto**. Confonderle fa entrare in doc materiale che non ha finito di muoversi.
 
-Offline è poliedrico: **sette tipologie, ognuna col proprio confine**, che servono a chi **colloca** e non a chi cattura — `doc-criteria.md` §Le sette tipologie offline.
+## Imbuto — i criteri indipendenti
 
-## Imbuto di selezione
-
-Dal filtro più economico. I primi tre decidono **se**, gli ultimi quattro **dove** e **come tenerla viva**.
+Si rispondono guardando la sola nozione, senza aprire niente, e sono i soli che si applicano **in clessidra e al trasloco**:
 
 ```
 sopravvive alla task?          no → non scriverla
-sopravvive al refactor?        no → → codice
-costosa o sorprendente?        no → taglia, il codice basta
-   (è doc: da qui si colloca, non si taglia più)
-serve prima della domanda?     sì → online    no → offline
-è già scritto altrove?         sì → una fonte muore
-con che query la trovo?        → il file e il punto di taglio
-come si accorge che è falsa?   → invariante: asseriscila in un test
+costata scoprirla?             no → taglia, il codice basta
+le nove parole                 riconoscibili dal testo
 ```
 
-**I test non si pagano tutti nello stesso momento**, e il discriminante è da cosa dipende il verdetto.
+Tutti gli altri — *eco*, *sorpresa*, *sopravvive al refactor* (dipendono dal codice) · *inventario*, *calco* (dalla fonte viva) · *già scritto*, *online o offline*, *quale file*, *noto* (dalla doc e dalla competenza di progetto) — sono **dipendenti**: li paga il drain, aprendo quelle fonti una volta per file inbox invece che una per nozione. Pretenderli prima rimetterebbe la lettura dell'intera doc dentro il checkpoint.
 
-- **indipendenti** — si rispondono guardando la nozione e chi l'ha scritta, senza aprire niente. Sono i soli che si applicano alla **transizione in inbox**: *sopravvive alla task* (fra sei mesi, senza sapere che è esistita la task che l'ha generata, la frase ha ancora senso?) · *costo di scoperta* (quanto è costato scoprirlo la prima volta? lo sa chi ha appena lavorato) · le nove parole riconoscibili dal testo — cronaca, intenzione, ipotesi, cantiere, scarto, cornice · il TLDR, che è forma.
-- **dipendenti** — il verdetto sta fuori dalla frase: *eco*, *sorpresa* e *sopravvive al refactor* dipendono dal **codice** · *inventario* e *calco* dalla **fonte viva** · *fonte unica*, *online o offline*, *quale file* e le soglie del target dipendono dalla **doc**. Si pagano allo **smaltimento**, che apre quelle fonti una volta per batch invece di una per nozione.
-
-La riga «costosa o sorprendente» ne mescola due: il costo di scoperta è indipendente, la sorpresa è una domanda sul codice e aspetta.
-
-## Forma
-
-- **Solo as-is**: presente indicativo, stato corrente. Niente date, task, PR inline.
-- **Sostituisci, non appendere**: riscrivi la sezione toccata, non stratificare versioni. È così che un TLDR diventa un secondo documento.
-- **Coordinate non opache**: ogni id porta una maniglia verbo+oggetto — `T38 (unificare docs-root)`, mai `T38` nudo.
-- **Token-efficiente**: liste `- chiave: valore` invece di tabelle · niente separatori `---` · gerarchia per indentazione, non per heading annidati · header ogni 2-3 righe = rumore.
-- I pattern di scrittura (claim in grassetto d'apertura, un'idea per blocco, nessun livello che ri-afferma) arrivano dal contratto di scrittura del proprio binario e valgono qui senza essere ricopiati.
-
-## Soglie
-
-Numeri, non giudizi a runtime: due verifiche sullo stesso file devono dare lo stesso esito.
-
-- **Split**: file ≥ **15.000 char**. Il taglio è **per perimetro** — due trigger di ricerca distinti = due file — mai per byte; ogni frammento nasce col proprio TLDR-ancora.
-- **Merge**: file ≤ **3.000 char** → va **riesaminato**, non fuso d'ufficio: sopravvive se il suo perimetro di ricerca è distinto.
-- **Regroup**: cartella ≥ **60.000 char** di figli diretti → i suoi file vanno in sottocartelle. Trigger **ricorsivo**, quindi la profondità emerge invece di essere decisa.
-- **TLDR**: cap **600 char**, violazione **bloccante** — `build-index.sh` esce non-zero. Il TLDR finisce nell'INDEX, che è online: un TLDR prolisso si paga come se il file intero fosse online.
-- **Inbox**: **8 file** → oltre, lo smaltimento non è più opzionale. La metrica è il **conteggio**, non i char: ogni file costa fino a 600 char di TLDR online a ogni sessione. Provvisorio, da tarare sull'esercizio.
-
-Perché ogni numero è quello e non un altro: `doc-criteria.md` §Le cinque soglie.
+`noto` si misura contro la competenza **di progetto** (`{docs_root}/reference/assumed-knowledge.md`, §Project assumed knowledge), mai contro quella di chi lancia.
 
 ## Chi scrive la doc
 
-**La doc non si scrive a mano**: ogni scrittura passa da una skill, che porta con sé forma, soglie e le due formule del TLDR (`${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md`).
+**La doc non si scrive a mano**: ogni scrittura passa da una skill.
 
-- nozione ad hoc, fuori da una task → `capture-doc`
-- voce `## Doc Impact` → il checkpoint, che la porta in inbox
-- nozione in inbox → `drain-doc`, che la colloca
-- doc esistente che mente o viola → `align-doc` · `lint-doc`
+- nozione emersa in una task → resta in `## Doc Impact`, viva (clessidra); il **trasloco** al rilascio o alla chiusura la porta in inbox (`checkpoint-task`)
+- file inbox `nozioni` drainable → `drain-notions` (router → writer → validator, registro nel file)
+- file inbox `derivazione` → `derive-notions` (dal diff a un file `nozioni` nuovo)
+- file inbox `sweep` → `align-doc` (estrazione + stesura, su branch `doc/sweep-<slug>` con PR)
+- topologia (split · merge · regroup) → `rebalance-doc`, sui flag di `doc-metrics.sh`
 
-## Manutenzione
+Le soglie vivono negli **script**, mai nei prompt: chi decide legge i flag dall'output. Nessun man-in-the-loop nei flussi non presidiati; l'unico presidio dello sweep è la review della PR.
 
-Tre skill, distinte da cosa **misurano** — `align-doc` contro la fonte nativa del layer (i **drift**) · `lint-doc` contro questo contratto (le violazioni) · `drain-doc` non misura: colloca, e paga i criteri dipendenti una volta per batch. Le prime due giudicano con `doc-auditor` read-only, `drain-doc` con `doc-router`; tutte applicano con `doc-writer` e chiudono uguale — guardiani deterministici, `doc-verifier` sul diff, commit. Le misure vengono da `scripts/docs/doc-metrics.sh`, mai da un giudizio a runtime. Perimetri, ordine delle fasi e regole del regroup: `doc-criteria.md` §Manutenzione.
-
-**Nessun man-in-the-loop.** Le quattro skill di scrittura non chiedono di approvare una patch e non lasciano niente staged: il collaudo è `doc-verifier`, che etichetta ogni violazione `rollback` (l'ha causata questa patch) o `accodato` (l'ha solo rivelata — topologia, e la raccoglie la misura successiva).
-
-**Il regroup è la terza fase di `lint-doc`, in coda e mai prima**: una categorizzazione dimensionata su file che stanno per essere spezzati nasce stale.
-
-**Doc segue codice, stesso commit.** Nuovo file in `reference/` o in `inbox/` → rigenera l'indice con `scripts/docs/build-index.sh`.
+**La doc segue il rilascio.** Atomicità richiesta: inbox + doc derivata nello stesso commit di drain; codice + task file nel checkpoint. Nuovo file in `reference/` o in `inbox/` → rigenera l'indice con `scripts/docs/build-index.sh`.

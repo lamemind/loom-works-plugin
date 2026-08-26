@@ -7,6 +7,7 @@
 - **Size**: {{size}}
 - **Lane**: {{lane}}
 - **Parent Task**:
+- **Branch**:
 - **Folder**:
 - **Progress**: 🔵 Todo
 
@@ -32,9 +33,8 @@
 *Criteri di test e validazione*
 
 ## Doc Impact
-*Chi cattura (`create-task`, `preflight-task`, `run-task`) scrive: **nozione + ancora primaria**; se una pagina in esercizio diventa falsa aggiungere `🚨 drift: <path>`.*
-*`⏳ <evento di sblocco>` lo scrive chiunque, per trattenere una nozione il cui referente non è ancora materializzato (`⏳ publish`, `⏳ deploy`, `⏳ F7`): è l'unico marker non terminale.*
-*Solo `checkpoint-task` marca l'esito — `→ ✔️ inbox` · `→ ✖️ <parola>` — e sono terminali: scriverli qui significa che nessuno ripassa più sulla voce.*
+*Chi cattura (`create-task`, `preflight-task`, `run-task`) scrive: **nozione + ancora primaria**. La voce resta qui VIVA (clessidra): si riscrive o si elimina finché la task è attiva, nessun marker di esito, nessuna attesa.*
+*Il trasloco in inbox è del `checkpoint-task` — subito per le nozioni di mondo, al rilascio per la feature rilasciata, alla chiusura per tutto — e al posto delle voci lascia `→ inbox <file> · storia: <sha>`.*
 
 {{doc_impact}}
 
