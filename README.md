@@ -53,7 +53,7 @@ Then bootstrap the project structure:
 | `/loom-works:reindex` | Regenerate the reference INDEX.md from file TLDRs |
 | `/loom-works:capture-doc` | Capture ad-hoc doc notions outside of tasks |
 | `/loom-works:discover` | Doc bootstrap for a project with zero existing docs |
-| `/loom-works:tutor` | Interactive topic tutor with comprehension checkpoints |
+| `/loom-works:statusline-task` | Manage the 📌 active-task widget in the global statusline (default patch, token `unpatch`) |
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |
 | `/loom-works:set-task-folder` | Attach a task folder to an existing task |
 | `/loom-works:reconcile-tasks` | Reconcile git conflicts in tasks.md during lane merge |

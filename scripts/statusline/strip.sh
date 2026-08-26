@@ -5,7 +5,7 @@
 #   - any wire line ending with the marker comment: # loom-works:task-widget:wire
 #
 # Safe / idempotent: no markers → no-op. Begin without end → refuses (no edit).
-# Used by statusline-task-unpatch, and by statusline-task-patch for clean re-sync.
+# Used by statusline-task (unpatch mode, and patch mode for clean re-sync).
 set -euo pipefail
 
 TARGET="${1:?usage: strip.sh <statusline-script>}"
