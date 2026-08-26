@@ -1,7 +1,0 @@
-nozioni · indexed · drainable  —  T109 — cache dei prompt Anthropic per i subagent
-TLDR (246 char): comportamento della cache prompt Anthropic per i subagent Claude Code — cosa sta nel prefisso cachabile (body dell'agent) e cosa no (prompt d'invocazione, contesto progetto), minimi per modello, TTL, fan-out, fork, e come misurare dai transcript.
-n1   chiusa  writer ✔️ ha creato il file; la nozione apre §Prefisso, breakpoint e minimi
-n2   chiusa  writer ✔️ appesa come §Subagent, fork e fan-out; il TTL doppio della n1 è rimasto solo qui (una sede sola)
-n3   chiusa  writer ✔️ fusa in §Prefisso, breakpoint e minimi — la prima frase era un'eco di n1 ed è caduta; restano la prova differenziale e la quota per-spawn
-n4   chiusa  writer ✔️ fusa in §Struttura dello store: il ramo `subagents/agent-<id>.jsonl` accanto ai jsonl di sessione; il test dei due spawn è appeso come §Misurare la cache di un subagent, con rimando a prompt-caching.md per il meccanismo
-n5   chiusa  router ✖️ drop
