@@ -1,7 +1,7 @@
 ---
 name: checkpoint-task
-description: Checkpoint task progress: analyze changes, commit, update tasks.md.
-allowed-tools: Bash(*), Edit, Read, Write
+description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: clessidra (manutiene le nozioni vive nel task file) e trasloco in inbox al rilascio o alla chiusura.
+allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion
 model: sonnet
 ---
 
@@ -13,7 +13,7 @@ model: sonnet
 
 Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna il task file e `{docs_root}/tasks.md`, committa e pusha.
+Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna il task file e `{docs_root}/tasks.md`, committa e pusha. **La doc segue il rilascio, non il commit**: le nozioni restano vive nel task file (clessidra) e il trasloco le muove in inbox solo al rilascio, alla chiusura, o subito se sono nozioni di mondo.
 
 ## Note utente
 ~~~human
@@ -22,7 +22,7 @@ $ARGUMENTS
 
 ## Modalità
 
-Da `$ARGUMENTS` estrai un eventuale **taskId** (pattern `T\d+` o `D\d+`), poi risolvi:
+Da `$ARGUMENTS` estrai un eventuale **taskId** (pattern `T\d+`), poi risolvi:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
@@ -31,20 +31,23 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 Il `TASK_SRC` che lo script stampa **determina la modalità** — non la presenza dell'argomento:
 
 - `symlink` → **linked**. Binding di *worktree*: la task è una sola, tutto il movimento del repo le appartiene → analisi diff + `git add -A`.
-- `env` (`$LOOM_TASK`) → **detached**. Binding di *sessione*: N sessioni parallele nello stesso worktree, una task ciascuna. Un `git add -A` da qui rastrellerebbe nel commit i file su cui stanno lavorando le altre, in silenzio → la lista dei file la passi tu come pathspec, e il commit resta dentro quella lista.
+- `env` (`$LOOM_TASK`) → **detached**. Binding di *sessione*: N sessioni parallele nello stesso worktree, una task ciascuna. Un `git add -A` da qui rastrellerebbe nel commit i file su cui stanno lavorando le altre → la lista dei file la passi tu come pathspec.
 - `arg` → **detached**. Chi nomina una task esplicita non sta dichiarando di essere solo nel worktree.
 
 Detached = analisi diff saltata (i deliverables li deriva l'agente dal contesto della conversazione) + stage selettivo. Vedi `${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Detached.
 
 Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argomento grezzo.
 
-`Read` di `TASK_FILE`, poi leggi il campo `**Folder**:` dal task file. Se popolato, mostralo in output prefixato con 📁 (solo informativo, non cambia CWD né operazioni). Il path è root-relative (`./.YY-MM-DD-slug`): la folder vive in project root, **non** sotto `{docs_root}/tasks/`.
+`Read` di `TASK_FILE`, poi leggi due campi dalla mappa proprietà:
+
+- `**Folder**:` — se popolato, mostralo in output prefixato con 📁 (solo informativo).
+- `**Branch**:` — il branch su cui la task sviluppa; **assente o vuoto = `main`**. Governa i marker del trasloco (step 6).
 
 ## Flusso checkpoint
 
 1. **Analisi modifiche**
 
-   **Linked**: esegui `${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-analyze.sh` — **senza** `--task`: lo script risolve dal symlink da sé, e passargli un id lo farebbe cadere nel ramo detached (un id esplicito *è* un binding di sessione). Legge metadata, mostra commit/file modificati.
+   **Linked**: esegui `${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-analyze.sh` — **senza** `--task`: lo script risolve dal symlink da sé, e passargli un id lo farebbe cadere nel ramo detached. Legge metadata, mostra commit/file modificati.
 
    **Detached**: SKIP. Nessuno script di analisi. L'agente ricava dal contesto:
    - quali deliverables della task corrente sono completati
@@ -52,13 +55,12 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    - sintesi delle modifiche per il Progress Log
 
 2. **Valutazione progresso**
-   Analizza l'output dello script (linked) o il contesto della conversazione (detached):
    1. Confronta file modificati con **solo** `Deliverables Checklist`
    2. Identifica items completati
    3. Calcola nuovo progresso %
    4. Chiedi conferma all'utente se necessario
 
-   **IMPORTANTE**: Ignora la sezione `## Prod Validation` — item non checkati in quella sezione NON bloccano il completamento della task.
+   **IMPORTANTE**: Ignora la sezione `## Prod Validation` — item non checkati lì NON bloccano il completamento.
 
 3. **Aggiornamento task documentation**
    1. Aggiorna checklist con [x] items completati
@@ -72,178 +74,94 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
       L'header `### Avanzamento N` non è cosmetico: è l'**ancora del baseline**. Il prossimo checkpoint deriva la finestra di diff dal commit che ha introdotto l'ultimo header di questa forma (`lw_task_baseline_sha`), quindi riscriverlo in altro formato allarga la finestra fino alla nascita della task.
 
 4. **Task completata?**
-   Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON viene considerata):
+   Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON conta):
    1. Imposta Progress a `✔️ Done` (nel file task)
-   2. Se il symlink `{docs_root}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Un puntatore di worktree a una task chiusa è il residuo stale che manda fuori strada la sessione dopo. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
-   3. **Se nel task file esiste il campo `**Parent Task**: T{N}`** (scritto a mano su qualunque task, non c'è un kind che lo gatei):
+   2. Se il symlink `{docs_root}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
+   3. **Se nel task file esiste il campo `**Parent Task**: T{N}`**:
       - Risolvi task parent: `{docs_root}/tasks/T{N}-*.md`
-      - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera** — la riga si scrive con la maniglia (`- [ ] T07 (unificare docs-root) chiusa`), quindi cercare `- [ ] T{taskId} chiusa` alla lettera non trova mai nulla e il flag-back muore nel ramo warning qui sotto. Riscrivi solo il box, lasciando maniglia e testo intatti.
-      - Se nessuna riga porta l'id, log warning ma non bloccare (utente potrebbe averla rimossa manualmente)
+      - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera**. Riscrivi solo il box, lasciando maniglia e testo intatti.
+      - Se nessuna riga porta l'id, log warning ma non bloccare.
 
 5. **Commit e push — fase codice**
 
-   Il codice si committa **e si pusha prima** della fase doc. Il push è il punto in cui il lavoro diventa visibile alle **altre sessioni** — altre task nello stesso worktree o in worktree paralleli, che da qui possono ripartire mentre questa sessione finisce la doc. La doc si allinea dopo, con commit e push propri (step 8).
+   Il codice si committa **e si pusha prima** della fase doc: il push è il punto in cui il lavoro diventa visibile alle altre sessioni. **Il task file entra QUI, con le nozioni correnti in `## Doc Impact`** — è il commit su cui il trasloco (step 6) potrà puntare come storia.
 
-   **`tasks.md` non è ancora stato toccato** e quindi non entra in questo commit: la sua colonna Prog si scrive allo step 7, dopo la fase doc. Il perché sta lì.
-
-   Lo script partiziona comunque i file staged in due commit:
-   - **Commit 1** `checkpoint(${taskId}): ${descrizione}` → codice + task tracking (task file).
-   - **Commit 2** `docs(${taskId}): …` → file doc-nozione (sotto `{docs_root}/` **tranne** `tasks.md` e `tasks/`). In questa fase ne esistono solo se la doc era già stata toccata **prima** del checkpoint: passa `--doc-message` che li descrive, oppure ometti il flag se l'analisi (step 1) non ne ha mostrati.
+   **`tasks.md` non è ancora stato toccato** e non entra in questo commit: la sua Prog si scrive allo step 7.
 
    **Linked**:
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh "checkpoint(${taskId}): ${descrizione}"
    ```
-   Lo script: `git add -A` → split doc/codice sulla lista staged → commit(s) con pathspec → push. Non tocca il task file dopo il commit: il working tree resta pulito.
+   Lo script: `git add -A` → split doc/codice sulla lista staged → commit(s) con pathspec → push.
 
-   **Detached** — passa la lista dei file **codice** della task (identificati al punto 1) come pathspec dopo `--`, nessuno stage a mano:
+   **Detached** — passa la lista dei file **codice** della task come pathspec dopo `--`, nessuno stage a mano:
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} "checkpoint(${taskId}): ${descrizione}" -- <file1> <file2> ...
    ```
-   `--task` fissa il task file all'ID risolto; lo script lo aggiunge da sé alla pathspec. Lo split doc/codice opera sulla lista passata. Ogni commit porta la propria pathspec: ciò che altre sessioni hanno in stage nello stesso worktree **resta in stage**, non entra. Con `TASK_SRC=env` e nessuna pathspec lo script esce in errore — l'indice è uno per worktree e lo script non può distinguere i tuoi file da quelli altrui: l'unica fonte della lista sei tu.
+   `--task` fissa il task file all'ID risolto; lo script lo aggiunge da sé alla pathspec. Con `TASK_SRC=env` e nessuna pathspec lo script esce in errore.
 
-6. **Fase doc — le voci `## Doc Impact` in inbox**
+6. **Fase doc — clessidra e trasloco**
 
-   Leggi la sezione `## Doc Impact` del task file. Da lavorare sono le voci **senza marker** e quelle col marker `⏳` (6.3): la terminalità si legge dal marker, non dalla sua presenza. Sezione vuota, assente, o nessuna voce da lavorare → salta a **step 7**, che gira comunque.
+   Nessuno spawn di subagent. L'unica domanda ammessa all'utente è quella del punto 6.4 (drainable a chiusura incerta): il flusso è presidiato per natura.
 
-   Nessuna domanda all'utente, nessuno spawn di subagent: la nozione la scrive questa sessione, che ha già il contesto della task in memoria. Un subagent dovrebbe ricostruirlo, ed è il costo che questa fase esiste per togliere.
+   **6.1 — Clessidra: manutieni, non smaltire.** Leggi ogni voce di `## Doc Impact`. La voce è **viva**: riscrivila se il codice di questo checkpoint l'ha cambiata, eliminala se l'ha resa falsa o inutile. Applichi i **soli criteri indipendenti** — *sopravvive alla task* · *costo di scoperta* · le nove parole leggibili nel testo (cronaca, intenzione, ipotesi, cantiere, scarto, eco, inventario, calco, cornice: le prime cinque si giudicano qui, le altre dipendono da fonti e le paga il drain). **Nessun marker di esito, nessun inbox automatico**: il default è che le voci restano qui.
 
-   **6.1 — Filtra coi soli criteri indipendenti.** Sono quelli che si rispondono guardando la frase, senza aprire niente: *sopravvive alla task* · *costo di scoperta* · le **sei parole** riconoscibili dal testo — cronaca, intenzione, ipotesi, cantiere, scarto, cornice.
+   **6.2 — Nozioni di mondo: trasloco subito.** Le voci su gotcha, vincoli di servizi esterni, fatti d'ambiente — il cui as-is non dipende dal rilascio del codice della task — traslocano adesso, `indexed` + `drainable` (punto 6.5).
 
-   Il contratto non è iniettato a `SessionStart`: se un caso esce da questo elenco, aprilo — `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md` §Imbuto, che ha la parola finale su criteri e soglie.
+   **6.3 — Rilevazione del rilascio.** La conversazione di QUESTO checkpoint contiene un deploy, un publish, un merge in prod? Se sì, traslocano le voci della feature rilasciata, `indexed` + `drainable` — oppure `branch:<nome>` e **mai** drainable se la task dichiara `**Branch**:` (lo sblocco è di `pull-repos`, al merge). Fallback benigno: il rilascio è avvenuto altrove → le voci restano in clessidra.
 
-   **Non giudicare il resto.** *Eco*, *inventario*, *calco*, *sorpresa* e «è già scritto altrove» dipendono dal codice, da una fonte viva o dal resto della doc, e aprirli qui rimette il pavimento di lettura. Una voce ridondante entra in inbox e muore allo smaltimento: è l'esito previsto, non una svista da anticipare.
+   **6.4 — Chiusura della task** (step 4): traslocano **tutte** le voci residue. Se la materializzazione è incerta — non sai se la feature è in esercizio — chiedi all'utente con `AskUserQuestion`: drainable sì/no. Dopo il trasloco di chiusura il task file non ha più nozioni, solo puntatori.
 
-   **6.2 — Riscrivi, non copiare.** Una voce mista si **pota**: la cronaca cade, il nucleo entra. Nel task file non tocchi il testo — l'unica scrittura lì è il marker.
+   **6.5 — Il trasloco**, per ogni perimetro deciso sopra. Ordine vincolante:
 
-   **6.3 — Marca ogni voce lavorata**, in coda alla voce nel task file:
-   - entra → `→ ✔️ inbox`
-   - non entra → `→ ✖️ <parola>`, una delle sei (es. `→ ✖️ cronaca`)
-   - aspetta → `⏳ <evento>`, l'unico marker **non terminale**
+   1. **Commit del task file CON le voci**, se ha modifiche non committate (la manutenzione 6.1 lo sporca): 
+      ```bash
+      source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
+      lw_git_add_n_commit "task(${taskId}): clessidra pre-trasloco" "${task_file}"
+      ```
+      Poi lo sha di storia: `sha=$(git log -1 --format=%h -- "${task_file}")`.
+   2. **Risolvi il cappello**: leggi `**Parent Task**: T{N}` dal task file. Il cappello è `T{N}` se il campo c'è, `{docs_root}/tasks/T{N}-*.md` esiste, e la sua Prog in `tasks.md` **non** è `✔️`. Altrimenti è la task corrente — dichiaralo in output con quale ramo è scattato.
+   3. **Crea il file inbox** — sempre un file NUOVO, mai un append (su collisione lo script suffissa da sé):
+      ```bash
+      printf '%s\n' "<voce 1 per esteso>" "<voce 2 per esteso>" | \
+        "${CLAUDE_PLUGIN_ROOT}/scripts/docs/inbox.sh" new --docs-root "{docs_root}" \
+          --cappello <cappello> --slug <tema-delle-voci> --natura nozioni \
+          --titolo "<cappello> — <tema>" --tldr "<perimetro, formula inbox di tldr-formats.md>" \
+          --indexed [--drainable | --branch <nome>]
+      ```
+      Una voce = una riga su stdin, **per esteso** (il fatto, il perché, le condizioni; l'ancora in coda alla voce). Lo script assegna gli id `n1..nN`, valida i marker e stampa `INBOX_PATH=`. Exit 1 = input malformato: correggi, non aggirare.
+   4. **Nel task file, al posto delle voci traslocate** resta una riga sola:
+      ```markdown
+      - → inbox <basename del file creato> · storia: <sha>
+      ```
+   5. Se il file è `indexed`: rigenera l'indice — `"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"`. Exit 2 = indice scritto ma un TLDR sfora il cap: se è il tuo, accorcialo e rilancia.
 
-   `⏳` vale quando la nozione è vera ma il suo referente si sta ancora muovendo. L'evento è una **condizione verificabile** (`⏳ F7`, `⏳ publish`), mai un momento (`⏳ dopo`).
-
-   **`⏳` è l'unico dei tre che puoi trovare già scritto**: lo mette anche chi cattura (`create-task`, `preflight-task`, `run-task`) per trattenere una nozione non ancora materializzata. Trovarlo non vuol dire «già lavorata» — verifichi l'evento e risolvi, oppure lo riscrivi con l'evento aggiornato. `→ ✔️ inbox` e `→ ✖️ <parola>` restano invece tuoi in esclusiva: nessun altro attore li scrive.
-
-   **Se questo checkpoint chiude la task** (step 4), nessuna voce può restare `⏳`: forza ogni residuo a `→ ✔️ inbox` o `→ ✖️ <parola>`, evento arrivato o no. Da qui in poi non ripassa nessuno, e un'attesa lasciata aperta è materiale che si perde in silenzio. Vale anche per un evento che cade **oltre** la vita della task (`⏳ deploy` su una task che chiude prima): non compra tempo, arriva comunque a decisione qui, senza l'evento.
-
-   Il marker impedisce al checkpoint successivo di riscansionare ciò che hai già deciso. Una voce senza marker è per costruzione «non ancora lavorata», ed è così che `align-doc` la ripesca sul perimetro task.
-
-   **6.4 — Risolvi il cappello.** Il file inbox è **per cappello, non per checkpoint**: tutti i checkpoint dello stesso cappello scrivono nello stesso file, e un'epica esce in un file solo invece che in uno per fase.
-
-   Leggi `**Parent Task**: T{N}` dal task file. Il cappello è `T{N}` se reggono tutte e tre:
-   - il campo c'è
-   - `{docs_root}/tasks/T{N}-*.md` esiste
-   - la Prog di `T{N}` in `{docs_root}/tasks.md` **non** è `✔️`
-
-   Altrimenti il cappello è la **task corrente**, `${taskId}` — e **dichiaralo in output**, con quale dei tre rami è scattato. Il campo si scrive a mano e nessuno script lo valida (`${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Parentela), quindi il degrado è il ramo di maggioranza, non un caso limite.
-
-   Il terzo ramo — parent già `✔️ Done` — non è ridondante con gli altri due: scrivere nel file di un cappello chiuso lo fa **rinascere** dopo che `drain-doc` l'ha rimosso, e consegna al drain le nozioni di una task ancora in movimento.
-
-   **6.5 — Scrivi o fondi il file inbox.**
-
-   ```bash
-   mkdir -p "{docs_root}/inbox"
-   ```
-   `init.sh` la crea, ma un progetto registrato prima che esistesse non ce l'ha.
-
-   Path: `{docs_root}/inbox/<cappello>-<slug>.md`, con `<slug>` quello del task file **del cappello**. Nessun suffisso numerico: il nome è funzione del solo cappello, o due checkpoint non ricadrebbero sullo stesso file.
-
-   **File assente** → crealo. Forma: `# Titolo`, poi **esattamente sulla riga 3** `> **TLDR**: <perimetro>`, poi una voce per nozione. Fuori dalla riga 3 il file resta fuori dall'INDEX, e un file inbox non indicizzato non serve a nessuno. La formula del TLDR inbox è **perimetro**, non ancora, e sta in `${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md`: leggilo prima di scrivere.
-
-   **File già presente** → **fondi in place**, tre mosse in quest'ordine:
-   1. **Riconcilia** — leggi le voci già scritte e riscrivi o rimuovi quelle che il lavoro di questo checkpoint ha superato. **Un fatto, una voce.** Due voci che dicono l'opposto sullo stesso fatto arrivano al router come rotte pari, e nessuna delle due sa di essere vecchia: metterle nello stesso file non le riconcilia da sé.
-   2. **Appendi** le nozioni nuove.
-   3. **Riscrivi il TLDR** di riga 3 sull'intero contenuto, entro i 600 char. Più il file cresce, più il perimetro diventa grosso-grana: nomina le materie, non le singole nozioni.
-
-   **Perché l'append non corre contro il drain**: `drain-doc` rifiuta un file il cui cappello non è Done, e il checkpoint non scrive mai nel file di un cappello Done (6.4). I due non toccano mai lo stesso file, quindi un append non può sparire dentro uno smaltimento già in corso — a patto che la Prog `✔️` non arrivi prima di questa scrittura, che è la ragione dell'ordine fra step 6 e step 7.
-
-   Zero voci sopravvissute al filtro → **nessuna scrittura**, né file nuovo né fusione. Restano i marker `→ ✖️` e `⏳`, che vanno comunque committati (step 8).
-
-   **Il file inbox appena scritto o fuso non è ancora committato**, e per `drain-doc` quello è un dato: la coda lo marca `modificato` o `untracked` e i suoi cancelli lo tengono fuori dal perimetro finché il commit dello step 8 non arriva. È il presidio che copre la finestra fra questa scrittura e quel commit.
-
-   **6.5b — Propaga la sentinella di drift, non dedurla.** Se almeno una delle voci entrate porta una riga `🚨 drift: <path...>` — scritta a monte da `create-task`, `preflight-task` o `run-task`, che erano nella stanza quando il drift è nato — scrivi sul file inbox, **esattamente sulla riga 4**:
-
-   ```markdown
-   > **PRIORITY**: 🚨 · drift: <unione dei path già in riga 4 e di quelli delle voci appena entrate>
-   ```
-
-   Nessuna sentinella fra le voci entrate → **nessuna riga 4**, e la riga assente vale priorità normale. Non inventarne una: qui la decisione che ha generato il drift è già stata presa e il contesto che la riconosceva si è chiuso con la sessione. Dedurla significherebbe aprire `reference/` per giudicare, cioè rimettere dentro il costo che questa fase esiste per togliere — nessuno spawn di subagent, nessun criterio dipendente.
-
-   Due conseguenze del «propaga, non deduce»:
-   - **Una sentinella su una voce scartata non propaga niente.** Se la voce esce `→ ✖️ cronaca`, non entra nel file e la sirena muore con lei: la priorità ordina l'inbox, non forza l'ingresso.
-   - **La riga `🚨 drift:` resta nel task file** insieme al resto della voce, come record datato. Non è un secondo stato da tenere allineato: dopo il marker `→ ✔️ inbox` nessuno la rilegge più, e l'unico posto su cui `drain-doc` ordina è la riga 4 del file inbox.
-
-   **La riga 4 è l'unica posizione valida, e sbagliarla non produce nessun errore.** `doc-metrics.sh --inbox` estrae il dato con lo stesso `sed -n` a posizione fissa del TLDR: una riga vuota di troppo, e il file entra in coda a priorità normale **senza** la sentinella — perde due dati insieme, non uno. Lo script lo segnala (colonna `PRIO_FORM`, che misura la posizione con un grep separato dall'estrazione), ma il segnale arriva a chi drena, non a te: contala tu, la riga. E stando fuori dalla riga 3 non entra nell'INDEX, che è online — costo per-sessione zero.
-
-   **6.6 — Rigenera l'indice**, dopo ogni scrittura sul file inbox — creazione o fusione, perché il TLDR indicizzato cambia in entrambe:
-   ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"
-   ```
-   **Exit 2** = indice scritto, ma un TLDR è oltre il cap di 600 char: violazione **bloccante** del contratto, non un comando fallito. Se è quello che hai appena scritto, accorcialo e rilancia.
-
-   **Detached**: nessuna differenza di flusso.
-
-7. **Aggiorna {docs_root}/tasks.md — dopo la fase doc, mai prima**
-   1. Leggi `{docs_root}/tasks.md`
-   2. Nella sezione Tasks Overview (formato: `| ID | Pri | Prog | Task (max 100) |`), trova la riga che inizia con `| {taskId} |`
-   3. Aggiorna la colonna Prog (solo emoji):
-      - Se task completata (step 4): `✔️`
-      - Altrimenti: `🟡` (emoji sola, niente percentuali)
-   4. Se la task appare nel grafo Execution Plan (dentro il blocco ``` dopo "Legend:"):
-      - Se completata: metti ✔️ davanti al task ID (es. `T199` → `✔️T199`, `🟡T199` → `✔️T199`)
-      - Se in progress: metti 🟡 davanti al task ID (se non già presente)
-   5. Usa Edit tool per applicare le modifiche
-
-   **Questo passo sta dopo la fase doc perché la Prog `✔️` è il dato su cui `drain-doc` decide se un file inbox è suo.** Lo legge da `tasks.md` **nel working tree** (`load_task_prog` in `doc-metrics.sh`), non da `HEAD`: la finestra si apre nell'istante in cui l'Edit tocca la tabella, non quando il commit arriva al remoto. Scritta prima dello step 6, la `✔️` dichiarerebbe il cappello chiuso su un file il cui ultimo lotto non è ancora appeso — e `drain-doc` lo prenderebbe in carico e lo rimuoverebbe (`git rm`), portandosi via il lotto in arrivo. La partizione produttore-consumatore è per **stato**, quindi è sicura solo quanto l'ordine in cui quello stato si scrive.
-
-   La finestra residua — Prog `✔️` scritta, file inbox scritto ma non ancora committato — la chiude il cancello del working tree di `drain-doc`: quel file risulta `modificato` o `untracked` e resta fuori dal perimetro.
-
-   **Se la fase doc muore, la task resta `🟡`.** È lo stato vero: una task il cui materiale doc non è stato rilasciato non è chiusa. Il campo `**Progress**: ✔️ Done` del *task file* (step 4) invece non si muove — nessun consumatore lo legge per decidere la drenabilità.
-
-   Nota: le eventuali divergenze tra branch vengono riconciliate da `reconcile-tasks` in `merge-lane`.
+7. **Aggiorna {docs_root}/tasks.md**
+   1. Nella tabella Tasks Overview trova la riga `| {taskId} |`
+   2. Aggiorna la colonna Prog: `✔️` se completata (step 4), altrimenti `🟡`
+   3. Se la task appare nel grafo Execution Plan, allinea l'emoji davanti all'ID
+   4. L'ordine fra questo step e la fase doc è **libero**: il cancello Done non esiste più — la drenabilità la dichiara il marker `drainable` dentro il file inbox, non lo stato della task.
 
 8. **Commit e push — fase tracking e doc**
 
-   **Gira sempre**, anche se lo step 6 è stato saltato: `tasks.md` è stato toccato allo step 7 e resterebbe altrimenti non committato.
-
-   L'unica eccezione è il working tree già pulito su tutti e due i file di tracking — la Prog era già `🟡` e l'Edit dello step 7 non ha cambiato niente, la fase doc non ha scritto, nessun marker nuovo sul task file. Verificalo prima di stagiare:
+   **Gira sempre**, anche se lo step 6 non ha traslocato niente: `tasks.md` è stato toccato allo step 7. Unica eccezione, working tree già pulito sul perimetro tracking+doc:
 
    ```bash
-   git status --porcelain -- "{docs_root}/tasks.md" "{docs_root}/tasks/" "{docs_root}/inbox/"
+   git status --porcelain -- "{docs_root}/tasks.md" "{docs_root}/tasks/" "{docs_root}/inbox/" "{docs_root}/reference/INDEX.md"
    ```
 
-   Output vuoto → salta lo step: il push della fase codice ha già chiuso il checkpoint, e un commit senza delta esce in errore.
-
-   Pathspec: `tasks.md`, più — solo se lo step 6 ha scritto — il file inbox e l'`INDEX.md` rigenerato. **Identico in linked e detached**, nessuno stage a mano:
+   Output vuoto → salta lo step. Altrimenti pathspec esplicita, identica in linked e detached:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --doc-message "docs(${taskId}): ${sintesi_doc}" "checkpoint(${taskId}): Prog + marker Doc Impact" -- "{docs_root}/tasks.md" "{docs_root}/inbox/<cappello>-<slug>.md" "{docs_root}/reference/INDEX.md"
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --doc-message "docs(${taskId}): trasloco in inbox" "checkpoint(${taskId}): Prog + clessidra" -- "{docs_root}/tasks.md" "{docs_root}/inbox/<file creato>.md" "{docs_root}/reference/INDEX.md"
    ```
 
-   Nessuna scrittura sul file inbox → pathspec col solo `tasks.md` e **ometti `--doc-message`**: `tasks.md` e i marker `→ ✖️` / `⏳` sono task tracking e vanno tutti nel commit `checkpoint(...)`. La partizione dello script è path-based e tiene `tasks.md` fuori dai file doc-nozione da sé.
+   Nessun trasloco → pathspec col solo `tasks.md` e **ometti `--doc-message`**.
 
-   Due cose obbligatorie, per due motivi distinti:
-   - **la pathspec dopo `--`** — il push della fase codice è già avvenuto, quindi altre sessioni possono aver ripreso a lavorare nello stesso worktree: un `git add -A` qui rastrellerebbe lavoro non tuo, e anche in linked lo script la pretende. Il task file coi marker lo aggiunge lo script da sé.
-   - **`--task`** — anche in linked, dove di norma basterebbe il symlink: se la task si è chiusa allo step 4 il symlink è già stato rimosso, e senza `--task` lo script non risolverebbe il task file su cui hai appena appeso i marker.
+   - **la pathspec dopo `--`** è obbligatoria: il push della fase codice è già avvenuto e altre sessioni possono aver ripreso a lavorare — un `git add -A` qui rastrellerebbe lavoro non tuo.
+   - **`--task`** è obbligatorio anche in linked: se la task si è chiusa allo step 4 il symlink non c'è più.
 
-9. **Allerta inbox** — solo se lo step 6 ha scritto sul file inbox:
-   ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --inbox
-   ```
-   Tre righe da leggere, e le prime due sono trigger indipendenti:
-
-   - `- file inbox: N / 8` — **oltre il tetto**, chiudi il feedback con una riga sola: quanti file, da quanti giorni è in coda il più vecchio, e l'invito a invocare `/loom-works:drain-doc`.
-   - `- con sentinella di drift: N` — **presente a qualunque conteggio**, anche a 1 file su 8: invita a `/loom-works:drain-doc urgenti`, che prende solo quelli. Aspettare la soglia è il difetto che la sentinella esiste per togliere — un drift è vivo dall'istante in cui il codice cambia, e ogni giro saltato è un giorno di doc bugiarda.
-   - `- drenabili: X · bloccati…` — **gatea entrambi gli inviti**: a `X = 0` non c'è niente da drenare e l'invito manderebbe l'utente a una skill che si ferma alla prima riga. Un file bloccato è WIP per contratto, non arretrato: non conta come debito e non va segnalato come tale.
-
-   **Il checkpoint allerta, non invoca.** Auto-lanciare `drain-doc` da qui rimetterebbe dentro il costo che questa fase ha tolto; a smaltire è l'umano, o il driver notturno.
-
-   L'allerta sta **qui** perché qui la soglia si supera — il checkpoint è l'unico produttore dell'inbox. Non è un gate e non blocca niente: il tetto è un trigger, mai un cap, e una nozione non si rifiuta perché la coda è lunga.
-
-10. **Feedback finale**
-   L'output dello script contiene tutte le info necessarie.
-   Aggiungi eventuali note per l'utente.
-   Esegui il ping TTS:
+9. **Feedback finale**
+   Riporta: avanzamento registrato, cosa è rimasto in clessidra, cosa è traslocato e con quali marker. Poi il ping TTS:
    ```bash
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "checkpoint $(say_id ${taskId}) done"
    ```
@@ -259,13 +177,10 @@ Topic = argomento concreto della domanda. NO generici.
 
 ## Note
 
-- **Due script**: analyze per raccogliere info (solo linked), commit per eseguire
-- **Due fasi di commit**: la fase codice (step 5) chiude e **pusha** il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e la doc con pathspec esplicita, e gira **sempre**. Dentro ogni fase lo script separa comunque codice+tracking (`checkpoint(...)`) da doc-nozione (`docs(...)`) — partizione path-based: doc-nozione = sotto `docs-root/` ma fuori da `tasks.md` e `tasks/`. Zero file doc nel perimetro → commit singolo.
-- **La Prog di `tasks.md` si scrive per ultima** (step 7), dopo la fase doc: è il dato su cui `drain-doc` legge se un cappello è chiuso, e lo legge dal working tree. Scriverla prima apre una finestra in cui la coda dichiara drenabile un file inbox il cui ultimo lotto non è ancora appeso. Il campo `**Progress**` del *task file* resta invece allo step 4 — nessun consumatore lo legge per quella decisione.
-- **Perché la fase doc sta dopo il commit**: il `git add -A` finale cadeva su una working copy ancora in scrittura — working copy inutilizzabile nel frattempo, lavoro di codice non ancora al sicuro. Committare e pushare per primo il codice è il commit di transazione che sblocca le altre sessioni; la doc arriva dopo, e un fallimento lì non porta con sé il codice.
-- **Messaggi commit**: `checkpoint(taskId): descrizione breve` (commit 1) + `docs(taskId): sintesi doc` (commit 2, via `--doc-message`)
-- **Baseline del diff**: derivato, mai storato. `checkpoint-task-analyze.sh` (solo linked) lo prende dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD` — zero avanzamenti → commit di creazione del task file.
-- **Detached**: niente analyze script, niente symlink. L'agente è la fonte di verità per "cosa è stato fatto in questa sessione". Stage selettivo obbligatorio per non contaminare con file di altre task parallele.
-- **Niente gate sulla fase doc**: serviva a decidere *quando* pagare il costo del consolidamento, e senza quel costo non resta una decisione da prendere. Tutto ciò che passa i criteri indipendenti va in inbox, sempre; dove atterri lo decide `drain-doc`, in differita.
-- **Ogni voce lavorata porta un marker**, `→ ✔️ inbox` · `→ ✖️ <parola>` · `⏳ <evento>`: è l'unico stato che distingue «già deciso» da «non ancora guardato», e senza il marker di scarto una voce rifiutata tornerebbe a ogni checkpoint. `⏳` torna apposta, ed è il motivo per cui la scansione non può guardare la sola presenza di un marker.
-- **`**Parent Task**` alimenta due meccanismi con condizioni diverse**: il flag-back della checkbox `- [ ] T{N} (<maniglia>) chiusa` (step 4.3), che scatta sul solo campo, e la risoluzione del cappello (step 6.4), che pretende anche un parent esistente e non ancora chiuso. Chiuderne uno non chiude l'altro.
+- **Due script**: analyze per raccogliere info (solo linked), commit per eseguire.
+- **Due fasi di commit**: la fase codice (step 5) chiude e pusha il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e l'eventuale trasloco con pathspec esplicita. Un fallimento della fase doc non porta con sé il codice.
+- **Clessidra ≠ archivio**: la manutenzione (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola.
+- **Il file inbox nasce congelato**: dopo la creazione nessuno lo appende né lo riconcilia — un trasloco successivo dello stesso cappello produce un file NUOVO. Le uniche scritture su un file esistente sono lo sblocco di `pull-repos` e il registro del drain.
+- **Baseline del diff**: derivato, mai storato — dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD`.
+- **Detached**: niente analyze script, niente symlink. Stage selettivo obbligatorio.
+- **Nessuna allerta di coda**: l'accumulo in inbox è libero — nessun cap, nessun tetto. A drenare sono `drain-notions` / il giro notturno, non un invito a fine checkpoint.

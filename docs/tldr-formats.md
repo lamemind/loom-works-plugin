@@ -1,6 +1,6 @@
 # Formule TLDR
 
-Due sedi: **riga 3** per i file di `reference/`, **riga 4** per i file inbox di natura `nozioni` (la riga 3 è del marker `> **INBOX**:`). Cap **600 char** per entrambe le formule, violazione bloccante — `build-index.sh` esce non-zero.
+Due sedi: **riga 3** per i file di `reference/`, **riga 4** per i file inbox di natura `nozioni` (la riga 3 è del marker `> **INBOX**:`). Il cap in char vale per entrambe le formule e vive in `lib-doc.sh` (sede unica delle soglie): la violazione è bloccante — `build-index.sh` esce non-zero e stampa la misura.
 
 ```markdown
 # Titolo                                   # reference/

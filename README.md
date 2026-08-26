@@ -51,6 +51,12 @@ Then bootstrap the project structure:
 | `/loom-works:recap-status-epic` | Umbrella-task recap: children with DLV/AC figures, deps, two-level entry point |
 | `/loom-works:list-worktrees` | List worktrees with branch, dirty count and active task |
 | `/loom-works:reindex` | Regenerate the reference INDEX.md from file TLDRs |
+| `/loom-works:drain-notions` | Drain the `nozioni` inbox queue: router → registro → writer → validator → commit |
+| `/loom-works:derive-notions` | Consume `derivazione` orders: diff → disallineamenti → new `nozioni` inbox file |
+| `/loom-works:align-doc` | Execute `sweep` orders: extractor + writer on a `doc/sweep-<slug>` branch with PR |
+| `/loom-works:pull-repos` | Pull umbrella + submodules, unlock `branch:` inboxes found on main, derive from foreign merges |
+| `/loom-works:rebalance-doc` | Doc topology: split / merge review / regroup on doc-metrics flags |
+| `/loom-works:notturno` | Nightly composition: spot-commit derivation, pull, derive, drain, sweeps |
 | `/loom-works:statusline-task` | Manage the 📌 active-task widget in the global statusline (default patch, token `unpatch`) |
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |
 | `/loom-works:set-task-folder` | Attach a task folder to an existing task |

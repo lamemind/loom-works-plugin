@@ -1,6 +1,6 @@
 ---
 name: align-doc
-description: Allinea la doc alla fonte nativa del suo layer — caccia ai drift (la doc dice X, il codice o la fonte viva dicono Y). Integra anche le nozioni di una task chiusa. Non presidiata, committa da sé. Fan-out di doc-auditor read-only, registro con verdetti, patch via doc-writer, collaudo via doc-verifier.
+description: Esegue i file inbox di natura sweep — ordini di riscrittura della doc in prosa. Due stadi su un branch doc/sweep-<slug> con PR: doc-extractor (fable) legge il perimetro codice e scrive un referto in temporanea, doc-writer riscrive un bersaglio alla volta dal referto. Nessun router davanti, nessun validator dietro: la sicurezza è il branch, il presidio è la review della PR.
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task
 model: sonnet
 ---
@@ -11,238 +11,121 @@ model: sonnet
 "${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
 ```
 
-Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+Usa il valore ovunque sotto compaia `{docs_root}`.
 
-Confronta la doc di progetto con la **fonte nativa del suo layer** e trova i **drift**: fatti documentati che la fonte smentisce.
+Esegui gli **sweep**: ordini di riscrittura della doc scritti in prosa da un umano, unico produttore di questa natura. Catena corta e senza giudici — leggi l'ordine, estrai, riscrivi, apri una PR. Nessun router davanti (non collochi niente di nuovo: riscrivi ciò che è già collocato) e nessun validator dietro (una doc driftata non offre un metro, e un giudice puntiglioso su una riscrittura di massa produce rumore). **La sicurezza è git**: su main non atterra niente finché qualcuno non mergia. Che il risultato sia perfetto non è un'attesa — su un perimetro grande è scontato che non lo sia, e la PR è dove lo si constata.
 
-Input utente (perimetro: dir, glob, submodule, file doc, task ID — oppure vuoto):
+Nessuna domanda all'utente: giri anche nel notturno, e il presidio umano è asincrono — la review della PR.
+
+## Note utente
 ~~~human
 $ARGUMENTS
 ~~~
 
-## Drift, non lacune
+Un path di sweep in `$ARGUMENTS` → la coda è quel solo file.
 
-Il bersaglio non è coprire quello che manca, è **trovare quello che mente**.
-
-- Una **lacuna** (fatto vero, non documentato) è auto-limitante: chi la incontra apre la fonte.
-- Un **drift** (fatto documentato ≠ realtà) è attivamente dannoso: la doc offline esiste proprio per *sostituire* quella lettura, quindi chi si fida agisce su una realtà che non esiste — e nessun segnale gli dice di verificare.
-
-Da qui l'asimmetria di tutto il flusso: si parte dalle **affermazioni della doc** e si va a verificarle nella fonte, mai il contrario. Partire dalla fonte produce copertura, non allineamento, e non termina mai.
-
-L'unica eccezione è il perimetro **task** (§0): lì le affermazioni da verificare non stanno nella doc, stanno nel task file — ma la direzione resta la stessa, dall'affermazione alla fonte.
-
-Gemella di `lint-doc`, che misura la stessa doc contro il **contratto editoriale** invece che contro la fonte nativa. Stessa meccanica, fonte di verità opposta.
-
-## Non presidiata — nessuna domanda, e il collaudo è un agente
-
-`AskUserQuestion` non è nel toolset. La skill sceglie il perimetro con un criterio deterministico (§1), applica i verdetti dell'auditor senza farli approvare, li fa collaudare da `doc-verifier` (§6) e committa (§7).
-
-Il gate umano che stava fra il registro e la patch è stato **rimosso**: era l'unico collaudo della skill, e non può esserlo per una skill che gira anche di notte. Chi lo sostituisce misura la patch contro il contratto, non contro il gusto di chi guarda.
-
-**Guardia in ingresso, prima di qualunque altra cosa.** Se `git diff --cached --quiet` esce non-zero l'indice è già popolato da qualcun altro: **fermati e dillo**. Il commit di questa skill ha una pathspec esplicita, e con un indice sporco porterebbe via lavoro non tuo.
-
-**Mai staged fino al commit.** Lo stage git è uno per *worktree*, non per sessione: una patch lasciata nell'indice viene raccolta dal `git add -A` di qualunque altra sessione che committi nel frattempo. Le patch vivono quindi solo nel working tree, il collaudo legge `git diff` non-staged, e il commit è una catena unica — `git add -- <path...> && git commit -m "..." -- <path...>`.
-
-## La fonte nativa non è sempre il codice
-
-Ogni affermazione appartiene a un layer, e il layer decide contro **cosa** si misura:
-
-- **codice** — si apre e si legge. Nomi di simboli, default, precedenze, formati, sequenze di chiamata.
-- **fonte viva** — si **interroga**: `--help` di un CLI, uno schema servito da un MCP, un endpoint, la suite di test. Risponde dallo stato attuale, quindi la sua risposta non può essere stantia.
-
-Chi interroga dipende da dove arriva la fonte. Se basta `Bash` (un `--help`, una query da riga di comando), la esegue l'auditor. Se serve uno strumento che l'auditor non ha — un MCP — **la query la fai tu prima del fan-out** e passi la risposta nel prompt come materiale già raccolto, stesso pattern con cui `lint-doc` passa le misure di `doc-metrics.sh`. Se la fonte non è raggiungibile da nessuno dei due, il perimetro si dichiara non verificabile e si salta: una verifica simulata è peggio di una verifica mancata.
-
-È il caso in cui la doc di uno schema DB va misurata contro il DB, non contro il codice che lo interroga.
-
-## Flusso
-
-### 0. Perimetro «task» — le nozioni di una task che ha finito di muoversi
-
-Solo se l'input è un **task ID** (`T63`) o «task attiva». Il perimetro non è un'area di fonte: sono le nozioni che quella task ha prodotto, da verificare e far atterrare. Dal §3 in poi il flusso è identico — cambia solo da dove escono le affermazioni da verificare.
-
-**Indice d'ingresso: le voci `## Doc Impact` senza marker.** Il checkpoint ne appende uno a ogni voce che lavora — `→ ✔️ inbox` o `→ ✖️ <parola>` — quindi l'assenza è esattamente il segnale «mai guardata»: non serve inventare un registro. Conseguenza pratica — una task su cui nessun checkpoint ha girato entra comunque nello scope.
-
-**Bound di scope**: apri le fonti **di quella task e basta**. Nessuna scansione delle folder del progetto, nessun giro su altre task. Senza questo bound il costo tolto al checkpoint rientra intero dalla finestra.
-
-Tre fonti, che non valgono uguale:
-
-- **`## Doc Impact`** — scritta a `create-task`, cioè *prima* di lavorare. È una **previsione**, non un referto: ha già il formato giusto (nozione + ancora) e per questo sembra affidabile, ma l'esecuzione può averla smentita. Si verifica contro il risultato, non si integra alla lettera.
-- **task file** (Description, Implementation Notes, Progress Log) — segnale/rumore basso: per lo più intenzione e cronaca. Si legge per capire il contesto, non per copiarne frasi.
-- **task folder** (campo `**Folder**:`, se popolato) — valore più alto *e* costo più alto: è dove stanno referto e sentenza. **Si legge per nomi e intestazioni**, aprendo solo i file che promettono nozione (`valutazione-*`, `findings`, benchmark); mai i dump. È l'INDEX applicato alla folder.
-
-**Ogni voce è un semilavorato**, e questo cambia il ruolo: non la riformatti, la lavori.
-
-- **potenzialmente ridondante** → deduplica contro il corpo del file doc target prima di proporla: la nozione può già esserci, scritta meglio.
-- **potenzialmente incompleta** → hai **licenza di cercare** (altre fonti, il codice). Chi ha scritto la voce lo ha fatto prima di lavorare; tu arrivi dopo, col codice assestato e la nozione ferma.
-
-Il rischio specifico di questo perimetro è opposto al drift: **gonfiare la doc con materiale di processo**. Una folder contiene anche alternative bocciate con motivazione *provvisoria*, poi riprese — quelle sono scarto, non sentenza. Lo tagliano i test «sopravvive alla task» e «sopravvive al refactor» di `doc-criteria.md`; la parola che fa il lavoro è **definitiva**.
-
-Al fan-out (§2) passa all'auditor l'**elenco esplicito** delle nozioni candidate, ognuna con la fonte nativa contro cui verificarla. È l'elenco che gli toglie il tetto dei 3 gap: la selezione l'hai già fatta tu.
-
-Chiudendo (§7), marca nel task file ogni voce integrata con `→ ✔️ align` — stesso schema dei marker `→ ✔️ inbox` / `→ ✖️ <parola>` che appende il checkpoint. Senza il marker il prossimo `checkpoint-task` rilavora voci già collocate, e le manda in inbox una seconda volta.
-
-### 1. Risolvi i perimetri
-
-Un perimetro = **una coppia** `fonte ↔ file doc`. Dall'input:
-
-- **path di codice** (`loom-deck/src/`, `scripts/config/`) → trova la doc che lo descrive: `grep -rl` del nome dir/file dentro `{docs_root}/`, più i TLDR di `{docs_root}/reference/INDEX.md` che lo nominano.
-- **file doc** (`reference/compass.md`) → trova la fonte: i path citati dentro il file stesso; e se il file descrive un sistema interrogabile (uno schema DB, un CLI esterno), la fonte è **quello**, non il codice che lo usa.
-- **vuoto** → deriva i candidati dall'INDEX (ogni file reference che cita path o comandi reali) e prendi i **primi 4 per char decrescente**. Il cap è di concorrenza, il criterio è deterministico: un file grosso porta più affermazioni verificabili, quindi più drift per auditor speso. Dichiara sempre quali perimetri hai preso e quali sono rimasti fuori — una selezione taciuta si legge come copertura completa.
-
-Se una coppia non si chiude (doc senza fonte identificabile), **non inventarla**: dillo e saltala. Un perimetro senza fonte di verità è lavoro per `lint-doc`, non per questa skill.
-
-Se la fonte è viva e richiede un MCP, **interrogala ora**, prima del fan-out: raccogli le risposte alle domande che la doc pretende di sostituire (la forma di una tabella, l'elenco reale delle opzioni) e portale nel prompt dell'auditor.
-
-**Risolvi il path del registro adesso, prima di spawnare qualunque subagent:**
+## 0. Guardia d'ingresso
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/resolve-registry-path.sh" --skill align-doc --perimeter <slug corto del perimetro, o `multi` se sono più d'uno>
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-guard.sh" worktree --docs-root "{docs_root}"
 ```
 
-Stampa una riga `REGISTRY_PATH=`: un file `.md` nudo in project root, mai sotto `{docs_root}/`. Lo script **hard-erra** se quel path risulterebbe gitignorato — il commit del §3 è l'unico custode dei finding, quindi proseguire li cancellerebbe. Costa un'invocazione abortita ora, contro N auditor buttati dopo.
+Exit 2 → STOP con notifica · exit 1 → non è un repo git, STOP.
 
-### 2. Fan-out doc-auditor
-
-Un `Task` con `subagent_type: doc-auditor` **per perimetro**, tutti nello stesso messaggio → girano in parallelo. È possibile solo perché l'auditor è read-only: nessuno tocca il working tree, nessun conflitto.
-
-Prompt per ogni auditor:
-
-```
-Perimetro:
-- Fonte: <path/glob concreti, oppure il comando/schema da interrogare>
-- Doc: <file doc del perimetro>
-
-Fonte di verità: fonte-nativa
-
-Docs root: {project_root}/{docs_root}
-Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
-Criteri di selezione: ${CLAUDE_PLUGIN_ROOT}/docs/doc-criteria.md — otto test e sette tipologie offline, da leggere quando la collocazione non è ovvia.
-Prefisso ID: <sigla corta del perimetro, es. DECK>
-
-Risposte pre-raccolte: <solo se la fonte viva è MCP-only — le risposte che hai già ottenuto>
-
-Cerca drift: parti dalle affermazioni verificabili della doc e apri o interroga la fonte.
-Segnala relayer quando la doc ha copiato ciò che la fonte già risponde.
-Ogni finding porta EVIDENCE verificata davvero (path:linea, o il comando interrogato).
-Ritorna solo il registro.
-```
-
-Sul perimetro **task** (§0) il prompt cambia in tre punti: `Nozioni candidate:` con l'elenco esplicito al posto della doc da ispezionare, `Doc:` diventa il file target su cui deduplicare, e la richiesta è «verifica ogni nozione contro la fonte nativa e dì quali reggono» invece di «cerca drift».
-
-### 3. Consolida il registro
-
-Unisci i registri in **un unico file**, ordinato per severità (alta prima), al `REGISTRY_PATH` risolto al §1.
-
-**Committalo subito, prima delle patch che lo eseguono** — catena unica, pathspec esplicita:
+## 1. La coda
 
 ```bash
-git add -- <REGISTRY_PATH> && git commit -m "docs(align): registro <perimetro>" -- <REGISTRY_PATH>
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --docs-root "{docs_root}" --inbox --natura sweep --drainable
 ```
 
-`git show` su questo commit è il **custode nominato** dei finding: il registro non sopravvive alla run (§7), quindi è l'unico indirizzo da cui si rileggono le voci che non sono state applicate.
+Ordine `created` crescente. Coda vuota → report e fine.
 
-Poi presenta in chat la **sintesi**, non il registro intero: una riga per finding (`ID · severità · file doc · claim → realtà · verdetto proposto`). Il dettaglio sta nel file.
+## 2. Il ciclo — per ogni sweep
 
-I verdetti proposti dagli auditor **valgono come approvati**: non c'è un passo che li raccoglie e li fa confermare. Quello che li misura è il collaudo del §6, e misura la patch — non l'intenzione.
-
-### 4. Applica — doc-writer su `fix-doc`, `relayer`, `split`
-
-Raggruppa le voci approvate **per file doc target** e invoca un `doc-writer` per gruppo (mai due writer sullo stesso file: si sovrascrivono a vicenda). Sequenziali, non paralleli — questi scrivono davvero.
-
-**Ogni voce porta il proprio verdetto**, non solo le `relayer`. Il writer non giudica: se una voce arriva senza verdetto e senza target esplicito, o rifiuta o improvvisa — è il modo tipico in cui una correzione atterra nel posto sbagliato.
-
-```
-Rotte da applicare — verdetto e target sono già decisi e vincolanti, non rivalutarli.
-Target: <file doc>
-
-<una voce per finding del registro:>
-NOTION: <il claim, come la doc lo scrive oggi>
-VERDICT: fix-doc | relayer | drop
-TARGET: <file>.md §<sezione>
-POINTER: <file + simbolo> | <comando + forma della domanda> | —
-EVIDENCE: <path:linea | comando interrogato>
-WRITE: <cosa deve diventare la sezione — per fix-doc la realtà as-is; per relayer «cancella la copia, resta il puntatore»; per drop il motivo>
-
-Contesto:
-<le voci del registro per questo file: CLAIM / REALITY / EVIDENCE / FIX>
-
-Docs root: {project_root}/{docs_root}
-Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo, ha la parola finale su convenzioni e soglie.
-Formule TLDR: ${CLAUDE_PLUGIN_ROOT}/docs/tldr-formats.md — il TLDR resta invariato salvo che un fix cambi il trigger del file.
-
-Applica le patch direttamente (Write/Edit), non committare, non rigenerare l'indice, non stagiare niente.
-Sostituisci la sezione sbagliata, non appendere una correzione accanto a quella vecchia.
-Ritorna il contratto APPLIED: + INDEX_REBUILD_NEEDED.
-```
-
-Il `POINTER:` di una `relayer` lo produce **l'auditor**, che ha già aperto la fonte per giudicare: il writer lo trascrive senza riaprire niente. Aggiornare la copia invece di cancellarla la farebbe driftare di nuovo.
-
-`drop` e `relayer` passano dallo stesso canale (sono patch di rimozione, con o senza puntatore che resta). `code-divergent` **no**: la doc resta.
-
-### 5. `code-divergent` → task, non patch
-
-Per ogni voce con questo verdetto la doc descrive l'intenzione e la fonte ci è andata contro: correggere la doc **cancellerebbe l'intenzione**. Proponi `/loom-works:create-task` con titolo e razionale già pronti, e lascia la scelta all'utente. Se una task per quel perimetro esiste già (cerca in `{docs_root}/tasks.md`), citala con la sua maniglia verbo+oggetto invece di aprirne una gemella.
-
-### 6. Guardiani, poi collaudo — `doc-verifier` sul diff
-
-Prima gli script, che non hanno opinioni:
+**2a. Il branch è lo stato.** `slug` = basename del file senza estensione, `branch` = `doc/sweep-<slug>`.
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh"       # solo se le patch hanno toccato reference/
-"${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh"
+git branch --list "doc/sweep-<slug>"; git ls-remote --heads origin "doc/sweep-<slug>" 2>/dev/null
 ```
 
-**Exit 2 è un verdetto, non un comando fallito** — su `build-index.sh` significa indice scritto ma TLDR oltre il cap, su `check-doc-links.sh` riferimenti appesi. Il secondo è il caso tipico qui: i verdetti `relayer` e `drop` **cancellano** una sezione, e il puntatore che la citava resta valido sul path e falso sulla `§` — invisibile a un grep. Risolvi i `NOSECTION` con `Edit` finché lo script non esce 0; il resto passa al collaudo, che decide se è rollback o coda.
+Branch esistente (locale o remoto) = **sweep in volo**, la PR è aperta: salta il file. È ciò che permette a un notturno di girare due sere di fila senza ripartire da capo. Poi la guardia, di nuovo (stessa invocazione dello step 0).
 
-Poi il collaudo, una volta, a patch applicate e prima del commit. `Task` con `subagent_type: doc-verifier`.
+**2b. Leggi l'ordine.**
 
-```
-Patch da collaudare — allineamento su <i perimetri>.
-
-File toccati (dai contratti APPLIED: dei writer):
-<la lista coi marker NEW / MOD / DEL>
-
-Registro dei verdetti che hanno ordinato questa patch:
-<le voci del registro: claim / realtà / verdetto / target>
-
-Docs root: {project_root}/{docs_root}
-Contratto doc: ${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md — leggilo per primo.
-
-Esiti dei guardiani (fatti deterministici, non ricontarli):
-- build-index.sh: exit <n> <+ i TLDR oltre cap che ha elencato, se ce ne sono>
-- check-doc-links.sh: exit <n>, riferimenti appesi residui: <la lista, o «nessuno»>
-
-La patch non è staged: leggila con `git diff` sul working tree.
-Ritorna solo il referto.
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/inbox.sh" parse --file <path> --format text
 ```
 
-- **`LABEL: accodato` non boccia**: un file che dopo la patch supera la soglia di split o scende sotto il pavimento è topologia che la patch ha *rivelato*, non causato, e la raccoglie `lint-doc` alla prossima misura. Riportala e prosegui.
-- **`OUTCOME: rollback` annulla la patch**, per file secondo il marker: `MOD` → `git checkout -- <path>` · `NEW` → `rm -- <path>` · `DEL` → `git checkout -- <path>`. Le voci del registro tornano non applicate, col motivo — la `RULE:` della violazione — scritto sopra. Nessun commit di patch, e i marker `→ ✔️ align` del §0 **non** si scrivono: quelle nozioni non sono atterrate. Il commit di chiusura del §7 gira lo stesso.
+La prosa è l'ordine, integrale. Le ancore sono **indicazioni, non perimetri** — facoltative, mai verificate a valle:
 
-Se hai già rigenerato l'indice, dopo un rollback **rigeneralo di nuovo**: contiene la voce di un file che adesso non esiste più, ed è drift prodotto dal rollback stesso.
+- `codice:` — dove guardare. Assente o `niente` → nessuna estrazione: riscrittura di sola prosa, che riformula i fatti del target senza introdurne.
+- `doc:` — dove scrivere. Assente → i bersagli si ricavano dalla prosa, via INDEX quando l'ordine nomina un componente.
+- `modo:` — `integra` (default: assorbi la doc preesistente) | `riscrivi` (rasala e riparti dal referto).
+- `online: si` — solo con questa riga la doc @-importata da `CLAUDE.md` entra nei bersagli; la **lista** degli @-import resta comunque fuori (topologia, mestiere di `rebalance-doc`).
 
-### 7. Chiudi e committa
+**2c. Sul branch.**
 
-**Il commit della patch è solo su collaudo `pass`; quello di chiusura gira sempre.**
+```bash
+git checkout -b "doc/sweep-<slug>"
+```
 
-- Sul perimetro **task** (§0): marca `→ ✔️ align` le voci `## Doc Impact` integrate, nel task file. È l'unico file di runtime che questa skill tocca — e lo tocca lei, mai il `doc-writer`, che ha `{docs_root}/tasks/` fuori dal proprio perimetro.
-- **Non stampare i diff** in chat: bruciano contesto e sono già ispezionabili nel pannello git. Stampa la lista file dal contratto `APPLIED:`.
-- **Commit della patch**, catena unica con pathspec esplicita:
-  ```bash
-  git add -- <path...> && git commit -m "docs(align): <perimetro>" -m "<corpo>" -- <path...>
-  ```
-  La pathspec sono tutti i file di `APPLIED:`, più `INDEX.md` se il rebuild l'ha toccato e il task file se hai scritto i marker. Su un `DEL` serve `git add -A -- <path>`, o la cancellazione non entra nell'indice e il commit fa rinascere il file. Il **corpo** porta il blocco `DISCARDED:` del writer: è materiale che ha deciso di non scrivere, e il posto durevole di quel verdetto è il messaggio di commit.
-- **Commit di chiusura, che rimuove il registro** — anche dopo un `rollback`:
-  ```bash
-  git rm -- <REGISTRY_PATH> && git commit -m "docs(align): chiude allineamento <perimetro>" -- <REGISTRY_PATH>
-  ```
-  Materiale di lavoro esaurito: la cronologia lo conserva al commit del §3. Il working tree resta **pulito** su entrambi gli esiti, ed è il solo sintomo osservabile che la run è finita davvero.
-- **Non pusha.** Finché i commit restano locali l'undo è una riga; pushati, diventa un force-push su un ramo che altre sessioni possono già aver letto.
-- Report finale: quanti finding per verdetto, quali file toccati, quali voci restano nel registro non applicate **con lo SHA del commit del §3 da cui si rileggono**, e l'esito del collaudo. Su `rollback` la riga di chiusura dice **cosa** ha violato la patch, non «bocciata».
+Da qui in poi main non si tocca, fino al `checkout main` finale.
 
-## Note
+**2d. Stadio 1 — estrazione.** Solo se `codice:` indica qualcosa:
 
-- **Re-entrante senza bookkeeping.** Il registro vive un commit e sparisce: le voci non applicate (severità bassa, verdetto rinviato) si **riscoprono** alla prossima esecuzione invece di essere recuperate da disco. Il costo è il delta fra *trovare* e *rileggere*, non una passata in più — l'auditor gira comunque sul perimetro. Chi le vuole rileggere adesso ha `git show` sul commit del §3, che è un indirizzo apribile e non una promessa.
-- **Non fondere con `discover`**: quella presuppone doc **zero** e scansiona la struttura per produrre lo scaffold; questa presuppone doc **esistente** e la mette a confronto con la fonte.
-- **Perimetro task vs `capture-doc`**: stessa destinazione, momento diverso. `capture-doc` integra una nozione **calda**, mentre la task è aperta e il codice si muove ancora; il §0 la integra **dopo**, con più fonti e la nozione ferma. Il secondo non rimpiazza il primo — lo rende non obbligatorio.
-- Un perimetro pulito che risulta pulito è l'esito migliore. Se un auditor torna con `FINDINGS: 0`, riportalo così — non rilanciarlo con istruzioni più aggressive per trovare qualcosa.
+```bash
+TMPDIR_SWEEP="$(mktemp -d /tmp/loom-sweep-<slug>.XXXXXX)"
+```
+
+Partiziona il perimetro codice in **componenti** (una lettura per componente, non una gigante). Per ogni componente, `Task` con `subagent_type: doc-extractor`:
+
+```
+perimetro: <i path del componente>
+ordine: <la prosa dello sweep, integrale>
+out: <TMPDIR_SWEEP>/<componente>.md
+```
+
+Il referto è prolisso per progetto e **non entra mai nel sistema doc**: vive nella temporanea, non si committa, muore a fine giro. Una `confidence: bassa` nel ritorno è un red flag da riportare nella PR.
+
+**2e. Dalla prosa ai file — il pezzo che nessun agent copre.** Ricava i **bersagli**: da `doc:` quando c'è, dall'ordine e dall'INDEX quando nomina un componente. Lista esplicita di file, dichiarata nel report e nel corpo della PR.
+
+**2f. Stadio 2 — stesura.** Un `Task` con `subagent_type: doc-writer` **per bersaglio**, modo sweep:
+
+```
+Modo sweep.
+
+target: <path del bersaglio>
+ordine: <la prosa dello sweep, integrale>
+referto: <path del referto pertinente in TMPDIR_SWEEP, o vuoto>
+modo: <integra | riscrivi>
+assumed_knowledge: {docs_root}/reference/assumed-knowledge.md
+```
+
+Lo sweep **non cambia il numero dei file**: il writer non esce dal file che riceve. Un bersaglio che finisce sopra la soglia di split ci resta — lo raccoglie `rebalance-doc` al giro dopo.
+
+**2g. Guardiani e chiusura del branch.**
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/check-doc-links.sh" --docs-root "{docs_root}"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
+git rm -q <path del file sweep>
+lw_git_add_n_commit "docs(sweep): <slug> — <N> bersagli riscritti" \
+    <i bersagli> "{docs_root}/reference/INDEX.md" <path del file sweep>
+rm -rf "$TMPDIR_SWEEP"
+```
+
+Il file sweep muore **nello stesso commit** della patch: mergiare la PR lo fa sparire da main; chiudere la PR e cancellare il branch lo rimette in coda, con l'ordine da riscrivere meglio.
+
+```bash
+git push -u origin "doc/sweep-<slug>" && \
+gh pr create --title "docs(sweep): <slug>" --body "<ordine integrale + lista bersagli + esiti guardiani + red flag>" || \
+echo "senza remote/gh: branch locale doc/sweep-<slug>, merge a mano"
+git checkout main
+```
+
+Senza remote il giro degrada al solo branch, mergiato a mano — dillo nel report.
+
+## 3. Chiusura
+
+Report: sweep eseguiti (branch e PR), saltati perché in volo, bersagli per sweep, red flag (confidence bassa, guardiani rossi — che non bloccano: finiscono nel corpo della PR, dove il diff si legge).
