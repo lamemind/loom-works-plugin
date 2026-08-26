@@ -27,7 +27,7 @@ Solo se **assenti** (idempotente):
 - `{docs_root}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
 - `{docs_root}/tasks/` — directory per i file task
 - `{docs_root}/reference/` — directory per doc offline
-- `{docs_root}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-doc` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
+- `{docs_root}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-notions` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`. Unico file che init tocca anche quando esiste già: su un progetto registrato lo step 1b ripropone i campi non identitari coi valori attuali, per far crescere un file scritto prima che un campo esistesse
 - `.claude/settings.json` — solo la regola `Read(~/.claude/plugins/cache/…/**)`, aggiunta in coda alle esistenti senza toccare il resto del file. Serve agli agent doc, che aprono i propri contratti dalla cache del plugin: senza, la `Read` cade sotto approvazione e l'agent **prosegue senza contratto** invece di fermarsi. Il path è sul segmento stabile, mai sulla versione — una regola concessa a mano da un «non chiedere più» nasce version-pinned e muore al primo bump
 

@@ -77,8 +77,8 @@ copy_template() {
 # =============================================================================
 # Regola di permesso sulla cache del plugin
 # =============================================================================
-# Gli agent doc (doc-router, doc-writer, doc-auditor, doc-grouper, doc-verifier)
-# aprono da sé i propri contratti sotto ${CLAUDE_PLUGIN_ROOT}/docs/. Quel path sta
+# Gli agent del sistema doc aprono da sé i propri contratti sotto
+# ${CLAUDE_PLUGIN_ROOT}/docs/. Quel path sta
 # nella cache del plugin, cioè FUORI dalla working directory del progetto: senza una
 # regola che lo copra la Read cade sotto approvazione, e l'agent NON si ferma — chiude
 # con un verdetto che si legge come legittimo, avendo giudicato senza il contratto.

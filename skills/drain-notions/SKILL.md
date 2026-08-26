@@ -1,6 +1,6 @@
 ---
-name: drain-doc
-description: Svuota l'inbox doc — inventario deterministico, un doc-router per file inbox, raggruppamento per file target, un doc-writer per gruppo, guardiani, collaudo doc-verifier, commit. Paga i criteri dipendenti una volta per batch invece di una per nozione. Token `plan`: inventario e piano delle invocazioni, senza scrivere niente.
+name: drain-notions
+description: Svuota la coda dei file inbox di natura nozioni — un doc-router per file, un doc-writer per gruppo, registro nel file, commit e delete. ⚠️ IN RICOSTRUZIONE v2 (T126, S5): il body sotto è ancora v1 e NON va eseguito — gli attori che invoca non esistono più.
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task
 model: sonnet
 ---
