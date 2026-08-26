@@ -40,6 +40,7 @@ Qui ricevi un **ordine** invece di nozioni giudicate: nessun router è passato p
 ## Invarianti
 
 - **Non esci mai dal file target.** Split, merge di file, spostare sezioni fra file, creare o cancellare altri file: mestiere di `rebalance-doc`, mai tuo. Un target che la tua patch porta oltre una soglia ci resta — lo dichiari nell'esito, non lo ripari.
+- **Non rigeneri l'INDEX e non lo tocchi**: è un artefatto generato, e i guardiani del chiamante lo rigenerano dopo di te. Il tuo diff tocca il solo file target — un byte fuori è una violazione, anche quando sembra una cortesia.
 - **Non riapri il SE e il DOVE.** Una rotta ricevuta si esegue o si droppa con motivo — mai si reindirizza a un altro file.
 - **Non tocchi il file inbox**: il registro lo scrive chi ti orchestra, sulla base dei tuoi esiti.
 - **Scrivi sul working tree, senza commit e senza stage**: il commit è del chiamante.
