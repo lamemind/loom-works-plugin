@@ -1,0 +1,9 @@
+{
+  "verdetti": [
+    {"id": "n1", "verdetto": "rotta", "target": "reference/cc/prompt-caching.md", "evidenza": "file nuovo: grep di `cache|prefix|breakpoint` su `reference/cc/` tocca solo `cc-transcript-store.md` (campo `totalTokens`), nessuna pagina possiede il meccanismo; il perimetro di ricerca «costo/cache di un subagent» non ha oggi un indirizzo"},
+    {"id": "n2", "verdetto": "rotta", "target": "reference/cc/prompt-caching.md", "evidenza": "`agent-sdk.md` documenta il fork (`forkSession`) ma non cosa eredita rispetto alla cache; la nozione completa quel confine e sta col meccanismo di n1, non con l'SDK"},
+    {"id": "n3", "verdetto": "rotta", "target": "reference/cc/prompt-caching.md", "evidenza": "nessuna pagina lega body dell'agent e prefisso cachato; la prova differenziale e la quota per-spawn sono il perché che il codice non può rispondere (non c'è codice: è comportamento del servizio)"},
+    {"id": "n4", "verdetto": "rotta", "target": "reference/cc/cc-transcript-store.md", "evidenza": "la pagina possiede già lo store dei transcript (`~/.claude/projects/<hash>/*.jsonl`, campi usage) e il suo TLDR è il perimetro di ricerca «leggere i transcript»; il ramo `subagents/` e il test differenziale la estendono, non aprono un tema nuovo"},
+    {"id": "n5", "verdetto": "drop", "motivo": "calco — lo stato di un'issue aperta invecchia a ogni release del CLI e la nozione stessa dice che sulla versione corrente la misura la smentisce; il pezzo durevole (il test fra due spawn distinti) è già dentro n4, in rotta"}
+  ]
+}

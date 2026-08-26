@@ -1,45 +1,42 @@
 #!/bin/bash
 
 # =============================================================================
-# build-index.sh - Rigenera INDEX.md dai TLDR dei file .md in una directory
-# Usage: build-index.sh [--dir <path>] [--output <path>] [--title <title>]
-#                      [--exclude <dir1,dir2>]
+# build-index.sh — rigenera INDEX.md dai TLDR di reference/ + sezioni inbox (v2)
+# Usage: build-index.sh [--dir <path>] [--inbox <path>] [--docs-root <name>]
+#                       [--output <path>] [--title <title>] [--exclude <dir1,dir2>]
 # =============================================================================
 #
-# Scansiona ricorsivamente <dir> (default: docs/reference/) e per ogni file .md
-# estrae la riga 3 nel formato:
-#   > **TLDR**: <testo>
-# Genera un INDEX.md con struttura a sezioni (una per sottocartella) e liste
-# `- \`file.md\` — <tldr>`.
+# Scansiona ricorsivamente <dir> (default: {docs_root}/reference/) e per ogni
+# file .md estrae il TLDR di riga 3 (`> **TLDR**: <testo>`). Genera un INDEX.md
+# a sezioni (una per sottocartella) con liste `- \`file.md\` — <tldr>`.
 #
-# In coda indicizza anche {docs_root}/inbox/ — il layer delle nozioni non ancora
-# collocate — in una sezione propria, preceduta dalla riga di PRECEDENZA: in caso
-# di contraddizione con reference/, vince l'inbox.
+# Sezioni inbox (v2):
+#   - L'indicizzazione la decide il MARKER `indexed`, non la presenza del TLDR:
+#     un `nozioni` con `indexed` senza TLDR entra col SOLO TITOLO, in corsivo —
+#     il router che sceglie dove cercare deve poter vedere che quella voce gli
+#     offre meno. Il TLDR resta obbligatorio per reference/.
+#   - I file inbox si leggono attraverso `inbox.sh parse`, MAI con regex proprie:
+#     da li' arrivano marker, TLDR (riga 4) e titolo insieme. `doc_tldr` diretto
+#     sulla riga 3 resta per i soli file di reference/.
+#   - Gli inbox con `branch:` vanno in una sezione PER BRANCH, dopo quella di
+#     prod, fra loro in ordine alfabetico: la precedenza e' qualificata dal
+#     branch, quindi varia da voce a voce e un'intestazione collettiva direbbe
+#     che una condizione esiste senza dire quale ti riguarda.
+#   - Le sezioni si emettono SOLO se contengono almeno un file indicizzabile:
+#     una regola di precedenza che sopravvive a un'inbox vuota drifterebbe da sola.
 #
-# La sezione (e con essa la riga) si emette solo se l'inbox contiene almeno un file
-# indicizzabile, non se la cartella esiste: una regola che sparisce quando smette di
-# applicarsi non può driftare, e su un'inbox vuota la precedenza sarebbe permanente.
+# Il cap del TLDR viene da lib-doc.sh (sede unica). I TLDR oltre il cap sono una
+# violazione BLOCCANTE: l'indice viene scritto comunque, ma lo script esce 2.
 #
-# I file senza TLDR vengono segnalati a stderr ma NON inclusi nell'indice.
-# L'INDEX.md stesso è sempre escluso.
-#
-# I TLDR oltre TLDR_CAP char sono una violazione BLOCCANTE del contratto doc
-# (docs/doc-management.md §Soglie): l'indice viene scritto comunque, ma lo
-# script esce 2. Il cap viene dal contratto — cambiarlo qui lo sfasa da lì.
-#
-# Exit code:
+# Exit (famiglia generatore):
 #   0  indice scritto, nessuna violazione
 #   1  errore duro: indice NON scritto (dir inesistente, argomento ignoto)
-#   2  indice scritto, uno o più TLDR oltre il cap
+#   2  indice scritto, uno o piu' TLDR oltre il cap
 #
-# Env:
-#   PROJECT_ROOT (default: $PWD)
+# Env: PROJECT_ROOT (default: auto-detect)
 # =============================================================================
 
 set -euo pipefail
-
-# Cap TLDR in caratteri — contratto doc §Soglie
-TLDR_CAP=600
 
 DIR=""
 INBOX_DIR=""
@@ -49,12 +46,12 @@ EXCLUDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --dir)      DIR="$2"; shift 2 ;;
-        --inbox)    INBOX_DIR="$2"; shift 2 ;;
+        --dir)       DIR="$2"; shift 2 ;;
+        --inbox)     INBOX_DIR="$2"; shift 2 ;;
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
-        --output)   OUTPUT="$2"; shift 2 ;;
-        --title)    TITLE="$2"; shift 2 ;;
-        --exclude)  EXCLUDE="$2"; shift 2 ;;
+        --output)    OUTPUT="$2"; shift 2 ;;
+        --title)     TITLE="$2"; shift 2 ;;
+        --exclude)   EXCLUDE="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -62,6 +59,8 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../utils/lib.sh
 source "${SCRIPT_DIR}/../utils/lib.sh"
+# shellcheck source=lib-doc.sh
+source "${SCRIPT_DIR}/lib-doc.sh"
 
 [[ -z "$DIR" ]] && DIR="$(lw_docs_root)/reference"
 [[ -z "$INBOX_DIR" ]] && INBOX_DIR="$(lw_docs_root)/inbox"
@@ -76,20 +75,6 @@ if [[ ! -d "$SCAN_DIR" ]]; then
     exit 1
 fi
 
-# --- Estrai TLDR dalla prima riga utile ---------------------------------------
-# Accetta: `> **TLDR**: testo` (con o senza spazi flessibili)
-extract_tldr() {
-    local file="$1"
-    # Convenzione strict: TLDR opt-in deve stare esattamente sulla 3a riga del file
-    # nel formato `> **TLDR**: <testo>`. Pattern semplice, niente parser stato.
-    local line
-    line=$(sed -n '3p' "$file") || return 0
-    [[ "$line" =~ ^\>\ \*\*TLDR\*\*:\ (.+)$ ]] || return 0
-    # Trim trailing whitespace
-    local tldr="${BASH_REMATCH[1]}"
-    echo "${tldr%"${tldr##*[![:space:]]}"}"
-}
-
 should_exclude() {
     local path="$1"
     [[ -z "$EXCLUDE" ]] && return 1
@@ -101,65 +86,94 @@ should_exclude() {
     return 1
 }
 
-# --- Raccogli files, raggruppa per directory ----------------------------------
-# Output temp: "<reldir>|<filename>|<tldr>"
+# --- Raccolta reference/ --------------------------------------------------------
+# Temp: "<reldir>|<filename>|<tldr>"
 TMP="$(mktemp)"
-INBOX_TMP="$(mktemp)"
+INBOX_TMP="$(mktemp)"       # "<branch>|<filename>|<voce>" — branch vuoto = prod
 trap 'rm -f "$TMP" "$INBOX_TMP"' EXIT
 
 MISSING=0
 OVERCAP=0
 
-collect() {  # <scan-dir> <tmp-file>
-    local scan="$1" out="$2" file tldr rel reldir fname
-    [[ -d "$scan" ]] || return 0
-    while IFS= read -r -d '' file; do
-        # skip INDEX.md stesso
-        [[ "$(basename "$file")" == "INDEX.md" ]] && continue
-        should_exclude "$file" && continue
+while IFS= read -r -d '' file; do
+    [[ "$(basename "$file")" == "INDEX.md" ]] && continue
+    should_exclude "$file" && continue
 
-        tldr="$(extract_tldr "$file")"
-        if [[ -z "$tldr" ]]; then
-            echo "[build-index] WARN no TLDR: ${file#$PROJECT_ROOT/}" >&2
-            MISSING=$((MISSING+1))
+    tldr="$(doc_tldr "$file" 3)"
+    if [[ -z "$tldr" ]]; then
+        echo "[build-index] WARN no TLDR: ${file#"$PROJECT_ROOT"/}" >&2
+        MISSING=$((MISSING+1))
+        continue
+    fi
+
+    if (( ${#tldr} > LW_DOC_TLDR_CAP )); then
+        echo "[build-index] OVER-CAP TLDR ${#tldr} char (cap ${LW_DOC_TLDR_CAP}): ${file#"$PROJECT_ROOT"/}" >&2
+        OVERCAP=$((OVERCAP+1))
+    fi
+
+    rel="${file#"$SCAN_DIR"/}"
+    reldir="$(dirname "$rel")"
+    fname="$(basename "$rel")"
+    [[ "$reldir" == "." ]] && reldir=""
+
+    # Nessun escape di `|`: l'output e' a liste, e `read` assegna all'ultima
+    # variabile il resto della riga separatori inclusi → il TLDR arriva intatto.
+    echo "${reldir}|${fname}|${tldr}" >> "$TMP"
+done < <(find "$SCAN_DIR" -type f -name '*.md' -print0 | sort -z)
+
+# --- Raccolta inbox (via inbox.sh parse) ----------------------------------------
+# Indicizzabile = natura nozioni + token indexed. Voce = TLDR se c'e', altrimenti
+# il titolo in corsivo. Il branch decide la sezione.
+if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
+    while IFS= read -r -d '' file; do
+        parse_out="$("${SCRIPT_DIR}/inbox.sh" parse --file "$file" --format tsv 2>/dev/null)" && parse_rc=0 || parse_rc=$?
+        if [[ $parse_rc -eq 2 ]]; then
+            echo "[build-index] WARN malformato, escluso: ${file#"$PROJECT_ROOT"/}" >&2
+            continue
+        elif [[ $parse_rc -ne 0 ]]; then
+            echo "[build-index] WARN parse fallito, escluso: ${file#"$PROJECT_ROOT"/}" >&2
             continue
         fi
 
-        # ${#var} conta caratteri (non byte) con locale UTF-8 — coerente col cap del contratto
-        if (( ${#tldr} > TLDR_CAP )); then
-            echo "[build-index] OVER-CAP TLDR ${#tldr} char (cap ${TLDR_CAP}): ${file#$PROJECT_ROOT/}" >&2
-            OVERCAP=$((OVERCAP+1))
+        natura=""; indexed=""; branch=""; titolo=""; tldr=""; tldr_len=0
+        # tab tradotto in unit separator: con IFS=$'\t' i tab sono whitespace e i
+        # campi vuoti in mezzo collassano (un `nozioni · branch:` senza indexed
+        # sposterebbe il branch nella colonna sbagliata)
+        while IFS=$'\x1f' read -r kind f1 f2 f3 f4 _; do
+            case "$kind" in
+                TITOLO) titolo="$f1" ;;
+                MARKER) natura="$f1"; indexed="$f2"; branch="$f4" ;;
+                TLDR)   tldr="$f1"; tldr_len="$f2" ;;
+            esac
+        done < <(tr '\t' '\037' <<< "$parse_out")
+
+        [[ "$natura" == "nozioni" && "$indexed" == "indexed" ]] || continue
+
+        if [[ -n "$tldr" ]]; then
+            if (( tldr_len > LW_DOC_TLDR_CAP )); then
+                echo "[build-index] OVER-CAP TLDR ${tldr_len} char (cap ${LW_DOC_TLDR_CAP}): ${file#"$PROJECT_ROOT"/}" >&2
+                OVERCAP=$((OVERCAP+1))
+            fi
+            voce="$tldr"
+        else
+            voce="*${titolo}*"
         fi
 
-        rel="${file#"$scan"/}"
-        reldir="$(dirname "$rel")"
-        fname="$(basename "$rel")"
-        [[ "$reldir" == "." ]] && reldir=""
+        echo "${branch}|$(basename "$file")|${voce}" >> "$INBOX_TMP"
+    done < <(find "$INBOX_SCAN_DIR" -maxdepth 1 -type f -name '*.md' -print0 | sort -z)
+fi
 
-        # Nessun escape di `|`: l'output è a liste, e `read` assegna all'ultima
-        # variabile il resto della riga separatori inclusi → il TLDR arriva intatto.
-        echo "${reldir}|${fname}|${tldr}" >> "$out"
-    done < <(find "$scan" -type f -name '*.md' -print0 | sort -z)
-}
-
-collect "$SCAN_DIR" "$TMP"
-# L'inbox si indicizza solo se è un perimetro diverso da quello già scansionato,
-# o un `--dir` puntato sull'inbox la elencherebbe due volte.
-[[ "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]] && collect "$INBOX_SCAN_DIR" "$INBOX_TMP"
-
-# --- Genera output ------------------------------------------------------------
+# --- Genera output --------------------------------------------------------------
 {
     echo "# ${TITLE}"
     echo ""
     echo "Indice della documentazione offline."
     echo ""
 
-    # Group by reldir. `LC_ALL=C sort -t'|' -k1,1` e non `sort`: sotto collazione
-    # locale la punteggiatura non pesa al livello primario, quindi il separatore `|`
-    # viene ignorato e le righe si ordinano sul testo intero — i figli diretti
-    # (reldir vuoto) finiscono sparsi fra le sottocartelle e la sezione `(root)`
-    # viene riaperta a ogni interruzione. Ordinare sul campo, in C, tiene un gruppo
-    # per directory e rende l'ordine indipendente dal locale di chi lancia.
+    # `LC_ALL=C sort -t'|' -k1,1` e non `sort`: sotto collazione locale la
+    # punteggiatura non pesa al livello primario, quindi il separatore `|` viene
+    # ignorato e la sezione `(root)` si riapre a ogni interruzione. Ordinare sul
+    # campo, in C, rende l'ordine indipendente dal locale di chi lancia.
     current_section=""
     LC_ALL=C sort -t'|' -k1,1 -k2,2 "$TMP" | while IFS='|' read -r reldir fname tldr; do
         section="${reldir:-/}"
@@ -176,26 +190,35 @@ collect "$SCAN_DIR" "$TMP"
         echo "- \`${fname}\` — ${tldr}"
     done
 
-    # Sezione inbox: emessa solo se c'è almeno una voce. Zero file → nessuna
-    # sezione → nessuna riga di precedenza.
     if [[ -s "$INBOX_TMP" ]]; then
-        echo ""
-        echo "## inbox — nozioni non ancora collocate"
-        echo ""
-        echo "> Precedenza: in caso di contraddizione con un file di \`reference/\`,"
-        echo "> **prevale la voce inbox** — è più recente e nasce dal codice appena scritto."
-        echo ""
-        LC_ALL=C sort -t'|' -k1,1 -k2,2 "$INBOX_TMP" | while IFS='|' read -r reldir fname tldr; do
-            echo "- \`${fname}\` — ${tldr}"
+        # prod prima (branch vuoto ordina in testa con sort -k1,1), poi una
+        # sezione per branch in ordine alfabetico
+        current_branch="__unset__"
+        LC_ALL=C sort -t'|' -k1,1 -k2,2 "$INBOX_TMP" | while IFS='|' read -r branch fname voce; do
+            if [[ "$branch" != "$current_branch" ]]; then
+                echo ""
+                if [[ -z "$branch" ]]; then
+                    echo "## inbox — nozioni non ancora collocate"
+                    echo ""
+                    echo "> Precedenza: in caso di contraddizione con un file di \`reference/\`, **prevale la voce inbox** — descrive un rilascio che la doc consolidata non ha ancora assorbito."
+                else
+                    echo "## inbox — branch \`${branch}\`"
+                    echo ""
+                    echo "> As-is di uno sviluppo, non di prod: vale **solo lavorando su \`${branch}\`**, e per chi sta su prod non ha nessuna precedenza sulla doc consolidata."
+                fi
+                echo ""
+                current_branch="$branch"
+            fi
+            echo "- \`${fname}\` — ${voce}"
         done
     fi
 } > "$OUTPUT_FILE"
 
-echo "[build-index] wrote: ${OUTPUT_FILE#$PROJECT_ROOT/}"
+echo "[build-index] wrote: ${OUTPUT_FILE#"$PROJECT_ROOT"/}"
 [[ $MISSING -gt 0 ]] && echo "[build-index] ${MISSING} file(s) skipped (no TLDR)" >&2
 
 if (( OVERCAP > 0 )); then
-    echo "[build-index] FAIL: ${OVERCAP} TLDR oltre il cap ${TLDR_CAP} — riscrivili come ancora (contratto doc §Soglie)" >&2
+    echo "[build-index] FAIL: ${OVERCAP} TLDR oltre il cap ${LW_DOC_TLDR_CAP} — riscrivili come ancora (contratto doc)" >&2
     exit 2
 fi
 exit 0

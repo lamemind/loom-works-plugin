@@ -1,314 +1,201 @@
 #!/usr/bin/env bash
 
 # =============================================================================
-# doc-metrics.sh — misure deterministiche sulla doc di progetto
-# Usage: doc-metrics.sh [--docs-root <name>] [--dir <path>] [--online] [--inbox]
-#                      [--split-threshold N] [--merge-threshold N] [--tldr-cap N]
-#                      [--regroup-threshold N] [--inbox-cap N]
-#                      [--format text|tsv]
+# doc-metrics.sh — misure deterministiche sulla doc di progetto (v2)
+# Usage: doc-metrics.sh --docs-root <name> [--dir <path>] [--online]
+#                       [--inbox [--natura nozioni|derivazione|sweep] [--drainable]]
+#                       [--format text|tsv]
 # =============================================================================
 #
-# Conta i CHAR (non i byte) di ogni file .md della doc, estrae il TLDR di riga 3
-# e alza i flag rispetto alle soglie del contratto doc (docs/doc-management.md
-# §Soglie). Le soglie sono NUMERI: due esecuzioni sullo stesso albero devono dare
-# lo stesso esito — è la ragione per cui questo passo è uno script e non un
-# giudizio a runtime dell'agent.
+# Famiglia MISURA: exit 0 sempre sull'esito della misura, anche a risultato
+# vuoto · exit 2 SOLO quando la misura non e' stata fatta perche' l'invocazione
+# era sbagliata — e in quel caso stdout resta VUOTO: e' il discriminante fra i
+# due sensi del 2. Le soglie vengono da lib-doc.sh (sede unica, niente override
+# da CLI; il canale di test LOOM_DOC_THRESHOLDS_OVERRIDE si dichiara da se'
+# nella riga `# soglie:`). Il modo testo apre SEMPRE con quella riga, cosi' chi
+# legge una misura sa contro cosa e' stata presa; il TSV solo sotto override.
 #
-# `--online` aggiunge il footprint per-sessione: gli @-import di CLAUDE.md PIÙ le
-# entry hook SessionStart (misurate da check-injection-budget.sh). Le due voci
-# vanno lette insieme: gli @-import da soli sono circa il 70% del costo reale.
+# I due modi sono mutuamente esclusivi: --inbox emette la coda ed esce.
 #
-# `--inbox` emette SOLO la coda di smaltimento — i file di {docs_root}/inbox/ —
-# ed e' l'inventario che drain-doc consuma. L'ordine e' a due chiavi: prima i
-# file con SENTINELLA DI DRIFT (riga 4, vedi drift_of), poi l'eta' crescente
-# dentro ogni classe. Una sentinella dice che quella nozione sta curando una
-# pagina gia' falsa, e un drift e' vivo dall'istante in cui il codice cambia:
-# farla aspettare la coda significa tenere in piedi la bugia.
-# Le colonne CAPPELLO e STATO dicono se il file e' drenabile: un file inbox e'
-# WIP finche' la task che lo possiede non e' chiusa. Il verdetto e' un dato, non
-# un giudizio — drain-doc filtra su un valore, per la stessa ragione per cui
-# l'ordine lo decide questo script e non il chiamante.
-# Lo stesso vale per WT (working tree): pulito | modificato | untracked. Un file
-# inbox che un'altra sessione sta ancora scrivendo non e' drenabile — drain-doc
-# lo LEGGE e poi lo RIMUOVE, quindi leggerebbe una versione a meta' edit e
-# cancellerebbe il resto. La guardia sull'indice (`git diff --cached`) non vede
-# questo caso: protegge il commit con pathspec, che e' un'altra operazione.
-# I due esclusi hanno motivi diversi da dichiarare, e su untracked il perimetro
-# non e' una scelta di prudenza — `git rm` su un untracked esce non-zero, quindi
-# la chiusura di drain-doc si romperebbe a prescindere dalla guardia.
-# PRIO_FORM dice se la riga `> **PRIORITY**:` sta dove il lettore la cerca:
-# ok | none | malformed:<riga>. Vedi prio_form_of.
-# L'eta' viene dal commit che ha AGGIUNTO il file (`git log --diff-filter=A`, il
-# piu' vecchio), non dall'mtime: un file inbox si riscrive solo per errore,
-# mentre un checkout ne azzera l'mtime di tutti insieme e l'ordine a coda
-# sparirebbe senza che nulla lo segnali. Fallback su mtime per un file mai
-# committato. Il flag NON altera l'output di default: doc-partition.sh lo
-# consuma.
+# Modo principale — flag per file:
+#   SPLIT     char >= soglia split
+#   MERGE?    char <= pavimento merge — trigger di RIESAME, non ordine di fusione
+#   TLDR>CAP  TLDR oltre il cap (il numero sta nella riga # soglie:, non nel nome)
+#   NOTLDR    file sotto reference/ senza TLDR in riga 3 — NON si applica
+#             all'inbox: un nozioni con indexed senza TLDR e' legittimo
+#   ONLINE    file @-importato da CLAUDE.md (si paga a ogni sessione)
+#   INBOX     nozione non ancora collocata — ne' SPLIT ne' MERGE?
+#   GEN       INDEX.md — esclusivo, nessun altro flag calcolato
+#   CONFIG    assumed-knowledge.md — sopprime SOLO SPLIT e MERGE?: il file e'
+#             configurazione, corto per natura, e una fusione per topologia gli
+#             farebbe perdere l'indirizzo fisso su cui il router conta. I flag
+#             di TLDR restano calcolati: sopprimerli renderebbe invisibile la
+#             sparizione del TLDR proprio sul file aperto a ogni giudizio.
 #
-# Flag per file:
-#   SPLIT   char >= soglia split
-#   MERGE?  char <= pavimento merge — trigger di RIESAME, non un ordine di fusione:
-#           il file sopravvive se il suo perimetro di ricerca e' distinto
-#   TLDR>N  TLDR oltre il cap
-#   NOTLDR  file sotto reference/ o inbox/ senza TLDR su riga 3 (fuori dall'INDEX)
-#   ONLINE  file @-importato da CLAUDE.md (si paga a ogni sessione)
-#   INBOX   nozione non ancora collocata — si smaltisce, non si mantiene, ed e'
-#           esente da SPLIT e MERGE: un file inbox aggrega un cappello e nasce
-#           per morire al drain, quindi spezzarlo lo riporterebbe alle N voci
-#           d'INDEX che il file per cappello esiste per chiudere. Il tetto
-#           dell'inbox resta sul CONTEGGIO dei file.
-#   GEN     artefatto generato (INDEX.md) — mai splittato a mano
+# Modo --inbox — la coda, ordine `created` crescente e niente altro:
+#   PATH · NATURA · INDEXED · DRAINABLE · BRANCH · NOZIONI · APERTE · CHAR ·
+#   CREATED · AGE_DAYS · CAPPELLO
+# Le colonne di stato vengono da `inbox.sh parse`, invocato una volta per file:
+# doc-metrics NON conosce il formato inbox (lib-doc §2.2). Il 2 di parse su un
+# file malformato NON e' un fallimento: diventa NATURA=malformato (altre colonne
+# vuote, riga su stderr) e l'exit resta 0 — una coda che contiene un malformato
+# e' una misura riuscita. --drainable = token drainable presente E branch:
+# assente (un file branched non entra in nessuna coda, drainable o no);
+# malformato sempre escluso dal filtro. CREATED dal commit che ha AGGIUNTO il
+# file, fallback stat per un file mai committato — mai l'mtime: un checkout lo
+# azzera su tutti i file insieme. CAPPELLO dal nome del file (provenienza
+# leggibile, non un dato su cui si decide). CHAR resta: e' il proxy del costo
+# del router che sta per aprire quel file.
 #
-# Tre layer, contati separatamente perche' hanno regimi di costo diversi: ONLINE si
-# paga a ogni sessione, OFFLINE all'apertura, INBOX all'apertura piu' il TLDR online
-# — ed e' l'unico che deve tendere a zero. Il layer si legge dal path, tranne per
-# online che si legge dagli @-import: INDEX.md sta sotto reference/ ma e' online.
+# --online: invariato e SENZA consumer automatico in v2 — nessun flusso lo
+# invoca. Resta come diagnostica on-demand: la domanda che risponde (quanto
+# costa una sessione) e' reale al momento del publish.
 #
-# CARTELLE: char per cartella (figli diretti, la stessa unita' con cui
-# doc-partition.sh forma i gruppi) contro la soglia di REGROUP — sopra, la cartella
-# non e' piu' un perimetro che un auditor tiene in testa tutto insieme.
-#
-# Escluso dallo scan: tasks/ (runtime, non doc) e current-task.md (symlink).
-#
-# Env: PROJECT_ROOT (default: auto-detect), LOOM_DOCS_ROOT (default: docs)
-# Exit: 0 sempre — è una misura, non un guard. Chi decide è il chiamante.
+# Env: PROJECT_ROOT (default: auto-detect)
 # =============================================================================
 
 set -uo pipefail
 
-SPLIT_THRESHOLD=15000
-MERGE_THRESHOLD=3000
-TLDR_CAP=600
-# Stesso numero di doc-partition.sh --max-char, e per la stessa ragione: misura
-# quanta doc legge un auditor. Riusarlo tiene coerenti topologia e fan-out.
-REGROUP_THRESHOLD=60000
-INBOX_CAP=8
 DIR=""
 ONLINE=0
 INBOX_ONLY=0
+NATURA_FILTER=""
+DRAINABLE_ONLY=0
 FORMAT="text"
+
+usage_err() { echo "[doc-metrics] ERROR: $*" >&2; exit 2; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --docs-root)          LOOM_DOCS_ROOT="$2"; shift 2 ;;
-        --dir)                DIR="$2"; shift 2 ;;
-        --online)             ONLINE=1; shift ;;
-        --inbox)              INBOX_ONLY=1; shift ;;
-        --split-threshold)    SPLIT_THRESHOLD="$2"; shift 2 ;;
-        --merge-threshold)    MERGE_THRESHOLD="$2"; shift 2 ;;
-        --tldr-cap)           TLDR_CAP="$2"; shift 2 ;;
-        --regroup-threshold)  REGROUP_THRESHOLD="$2"; shift 2 ;;
-        --inbox-cap)          INBOX_CAP="$2"; shift 2 ;;
-        --format)             FORMAT="$2"; shift 2 ;;
-        *) echo "unknown arg: $1" >&2; exit 2 ;;
+        --docs-root)  LOOM_DOCS_ROOT="$2"; shift 2 ;;
+        --dir)        DIR="$2"; shift 2 ;;
+        --online)     ONLINE=1; shift ;;
+        --inbox)      INBOX_ONLY=1; shift ;;
+        --natura)     NATURA_FILTER="$2"; shift 2 ;;
+        --drainable)  DRAINABLE_ONLY=1; shift ;;
+        --format)     FORMAT="$2"; shift 2 ;;
+        *) usage_err "argomento ignoto: $1" ;;
     esac
 done
+
+case "$FORMAT" in text|tsv) ;; *) usage_err "--format deve essere text|tsv" ;; esac
+if [[ -n "$NATURA_FILTER" ]]; then
+    [[ "$INBOX_ONLY" -eq 1 ]] || usage_err "--natura richiede --inbox"
+    case "$NATURA_FILTER" in nozioni|derivazione|sweep) ;; *) usage_err "--natura deve essere nozioni|derivazione|sweep" ;; esac
+fi
+[[ "$DRAINABLE_ONLY" -eq 1 && "$INBOX_ONLY" -eq 0 ]] && usage_err "--drainable richiede --inbox"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../utils/lib.sh
 source "${SCRIPT_DIR}/../utils/lib.sh"
+# shellcheck source=lib-doc.sh
+source "${SCRIPT_DIR}/lib-doc.sh"
 
 PROJECT_ROOT="$(lw_find_project_root)"
 DOCS_ROOT="$(lw_docs_root)"
 [[ -z "$DIR" ]] && DIR="${PROJECT_ROOT}/${DOCS_ROOT}"
 [[ "$DIR" != /* ]] && DIR="${PROJECT_ROOT}/${DIR}"
 
-[[ -d "$DIR" ]] || { echo "[doc-metrics] ERROR: dir not found: $DIR" >&2; exit 2; }
-
-# --- Set dei file online (@-import di CLAUDE.md) ------------------------------
-# Solo primo livello: un file online che ne @-importa altri non viene seguito.
-ONLINE_LIST=""
-CLAUDE_MD="${PROJECT_ROOT}/CLAUDE.md"
-if [[ -f "$CLAUDE_MD" ]]; then
-    ONLINE_LIST="$(grep -oE '@[^ )]+\.md' "$CLAUDE_MD" 2>/dev/null | sed 's/^@//' | sort -u)"
-fi
-
-is_online() {  # <rel-to-project-root>
-    [[ -z "$ONLINE_LIST" ]] && return 1
-    grep -qxF "$1" <<< "$ONLINE_LIST"
-}
+[[ -d "$DIR" ]] || usage_err "dir not found: $DIR"
 
 char_count() { wc -m < "$1" | tr -d ' '; }
 
-tldr_of() {  # <file> — convenzione strict: riga 3, stessa di build-index.sh
-    local line
-    line="$(sed -n '3p' "$1" 2>/dev/null)" || return 0
-    [[ "$line" =~ ^\>\ \*\*TLDR\*\*:\ (.+)$ ]] || return 0
-    local t="${BASH_REMATCH[1]}"
-    echo "${t%"${t##*[![:space:]]}"}"
+cappello_of() {  # <basename> → ID dal nome, vuoto se il nome non ne porta uno
+    [[ "$1" =~ ^([A-Za-z]+[0-9]+)- ]] && echo "${BASH_REMATCH[1]}" || echo ""
 }
 
-# Sentinella di drift: riga 4 di un file inbox, subito sotto il TLDR.
-#   > **PRIORITY**: 🚨 · drift: <path> <path>
-# Riga assente = priorità normale, ed è il caso di maggioranza: i file nati prima
-# che le sentinelle esistessero non vanno ritoccati. Posizione fissa come il
-# TLDR, quindi si legge con un `sed -n` invece che con un grep sul corpo — e
-# fuori dalla riga 3 non entra nell'INDEX, che è online: costo per-sessione zero.
-drift_of() {  # <file> → i path candidati, o vuoto se la riga manca
-    local line
-    line="$(sed -n '4p' "$1" 2>/dev/null)" || return 0
-    [[ "$line" =~ ^\>\ \*\*PRIORITY\*\*:\ 🚨(.*)$ ]] || return 0
-    local rest="${BASH_REMATCH[1]}"
-    [[ "$rest" =~ drift:[[:space:]]*(.+)$ ]] && rest="${BASH_REMATCH[1]}" || rest="—"
-    echo "${rest%"${rest##*[![:space:]]}"}"
-}
-
-# Un lettore a posizione fissa collassa «riga assente» e «riga malformata» nello
-# stesso esito, e quando l'assenza e' il caso legittimo di maggioranza il guasto
-# diventa invisibile: drift_of() ritorna vuoto sia sul file nato prima che le
-# sentinelle esistessero sia sulla riga scritta con una riga vuota di troppo.
-# Le due uscite si separano QUI, nel lettore: il produttore non ha modo di
-# dichiarare «qui la riga ci dovrebbe essere». La posizione resta strict — una
-# finestra di ricerca lascerebbe due grafie in circolazione senza che nessuno le
-# riconcili — quindi il rimedio e' il segnale, non la tolleranza.
-prio_form_of() {  # <file> → ok | none | malformed:<riga trovata>
-    local n
-    n="$(grep -n -m1 -F '**PRIORITY**' "$1" 2>/dev/null | cut -d: -f1)"
-    [[ -z "$n" ]] && { echo "none"; return; }
-    # Riga 4 che matcha il pattern strict: e' l'unico caso conforme. Riga 4 con la
-    # forma sbagliata (🚨 assente) e' malformata quanto una riga 5 ben scritta.
-    [[ "$n" -eq 4 && -n "$(drift_of "$1")" ]] && { echo "ok"; return; }
-    echo "malformed:${n}"
-}
-
-# --- Stato working tree dei file inbox ----------------------------------------
-# Una sola invocazione git per l'intera cartella, non una per file. `-uall` e'
-# obbligatorio: col default `normal`, una inbox interamente untracked collassa in
-# una riga sola `?? <dir>/` e i singoli file diventano invisibili.
-declare -A WT_STATE=()
-load_wt_state() {
-    local xy path
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        xy="${line:0:2}"
-        path="${line:3}"
-        [[ "$path" == *" -> "* ]] && path="${path##* -> }"
-        path="${path%\"}"; path="${path#\"}"
-        if [[ "$xy" == "??" ]]; then
-            WT_STATE["$path"]="untracked"
-        else
-            WT_STATE["$path"]="modificato"
-        fi
-    done < <(cd "$PROJECT_ROOT" && git status --porcelain -uall -- "${DOCS_ROOT}/inbox" 2>/dev/null)
-}
-
-wt_of() {  # <rel-to-project-root> → pulito | modificato | untracked
-    echo "${WT_STATE[$1]-pulito}"
-}
-
-# --- Cappello di un file inbox ------------------------------------------------
-# L'ID sta nel NOME del file (`T74-<slug>.md` → `T74`), quindi si legge senza
-# aprirlo, e il taglio sul primo `-` regge anche i legacy col suffisso numerico
-# (`T89-<slug>-2.md`). Lo STATO viene dalla colonna Prog di tasks.md: `done` solo
-# su ✔️, tutto il resto e' WIP.
-declare -A TASK_PROG=()
-load_task_prog() {
-    local tasks_md="${PROJECT_ROOT}/${DOCS_ROOT}/tasks.md" id prog
-    [[ -f "$tasks_md" ]] || return 0
-    while IFS=$'\t' read -r id prog; do
-        TASK_PROG["$id"]="$prog"
-    # La colonna Prog si localizza dall'header, non per indice fisso: le colonne di
-    # tasks.md sono gia' cambiate una volta (drop della K a T93) e un parse
-    # posizionale non lo segnala — leggerebbe Pri al posto di Prog e chiamerebbe
-    # WIP l'intera coda. Header assente → fallback sulla 4a.
-    done < <(awk -F'|' '
-        /^[[:space:]]*\|/ {
-            for (i = 2; i <= NF; i++) { f[i] = $i; gsub(/^[ \t]+|[ \t]+$/, "", f[i]) }
-            if (f[2] == "ID") { for (i = 2; i <= NF; i++) if (f[i] == "Prog") col = i; next }
-            if (f[2] ~ /^[A-Za-z]+[0-9]+$/) print f[2] "\t" f[col ? col : 4]
-        }' "$tasks_md")
-}
-
-cappello_of() {  # <basename> → ID, o — se il nome non ne porta uno
-    [[ "$1" =~ ^([A-Za-z]+[0-9]+)- ]] && echo "${BASH_REMATCH[1]}" || echo "—"
-}
-
-# Cappello SENZA riga in tasks.md → done. `clean-tasks` purga solo le task chiuse,
-# quindi un cappello che non esiste piu' e' chiuso; il ramo opposto terrebbe il
-# file bloccato in coda per sempre, e nessuno potrebbe piu' sbloccarlo.
-stato_of() {  # <cappello> → done | wip
-    local prog
-    [[ "$1" == "—" ]] && { echo "done"; return; }
-    prog="${TASK_PROG[$1]-}"
-    [[ -z "$prog" || "$prog" == *✔* ]] && echo "done" || echo "wip"
-}
-
-# --- Coda inbox (--inbox) -----------------------------------------------------
-# Ordine: i file con sentinella di drift per primi, poi a coda — il piu' vecchio
-# per primo dentro ogni classe. La priorita' si antepone QUI e non nel chiamante:
-# due lettori della stessa coda devono vedere lo stesso ordine.
+# --- Modo --inbox --------------------------------------------------------------
 if [[ "$INBOX_ONLY" -eq 1 ]]; then
     INBOX_DIR="${PROJECT_ROOT}/${DOCS_ROOT}/inbox"
     NOW="$(date +%s)"
     QTMP="$(mktemp)"
     trap 'rm -f "$QTMP"' EXIT
 
-    load_task_prog
-    load_wt_state
-
     if [[ -d "$INBOX_DIR" ]]; then
         while IFS= read -r -d '' file; do
             rel="${file#"$PROJECT_ROOT"/}"
             created="$(cd "$PROJECT_ROOT" && git log --diff-filter=A --format=%at -- "$rel" 2>/dev/null | tail -1)"
             [[ "$created" =~ ^[0-9]+$ ]] || created="$(stat -c %Y "$file")"
-            tldr="$(tldr_of "$file")"
-            drift="$(drift_of "$file")"
-            cap="$(cappello_of "$(basename "$file")")"
-            if [[ -n "$drift" ]]; then rank=0; else rank=1; drift="—"; fi
+
+            parse_out="$("${SCRIPT_DIR}/inbox.sh" parse --file "$file" --format tsv 2>/dev/null)"
+            parse_rc=$?
+
+            if [[ $parse_rc -eq 2 ]]; then
+                echo "[doc-metrics] WARN malformato: ${rel} — $(cut -f2 <<< "$parse_out")" >&2
+                # escluso da qualunque filtro: nessun processo lo consuma, e non
+                # ha una natura che possa matchare --natura
+                if [[ -z "$NATURA_FILTER" && "$DRAINABLE_ONLY" -eq 0 ]]; then
+                    printf '%s\t%s\tmalformato\t\t\t\t\t\t\t\n' "$created" "$rel" >> "$QTMP"
+                fi
+                continue
+            elif [[ $parse_rc -ne 0 ]]; then
+                echo "[doc-metrics] WARN parse fallito (exit ${parse_rc}): ${rel}" >&2
+                continue
+            fi
+
+            natura="";  indexed="no"; drainable="no"; branch=""
+            n_noz=0; n_aperte=0
+            # tab tradotto in unit separator prima della read: con IFS=$'\t' i tab
+            # sono whitespace e i campi VUOTI in mezzo collassano, spostando le colonne
+            while IFS=$'\x1f' read -r kind f1 f2 f3 f4 _; do
+                case "$kind" in
+                    MARKER)
+                        natura="$f1"
+                        [[ "$f2" == "indexed" ]] && indexed="si"
+                        [[ "$f3" == "drainable" ]] && drainable="si"
+                        branch="$f4" ;;
+                    NOZIONE)
+                        n_noz=$((n_noz+1))
+                        [[ "$f2" == "aperta" ]] && n_aperte=$((n_aperte+1)) ;;
+                esac
+            done < <(tr '\t' '\037' <<< "$parse_out")
+
+            if [[ -n "$NATURA_FILTER" && "$natura" != "$NATURA_FILTER" ]]; then continue; fi
+            if [[ "$DRAINABLE_ONLY" -eq 1 ]]; then
+                [[ "$drainable" == "si" && -z "$branch" ]] || continue
+            fi
+
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-                "$rank" "$created" "$rel" "$(char_count "$file")" "${#tldr}" "$drift" \
-                "$cap" "$(stato_of "$cap")" "$(wt_of "$rel")" "$(prio_form_of "$file")" >> "$QTMP"
-        done < <(find "$INBOX_DIR" -maxdepth 1 -type f -name '*.md' -print0)
+                "$created" "$rel" "$natura" "$indexed" "$drainable" "$branch" \
+                "$n_noz" "$n_aperte" "$(char_count "$file")" "$(cappello_of "$(basename "$file")")" >> "$QTMP"
+        done < <(find "$INBOX_DIR" -maxdepth 1 -type f -name '*.md' -print0 | sort -z)
     fi
 
-    n_q=0; c_q=0; n_urg=0; n_wip=0; n_dirty=0; n_badprio=0
-    while IFS=$'\t' read -r rk _ _ c _ _ _ st wt pf; do
-        n_q=$((n_q+1)); c_q=$((c_q + c)); (( rk == 0 )) && n_urg=$((n_urg+1))
-        [[ "$st" == "wip" ]] && n_wip=$((n_wip+1))
-        [[ "$wt" != "pulito" ]] && n_dirty=$((n_dirty+1))
-        [[ "$pf" == malformed:* ]] && n_badprio=$((n_badprio+1))
-    done < "$QTMP"
-
+    # filtro natura/drainable sui malformati: --drainable li esclude sempre
+    # (nessun processo li consuma); --natura non li matcha mai
     if [[ "$FORMAT" == "tsv" ]]; then
-        printf 'PATH\tCHAR\tAGE_DAYS\tTLDR\tPRIO\tDRIFT\tCREATED\tCAPPELLO\tSTATO\tWT\tPRIO_FORM\n'
-        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st wt pf; do
-            (( rk == 0 )) && prio="urgente" || prio="normale"
-            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-                "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$dr" "$ts" "$cp" "$st" "$wt" "$pf"
-        done
+        if [[ -s "$QTMP" ]]; then
+            (( LW_DOC_OVERRIDE )) && doc_soglie_line
+            printf 'PATH\tNATURA\tINDEXED\tDRAINABLE\tBRANCH\tNOZIONI\tAPERTE\tCHAR\tCREATED\tAGE_DAYS\tCAPPELLO\n'
+            sort -t$'\t' -k1,1n -k2,2 "$QTMP" | tr '\t' '\037' | while IFS=$'\x1f' read -r ts p nat idx dr br nn na ch cp; do
+                if [[ "$nat" == "malformato" ]]; then
+                    printf '%s\tmalformato\t\t\t\t\t\t\t\t\t\n' "$p"
+                else
+                    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                        "$p" "$nat" "$idx" "$dr" "$br" "$nn" "$na" "$ch" "$ts" "$(( (NOW - ts) / 86400 ))" "$cp"
+                fi
+            done
+        fi
     else
-        echo "[doc-metrics] coda inbox: ${DOCS_ROOT}/inbox  ·  ordine: sentinelle prima, poi il più vecchio"
+        echo "[doc-metrics] coda inbox: ${DOCS_ROOT}/inbox  ·  ordine: created crescente"
         echo
-        # WT e PRIO_FORM come riga di dettaglio: una colonna in piu' allargherebbe la
-        # tabella oltre il terminale per dire `pulito` su ogni riga.
-        printf '%-52s %8s %6s %6s %5s %9s %6s\n' "PATH" "CHAR" "AGE_D" "TLDR" "PRIO" "CAPPELLO" "STATO"
-        sort -t$'\t' -k1,1n -k2,2n "$QTMP" | while IFS=$'\t' read -r rk ts p c t dr cp st wt pf; do
-            (( rk == 0 )) && prio="🚨" || prio="-"
-            printf '%-52s %8s %6s %6s %5s %9s %6s\n' \
-                "$p" "$c" "$(( (NOW - ts) / 86400 ))" "$t" "$prio" "$cp" "$st"
-            (( rk == 0 )) && echo "      drift: ${dr}"
-            [[ "$wt" != "pulito" ]] && echo "      ⚠ working tree: ${wt} — fuori dal perimetro di drain-doc"
-            [[ "$pf" == malformed:* ]] && \
-                echo "      ⚠ riga PRIORITY sulla ${pf#malformed:} invece della 4 — il file perde LA PRIORITÀ e LA SENTINELLA DI DRIFT (i path della riga 4 sono invisibili)"
+        printf '%-46s %-12s %-4s %-5s %-22s %4s %4s %8s %9s\n' \
+            "PATH" "NATURA" "IDX" "DRAIN" "BRANCH" "NOZ" "APER" "CHAR" "CAPPELLO"
+        sort -t$'\t' -k1,1n -k2,2 "$QTMP" | tr '\t' '\037' | while IFS=$'\x1f' read -r ts p nat idx dr br nn na ch cp; do
+            if [[ "$nat" == "malformato" ]]; then
+                printf '%-46s %-12s\n' "$p" "malformato"
+            else
+                printf '%-46s %-12s %-4s %-5s %-22s %4s %4s %8s %9s\n' \
+                    "$p" "$nat" "$idx" "$dr" "${br:--}" "$nn" "$na" "$ch" "${cp:--}"
+            fi
         done
-        echo
-        if (( n_q > INBOX_CAP )); then
-            echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}  → OLTRE IL TETTO, lo smaltimento non è più opzionale"
-        else
-            echo "- file inbox: ${n_q} / ${INBOX_CAP}  ·  char: ${c_q}"
-        fi
-        echo "- drenabili: $(( n_q - n_wip - n_dirty ))  ·  bloccati da un cappello ancora aperto: ${n_wip}  ·  in scrittura nel working tree: ${n_dirty}"
-        if (( n_urg > 0 )); then
-            echo "- con sentinella di drift: ${n_urg}  → smaltibili subito, il tetto non li riguarda"
-        fi
-        if (( n_badprio > 0 )); then
-            echo "- con riga PRIORITY fuori posizione: ${n_badprio}  → da correggere a mano sulla riga 4, o restano senza priorità e senza sentinella"
-        fi
     fi
     exit 0
 fi
 
-# --- Scan ---------------------------------------------------------------------
+# --- Modo principale ------------------------------------------------------------
+doc_load_online "$PROJECT_ROOT"
+
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
@@ -319,50 +206,49 @@ declare -A DIR_CHAR=() DIR_FILES=()
 
 while IFS= read -r -d '' file; do
     rel="${file#"$PROJECT_ROOT"/}"
-    case "$rel" in
-        */tasks/*|*/current-task.md) continue ;;
-    esac
+    doc_excluded "$rel" && continue
 
     chars="$(char_count "$file")"
-    tldr="$(tldr_of "$file")"
-    tldr_len=${#tldr}
-    online=0; is_online "$rel" && online=1
+    layer="$(doc_layer "$rel")"
+    base="$(basename "$file")"
 
-    # Layer: online vince sul path (INDEX.md sta sotto reference/ ma si paga a ogni
-    # sessione), inbox vince su online (un file inbox @-importato resta inbox).
-    if [[ "$rel" == */inbox/* ]]; then
-        layer="inbox"
-    elif (( online )); then
-        layer="online"
-    elif [[ "$rel" == */reference/* ]]; then
-        layer="offline"
-    else
-        layer="altro"
+    tldr=""; tldr_len=0
+    if [[ "$layer" != "inbox" ]]; then
+        # il TLDR dei file inbox sta in riga 4 e lo possiede inbox.sh: qui non
+        # si legge (nessuna regex propria sul formato inbox)
+        tldr="$(doc_tldr "$file" 3)"
+        tldr_len=${#tldr}
     fi
 
     flags=""
-    if [[ "$(basename "$file")" == "INDEX.md" ]]; then
-        flags="GEN"
-    elif [[ "$layer" == "inbox" ]]; then
-        # Né split né merge: il verdetto su un file inbox è «smaltiscilo». Sotto il
-        # pavimento perché nasce piccolo, sopra la soglia perché aggrega un cappello
-        # intero — e spezzarlo lo riporterebbe alle N voci d'INDEX che il file per
-        # cappello esiste per chiudere. Il tetto dell'inbox è sul conteggio dei file.
-        :
-    elif (( chars >= SPLIT_THRESHOLD )); then
-        flags="SPLIT"; n_split=$((n_split+1))
-    elif (( chars <= MERGE_THRESHOLD )); then
-        flags="MERGE?"; n_merge=$((n_merge+1))
-    fi
-    if [[ -n "$tldr" ]]; then
-        if (( tldr_len > TLDR_CAP )); then
-            flags="${flags:+$flags }TLDR>${TLDR_CAP}"; n_overcap=$((n_overcap+1))
+    if [[ "$base" == "INDEX.md" ]]; then
+        flags="GEN"    # esclusivo: artefatto generato, nessun altro flag
+    else
+        is_config=0
+        [[ "$base" == "assumed-knowledge.md" && "$rel" == */reference/* ]] && is_config=1
+
+        if [[ "$layer" != "inbox" && $is_config -eq 0 ]]; then
+            if (( chars >= LW_DOC_SPLIT )); then
+                flags="SPLIT"; n_split=$((n_split+1))
+            elif (( chars <= LW_DOC_MERGE )); then
+                flags="MERGE?"; n_merge=$((n_merge+1))
+            fi
         fi
-    elif [[ "$rel" == */reference/* || "$layer" == "inbox" ]] && [[ "$(basename "$file")" != "INDEX.md" ]]; then
-        flags="${flags:+$flags }NOTLDR"; n_notldr=$((n_notldr+1))
+        if [[ "$layer" != "inbox" ]]; then
+            if [[ -n "$tldr" ]]; then
+                if (( tldr_len > LW_DOC_TLDR_CAP )); then
+                    flags="${flags:+$flags }TLDR>CAP"; n_overcap=$((n_overcap+1))
+                fi
+            elif [[ "$rel" == */reference/* ]]; then
+                flags="${flags:+$flags }NOTLDR"; n_notldr=$((n_notldr+1))
+            fi
+        fi
+        (( is_config )) && flags="${flags:+$flags }CONFIG"
+        [[ "$layer" == "inbox" ]] && flags="${flags:+$flags }INBOX"
+        [[ "$layer" == "online" ]] && flags="${flags:+$flags }ONLINE"
+        # un file inbox @-importato resta inbox come layer, ma il costo online va detto
+        [[ "$layer" == "inbox" ]] && doc_is_online "$rel" && flags="${flags:+$flags }ONLINE"
     fi
-    [[ "$layer" == "inbox" ]] && flags="${flags:+$flags }INBOX"
-    (( online )) && flags="${flags:+$flags }ONLINE"
 
     case "$layer" in
         online)  n_online=$((n_online+1));   c_online=$((c_online + chars)) ;;
@@ -380,12 +266,16 @@ while IFS= read -r -d '' file; do
     total_char=$((total_char + chars))
 done < <(find "$DIR" -type f -name '*.md' -print0 | sort -z)
 
-# --- Output -------------------------------------------------------------------
+# --- Output ---------------------------------------------------------------------
 if [[ "$FORMAT" == "tsv" ]]; then
-    printf 'PATH\tCHAR\tTLDR\tFLAGS\n'
-    sort -t$'\t' -k2,2nr "$TMP"
+    if [[ -s "$TMP" ]]; then
+        (( LW_DOC_OVERRIDE )) && doc_soglie_line
+        printf 'PATH\tCHAR\tTLDR\tFLAGS\n'
+        sort -t$'\t' -k2,2nr "$TMP"
+    fi
 else
-    echo "[doc-metrics] root: ${DIR#"$PROJECT_ROOT"/}  ·  split ${SPLIT_THRESHOLD}  ·  merge ${MERGE_THRESHOLD}  ·  cap TLDR ${TLDR_CAP}"
+    doc_soglie_line
+    echo "[doc-metrics] root: ${DIR#"$PROJECT_ROOT"/}"
     echo
     printf '%-56s %8s %6s  %s\n' "PATH" "CHAR" "TLDR" "FLAGS"
     sort -t$'\t' -k2,2nr "$TMP" | while IFS=$'\t' read -r p c t f; do
@@ -394,9 +284,9 @@ else
     echo
     echo "TOTALI"
     echo "- file: ${n_files}  ·  char: ${total_char}"
-    echo "- sopra soglia split (${SPLIT_THRESHOLD}): ${n_split}"
-    echo "- sotto pavimento merge (${MERGE_THRESHOLD}), da riesaminare: ${n_merge}"
-    echo "- TLDR sopra cap (${TLDR_CAP}): ${n_overcap}"
+    echo "- sopra soglia split: ${n_split}"
+    echo "- sotto pavimento merge, da riesaminare: ${n_merge}"
+    echo "- TLDR sopra cap: ${n_overcap}"
     echo "- senza TLDR (fuori dall'INDEX): ${n_notldr}"
     echo
     echo "LAYER"
@@ -406,37 +296,33 @@ else
     printf '%-40s %6s %10s\n' "inbox (non collocata)"       "$n_inbox"   "$c_inbox"
     printf '%-40s %6s %10s\n' "altro"                       "$n_altro"   "$c_altro"
     echo
-    if (( n_inbox > INBOX_CAP )); then
-        echo "- file inbox: ${n_inbox} / ${INBOX_CAP}  → OLTRE IL TETTO, lo smaltimento non è più opzionale"
-    else
-        echo "- file inbox: ${n_inbox} / ${INBOX_CAP}"
-    fi
+    echo "- file inbox: ${n_inbox}"
     echo
-    echo "CARTELLE (soglia regroup ${REGROUP_THRESHOLD})"
+    echo "CARTELLE"
     printf '%-56s %6s %10s  %s\n' "DIR" "FILE" "CHAR" "FLAGS"
     n_regroup=0
     while IFS=$'\t' read -r ch d; do
         rf=""
-        if (( ch >= REGROUP_THRESHOLD )); then rf="REGROUP"; n_regroup=$((n_regroup+1)); fi
+        if (( ch >= LW_DOC_REGROUP )); then rf="REGROUP"; n_regroup=$((n_regroup+1)); fi
         printf '%-56s %6s %10s  %s\n' "$d" "${DIR_FILES[$d]}" "$ch" "${rf:--}"
     done < <(for d in "${!DIR_CHAR[@]}"; do printf '%s\t%s\n' "${DIR_CHAR[$d]}" "$d"; done \
              | sort -t$'\t' -k1,1nr -k2,2)
     echo
-    echo "- cartelle oltre soglia regroup (${REGROUP_THRESHOLD}): ${n_regroup}"
+    echo "- cartelle oltre soglia regroup: ${n_regroup}"
 fi
 
-# --- Footprint per-sessione ---------------------------------------------------
+# --- Footprint per-sessione -----------------------------------------------------
 if [[ "$ONLINE" -eq 1 ]]; then
     echo
     echo "FOOTPRINT PER-SESSIONE"
     online_total=0
-    if [[ -n "$ONLINE_LIST" ]]; then
+    if [[ -n "$LW_DOC_ONLINE_LIST" ]]; then
         while IFS= read -r rel; do
             [[ -f "${PROJECT_ROOT}/${rel}" ]] || continue
             c="$(char_count "${PROJECT_ROOT}/${rel}")"
             online_total=$((online_total + c))
             printf '  @-import  %-52s %8s\n' "$rel" "$c"
-        done <<< "$ONLINE_LIST"
+        done <<< "$LW_DOC_ONLINE_LIST"
     fi
     printf '  %-62s %8s\n' "subtotale @-import (CLAUDE.md)" "$online_total"
 
@@ -448,8 +334,8 @@ if [[ "$ONLINE" -eq 1 ]]; then
             [[ "$char" =~ ^[0-9]+$ ]] || continue
             hook_total=$((hook_total + char))
             hook_ok=1
-        # CHAR = ultimo token puramente numerico della riga: lo STATUS può essere
-        # "OVER (9800)" (parentesi → non numerico) e la label può contenere cifre
+        # CHAR = ultimo token puramente numerico della riga: lo STATUS puo' essere
+        # "OVER (9800)" (parentesi → non numerico) e la label puo' contenere cifre
         # nude, ma sempre PRIMA della colonna CHAR.
         done < <("$GUARD" --project "$PROJECT_ROOT" 2>/dev/null \
             | awk '$1=="SessionStart" { for (i=NF; i>=2; i--) if ($i ~ /^[0-9]+$/) { print $1, $i; break } }')

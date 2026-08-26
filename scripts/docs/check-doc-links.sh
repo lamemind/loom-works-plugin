@@ -27,8 +27,16 @@
 # riferimenti risolvibili staticamente.
 #
 # Scansionati: {docs_root}/**/*.md (esclusi tasks/ e current-task.md, che sono
-# runtime) + CLAUDE.md. `--also <file|dir>` aggiunge perimetri (es. i SKILL.md di un
-# plugin che citano path di progetto), ripetibile.
+# runtime, e inbox/ — v. sotto) + CLAUDE.md. `--also <file|dir>` aggiunge perimetri
+# (es. i SKILL.md di un plugin che citano path di progetto), ripetibile — senza
+# chiamante di default: il perimetro extra e' una decisione per-progetto che la
+# skill dichiara.
+#
+# inbox/ e' FUORI dal perimetro (v2): il registro del drain scrive
+# `router → reference/...` su file che il writer non ha ancora creato — indirizzi
+# di un lavoro in corso, non riferimenti per un lettore, e sarebbero DANGLING per
+# costruzione fino alla fine del ciclo. Le citazioni dentro le nozioni diventano
+# riferimenti veri quando il writer le porta nel target, dove questo script le vede.
 #
 # Env: PROJECT_ROOT, LOOM_DOCS_ROOT
 # Exit: 0 = nessun riferimento appeso · 2 = VERDETTO (ce ne sono, elencati)
@@ -66,7 +74,9 @@ while IFS= read -r -d '' f; do
     rel="${f#"$PROJECT_ROOT"/}"
     # tasks/ e current-task.md sono runtime; INDEX.md e' generato — i suoi riferimenti
     # sono copie dei TLDR, gia' verificati nel file d'origine: segnalarli li raddoppia.
-    case "$rel" in */tasks/*|*/current-task.md|*/INDEX.md) continue ;; esac
+    # inbox/ e' fuori perimetro: i suoi `router → <target>` puntano a file non ancora
+    # creati, DANGLING per costruzione fino alla fine del ciclo di drain.
+    case "$rel" in */tasks/*|*/current-task.md|*/INDEX.md|*/inbox/*) continue ;; esac
     FILES+=("$f")
 done < <(find "$DIR" -type f -name '*.md' -print0 | sort -z)
 

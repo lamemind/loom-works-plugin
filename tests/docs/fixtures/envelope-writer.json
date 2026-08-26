@@ -1,0 +1,8 @@
+{
+  "esiti": [
+    {"id": "n1", "esito": "scritta", "come": "ha creato il file; la nozione apre §Prefisso, breakpoint e minimi"},
+    {"id": "n2", "esito": "scritta", "come": "appesa come §Subagent, fork e fan-out; il TTL doppio della n1 è rimasto solo qui (una sede sola)"},
+    {"id": "n3", "esito": "scritta", "come": "fusa in §Prefisso, breakpoint e minimi — la prima frase era un'eco di n1 ed è caduta; restano la prova differenziale e la quota per-spawn"},
+    {"id": "n4", "esito": "scritta", "come": "fusa in §Struttura dello store: il ramo `subagents/agent-<id>.jsonl` accanto ai jsonl di sessione; il test dei due spawn è appeso come §Misurare la cache di un subagent, con rimando a prompt-caching.md per il meccanismo"}
+  ]
+}

@@ -1,0 +1,8 @@
+TITOLO	T109 — cache dei prompt Anthropic per i subagent
+MARKER	nozioni	indexed	drainable
+TLDR	comportamento della cache prompt Anthropic per i subagent Claude Code — cosa sta nel prefisso cachabile (body dell'agent) e cosa no (prompt d'invocazione, contesto progetto), minimi per modello, TTL, fan-out, fork, e come misurare dai transcript.	246
+NOZIONE	n1	aperta	router	rotta	reference/cc/prompt-caching.md
+NOZIONE	n2	aperta	router	rotta	reference/cc/prompt-caching.md
+NOZIONE	n3	aperta	router	rotta	reference/cc/prompt-caching.md
+NOZIONE	n4	aperta	router	rotta	reference/cc/cc-transcript-store.md
+NOZIONE	n5	chiusa	router	drop
