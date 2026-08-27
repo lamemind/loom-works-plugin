@@ -69,13 +69,16 @@ La prosa è l'ordine, integrale. Le ancore sono **indicazioni, non perimetri** �
 - `modo:` — `integra` (default: assorbi la doc preesistente) | `riscrivi` (rasala e riparti dal referto).
 - `online: si` — solo con questa riga la doc @-importata da `CLAUDE.md` entra nei bersagli; la **lista** degli @-import resta comunque fuori (topologia, mestiere di `rebalance-doc`).
 
-**2c. Sul branch.**
+**2c. Sul branch.** Prima fotografa dove sei, poi stacca:
 
 ```bash
+git rev-parse --abbrev-ref HEAD          # <branch-di-partenza>
 git checkout -b "doc/sweep-<slug>"
 ```
 
-Da qui in poi main non si tocca, fino al `checkout main` finale.
+**Il branch di partenza non si assume, si legge.** `main` non è un dato del sistema: un progetto può chiamarlo `master`, e uno sweep lanciato da un branch di lavoro deve tornare **lì**, non sul principale. Riusa il valore letto come letterale nel `checkout` di chiusura (2g) — lo stato shell non sopravvive fra due invocazioni Bash, quindi va riportato nel comando, non tenuto in una variabile.
+
+Da qui in poi il branch di partenza non si tocca, fino al `checkout` finale.
 
 **2d. Stadio 1 — estrazione.** Solo se `codice:` indica qualcosa:
 
@@ -127,8 +130,10 @@ Il file sweep muore **nello stesso commit** della patch: mergiare la PR lo fa sp
 git push -u origin "doc/sweep-<slug>" && \
 gh pr create --title "docs(sweep): <slug>" --body "<ordine integrale + lista bersagli + esiti guardiani + red flag>" || \
 echo "senza remote/gh: branch locale doc/sweep-<slug>, merge a mano"
-git checkout main
+git checkout "<branch-di-partenza>"      # il valore letto al 2c, mai la stringa `main`
 ```
+
+**Il `checkout` di chiusura è l'ultimo comando di una catena riuscita, quindi se fallisce nessuno se ne accorge**: il report dice «sweep completato» e il worktree resta sul branch dello sweep. Chi lavora nello stesso worktree — un'altra sessione, o tu al giro dopo — si ritrova su un branch che non ha scelto, e i commit successivi atterrano lì. Verifica che il `checkout` sia andato a buon fine e dichiaralo nel report; se fallisce è un red flag, non una nota a piè di pagina.
 
 Senza remote il giro degrada al solo branch, mergiato a mano — dillo nel report.
 
