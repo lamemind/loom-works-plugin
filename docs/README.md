@@ -13,8 +13,8 @@ Manuali, convenzioni e riferimenti tecnici del sistema che il plugin implementa.
 **On-demand, letti da path**:
 
 - `doc-management.md` — **contratto doc**: i quattro layer più l'inbox, criteri indipendenti e dipendenti, soglie numeriche, formato TLDR. Fonte unica, senza copie per-progetto né override. Lo aprono le skill che scrivono doc e gli agent, che ne ricevono o risolvono il path
-- `agent-output.md` — **contratto di scrittura degli agent**: gemello di ciò che l'output style dà alla chat, senza la meccanica del terminale, il raggio e le domande all'utente. Ogni agent ne risolve il path da sé con `${CLAUDE_PLUGIN_ROOT}` e lo legge al primo passo
-- `doc-criteria.md` — razionale dei criteri dipendenti, delle soglie e della manutenzione
 - `task-management-technical.md` — naming, esempi di comando, dettaglio workflow
 - `tldr-formats.md` — le due formule del TLDR, `reference/` e `inbox/`
 - `path-conventions.md` — da dove parte un path scritto in un sorgente del plugin, e quale grafia porta un segnaposto
+
+**Incluso a build time, non letto da path**: il **contratto di scrittura degli agent** — gemello di ciò che l'output style dà alla chat, senza la meccanica del terminale, il raggio e le domande all'utente — non vive qui. Il sorgente sta nel repo cappello (`plugin-src/fragments/agent-output.md`) e `plugin-src/build-agents.sh` lo interpola dentro il body di ogni agent tramite la direttiva `<!-- include: agent-output.md -->`. Nessun agent lo apre a runtime: un contratto consegnato per path ha due modi di non arrivare — il consumer che non lo legge e il permesso che glielo impedisce — e l'inclusione a build time li toglie entrambi.
