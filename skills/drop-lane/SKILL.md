@@ -28,7 +28,7 @@ $ARGUMENTS
 Da `$ARGUMENTS` estrai:
 - **lane** (obbligatorio): nome della lane da distruggere
 
-Se lane assente, chiedi quale lane (mostra lista da `list-worktrees --filter lane`).
+Se lane assente, chiedi quale lane (mostra lista da `${CLAUDE_PLUGIN_ROOT}/scripts/utils/list-worktrees.sh --filter lane`).
 
 ## Flusso
 

@@ -18,7 +18,7 @@ Da `$ARGUMENTS` estrai:
 - **lane** (obbligatorio): nome della lane (es. `l1`, `feat-auth`)
 - **--cleanup** (opzionale): rimuove i worktrees dopo il merge
 
-Se lane assente, chiedi all'utente quale lane mergiare (mostra lista da `list-worktrees`).
+Se lane assente, chiedi all'utente quale lane mergiare (mostra lista da `${CLAUDE_PLUGIN_ROOT}/scripts/utils/list-worktrees.sh`).
 
 ## Flusso
 
