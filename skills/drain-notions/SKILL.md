@@ -22,7 +22,11 @@ Consumi i file inbox di natura `nozioni` marcati `drainable`, **un file alla vol
 $ARGUMENTS
 ~~~
 
-Un path di file inbox in `$ARGUMENTS` → la coda è quel solo file. Altrimenti la coda intera.
+Un file inbox nominato in `$ARGUMENTS` → la coda è quel solo file, e lo step 1 non si esegue. Altrimenti la coda intera.
+
+**Come si nomina.** Basta il nome, non il path: la cartella la sai già. Accetta il path completo, il basename con o senza `.md`, e il match è case-insensitive contro i file di `{docs_root}/inbox/`. Più di un file che matcha → elenca i candidati e fermati; nessuno → dillo, e non ripiegare sulla coda intera.
+
+**Un file nominato si drena anche senza `drainable`.** Quel token governa la **coda automatica** — chi il notturno può prendere da sé — non il permesso di drenare: nominare un file È la decisione che il token dichiarerebbe. Non aggiungere il token e non committare niente per «sbloccarlo». Resta escluso il solo `branch:`, che congela il file per chiunque.
 
 ## Costanti
 
@@ -41,6 +45,8 @@ Un path di file inbox in `$ARGUMENTS` → la coda è quel solo file. Altrimenti 
 Nessun lock: un run morto a metà lascia il tree sporco e il run successivo si ferma qui — è la guardia stessa il presidio del caso concorrente.
 
 ## 1. La coda
+
+**Salta questo step se `$ARGUMENTS` nomina un file**: la coda è già quello. Questa misura costruisce la coda **automatica**, e il suo filtro `--drainable` scarterebbe un file parcheggiato che qualcuno ha nominato apposta — chiudendo il giro con «coda vuota» invece che con un errore, cioè nel modo che non lascia traccia.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --docs-root "{docs_root}" --inbox --natura nozioni --drainable

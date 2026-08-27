@@ -22,7 +22,11 @@ Nessuna domanda all'utente: giri anche nel notturno, e il presidio umano è asin
 $ARGUMENTS
 ~~~
 
-Un path di sweep in `$ARGUMENTS` → la coda è quel solo file.
+Uno sweep nominato in `$ARGUMENTS` → la coda è quel solo file, e lo step 1 non si esegue.
+
+**Come si nomina.** Basta il nome, non il path: la cartella la sai già. Accetta il path completo, il basename con o senza `.md`, e il match è case-insensitive contro i file di `{docs_root}/inbox/` — `T126-loom-deck.md`, `t126-loom-deck` e `runtime/inbox/T126-loom-deck.md` sono lo stesso file. Più di un file che matcha → elenca i candidati e fermati; nessuno → dillo, e non ripiegare sulla coda intera.
+
+**Un file nominato si esegue anche senza `drainable`.** Quel token governa la **coda automatica** — chi il notturno può prendere da sé — non il permesso di eseguire: nominare un file È la decisione che il token dichiarerebbe, e pretenderlo significa chiedere due volte la stessa cosa. Non aggiungere il token e non committare niente per «sbloccarlo»: eseguilo e basta. Resta escluso il solo `branch:`, che congela il file per chiunque.
 
 ## 0. Guardia d'ingresso
 
@@ -33,6 +37,8 @@ Un path di sweep in `$ARGUMENTS` → la coda è quel solo file.
 Exit 2 → STOP con notifica · exit 1 → non è un repo git, STOP.
 
 ## 1. La coda
+
+**Salta questo step se `$ARGUMENTS` nomina uno sweep**: la coda è già quel file. Questa misura costruisce la coda **automatica**, e il suo filtro `--drainable` scarterebbe un file parcheggiato che qualcuno ha nominato apposta — chiudendo il giro con «coda vuota» invece che con un errore, cioè nel modo che non lascia traccia.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/doc-metrics.sh" --docs-root "{docs_root}" --inbox --natura sweep --drainable
