@@ -21,6 +21,8 @@
 {{dipendenze_raccolte}}
 
 ## Deliverables Checklist
+*Numerati **posizionalmente 1-based** sulle sole checkbox a colonna zero — è così che `run-task` li indirizza (`--scope "1,3-5"`). Le righe indentate sono prosa di una voce, non voci: aggiungerne non sposta la numerazione.*
+
 {{checklist_deliverables_raccolta}}
 
 ## Materiale

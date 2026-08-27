@@ -1,7 +1,7 @@
 ---
 name: drain-notions
 description: Svuota la coda dei file inbox di natura nozioni — un ciclo chiuso per file: doc-router giudica, il registro entra nel file, doc-writer applica per gruppo di target, guardiani deterministici, doc-validator, commit atomico e delete. Non presidiata, committa da sé.
-allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task
+allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, Skill
 model: sonnet
 ---
 
@@ -106,7 +106,7 @@ Poi registra gli esiti nel file:
 echo '<envelope esiti JSON>' | "${CLAUDE_PLUGIN_ROOT}/scripts/docs/inbox.sh" registro --file <path> --attore writer
 ```
 
-**2e. Collaudo — il determinabile prima del modello.**
+**2e. Collaudo — il determinabile prima del modello.** Primo passo, prima dell'indice: `Skill` `write-tldr` con i path dei file toccati dai writer del 2d che stanno sotto `reference/`, senza condizioni. È l'unico attore che scrive la riga 3.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"
@@ -123,7 +123,9 @@ guardiani: <esiti testuali dei tre check, compattati>
 assumed_knowledge: {docs_root}/reference/assumed-knowledge.md
 ```
 
-Se `aggiustamenti` non è vuoto: per al più `LIMITE_AGGIUSTAMENTI` giri, passa gli aggiustamenti a `doc-writer` in **modo aggiustamento** (un Task per file toccato), rilancia i guardiani, rilancia il validator. Esaurito il limite con aggiustamenti ancora aperti: **si committa comunque** — l'imperfezione residua entra come riga dichiarata nel messaggio di commit. Le `note` del validator non bloccano mai: riportale e prosegui.
+Un `OVER-CAP TLDR` nell'output di `build-index` è un **red flag da riportare**, non un aggiustamento da chiedere: la riga 3 non è più materia del validator, e nessuno la riscrive a mano per rientrare nel cap.
+
+Se `aggiustamenti` non è vuoto: per al più `LIMITE_AGGIUSTAMENTI` giri, passa gli aggiustamenti a `doc-writer` in **modo aggiustamento** (un Task per file toccato), rilancia i guardiani, rilancia il validator. Il giro di aggiustamento **non** rilancia `write-tldr`: gli aggiustamenti sono puntuali sulla prosa, e rigenerare l'ancora a ogni giro produrrebbe una riga 3 diversa a ogni passata senza che il perimetro del file sia cambiato. Esaurito il limite con aggiustamenti ancora aperti: **si committa comunque** — l'imperfezione residua entra come riga dichiarata nel messaggio di commit. Le `note` del validator non bloccano mai: riportale e prosegui.
 
 **2f. Uscita del file — due commit, atomici.**
 

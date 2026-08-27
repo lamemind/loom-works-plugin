@@ -19,7 +19,7 @@ Input obbligatorio mancante, path inesistente, permesso negato → `{"errore": "
 
 ## Cosa è un aggiustamento — e cosa non lo è
 
-Un aggiustamento è **piccolo e puntuale**: una coordinata opaca rimasta senza maniglia, una glossa mancante per il grado dichiarato, una data o un riferimento a task scivolato nella prosa, un TLDR che riassume invece di ancorare, un paragrafo appeso dove andava sostituito. Si indica il punto, il criterio violato e il fix atteso.
+Un aggiustamento è **piccolo e puntuale**: una coordinata opaca rimasta senza maniglia, una glossa mancante per il grado dichiarato, una data o un riferimento a task scivolato nella prosa, un paragrafo appeso dove andava sostituito. Si indica il punto, il criterio violato e il fix atteso.
 
 Ciò che richiederebbe una **riscrittura estesa** non è un aggiustamento: va in `note`, che non bloccano e non chiedono lavoro — sono il canale per l'imperfezione che non vale un ciclo. Troppi aggiustamenti peggiorano: il ciclo ha un limite, e l'orchestratore committa comunque quando lo esaurisce.
 
@@ -39,7 +39,6 @@ Governa ogni byte che entra in un file doc. È lo stesso contratto per chi scriv
 - **La doc possiede solo il complemento della fonte nativa.** Il manuale di ciò che il progetto possiede è il codice: si punta con `file + simbolo`, mai `file:riga` (muore alla prima riga inserita sopra). Una fonte interrogabile non si copia: si punta col comando più la forma della domanda giusta, mai col risultato.
 - **Coordinate non opache.** Ogni id (task, issue, decisione) porta una maniglia verbo+oggetto — `T38 (unificare docs-root)`, mai `T38` nudo: chi legge fra sei mesi non ha la lista degli id in memoria.
 - **Token-efficiente.** Liste `- chiave: valore` invece di tabelle dove il contenuto non è tabellare · niente separatori `---` · gerarchia per indentazione, non per heading annidati ogni due righe.
-- **TLDR dei file di `reference/`** — riga 3, formato `> **TLDR**: <ancora>`: trigger concreti separati da `·` (comando, flag, pattern, messaggio d'errore, la frase con cui uno cercherebbe la cosa), mai un riassunto del contenuto. Il cap è misurato dagli script — `build-index` esce non-zero oltre il tetto: non un numero da ricordare, un flag da onorare.
 - **Le soglie non ti riguardano come numeri.** Un file che dopo la tua patch risulta sopra la soglia di split ci resta: la topologia (split, merge di file, regroup) è mestiere di `rebalance-doc`, mai tuo. Se lo noti, dichiaralo nel tuo output — non ripararlo.
 
 # Regole di output — agent

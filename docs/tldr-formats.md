@@ -13,10 +13,7 @@ Due sedi: **riga 3** per i file di `reference/`, **riga 4** per i file inbox di 
 > **TLDR**: <perimetro>                    # riga 4 — opzionale
 ```
 
-**`reference/` — ancora.** Fa decidere *se aprire* il file, non risparmia l'apertura. Trigger concreti separati da `·`: comando, flag, tag, pattern, messaggio d'errore, la frase con cui uno cercherebbe la cosa. Mai un riassunto del contenuto. Obbligatorio: senza TLDR il file resta fuori dall'INDEX.
-
-- ✅ `deck-run --resume · sidecar session-tasks.jsonl · "bindare una task a una sessione"`
-- ❌ `Descrive il funzionamento del deck e le sue interazioni con le sessioni.`
+**`reference/` — non si scrive a mano.** La riga 3 è un **artefatto derivato**: la produce la skill `write-tldr` in tre stadi — raccoglitore, gate a `grep`, potatore — come ultimo passo prima di `build-index.sh`. Chi tocca il corpo di un file non tocca la riga 3, e i criteri di merito vivono nelle due attività `raccogli-tldr` e `pota-tldr` di `doc-helper`, non qui: una seconda formula scritta in questa pagina tornerebbe a essere un secondo giudice, cioè il difetto per cui il produttore unico esiste. Resta obbligatorio: senza TLDR il file resta fuori dall'INDEX.
 
 **`inbox/` — perimetro.** Risponde a un'altra domanda: «l'area che sto per toccare ha una nozione non ancora collocata?». Più sintetico, e qui la cronaca è ammessa — il corpo deve sopravvivere alla task, il TLDR solo al file, che è temporaneo per contratto. Opzionale: l'indicizzazione la decide il marker `indexed`, e un file `indexed` senza TLDR entra nell'INDEX col solo titolo.
 

@@ -39,7 +39,7 @@ Then bootstrap the project structure:
 | `/loom-works:init` | Bootstrap loom-works structure on the current project |
 | `/loom-works:create-task` | Create a new task with automation-ready metadata |
 | `/loom-works:start-task` | Activate a task for checkpoint tracking |
-| `/loom-works:run-task` | Execute a task (adaptive S/M/L workflow) |
+| `/loom-works:run-task` | Execute a task's deliverables — scoped per DLV, one commit each |
 | `/loom-works:checkpoint-task` | Checkpoint progress: analyze changes, commit, update tasks.md |
 | `/loom-works:preflight-task` | Freeze design decisions before execution |
 | `/loom-works:spawn-lane` | Create a persistent git worktree lane |
@@ -54,6 +54,7 @@ Then bootstrap the project structure:
 | `/loom-works:align-doc` | Execute `sweep` orders: extractor + writer on a `doc/sweep-<slug>` branch with PR |
 | `/loom-works:pull-repos` | Pull umbrella + submodules, unlock `branch:` inboxes found on main, derive from foreign merges |
 | `/loom-works:rebalance-doc` | Doc topology: split / merge review / regroup on doc-metrics flags |
+| `/loom-works:write-tldr` | Produce line 3 of touched `reference/` files: collector → grep gate → pruner |
 | `/loom-works:notturno` | Nightly composition: spot-commit derivation, pull, derive, drain, sweeps |
 | `/loom-works:statusline-task` | Manage the 📌 active-task widget in the global statusline (default patch, token `unpatch`) |
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |

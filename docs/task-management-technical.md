@@ -47,22 +47,22 @@ Per l'overview del sistema (struttura, grafo dipendenze, ciclo di vita lane, com
 
 ### run-task (Esecutore)
 
-Esecuzione operativa della task. Può essere lanciato più volte.
+Esegue i **deliverable** di una task, uno alla volta. Può essere lanciato più volte, su perimetri diversi.
 
 **Fasi**:
 
-1. **Validazione** — Requisiti chiari? Dipendenze soddisfatte? Dubbi → chiedi all'utente
-2. **Scomposizione** — Suddividi in step con TodoWrite
-3. **Pianificazione** — Piano top-down, micro-step validabili
-4. **Esecuzione** — Implementa, modalità unsupervised con checkpoint
-5. **Verifica** — Test passano, build funziona
+1. **Gate `Epic`** — un cappello non si esegue: dichiara le figlie e ferma
+2. **Perimetro** — `task-deliverables.sh` numera i DLV 1-based e risolve `--scope "1,3-5"`; nudo = tutti gli aperti. Errore secco su indice fuori range, spec malformata, perimetro vuoto, DLV già `[x]` nominato
+3. **Gate preflight** — nessun dubbio architetturale aperto: `L` pretende `## Decisions`, `S`/`M` lo pretendono quando il dubbio emerge. Nessuna domanda inline
+4. **Rito** — `Size` decide quanta validazione e pianificazione precedono il codice (`S` nessuna · `M` leggera · `L` profonda + piano top-down)
+5. **Promozione 🟡** — `promote-wip.sh`, tre posti insieme e commit dedicato, solo da 🔵 o 🟢
+6. **Ciclo per-DLV** — lavora, spunta `[x]`, committa `run(Txx): DLVn <maniglia>` con pathspec esplicita, pusha
 
-**Definition of Done**:
+**Definition of Done** (per deliverable, non per task):
 
-- Tutti gli step completati
-- Test passano
-- Build senza errori
-- Pronto per review
+- Il DLV è chiuso davvero: test passano, build senza errori
+- Spunta `[x]` e commit leggero — codice + spunta, niente `Prog`, niente inbox
+- Un DLV che non si chiude non si spunta: fermata dichiarata, quelli dopo restano intatti
 
 ### checkpoint-task (Checkpoint)
 

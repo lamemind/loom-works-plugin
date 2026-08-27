@@ -148,6 +148,14 @@ lw_git_add_n_commit "task(T01): preflight - 1 decisioni congelate" docs/tasks/T0
 expect "commit = task file + tasks.md" "$(committed HEAD)" docs/tasks.md docs/tasks/T01-foo.md
 expect_foreign_staged "preflight"
 
+# ── 3b. promote-wip.sh ───────────────────────────────────────────────────────
+echo "3b. promote-wip.sh (commit dedicato della promozione 🟡)"
+LOOM_TASK=T01 "$TASK_SCRIPTS/promote-wip.sh" T01 >/dev/null 2>&1 || fail "promote-wip exit $?"
+expect "commit = tasks.md + task file" "$(committed HEAD)" docs/tasks.md docs/tasks/T01-foo.md
+grep -qE '^\| T01 \| ⚡ \| 🟡 \|' docs/tasks.md && pass "cella Prog a 🟡" || fail "cella Prog non promossa"
+[ -z "$(git status --porcelain -- docs/tasks.md)" ] && pass "tasks.md pulito dopo la promozione" || fail "tasks.md ancora dirty"
+expect_foreign_staged "promote-wip"
+
 # ── 4. checkpoint-task-commit.sh detached ───────────────────────────────────
 echo "4. checkpoint-task-commit.sh detached (\$LOOM_TASK, pathspec dopo --)"
 echo more >> src/code.txt

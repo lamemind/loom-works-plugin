@@ -62,7 +62,7 @@ Cross-deps:
 
 Ciclo di vita: `🔵 → 🟢 preflight fatto → 🟡 → ✔️`. Tabella e grafo restano due alfabeti: 🔒 è esclusivo del grafo, 🔵 della tabella — nel grafo l'assenza di emoji marca la task in attesa.
 
-**Aggiornamenti**: `preflight-task` → Prog 🟢 + emoji grafo, solo da 🔵 · `start-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella · `merge-lane` → su conflitto git invoca `/loom-works:reconcile-tasks`.
+**Aggiornamenti**: `preflight-task` → Prog 🟢 + emoji grafo, solo da 🔵 · `start-task` · `run-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella · `merge-lane` → su conflitto git invoca `/loom-works:reconcile-tasks`.
 
 ## Task
 
@@ -70,7 +70,7 @@ Le task si gestiscono dal worktree lane o direttamente da main (task spot). Coma
 
 - `/loom-works:create-task {id} {name}` — crea task (può chiedere la lane)
 - `/loom-works:start-task {id} [detach]` — attiva task, inizia tracking (file task + docs/tasks.md)
-- `/loom-works:run-task [{id}]` — esecuzione operativa (validazione → implementazione → test → build). Può essere lanciato più volte. Definition of Done: test passano, build OK
+- `/loom-works:run-task [{id}] [perimetro]` — esegue i DLV (perimetro `1,3-5`; nudo = tutti gli aperti), promuove a 🟡, un commit leggero per DLV chiuso
 - `/loom-works:checkpoint-task [{id}]` — checkpoint, commit (file task + docs/tasks.md)
 
 Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-lane (next)`. Le lane lavorano in parallelo, ognuna nel proprio worktree.

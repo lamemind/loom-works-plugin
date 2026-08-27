@@ -1,7 +1,7 @@
 ---
 name: align-doc
 description: Esegue i file inbox di natura sweep — ordini di riscrittura della doc in prosa. Due stadi su un branch doc/sweep-<slug> con PR: doc-extractor (fable) legge il perimetro codice e scrive un referto in temporanea, doc-writer riscrive un bersaglio alla volta dal referto. Nessun router davanti, nessun validator dietro: la sicurezza è il branch, il presidio è la review della PR.
-allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task
+allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, Skill
 model: sonnet
 ---
 
@@ -112,7 +112,7 @@ assumed_knowledge: {docs_root}/reference/assumed-knowledge.md
 
 Lo sweep **non cambia il numero dei file**: il writer non esce dal file che riceve. Un bersaglio che finisce sopra la soglia di split ci resta — lo raccoglie `rebalance-doc` al giro dopo.
 
-**2g. Guardiani e chiusura del branch.**
+**2g. TLDR, guardiani e chiusura del branch.** Prima dell'indice, `Skill` `write-tldr` con i path dei bersagli che stanno sotto `reference/` — tutti quelli che un writer ha toccato in questo sweep, senza condizioni. È l'unico attore che scrive la riga 3, e la scrive dopo il writer proprio perché il corpo su cui si ancora è quello appena riscritto.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"
