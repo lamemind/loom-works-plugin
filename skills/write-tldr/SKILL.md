@@ -40,12 +40,14 @@ Due agent e quattro passi deterministici, alternati. Ogni agent è preso in mezz
 
 La copia è il file **senza la riga 3**. Da qui in avanti raccoglitore e gate lavorano sulla copia, mai sull'originale: se vedessero il TLDR precedente il raccoglitore ne riciclerebbe i frammenti e il gate li confermerebbe, perché nel file ci sono davvero. L'originale torna in scena solo al passo `set`.
 
-**1b. Raccolta.** `Task` con `subagent_type: doc-helper`:
+**1b. Raccolta.** `Task` con `subagent_type: doc-helper` **e `model: sonnet`**:
 
 ```
 attività: raccogli-tldr
 file: <TMPDIR_TLDR>/<basename>.copia.md
 ```
+
+Il modello si forza qui, invocazione per invocazione, invece di cambiarlo nel body dell'agent: `doc-helper` serve dieci attività e le altre nove stanno bene su haiku. Su questa no — haiku fabbrica nomi che nel file non esistono (parentesi aggiunte a un simbolo nudo, un prefisso di cartella inventato), e ogni fabbricazione è un'ancora persa: il gate la scarta correttamente, ma quel nome non entra più nell'indice. Misurato sui 55 file di `reference/`: una ventina di scarti con haiku, zero con sonnet a parità di file.
 
 L'envelope ritorna `{"candidati": ["ETICHETTA | frammento", ...]}`. Una lista corta o una `confidence` non alta sono red flag da riportare, non motivi per rilanciare.
 
@@ -53,7 +55,7 @@ L'envelope ritorna `{"candidati": ["ETICHETTA | frammento", ...]}`. Una lista co
 
 ```
 # <path del file>
-ORIENTAMENTO | <…>
+AREA | <…>
 NOME | <…>
 ```
 
@@ -70,7 +72,7 @@ Copiare qui una riga cambiandola vanifica il gate: da questo punto in poi nessun
 
 Ogni candidato `NOME` o `ERRORE` deve comparire letteralmente nella copia: chi non passa esce qui. Le righe `SCARTATO` e `MALFORMATO` su stderr sono **dati del report**, non errori — un nome fabbricato scartato è il gate che lavora. Il gate esce comunque zero: un exit non-zero è un problema d'uso (file assente, lista assente), e lì il file si salta.
 
-**1e. Potatura.** `Task` con `subagent_type: doc-helper`:
+**1e. Potatura.** `Task` con `subagent_type: doc-helper` **e `model: sonnet`**:
 
 ```
 attività: pota-tldr
@@ -79,7 +81,7 @@ candidati: path:<TMPDIR_TLDR>/<basename>.filtrata.txt
 
 Passi il **path della lista filtrata**, mai il path del file d'origine e mai il suo contenuto: il potatore sceglie su ciò che il gate ha già verificato. L'envelope ritorna `{"voci": [...]}`.
 
-Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim dall'envelope**, senza etichetta e senza riordinarle.
+Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim dall'envelope, nell'ordine in cui le ha rese**. Quell'ordine è di merito, non di categoria, ed è la sola decisione che il potatore prende su cosa sopravvive: `componi` taglia dalla coda, quindi riordinare qui significa scegliere al posto suo — con in mano molto meno di quello che aveva lui.
 
 **1f. Gate d'uscita e composizione.**
 
@@ -90,9 +92,9 @@ Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim 
     --out <TMPDIR_TLDR>/<basename>.riga.txt
 ```
 
-Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **ordine** (un solo `ORIENTAMENTO` in testa, poi `ERRORE`, `SINTOMO`, `NOME`; `TESI` e `META` mai), **cap** (taglia dalla coda finché la riga rientra, con la soglia presa da `lib-doc.sh`).
+Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (`TESI` e `META` non entrano mai), **cap** (taglia dalla coda dell'ordine di merito finché la riga rientra, con la soglia presa da `lib-doc.sh`). Le superstiti vengono poi raggruppate per categoria: è la resa, non la priorità.
 
-`NON-VERBATIM`, `ORIENTAMENTO-EXTRA`, `FUORI-ORDINE`, `OLTRE-CAP` su stderr sono dati del report. Exit 1 = nessuna voce utilizzabile: salta il file e dichiaralo.
+`NON-VERBATIM`, `FUORI-VOCABOLARIO`, `OLTRE-CAP` su stderr sono dati del report. Exit 1 = nessuna voce utilizzabile: salta il file e dichiaralo.
 
 **1g. La riga sul file.**
 

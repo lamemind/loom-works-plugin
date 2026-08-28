@@ -87,7 +87,7 @@ should_exclude() {
 }
 
 # --- Raccolta reference/ --------------------------------------------------------
-# Temp: "<reldir>|<filename>|<tldr>"
+# Temp: "<reldir>|<filename>|<h1>|<tldr>"
 TMP="$(mktemp)"
 INBOX_TMP="$(mktemp)"       # "<branch>|<filename>|<voce>" — branch vuoto = prod
 trap 'rm -f "$TMP" "$INBOX_TMP"' EXIT
@@ -116,9 +116,17 @@ while IFS= read -r -d '' file; do
     fname="$(basename "$rel")"
     [[ "$reldir" == "." ]] && reldir=""
 
-    # Nessun escape di `|`: l'output e' a liste, e `read` assegna all'ultima
-    # variabile il resto della riga separatori inclusi → il TLDR arriva intatto.
-    echo "${reldir}|${fname}|${tldr}" >> "$TMP"
+    # Il titolo del documento entra nella riga d'indice accanto al TLDR. E' gia'
+    # scritto, da chi il file lo conosce, e dice il perimetro meglio di quanto lo
+    # direbbe un TLDR generato — che cosi' non ci spende caratteri e li mette
+    # tutti in ancore. Un H1 assente non e' un errore: la riga porta solo il TLDR.
+    h1="$(sed -n '1s/^#[[:space:]]*//p' "$file")"
+    h1="${h1//|/ }"
+
+    # Nessun escape di `|` sul TLDR: l'output e' a liste, e `read` assegna
+    # all'ultima variabile il resto della riga separatori inclusi → arriva
+    # intatto. L'H1 invece sta in mezzo, quindi la sua `|` va neutralizzata.
+    echo "${reldir}|${fname}|${h1}|${tldr}" >> "$TMP"
 done < <(find "$SCAN_DIR" -type f -name '*.md' -print0 | sort -z)
 
 # --- Raccolta inbox (via inbox.sh parse) ----------------------------------------
@@ -175,7 +183,7 @@ fi
     # ignorato e la sezione `(root)` si riapre a ogni interruzione. Ordinare sul
     # campo, in C, rende l'ordine indipendente dal locale di chi lancia.
     current_section=""
-    LC_ALL=C sort -t'|' -k1,1 -k2,2 "$TMP" | while IFS='|' read -r reldir fname tldr; do
+    LC_ALL=C sort -t'|' -k1,1 -k2,2 "$TMP" | while IFS='|' read -r reldir fname h1 tldr; do
         section="${reldir:-/}"
         if [[ "$section" != "$current_section" ]]; then
             [[ -n "$current_section" ]] && echo ""
@@ -187,7 +195,11 @@ fi
             echo ""
             current_section="$section"
         fi
-        echo "- \`${fname}\` — ${tldr}"
+        if [[ -n "$h1" ]]; then
+            echo "- \`${fname}\` — **${h1}** — ${tldr}"
+        else
+            echo "- \`${fname}\` — ${tldr}"
+        fi
     done
 
     if [[ -s "$INBOX_TMP" ]]; then

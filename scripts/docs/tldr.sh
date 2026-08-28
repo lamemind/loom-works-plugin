@@ -36,10 +36,11 @@
 # contratto non puo' correggere un nome falso e non ha il file per accorgersene:
 # un errore del raccoglitore che superasse il gate diventerebbe incorreggibile.
 #
-# Formato di una riga: `ETICHETTA | frammento`. Le etichette sono ORIENTAMENTO,
-# NOME, ERRORE, SINTOMO, TESI, META. Una riga fuori formato viene scartata. Una riga
-# che inizia per `#` e' l'intestazione della lista (il path del file d'origine) e
-# attraversa il gate intatta.
+# Formato di una riga: `ETICHETTA | frammento`. Le etichette sono AREA, NOME,
+# ERRORE, SINTOMO, TESI, META (piu' ORIENTAMENTO, il nome che AREA aveva prima:
+# resta accettato perche' una lista gia' su disco non diventi illeggibile). Una
+# riga fuori formato viene scartata; una che inizia per `#` e' l'intestazione
+# della lista — il path del file d'origine — e attraversa il gate intatta.
 #
 # Il confronto e' letterale (`grep -F`) e il `--` che chiude le opzioni NON e'
 # opzionale: senza, ogni frammento che inizia per trattino (`--tab`, `--drainable`)
@@ -63,12 +64,28 @@
 #      riformulazione, e viene scartata. Cosi' l'etichetta di ogni voce si
 #      recupera dalla lista invece di essere richiesta al potatore, che non la
 #      rende.
-#   2. ORDINE — un solo ORIENTAMENTO in testa, poi ERRORE, poi SINTOMO, poi NOME.
-#      TESI e META non entrano mai. Gli ORIENTAMENTO in eccesso escono.
-#   3. CAP — si taglia dalla coda dell'ordine finche' la riga rientra. La coda e'
-#      la parte meno discriminante per costruzione, quindi il taglio non ha
-#      bisogno di giudizio. Il cap viene da lib-doc.sh, sede unica: nessun numero
-#      di caratteri vive nei prompt dei due agent.
+#   2. VOCABOLARIO — entrano AREA, ERRORE, SINTOMO, NOME. TESI e META mai.
+#   3. CAP — si taglia dalla coda dell'ORDINE IN CUI IL POTATORE HA RESO, finche'
+#      la riga rientra. Il cap viene da lib-doc.sh, sede unica: nessun numero di
+#      caratteri vive nei prompt dei due agent.
+#
+# Sul punto 3 il produttore ha cambiato idea una volta, e la ragione va tenuta.
+# Prima le voci venivano riordinate PER CATEGORIA e il taglio prendeva dalla coda
+# di quell'ordine: i NOME, ultima categoria, morivano sempre per primi — la piu'
+# economica (una manciata di caratteri) e l'unica cercabile con un grep. Misurato
+# sui 55 file di reference/: nove uscivano senza un solo nome, e su cc-hooks.md
+# sparivano `inject-task.sh` e `check-injection-budget.sh`.
+#
+# La correzione non e' una politica di taglio piu' furba: e' che l'ordine di
+# SACRIFICIO lo decide il potatore, che ha visto la lista, e non questo script,
+# che vede solo dei caratteri. Ogni tentativo di indovinare qui quale mix serva a
+# un file — pavimenti per categoria, taglio del gruppo piu' pesante — sposta il
+# difetto altrove: pavimento basso sulle aree e restano scoperte intere sezioni,
+# alto e muoiono i nomi su un file che ne ha cinquanta.
+#
+# Quindi: il potatore rende in ordine di merito, qui si taglia dalla coda senza
+# giudizio, e SOLO ALLA FINE le superstiti si riordinano per categoria — che e'
+# leggibilita' della riga, non priorita'.
 #
 # Quando la sola prima voce sfonda il cap la riga si scrive comunque: troncarla a
 # meta' parola produrrebbe un'ancora rotta, e build-index.sh la segnala gia'.
@@ -177,7 +194,7 @@ gate() {
         frammento="${frammento%"${frammento##*[![:space:]]}"}"
 
         case "$etichetta" in
-            ORIENTAMENTO|NOME|ERRORE|SINTOMO|TESI|META) ;;
+            AREA|ORIENTAMENTO|NOME|ERRORE|SINTOMO|TESI|META) ;;
             *)
                 echo "[tldr] MALFORMATO: ${riga}" >&2
                 malformati=$((malformati+1))
@@ -235,8 +252,10 @@ componi() {
         ETICHETTA_DI["$f"]="$e"
     done < "$CANDIDATI"
 
-    local -a orientamento=() errore=() sintomo=() nome=()
-    local rese=0 non_verbatim=0 fuori_ordine=0 orient_extra=0
+    # Le voci restano nell'ordine in cui il potatore le ha rese: e' la sua
+    # decisione su cosa sopravvive al taglio, e qui non si tocca.
+    local -a scelte=() etichette=()
+    local rese=0 non_verbatim=0 fuori_vocabolario=0
 
     while IFS= read -r voce; do
         [[ -z "${voce//[[:space:]]/}" ]] && continue
@@ -252,46 +271,65 @@ componi() {
         fi
 
         case "$et" in
-            ORIENTAMENTO)
-                if (( ${#orientamento[@]} )); then
-                    echo "[tldr] ORIENTAMENTO-EXTRA: ${voce}" >&2
-                    orient_extra=$((orient_extra+1))
-                else
-                    orientamento+=("$voce")
-                fi ;;
-            ERRORE)  errore+=("$voce") ;;
-            SINTOMO) sintomo+=("$voce") ;;
-            NOME)    nome+=("$voce") ;;
-            TESI|META)
-                echo "[tldr] FUORI-ORDINE ${et}: ${voce}" >&2
-                fuori_ordine=$((fuori_ordine+1)) ;;
+            AREA|ORIENTAMENTO|ERRORE|SINTOMO|NOME)
+                scelte+=("$voce"); etichette+=("$et") ;;
+            *)
+                echo "[tldr] FUORI-VOCABOLARIO ${et}: ${voce}" >&2
+                fuori_vocabolario=$((fuori_vocabolario+1)) ;;
         esac
     done < "$VOCI"
 
-    local -a ordinate=()
-    ordinate+=("${orientamento[@]}")
-    ordinate+=("${errore[@]}")
-    ordinate+=("${sintomo[@]}")
-    ordinate+=("${nome[@]}")
-
-    if (( ${#ordinate[@]} == 0 )); then
+    if (( ${#scelte[@]} == 0 )); then
         echo "[tldr] ERROR: nessuna voce utilizzabile, la riga non si compone" >&2
         exit 1
     fi
 
-    # Taglio dalla coda: la coda e' la parte meno discriminante per costruzione.
-    local riga="" tagliate=0
+    # Il potatore deve rendere in ordine di MERITO. Se rende raggruppato per
+    # etichetta, il taglio dalla coda decapita l'ultimo gruppo per intero — e su
+    # un file ricco di simboli quel gruppo sono i NOME, cioe' tutto cio' che
+    # rende la riga cercabile. Non e' correggibile qui (quale voce valga di piu'
+    # lo sa solo chi ha visto la lista), ma va dichiarato: una riga sbilanciata
+    # per questa ragione e' un difetto del potatore, non del materiale.
+    local blocchi=1 j
+    for (( j=1; j<${#etichette[@]}; j++ )); do
+        [[ "${etichette[$j]}" != "${etichette[$((j-1))]}" ]] && blocchi=$((blocchi+1))
+    done
+    local distinte
+    distinte="$(printf '%s\n' "${etichette[@]}" | sort -u | wc -l)"
+    if (( ${#etichette[@]} > 6 && blocchi == distinte && distinte > 1 )); then
+        echo "[tldr] RESA-RAGGRUPPATA: ${#etichette[@]} voci in ${blocchi} blocchi di etichetta — il potatore ha reso per categoria invece che per merito, il taglio decapitera' l'ultimo gruppo" >&2
+    fi
+
+    # Il taglio prende dalla coda dell'ordine di merito, senza guardare le
+    # etichette: chi ha reso ha gia' deciso, qui si contano solo caratteri.
+    local n=${#scelte[@]} tagliate=0 riga="" v i
     while :; do
         riga=""
-        local v
-        for v in "${ordinate[@]}"; do
+        for (( i=0; i<n; i++ )); do
+            v="${scelte[$i]}"
             if [[ -z "$riga" ]]; then riga="$v"; else riga="${riga} · ${v}"; fi
         done
         (( ${#riga} <= LW_DOC_TLDR_CAP )) && break
-        (( ${#ordinate[@]} <= 1 )) && break
-        echo "[tldr] OLTRE-CAP scartata: ${ordinate[-1]}" >&2
-        unset 'ordinate[-1]'
-        tagliate=$((tagliate+1))
+        (( n <= 1 )) && break
+        echo "[tldr] OLTRE-CAP scartata: ${scelte[$((n-1))]}" >&2
+        n=$((n-1)); tagliate=$((tagliate+1))
+    done
+
+    # Resa: le superstiti si raggruppano per categoria. E' leggibilita' della
+    # riga, non priorita' — la priorita' l'ha gia' consumata il taglio sopra.
+    local -a area_r=() errore_r=() sintomo_r=() nome_r=()
+    for (( i=0; i<n; i++ )); do
+        case "${etichette[$i]}" in
+            AREA|ORIENTAMENTO) area_r+=("${scelte[$i]}") ;;
+            ERRORE)            errore_r+=("${scelte[$i]}") ;;
+            SINTOMO)           sintomo_r+=("${scelte[$i]}") ;;
+            NOME)              nome_r+=("${scelte[$i]}") ;;
+        esac
+    done
+    local -a ordinate=("${area_r[@]}" "${errore_r[@]}" "${sintomo_r[@]}" "${nome_r[@]}")
+    riga=""
+    for v in "${ordinate[@]}"; do
+        if [[ -z "$riga" ]]; then riga="$v"; else riga="${riga} · ${v}"; fi
     done
 
     if [[ -n "$OUT" ]]; then
@@ -300,7 +338,7 @@ componi() {
         printf '%s\n' "$riga"
     fi
 
-    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${#riga} char, cap ${LW_DOC_TLDR_CAP}); scarti: ${non_verbatim} non-verbatim, ${fuori_ordine} fuori-ordine, ${orient_extra} orientamenti extra, ${tagliate} oltre-cap" >&2
+    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${#riga} char, cap ${LW_DOC_TLDR_CAP}) — aree=${#area_r[@]} err=${#errore_r[@]} sint=${#sintomo_r[@]} nomi=${#nome_r[@]}; scarti: ${non_verbatim} non-verbatim, ${fuori_vocabolario} fuori-vocabolario, ${tagliate} oltre-cap" >&2
 }
 
 # --- set ----------------------------------------------------------------------
