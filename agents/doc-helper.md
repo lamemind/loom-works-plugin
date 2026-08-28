@@ -44,8 +44,19 @@ I campi testuali accettano testo inline o un path (`testo:` | `path:`): inline q
 - Input: `file` (testo|path)
 - Esito: `{"gruppi": [{"trigger": "<il perimetro di ricerca che porta qui>", "sezioni": ["§...", "§..."]}]}` — due o più gruppi, ogni sezione in esattamente uno
 
-**`raccogli-tldr`** — raccoglie i candidati per il TLDR di un file di `reference/`. **Non selezioni: raccogli**, e la sovrabbondanza è voluta — nessun limite di numero, nessun taglio, nessuna preferenza. Un candidato è un frammento breve e autonomo; i nomi si riportano nella **grafia esatta del file**, perché chi sceglie a valle non può correggerli.
+**`raccogli-tldr`** — raccoglie i candidati per il TLDR di un file di `reference/`. **Non selezioni: raccogli**, e la sovrabbondanza è voluta — nessun limite di numero, nessun taglio, nessuna preferenza. Un candidato è un frammento breve e autonomo.
 - Etichette, una per candidato: `ORIENTAMENTO` (di cosa parla il file — «come si fa X», «dove vive Y») · `NOME` (simbolo, path, comando, flag, costante, così com'è scritto) · `ERRORE` (messaggio d'errore letterale) · `SINTOMO` (come uno descriverebbe il guasto **prima** di sapere la causa) · `TESI` (un'affermazione che si può giudicare vera o falsa) · `META` (un'affermazione sul documento, non sulla materia).
+- **Un `NOME` è nudo.** È la stringa che copieresti per incollarla in una barra di ricerca: il simbolo e nient'altro, nessuna parola di spiegazione, nessuna parentesi, un solo nome per candidato. Se ti viene da aggiungere cosa quel nome fa, dove sta o quando si rompe, quella parte è un candidato a sé — etichettala `TESI` o `SINTOMO`, e il nome resta nudo nel suo. Vale identico per `ERRORE`: solo il testo che il programma stampa.
+
+| sì | no |
+| --- | --- |
+| `` `St.Button` `` | `` `St.Button` centra la label quando ha `x_expand: true` `` |
+| `SPLIT` | `SPLIT (flag)` |
+| `` `bindings/` `` | `` `bindings/` (sottoalbero dconf) `` |
+| `` `tasks/` `` e `` `INDEX.md` ``, due candidati | `tasks/, current-task.md, INDEX.md, inbox/` |
+
+- **Perché i nomi vanno nudi.** A valle ogni candidato `NOME` o `ERRORE` viene cercato nel file con una ricerca **letterale**: se la stringa non compare identica viene scartato, e il nome è perso. Chi sceglie a valle non ha il file e non può correggerlo. Ogni parola aggiunta al nome è un modo di farlo buttare via.
+- **Una cifra non è un nome.** Una soglia, una misura, un conteggio si etichettano `TESI`: una cifra ricopiata invecchia da sola, e un'ancora che invecchia manda chi legge a cercare un numero che non esiste più.
 - `TESI` e `META` si raccolgono come tutto il resto. Etichettarle è il modo di tenerle fuori dal TLDR senza doverle prima comprimere in qualcos'altro — una tesi strizzata in forma ellittica è il difetto che questa separazione esiste per impedire.
 - Input: `file` (path)
 - Esito: `{"candidati": ["ETICHETTA | frammento", ...]}`
