@@ -65,27 +65,32 @@
 #      recupera dalla lista invece di essere richiesta al potatore, che non la
 #      rende.
 #   2. VOCABOLARIO — entrano AREA, ERRORE, SINTOMO, NOME. TESI e META mai.
-#   3. CAP — si taglia dalla coda dell'ORDINE IN CUI IL POTATORE HA RESO, finche'
-#      la riga rientra. Il cap viene da lib-doc.sh, sede unica: nessun numero di
+#   3. CAP — si taglia dalla coda dell'ordine di SACRIFICIO, finche' la riga
+#      rientra. Il cap viene da lib-doc.sh, sede unica: nessun numero di
 #      caratteri vive nei prompt dei due agent.
 #
-# Sul punto 3 il produttore ha cambiato idea una volta, e la ragione va tenuta.
-# Prima le voci venivano riordinate PER CATEGORIA e il taglio prendeva dalla coda
-# di quell'ordine: i NOME, ultima categoria, morivano sempre per primi — la piu'
-# economica (una manciata di caratteri) e l'unica cercabile con un grep. Misurato
-# sui 55 file di reference/: nove uscivano senza un solo nome, e su cc-hooks.md
-# sparivano `inject-task.sh` e `check-injection-budget.sh`.
+# L'ordine di sacrificio e' una precedenza di categoria — NOME > ERRORE >
+# SINTOMO > AREA — e dentro ogni categoria l'ordine di merito reso dal potatore.
+# Muoiono per prime le AREA, per ultimo il primo NOME.
 #
-# La correzione non e' una politica di taglio piu' furba: e' che l'ordine di
-# SACRIFICIO lo decide il potatore, che ha visto la lista, e non questo script,
-# che vede solo dei caratteri. Ogni tentativo di indovinare qui quale mix serva a
-# un file — pavimenti per categoria, taglio del gruppo piu' pesante — sposta il
-# difetto altrove: pavimento basso sulle aree e restano scoperte intere sezioni,
-# alto e muoiono i nomi su un file che ne ha cinquanta.
+# Le AREA vanno in coda perche' sono l'unica categoria in parte gia' detta
+# altrove: la riga d'indice porta accanto il path del file e il suo H1, che il
+# perimetro lo dichiarano gratis. Un nome o un testo d'errore no — sono
+# coordinate letterali che nessun altro campo dell'indice ripete, e sono le sole
+# che un grep ritrova. Un file di sola metodologia non ci perde: li' di NOME non
+# ce n'e', quindi le AREA non competono con nulla ed entrano lo stesso — la
+# categoria in coda cede solo dove c'e' qualcosa di piu' schietto da mettere.
 #
-# Quindi: il potatore rende in ordine di merito, qui si taglia dalla coda senza
-# giudizio, e SOLO ALLA FINE le superstiti si riordinano per categoria — che e'
-# leggibilita' della riga, non priorita'.
+# La precedenza sta qui e non nel prompt perche' e' una regola fissa: al potatore
+# resta l'unico giudizio che questo script non puo' dare, cioe' quali voci della
+# stessa categoria valgono di piu'. Storia delle due politiche gia' provate e
+# scartate — taglio dalla coda di una resa raggruppata (uccideva tutti i NOME) e
+# pavimenti per categoria (spostano il difetto su un'altra classe di file) — in
+# runtime/inbox/T132-produttore-tldr-ordine-merito.md del cappello.
+#
+# Le superstiti si rendono poi nell'ordine inverso, AREA in testa e NOME in coda:
+# e' leggibilita' della riga, non priorita' — la priorita' l'ha gia' consumata il
+# taglio.
 #
 # Quando la sola prima voce sfonda il cap la riga si scrive comunque: troncarla a
 # meta' parola produrrebbe un'ancora rotta, e build-index.sh la segnala gia'.
@@ -193,6 +198,24 @@ gate() {
         frammento="${frammento#"${frammento%%[![:space:]]*}"}"
         frammento="${frammento%"${frammento##*[![:space:]]}"}"
 
+        # Il canale che consegna l'envelope di un subagent al chiamante puo'
+        # neutralizzare `<` `>` `&` in entita' HTML. Il nome resta quello giusto,
+        # cambia la codifica in transito — ma il grep qui sotto non lo sa e lo
+        # scarterebbe come fabbricato, che e' il verdetto opposto. Misurato sul
+        # giro di rigenerazione dei 55 file di reference/: 61 ancore perse cosi',
+        # concentrate sui nomi che portano un segnaposto angolato (`<pid>`,
+        # `<slug>`), cioe' le firme di comando e i path di registry. Il ripristino
+        # sta qui e non nel prompt dell'orchestratore perche' li' e' a giudizio:
+        # tre lotti su otto lo fecero di propria iniziativa, tre no. Due giri, che
+        # un `&amp;lt;` va decodificato due volte.
+        local _g
+        for _g in 1 2; do
+            frammento="${frammento//&lt;/<}"
+            frammento="${frammento//&gt;/>}"
+            frammento="${frammento//&quot;/\"}"
+            frammento="${frammento//&amp;/&}"
+        done
+
         case "$etichetta" in
             AREA|ORIENTAMENTO|NOME|ERRORE|SINTOMO|TESI|META) ;;
             *)
@@ -232,6 +255,24 @@ gate() {
 
 # --- componi ------------------------------------------------------------------
 
+# Chiave di confronto fra una voce resa e un candidato: il testo senza backtick
+# e senza spazi ridondanti. Serve a distinguere due casi che l'uguaglianza
+# secca confonde — il potatore che RISCRIVE (vietato, esce) e il potatore che
+# RI-FORMATTA (aggiunge o toglie i backtick di un nome, innocuo). Misurato sul
+# giro dei 55 file: su cc/agent-sdk.md il raccoglitore rese i NOME senza
+# backtick, il potatore glieli rimise, e 44 voci su 59 uscirono come
+# NON-VERBATIM — la riga finale resto' senza una sola ancora cercabile.
+# Maiuscole e punteggiatura restano dentro la chiave: cambiarle e' riscrivere.
+_chiave() {
+    local s="$1"
+    s="${s//\`/}"
+    s="${s//$'\t'/ }"
+    while [[ "$s" == *"  "* ]]; do s="${s//  / }"; done
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    printf '%s' "$s"
+}
+
 componi() {
     [[ -n "$CANDIDATI" ]] || { echo "[tldr] ERROR: --candidati obbligatorio" >&2; exit 1; }
     [[ -f "$CANDIDATI" ]] || { echo "[tldr] ERROR: lista non trovata: $CANDIDATI" >&2; exit 1; }
@@ -240,20 +281,22 @@ componi() {
 
     # Frammento → etichetta, dalla lista che il gate ha gia' filtrato. E' la sola
     # fonte di verita' su cosa il potatore aveva il permesso di scegliere.
-    declare -A ETICHETTA_DI
+    declare -A ETICHETTA_DI CANONICA_DI
     while IFS= read -r riga; do
         [[ -z "${riga//[[:space:]]/}" ]] && continue
         [[ "$riga" == \#* ]] && continue
-        local e f
+        local e f k
         e="${riga%%|*}"; e="${e//[[:space:]]/}"
         f="${riga#*|}"
         f="${f#"${f%%[![:space:]]*}"}"
         f="${f%"${f##*[![:space:]]}"}"
         ETICHETTA_DI["$f"]="$e"
+        k="$(_chiave "$f")"
+        [[ -n "$k" ]] && CANONICA_DI["$k"]="$f"
     done < "$CANDIDATI"
 
-    # Le voci restano nell'ordine in cui il potatore le ha rese: e' la sua
-    # decisione su cosa sopravvive al taglio, e qui non si tocca.
+    # Le voci si raccolgono nell'ordine in cui il potatore le ha rese: dentro
+    # una categoria quell'ordine e' la sua decisione su cosa sopravvive.
     local -a scelte=() etichette=()
     local rese=0 non_verbatim=0 fuori_vocabolario=0
 
@@ -264,6 +307,18 @@ componi() {
         rese=$((rese+1))
 
         local et="${ETICHETTA_DI[$voce]:-}"
+        if [[ -z "$et" ]]; then
+            # Prima di bocciare, riprova sulla chiave normalizzata: se la voce
+            # differisce dal candidato solo per i backtick, il potatore non ha
+            # riscritto nulla, ha ri-formattato. Si riprende la forma della lista
+            # filtrata — quella verificata contro il file — e si tira dritto.
+            local kv
+            kv="$(_chiave "$voce")"
+            if [[ -n "$kv" && -n "${CANONICA_DI[$kv]:-}" ]]; then
+                voce="${CANONICA_DI[$kv]}"
+                et="${ETICHETTA_DI[$voce]:-}"
+            fi
+        fi
         if [[ -z "$et" ]]; then
             echo "[tldr] NON-VERBATIM: ${voce}" >&2
             non_verbatim=$((non_verbatim+1))
@@ -284,24 +339,25 @@ componi() {
         exit 1
     fi
 
-    # Il potatore deve rendere in ordine di MERITO. Se rende raggruppato per
-    # etichetta, il taglio dalla coda decapita l'ultimo gruppo per intero — e su
-    # un file ricco di simboli quel gruppo sono i NOME, cioe' tutto cio' che
-    # rende la riga cercabile. Non e' correggibile qui (quale voce valga di piu'
-    # lo sa solo chi ha visto la lista), ma va dichiarato: una riga sbilanciata
-    # per questa ragione e' un difetto del potatore, non del materiale.
-    local blocchi=1 j
-    for (( j=1; j<${#etichette[@]}; j++ )); do
-        [[ "${etichette[$j]}" != "${etichette[$((j-1))]}" ]] && blocchi=$((blocchi+1))
+    # Ordine di SACRIFICIO: precedenza di categoria NOME > ERRORE > SINTOMO >
+    # AREA, e dentro ogni categoria l'ordine di merito in cui il potatore ha
+    # reso. La precedenza e' una regola fissa, quindi la applica lo script: al
+    # potatore resta il giudizio che solo lui puo' dare, cioe' quali voci della
+    # stessa categoria valgono di piu'.
+    local -a sac=() sac_et=()
+    local cat et_i
+    for cat in NOME ERRORE SINTOMO AREA; do
+        for (( i=0; i<${#scelte[@]}; i++ )); do
+            et_i="${etichette[$i]}"
+            [[ "$et_i" == ORIENTAMENTO ]] && et_i=AREA
+            [[ "$et_i" == "$cat" ]] || continue
+            sac+=("${scelte[$i]}"); sac_et+=("$et_i")
+        done
     done
-    local distinte
-    distinte="$(printf '%s\n' "${etichette[@]}" | sort -u | wc -l)"
-    if (( ${#etichette[@]} > 6 && blocchi == distinte && distinte > 1 )); then
-        echo "[tldr] RESA-RAGGRUPPATA: ${#etichette[@]} voci in ${blocchi} blocchi di etichetta — il potatore ha reso per categoria invece che per merito, il taglio decapitera' l'ultimo gruppo" >&2
-    fi
+    scelte=("${sac[@]}"); etichette=("${sac_et[@]}")
 
-    # Il taglio prende dalla coda dell'ordine di merito, senza guardare le
-    # etichette: chi ha reso ha gia' deciso, qui si contano solo caratteri.
+    # Il taglio prende dalla coda dell'ordine appena costruito: prima muoiono le
+    # AREA di merito piu' basso, per ultimo il primo NOME.
     local n=${#scelte[@]} tagliate=0 riga="" v i
     while :; do
         riga=""

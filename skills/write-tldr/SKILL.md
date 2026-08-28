@@ -81,7 +81,7 @@ candidati: path:<TMPDIR_TLDR>/<basename>.filtrata.txt
 
 Passi il **path della lista filtrata**, mai il path del file d'origine e mai il suo contenuto: il potatore sceglie su ciò che il gate ha già verificato. L'envelope ritorna `{"voci": [...]}`.
 
-Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim dall'envelope, nell'ordine in cui le ha rese**. Quell'ordine è di merito, non di categoria, ed è la sola decisione che il potatore prende su cosa sopravvive: `componi` taglia dalla coda, quindi riordinare qui significa scegliere al posto suo — con in mano molto meno di quello che aveva lui.
+Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim dall'envelope, nell'ordine in cui le ha rese**. Dentro una stessa etichetta quell'ordine è di merito, ed è la sola decisione che il potatore prende su cosa sopravvive al taglio: riordinare qui significa scegliere al posto suo, con in mano molto meno di quello che aveva lui. Fra etichette diverse non decide né lui né tu — la precedenza la applica `componi`.
 
 **1f. Gate d'uscita e composizione.**
 
@@ -92,7 +92,7 @@ Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim 
     --out <TMPDIR_TLDR>/<basename>.riga.txt
 ```
 
-Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (`TESI` e `META` non entrano mai), **cap** (taglia dalla coda dell'ordine di merito finché la riga rientra, con la soglia presa da `lib-doc.sh`). Le superstiti vengono poi raggruppate per categoria: è la resa, non la priorità.
+Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (`TESI` e `META` non entrano mai), **cap** (ordina per precedenza di categoria — `NOME`, `ERRORE`, `SINTOMO`, `AREA`, e dentro ognuna il merito reso dal potatore — poi taglia dalla coda finché la riga rientra, con la soglia presa da `lib-doc.sh`). Le superstiti vengono rese nell'ordine inverso, `AREA` in testa: è la leggibilità, non la priorità.
 
 `NON-VERBATIM`, `FUORI-VOCABOLARIO`, `OLTRE-CAP` su stderr sono dati del report. Exit 1 = nessuna voce utilizzabile: salta il file e dichiaralo.
 
