@@ -51,6 +51,7 @@ Then bootstrap the project structure:
 | `/loom-works:recap-status-epic` | Umbrella-task recap: children with DLV/AC figures, deps, two-level entry point |
 | `/loom-works:drain-notions` | Drain the `nozioni` inbox queue: router → registro → writer → validator → commit |
 | `/loom-works:derive-notions` | Consume `derivazione` orders: diff → disallineamenti → new `nozioni` inbox file |
+| `/loom-works:create-sweep` | Write a `sweep` order: analyse targets, editorial scope and dead references, then commit the inbox file |
 | `/loom-works:align-doc` | Execute `sweep` orders: extractor + writer on a `doc/sweep-<slug>` branch with PR |
 | `/loom-works:pull-repos` | Pull umbrella + submodules, unlock `branch:` inboxes found on main, derive from foreign merges |
 | `/loom-works:rebalance-doc` | Doc topology: split / merge review / regroup on doc-metrics flags |
@@ -90,6 +91,14 @@ The folder holding `tasks.md`, `tasks/`, `reference/` and `current-task.md` is *
 ```
 
 Read it with `scripts/utils/docs-root.sh` (`--abs` for an absolute path); scripts resolve it themselves via `lw_docs_root` in `scripts/utils/lib.sh`.
+
+## Runtime dependencies
+
+Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception.
+
+| Dependency | Required by | Without it |
+|---|---|---|
+| `python3` | `scripts/docs/md-wrap.py` (the only non-bash script) | The script cannot be spawned at all. A consumer that invokes it must stay silent instead of breaking: the absence of an interpreter is an unavailable measurement, not an error to report. |
 
 ## TTS support
 
