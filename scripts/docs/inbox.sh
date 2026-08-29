@@ -37,6 +37,12 @@
 # ignorato: ignorarlo lascerebbe la nozione aperta per sempre e il sintomo
 # arriverebbe lontanissimo dalla causa.
 #
+# Su derivazione e sweep le ancore sono annunciate da un separatore `---` e
+# raccolte solo dopo di esso: senza, qualunque riga di prosa che apra con una
+# minuscola seguita da due punti diventerebbe un'ancora fantasma. Un file che il
+# separatore non ce l'ha si parsa con la regola vecchia — i file gia' scritti
+# perderebbero altrimenti le proprie ancore.
+#
 # parse espone attore/verdetto/target dell'ULTIMO sub-bullet anche sulle nozioni
 # aperte: e' cio' che rende ripartibile un drain morto a meta' — una aperta con
 # `router →` va dritta al writer, una nuda al router. Campi solo sulle chiuse
@@ -240,7 +246,7 @@ cmd_new() {
         else
             printf '%s\n' "${body[@]}"
             if [[ ${#ancore[@]} -gt 0 ]]; then
-                printf '\n'
+                printf '\n%s\n' "$LW_DOC_ANCORE_SEP"
                 for a in "${ancore[@]}"; do
                     printf '%s: %s\n' "${a%%:*}" "${a#*:}"
                 done
@@ -294,6 +300,14 @@ cmd_parse() {
         [[ "$line" =~ ^-\  || -z "$line" ]] || in_nozione=0
     done < "$file"
 
+    # Riga del separatore delle ancore, se il file ne ha uno. Si prende
+    # l'ULTIMA occorrenza: le ancore stanno sempre in coda al file, quindi un
+    # `---` che compare prima appartiene alla prosa e non apre il blocco.
+    local sep_line=0
+    if [[ "$MK_NATURA" != "nozioni" ]]; then
+        sep_line="$(awk -v sep="$LW_DOC_ANCORE_SEP" 'NR>3 && $0==sep { n=NR } END { print n+0 }' "$file")"
+    fi
+
     # Seconda passata: raccolta dati
     local -a noz_id=() noz_stato=() noz_attore=() noz_verdetto=() noz_target=() noz_resa=()
     local -a anc_k=() anc_v=()
@@ -318,7 +332,8 @@ cmd_parse() {
             sub_is_chiusura "$sub_content" && noz_stato[cur]="chiusa"
             continue
         fi
-        if [[ "$MK_NATURA" != "nozioni" && $lineno -gt 3 && "$line" =~ $LW_DOC_RE_ANCORA ]]; then
+        if [[ "$MK_NATURA" != "nozioni" && $lineno -gt ${sep_line:-0} && $lineno -gt 3 \
+              && "$line" =~ $LW_DOC_RE_ANCORA ]]; then
             anc_k+=("${BASH_REMATCH[1]}"); anc_v+=("${BASH_REMATCH[2]}")
         fi
     done < "$file"

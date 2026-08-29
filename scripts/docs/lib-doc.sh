@@ -132,3 +132,15 @@ readonly LW_DOC_RE_MARKER='^> \*\*INBOX\*\*: (.+)$'
 readonly LW_DOC_RE_NOZIONE='^- \*\*(n[0-9]+)\*\* — (.*)$'
 readonly LW_DOC_RE_SUB='^  - (.+)$'
 readonly LW_DOC_RE_ANCORA='^([a-z][a-z0-9_-]*): (.+)$'
+
+# Separatore che annuncia il blocco delle ancore in derivazione e sweep. Serve
+# perche' la regex sopra matcha qualunque riga `parola: valore`, quindi una riga
+# di prosa che apre con una minuscola seguita da due punti — «registro: presente
+# indicativo» — diventerebbe un'ancora che nessuno ha voluto. Col separatore il
+# confine fra prosa e ancore e' esplicito invece che affidato a una convenzione
+# tipografica invisibile a chi scrive prosa libera.
+#
+# Retro-compatibile per costruzione: un file senza separatore si parsa con la
+# regola vecchia (ancore ovunque dopo la riga 3), o i file inbox gia' scritti
+# perderebbero le loro ancore.
+readonly LW_DOC_ANCORE_SEP='---'
