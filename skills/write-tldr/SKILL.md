@@ -49,15 +49,18 @@ file: <TMPDIR_TLDR>/<basename>.copia.md
 
 Il modello si forza qui, invocazione per invocazione, invece di cambiarlo nel body dell'agent: `doc-helper` serve dieci attività e le altre nove stanno bene su haiku. Su questa no — haiku fabbrica nomi che nel file non esistono (parentesi aggiunte a un simbolo nudo, un prefisso di cartella inventato), e ogni fabbricazione è un'ancora persa: il gate la scarta correttamente, ma quel nome non entra più nell'indice. Misurato sui 55 file di `reference/`: una ventina di scarti con haiku, zero con sonnet a parità di file.
 
-L'envelope ritorna `{"candidati": ["ETICHETTA | frammento", ...]}`. Una lista corta o una `confidence` non alta sono red flag da riportare, non motivi per rilanciare.
+L'envelope ritorna `{"candidati": ["ETICHETTA | frammento | domanda", ...]}`. Una lista corta o una `confidence` non alta sono red flag da riportare, non motivi per rilanciare.
 
 **1c. La lista su disco.** Scrivi i candidati in `<TMPDIR_TLDR>/<basename>.txt`, **uno per riga, verbatim dall'envelope**, preceduti da una riga di intestazione col path **vero** del file — non quello della copia, che al potatore non direbbe nulla:
 
 ```
 # <path del file>
-AREA | <…>
-NOME | <…>
+SEZIONE | <…> | <il problema con cui uno ci arriva>
+NOME | <…> | <…>
+ERRORE | <…> | -
 ```
+
+Tre campi separati da ` | `, il terzo è la domanda e vale `-` quando il raccoglitore non ha saputo formularla. Non riempirla tu e non toglierla: è il criterio con cui il potatore scarta, e un trattino è un dato che gli serve.
 
 Copiare qui una riga cambiandola vanifica il gate: da questo punto in poi nessuno ha più il file per accorgersene.
 
@@ -70,7 +73,7 @@ Copiare qui una riga cambiandola vanifica il gate: da questo punto in poi nessun
     --out <TMPDIR_TLDR>/<basename>.filtrata.txt
 ```
 
-Ogni candidato `NOME` o `ERRORE` deve comparire letteralmente nella copia: chi non passa esce qui. Le righe `SCARTATO` e `MALFORMATO` su stderr sono **dati del report**, non errori — un nome fabbricato scartato è il gate che lavora. Il gate esce comunque zero: un exit non-zero è un problema d'uso (file assente, lista assente), e lì il file si salta.
+**Ogni** candidato deve comparire letteralmente nella copia: chi non passa esce qui. Le tre etichette — `NOME`, `ERRORE`, `SEZIONE` — sono tutte estrazione letterale, quindi il gate non ha eccezioni e nessuna voce entra senza verifica. Le righe `SCARTATO` e `MALFORMATO` su stderr sono **dati del report**, non errori — un nome fabbricato scartato è il gate che lavora. Il gate esce comunque zero: un exit non-zero è un problema d'uso (file assente, lista assente), e lì il file si salta.
 
 **1e. Potatura.** `Task` con `subagent_type: doc-helper` **e `model: sonnet`**:
 
@@ -79,9 +82,9 @@ attività: pota-tldr
 candidati: path:<TMPDIR_TLDR>/<basename>.filtrata.txt
 ```
 
-Passi il **path della lista filtrata**, mai il path del file d'origine e mai il suo contenuto: il potatore sceglie su ciò che il gate ha già verificato. L'envelope ritorna `{"voci": [...]}`.
+Passi il **path della lista filtrata**, mai il path del file d'origine e mai il suo contenuto: il potatore sceglie su ciò che il gate ha già verificato. L'envelope ritorna `{"voci": [...]}` — solo i frammenti, senza etichetta e senza domanda.
 
-Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim dall'envelope, nell'ordine in cui le ha rese**. Dentro una stessa etichetta quell'ordine è di merito, ed è la sola decisione che il potatore prende su cosa sopravvive al taglio: riordinare qui significa scegliere al posto suo, con in mano molto meno di quello che aveva lui. Fra etichette diverse non decide né lui né tu — la precedenza la applica `componi`.
+Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim dall'envelope, nell'ordine in cui le ha rese**. Dentro una stessa etichetta quell'ordine è di merito, ed è la sola decisione che il potatore prende su cosa sopravvive al taglio: riordinare qui significa scegliere al posto suo, con in mano molto meno di quello che aveva lui. Fra etichette diverse non decide né lui né tu — l'allocazione la applica `componi`.
 
 **1f. Gate d'uscita e composizione.**
 
@@ -92,7 +95,9 @@ Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim 
     --out <TMPDIR_TLDR>/<basename>.riga.txt
 ```
 
-Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (`TESI` e `META` non entrano mai), **cap** (ordina in tre blocchi — la prima voce di ogni categoria di contesto (`ERRORE`, `AREA`, `SINTOMO`), poi tutti i `NOME`, poi i residui di contesto, e dentro ognuna il merito reso dal potatore — poi taglia dalla coda finché la riga rientra, con la soglia presa da `lib-doc.sh`). Le superstiti vengono rese raggruppate, `AREA` in testa: è la leggibilità, non la priorità.
+Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (solo `NOME`, `ERRORE`, `SEZIONE`), **cap** (allocazione in due livelli, con la soglia presa da `lib-doc.sh`).
+
+L'allocazione: `NOME` ed `ERRORE` si dividono il cap in parti uguali, chi domanda meno viene servito per primo e libera agli altri la quota che non gli serve; le `SEZIONE` prendono solo ciò che avanza. Le tre categorie non sono pari — nomi ed errori sono chiavi che qualcuno digita, le sezioni sono il ripiego per i file che di chiavi non ne hanno. Su un file di API le sezioni non entrano affatto, su un file di sola metodologia prendono tutto il cap. Le superstiti vengono rese raggruppate, `SEZIONE` in testa: è la leggibilità, non la priorità.
 
 `NON-VERBATIM`, `FUORI-VOCABOLARIO`, `OLTRE-CAP` su stderr sono dati del report. Exit 1 = nessuna voce utilizzabile: salta il file e dichiaralo.
 

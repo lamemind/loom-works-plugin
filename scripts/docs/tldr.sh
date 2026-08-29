@@ -31,16 +31,26 @@
 #
 # --- gate ---------------------------------------------------------------------
 #
-# Ogni candidato etichettato NOME o ERRORE deve comparire LETTERALMENTE nel file
-# d'origine. Chi non passa viene scartato prima di arrivare al potatore, che per
-# contratto non puo' correggere un nome falso e non ha il file per accorgersene:
-# un errore del raccoglitore che superasse il gate diventerebbe incorreggibile.
+# OGNI candidato deve comparire LETTERALMENTE nel file d'origine. Chi non passa
+# viene scartato prima di arrivare al potatore, che per contratto non puo'
+# correggere un nome falso e non ha il file per accorgersene: un errore del
+# raccoglitore che superasse il gate diventerebbe incorreggibile.
 #
-# Formato di una riga: `ETICHETTA | frammento`. Le etichette sono AREA, NOME,
-# ERRORE, SINTOMO, TESI, META (piu' ORIENTAMENTO, il nome che AREA aveva prima:
-# resta accettato perche' una lista gia' su disco non diventi illeggibile). Una
-# riga fuori formato viene scartata; una che inizia per `#` e' l'intestazione
-# della lista — il path del file d'origine — e attraversa il gate intatta.
+# Il vocabolario e' NOME, ERRORE, SEZIONE — tre etichette che sono tutte
+# estrazione letterale, e per questo il gate non ha piu' eccezioni. Il regime
+# precedente aveva anche AREA e SINTOMO, frammenti di prosa scritti dall'agent, e
+# il gate era costretto a lasciarli passare senza verifica perche' nel file non
+# c'erano. Da li' entravano parole che il corpo di nessun file conteneva:
+# misurato sull'INDEX, `sorella`, `reclamato` e `topologia` comparivano nella riga
+# 3 di task-methodology.md e in nessun'altra riga dei 55 file — chi le cercava non
+# trovava nemmeno il file che gliele aveva promesse.
+#
+# Formato di una riga: `ETICHETTA | frammento | domanda`. La domanda e' il
+# problema con cui uno arriva a quel candidato, `-` quando il raccoglitore non ha
+# saputo formularla; il gate non la giudica e la lascia passare intatta, perche'
+# a scartare su quella base e' il potatore. Una riga fuori formato viene scartata;
+# una che inizia per `#` e' l'intestazione della lista — il path del file
+# d'origine — e attraversa il gate intatta.
 #
 # Il confronto e' letterale (`grep -F`) e il `--` che chiude le opzioni NON e'
 # opzionale: senza, ogni frammento che inizia per trattino (`--tab`, `--drainable`)
@@ -50,9 +60,6 @@
 #
 # Un frammento racchiuso in backtick viene provato anche nella forma nuda: la doc
 # cita i simboli col backtick, il sorgente li scrive senza.
-#
-# Il gate copre SOLO NOME ed ERRORE. Un flag inventato dentro un frammento
-# etichettato diversamente gli sfugge — e' il limite dichiarato, non un difetto.
 #
 # --- componi ------------------------------------------------------------------
 #
@@ -64,42 +71,46 @@
 #      riformulazione, e viene scartata. Cosi' l'etichetta di ogni voce si
 #      recupera dalla lista invece di essere richiesta al potatore, che non la
 #      rende.
-#   2. VOCABOLARIO — entrano AREA, ERRORE, SINTOMO, NOME. TESI e META mai.
-#   3. CAP — si taglia dalla coda dell'ordine di SACRIFICIO, finche' la riga
-#      rientra. Il cap viene da lib-doc.sh, sede unica: nessun numero di
-#      caratteri vive nei prompt dei due agent.
+#   2. VOCABOLARIO — entrano NOME, ERRORE, SEZIONE. Nient'altro.
+#   3. CAP — allocazione in due livelli, sotto. Il cap viene da lib-doc.sh, sede
+#      unica: nessun numero di caratteri vive nei prompt dei due agent.
 #
-# L'ordine di sacrificio ha tre blocchi: in testa UNA voce per ciascuna categoria
-# di contesto (primo ERRORE, prima AREA, primo SINTOMO), poi TUTTI i NOME, poi i
-# residui di contesto. Dentro ogni categoria vale l'ordine di merito reso dal
-# potatore. Muore per primo il residuo di contesto piu' basso, per ultimo il
-# primo ERRORE.
+# L'ALLOCAZIONE, in due livelli.
 #
-# I NOME stanno davanti ai residui perche' sono le sole coordinate letterali che
-# un grep ritrova, e non le ripete nessun altro campo dell'indice. Le AREA in
-# parte sono gia' dette: accanto alla riga d'indice compaiono path e H1 del file,
-# che il perimetro lo dichiarano gratis.
+# Livello 1 — NOME ed ERRORE si dividono il cap con un water-filling max-min
+# fair: quota uguale a testa, si serve per prima la categoria che domanda meno,
+# quello che avanza dalla sua quota si redistribuisce in parti uguali sulle
+# altre, e si ripete. Termina in al piu' N passate ed e' generico su N categorie.
 #
-# La testa esiste perche' una precedenza applicata in blocco si rovescia sui file
-# ricchi di simboli — coi NOME tutti davanti il cap finisce dentro l'elenco dei
-# nomi, e la riga esce senza una parola di contesto. Misurato su cc/agent-sdk.md:
-# 25 nomi nudi, zero aree, zero errori, zero sintomi, e fuori dalla riga restava
-# CLAUDE_SDK_CAN_USE_TOOL_SHADOWED, cioe' il gotcha del file. Tre voci di testa
-# costano un centinaio di caratteri e dicono di cosa parla il file; il ventesimo
-# nome no. Un file di sola metodologia non ci perde in nessuno dei due regimi:
-# li' di NOME non ce n'e', quindi le AREA non competono con nulla.
+# Livello 2 — le SEZIONE prendono SOLO cio' che avanza dal livello 1.
+#
+# Le tre categorie non sono pari, ed e' il motivo del secondo livello: NOME ed
+# ERRORE sono chiavi che qualcuno digita, SEZIONE e' il ripiego per i file che di
+# chiavi non ne hanno. Con una quota garantita anche alle sezioni, un file di API
+# paghe­rebbe un pezzo di riga per heading che non dicono niente — misurato su
+# cc/agent-sdk.md, dove `Identità e natura` e `Rischi residui` valgono da soli
+# quanto una decina di simboli. Cosi' invece i due estremi si servono da soli:
+# su un file ricco di simboli le sezioni non entrano affatto, su un file di sola
+# metodologia (zero NOME, zero ERRORE) il livello 1 non spende nulla e le sezioni
+# prendono tutto il cap.
+#
+# Passata finale — le voci sono atomiche, quindi una categoria puo' restare con
+# trenta caratteri in mano e una voce che ne chiede quarantacinque. Il residuo
+# complessivo si offre percio' a tutte le voci non ancora prese, la piu' corta per
+# prima, finche' nessuna ci sta piu'.
 #
 # La precedenza sta qui e non nel prompt perche' e' una regola fissa: al potatore
 # resta l'unico giudizio che questo script non puo' dare, cioe' quali voci della
 # stessa categoria valgono di piu'. Storia delle politiche gia' provate e
 # scartate — taglio dalla coda di una resa raggruppata (uccideva tutti i NOME),
-# pavimenti per categoria (spostano il difetto su un'altra classe di file) e
-# precedenza di categoria in blocco (la riga di soli nomi nudi qui sopra) — in
+# pavimenti per categoria, precedenza di categoria in blocco (riga di soli nomi
+# nudi) e testa protetta per categoria di contesto (una cornice come `Identità e
+# natura` sopravviveva a dieci nomi veri) — in
 # runtime/inbox/T132-produttore-tldr-ordine-merito.md del cappello.
 #
-# Le superstiti si rendono poi nell'ordine inverso, AREA in testa e NOME in coda:
-# e' leggibilita' della riga, non priorita' — la priorita' l'ha gia' consumata il
-# taglio.
+# Le superstiti si rendono raggruppate, SEZIONE in testa e NOME in coda: e'
+# leggibilita' della riga, non priorita' — la priorita' l'ha gia' consumata
+# l'allocazione.
 #
 # Quando la sola prima voce sfonda il cap la riga si scrive comunque: troncarla a
 # meta' parola produrrebbe un'ancora rotta, e build-index.sh la segnala gia'.
@@ -228,35 +239,45 @@ gate() {
         if [[ "$riga" == \#* ]]; then printf '%s\n' "$riga" >> "$dest"; continue; fi
         totale=$((totale+1))
 
-        local etichetta frammento
+        local etichetta resto frammento domanda
         etichetta="${riga%%|*}"
         etichetta="${etichetta//[[:space:]]/}"
-        frammento="${riga#*|}"
+        resto="${riga#*|}"
+
+        # Tre campi: etichetta, frammento, domanda. Il frammento puo' contenere
+        # un `|` (una riga di tabella markdown citata), la domanda no: si taglia
+        # sull'ULTIMO separatore, non sul primo. Senza il terzo campo la domanda
+        # resta vuota e il potatore la legge come assente, che e' il verdetto
+        # giusto — un candidato senza domanda non deve entrare.
+        if [[ "$resto" == *"|"* ]]; then
+            domanda="${resto##*|}"
+            frammento="${resto%|*}"
+        else
+            domanda=""
+            frammento="$resto"
+        fi
         frammento="${frammento#"${frammento%%[![:space:]]*}"}"
         frammento="${frammento%"${frammento##*[![:space:]]}"}"
+        domanda="${domanda#"${domanda%%[![:space:]]*}"}"
+        domanda="${domanda%"${domanda##*[![:space:]]}"}"
 
         frammento="$(_decodifica "$frammento")"
+        [[ -n "$domanda" ]] || domanda="-"
 
         case "$etichetta" in
-            AREA|ORIENTAMENTO|NOME|ERRORE|SINTOMO|TESI|META) ;;
+            NOME|ERRORE|SEZIONE) ;;
             *)
                 echo "[tldr] MALFORMATO: ${riga}" >&2
                 malformati=$((malformati+1))
                 continue ;;
         esac
 
-        if [[ "$etichetta" != "NOME" && "$etichetta" != "ERRORE" ]]; then
-            printf '%s | %s\n' "$etichetta" "$frammento" >> "$dest"
-            passati=$((passati+1))
-            continue
-        fi
-
         local nudo="$frammento"
         nudo="${nudo#\`}"
         nudo="${nudo%\`}"
 
         if grep -qF -- "$frammento" "$FILE" || grep -qF -- "$nudo" "$FILE"; then
-            printf '%s | %s\n' "$etichetta" "$frammento" >> "$dest"
+            printf '%s | %s | %s\n' "$etichetta" "$frammento" "$domanda" >> "$dest"
             passati=$((passati+1))
         else
             echo "[tldr] SCARTATO ${etichetta}: ${frammento}" >&2
@@ -294,6 +315,15 @@ _chiave() {
     printf '%s' "$s"
 }
 
+# Quanti caratteri chiede una categoria per rendere TUTTE le sue voci: e' la
+# domanda su cui il water-filling decide chi servire per primo. Legge l'array
+# `scelte` del chiamante (scoping dinamico di bash), che qui e' sempre componi.
+_domanda() {
+    local d=0 j
+    for j in $1; do d=$(( d + ${#scelte[$j]} + 3 )); done
+    printf '%s' "$d"
+}
+
 componi() {
     [[ -n "$CANDIDATI" ]] || { echo "[tldr] ERROR: --candidati obbligatorio" >&2; exit 1; }
     [[ -f "$CANDIDATI" ]] || { echo "[tldr] ERROR: lista non trovata: $CANDIDATI" >&2; exit 1; }
@@ -306,9 +336,12 @@ componi() {
     while IFS= read -r riga; do
         [[ -z "${riga//[[:space:]]/}" ]] && continue
         [[ "$riga" == \#* ]] && continue
-        local e f k
+        local e r f k
         e="${riga%%|*}"; e="${e//[[:space:]]/}"
-        f="${riga#*|}"
+        r="${riga#*|}"
+        # Terzo campo (la domanda) tagliato via sull'ultimo separatore: qui serve
+        # solo la corrispondenza frammento → etichetta.
+        if [[ "$r" == *"|"* ]]; then f="${r%|*}"; else f="$r"; fi
         f="${f#"${f%%[![:space:]]*}"}"
         f="${f%"${f##*[![:space:]]}"}"
         ETICHETTA_DI["$f"]="$e"
@@ -350,7 +383,7 @@ componi() {
         fi
 
         case "$et" in
-            AREA|ORIENTAMENTO|ERRORE|SINTOMO|NOME)
+            NOME|ERRORE|SEZIONE)
                 scelte+=("$voce"); etichette+=("$et") ;;
             *)
                 echo "[tldr] FUORI-VOCABOLARIO ${et}: ${voce}" >&2
@@ -363,72 +396,127 @@ componi() {
         exit 1
     fi
 
-    # ORIENTAMENTO e' il nome che AREA aveva prima: da qui in giu' una grafia sola.
-    for (( i=0; i<${#etichette[@]}; i++ )); do
-        [[ "${etichette[$i]}" == ORIENTAMENTO ]] && etichette[$i]=AREA
-    done
+    # Costo di una voce: la sua lunghezza piu' il separatore ` · ` che la lega
+    # alla precedente. La prima voce della riga il separatore non ce l'ha, quindi
+    # il conto qui sovrastima di tre caratteri: la riga esce appena sotto il cap
+    # invece che a filo, ed e' l'errore nella direzione innocua.
+    local SEPW=3
+    local i j c v riga
 
-    # Ordine di SACRIFICIO, in tre blocchi: una voce per ciascuna categoria di
-    # contesto (primo ERRORE, prima AREA, primo SINTOMO), poi TUTTI i NOME, poi i
-    # residui di contesto. Dentro ogni categoria vale l'ordine di merito in cui il
-    # potatore ha reso.
-    #
-    # La testa esiste perche' una precedenza di categoria applicata in blocco si
-    # rovescia sui file ricchi di simboli: coi NOME tutti davanti il cap finisce
-    # dentro l'elenco dei nomi e la riga esce senza una parola di contesto.
-    # Misurato su cc/agent-sdk.md: 25 nomi nudi, zero aree, zero errori, zero
-    # sintomi — e fuori restava `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED`, cioe' il
-    # gotcha del file. Tre voci di testa costano un centinaio di caratteri e
-    # dicono di cosa parla il file; il ventesimo nome no.
-    #
-    # I residui stanno dopo i NOME e non prima: la seconda AREA di un file pieno
-    # di simboli e' la voce che compete peggio col nome che sposta.
-    local -a sac=() sac_et=() preso=()
-    local cat
-    for (( i=0; i<${#scelte[@]}; i++ )); do preso[$i]=0; done
-
-    for cat in ERRORE AREA SINTOMO; do
-        for (( i=0; i<${#scelte[@]}; i++ )); do
-            [[ "${preso[$i]}" == 0 && "${etichette[$i]}" == "$cat" ]] || continue
-            sac+=("${scelte[$i]}"); sac_et+=("$cat"); preso[$i]=1
-            break
-        done
-    done
-    for cat in NOME ERRORE AREA SINTOMO; do
-        for (( i=0; i<${#scelte[@]}; i++ )); do
-            [[ "${preso[$i]}" == 0 && "${etichette[$i]}" == "$cat" ]] || continue
-            sac+=("${scelte[$i]}"); sac_et+=("$cat"); preso[$i]=1
-        done
-    done
-    scelte=("${sac[@]}"); etichette=("${sac_et[@]}")
-
-    # Il taglio prende dalla coda dell'ordine appena costruito: prima muoiono i
-    # residui di contesto, poi i NOME di merito piu' basso; la testa e' l'ultima.
-    local n=${#scelte[@]} tagliate=0 riga="" v i
-    while :; do
-        riga=""
-        for (( i=0; i<n; i++ )); do
-            v="${scelte[$i]}"
-            if [[ -z "$riga" ]]; then riga="$v"; else riga="${riga} · ${v}"; fi
-        done
-        (( ${#riga} <= LW_DOC_TLDR_CAP )) && break
-        (( n <= 1 )) && break
-        echo "[tldr] OLTRE-CAP scartata: ${scelte[$((n-1))]}" >&2
-        n=$((n-1)); tagliate=$((tagliate+1))
-    done
-
-    # Resa: le superstiti si raggruppano per categoria. E' leggibilita' della
-    # riga, non priorita' — la priorita' l'ha gia' consumata il taglio sopra.
-    local -a area_r=() errore_r=() sintomo_r=() nome_r=()
-    for (( i=0; i<n; i++ )); do
+    # Indici per categoria, nell'ordine di merito in cui il potatore ha reso.
+    local L_NOME="" L_ERRORE="" L_SEZIONE=""
+    for (( i=0; i<${#scelte[@]}; i++ )); do
         case "${etichette[$i]}" in
-            AREA|ORIENTAMENTO) area_r+=("${scelte[$i]}") ;;
-            ERRORE)            errore_r+=("${scelte[$i]}") ;;
-            SINTOMO)           sintomo_r+=("${scelte[$i]}") ;;
-            NOME)              nome_r+=("${scelte[$i]}") ;;
+            NOME)    L_NOME+="$i " ;;
+            ERRORE)  L_ERRORE+="$i " ;;
+            SEZIONE) L_SEZIONE+="$i " ;;
         esac
     done
-    local -a ordinate=("${area_r[@]}" "${errore_r[@]}" "${sintomo_r[@]}" "${nome_r[@]}")
+
+    local -a ammessi=()
+    local -A preso=()
+    local usato=0
+
+    # --- livello 1: NOME ed ERRORE, water-filling max-min fair ----------------
+    local -a resta=()
+    [[ -n "$L_NOME"   ]] && resta+=("NOME")
+    [[ -n "$L_ERRORE" ]] && resta+=("ERRORE")
+
+    local -A budget=() spesa=()
+    if (( ${#resta[@]} > 0 )); then
+        for c in "${resta[@]}"; do
+            budget[$c]=$(( LW_DOC_TLDR_CAP / ${#resta[@]} ))
+            spesa[$c]=0
+        done
+        while (( ${#resta[@]} > 0 )); do
+            # Si serve per prima la categoria che domanda meno: e' cio' che le
+            # permette di liberare la quota che non le serve, invece di tenerla
+            # bloccata mentre un'altra ne avrebbe bisogno.
+            local best="" bestd=-1 d lista
+            for c in "${resta[@]}"; do
+                lista="L_$c"
+                d="$(_domanda "${!lista}")"
+                if (( bestd < 0 || d < bestd )); then bestd=$d; best=$c; fi
+            done
+            lista="L_$best"
+            local costo
+            for j in ${!lista}; do
+                costo=$(( ${#scelte[$j]} + SEPW ))
+                # Ci si ferma alla prima voce che non entra invece di saltarla:
+                # l'ordine dentro la categoria e' merito, e scavalcare una voce
+                # cara per prenderne una economica piu' in basso e' una decisione
+                # che spetta al potatore, non a questo script. Il residuo lo
+                # recupera la passata finale.
+                (( spesa[$best] + costo <= budget[$best] )) || break
+                ammessi+=("$j"); preso[$j]=1
+                spesa[$best]=$(( spesa[$best] + costo ))
+            done
+            local avanzo=$(( budget[$best] - spesa[$best] ))
+            local -a ancora=()
+            for c in "${resta[@]}"; do [[ "$c" == "$best" ]] || ancora+=("$c"); done
+            resta=("${ancora[@]}")
+            if (( avanzo > 0 && ${#resta[@]} > 0 )); then
+                local quota=$(( avanzo / ${#resta[@]} ))
+                for c in "${resta[@]}"; do budget[$c]=$(( budget[$c] + quota )); done
+            fi
+        done
+        for c in NOME ERRORE; do usato=$(( usato + ${spesa[$c]:-0} )); done
+    fi
+
+    # --- livello 2: le SEZIONE su cio' che avanza dal livello 1 ---------------
+    if [[ -n "$L_SEZIONE" ]]; then
+        local costo
+        for j in $L_SEZIONE; do
+            costo=$(( ${#scelte[$j]} + SEPW ))
+            (( usato + costo <= LW_DOC_TLDR_CAP )) || break
+            ammessi+=("$j"); preso[$j]=1; usato=$(( usato + costo ))
+        done
+    fi
+
+    # --- passata finale: il residuo alle voci rimaste, la piu' corta per prima -
+    # Le voci sono atomiche: una categoria puo' restare con trenta caratteri in
+    # mano e una voce che ne chiede quarantacinque. Qui quel resto si spende.
+    while :; do
+        local scelto=-1 costo_scelto=0
+        for (( i=0; i<${#scelte[@]}; i++ )); do
+            [[ -n "${preso[$i]:-}" ]] && continue
+            local costo=$(( ${#scelte[$i]} + SEPW ))
+            (( usato + costo <= LW_DOC_TLDR_CAP )) || continue
+            if (( scelto < 0 || costo < costo_scelto )); then
+                scelto=$i; costo_scelto=$costo
+            fi
+        done
+        (( scelto < 0 )) && break
+        ammessi+=("$scelto"); preso[$scelto]=1; usato=$(( usato + costo_scelto ))
+    done
+
+    # Caso limite: la prima voce da sola sfonda il cap. La riga si scrive
+    # comunque — troncarla a meta' parola produrrebbe un'ancora rotta, e
+    # build-index.sh la segnala gia'.
+    if (( ${#ammessi[@]} == 0 )); then
+        ammessi=(0); preso[0]=1
+        echo "[tldr] OLTRE-CAP: nessuna voce entra nel cap, si tiene la prima" >&2
+    fi
+
+    local tagliate=0
+    for (( i=0; i<${#scelte[@]}; i++ )); do
+        [[ -n "${preso[$i]:-}" ]] && continue
+        echo "[tldr] OLTRE-CAP scartata ${etichette[$i]}: ${scelte[$i]}" >&2
+        tagliate=$((tagliate+1))
+    done
+
+    # Resa: raggruppata per categoria, SEZIONE in testa. E' leggibilita' della
+    # riga, non priorita' — la priorita' l'ha gia' consumata l'allocazione.
+    local -a sez_r=() err_r=() nome_r=()
+    for (( i=0; i<${#scelte[@]}; i++ )); do
+        [[ -n "${preso[$i]:-}" ]] || continue
+        case "${etichette[$i]}" in
+            SEZIONE) sez_r+=("${scelte[$i]}") ;;
+            ERRORE)  err_r+=("${scelte[$i]}") ;;
+            NOME)    nome_r+=("${scelte[$i]}") ;;
+        esac
+    done
+    local -a ordinate=("${sez_r[@]}" "${err_r[@]}" "${nome_r[@]}")
     riga=""
     for v in "${ordinate[@]}"; do
         if [[ -z "$riga" ]]; then riga="$v"; else riga="${riga} · ${v}"; fi
@@ -440,7 +528,7 @@ componi() {
         printf '%s\n' "$riga"
     fi
 
-    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${#riga} char, cap ${LW_DOC_TLDR_CAP}) — aree=${#area_r[@]} err=${#errore_r[@]} sint=${#sintomo_r[@]} nomi=${#nome_r[@]}; scarti: ${non_verbatim} non-verbatim, ${fuori_vocabolario} fuori-vocabolario, ${tagliate} oltre-cap" >&2
+    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${#riga} char, cap ${LW_DOC_TLDR_CAP}) — sez=${#sez_r[@]} err=${#err_r[@]} nomi=${#nome_r[@]}; scarti: ${non_verbatim} non-verbatim, ${fuori_vocabolario} fuori-vocabolario, ${tagliate} oltre-cap" >&2
 }
 
 # --- set ----------------------------------------------------------------------
