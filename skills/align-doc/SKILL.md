@@ -13,7 +13,7 @@ model: sonnet
 
 Usa il valore ovunque sotto compaia `{docs_root}`.
 
-Esegui gli **sweep**: ordini di riscrittura della doc scritti in prosa da un umano, unico produttore di questa natura. Catena corta e senza giudici — leggi l'ordine, estrai, riscrivi, apri una PR. Nessun router davanti (non collochi niente di nuovo: riscrivi ciò che è già collocato) e nessun validator dietro (una doc driftata non offre un metro, e un giudice puntiglioso su una riscrittura di massa produce rumore). **La sicurezza è git**: su main non atterra niente finché qualcuno non mergia. Che il risultato sia perfetto non è un'attesa — su un perimetro grande è scontato che non lo sia, e la PR è dove lo si constata.
+Esegui gli **sweep**: ordini di riscrittura della doc in prosa, scritti da `create-sweep` su intenzione umana. Catena corta e senza giudici — leggi l'ordine, estrai, riscrivi, apri una PR. Nessun router davanti (non collochi niente di nuovo: riscrivi ciò che è già collocato) e nessun validator dietro (una doc driftata non offre un metro, e un giudice puntiglioso su una riscrittura di massa produce rumore). **La sicurezza è git**: su main non atterra niente finché qualcuno non mergia. Che il risultato sia perfetto non è un'attesa — su un perimetro grande è scontato che non lo sia, e la PR è dove lo si constata.
 
 Nessuna domanda all'utente: giri anche nel notturno, e il presidio umano è asincrono — la review della PR.
 
