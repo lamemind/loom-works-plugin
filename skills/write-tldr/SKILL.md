@@ -92,7 +92,7 @@ Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim 
     --out <TMPDIR_TLDR>/<basename>.riga.txt
 ```
 
-Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (`TESI` e `META` non entrano mai), **cap** (ordina per precedenza di categoria — `NOME`, `ERRORE`, `SINTOMO`, `AREA`, e dentro ognuna il merito reso dal potatore — poi taglia dalla coda finché la riga rientra, con la soglia presa da `lib-doc.sh`). Le superstiti vengono rese nell'ordine inverso, `AREA` in testa: è la leggibilità, non la priorità.
+Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (`TESI` e `META` non entrano mai), **cap** (ordina in tre blocchi — la prima voce di ogni categoria di contesto (`ERRORE`, `AREA`, `SINTOMO`), poi tutti i `NOME`, poi i residui di contesto, e dentro ognuna il merito reso dal potatore — poi taglia dalla coda finché la riga rientra, con la soglia presa da `lib-doc.sh`). Le superstiti vengono rese raggruppate, `AREA` in testa: è la leggibilità, non la priorità.
 
 `NON-VERBATIM`, `FUORI-VOCABOLARIO`, `OLTRE-CAP` su stderr sono dati del report. Exit 1 = nessuna voce utilizzabile: salta il file e dichiaralo.
 

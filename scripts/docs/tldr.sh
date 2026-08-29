@@ -69,23 +69,32 @@
 #      rientra. Il cap viene da lib-doc.sh, sede unica: nessun numero di
 #      caratteri vive nei prompt dei due agent.
 #
-# L'ordine di sacrificio e' una precedenza di categoria — NOME > ERRORE >
-# SINTOMO > AREA — e dentro ogni categoria l'ordine di merito reso dal potatore.
-# Muoiono per prime le AREA, per ultimo il primo NOME.
+# L'ordine di sacrificio ha tre blocchi: in testa UNA voce per ciascuna categoria
+# di contesto (primo ERRORE, prima AREA, primo SINTOMO), poi TUTTI i NOME, poi i
+# residui di contesto. Dentro ogni categoria vale l'ordine di merito reso dal
+# potatore. Muore per primo il residuo di contesto piu' basso, per ultimo il
+# primo ERRORE.
 #
-# Le AREA vanno in coda perche' sono l'unica categoria in parte gia' detta
-# altrove: la riga d'indice porta accanto il path del file e il suo H1, che il
-# perimetro lo dichiarano gratis. Un nome o un testo d'errore no — sono
-# coordinate letterali che nessun altro campo dell'indice ripete, e sono le sole
-# che un grep ritrova. Un file di sola metodologia non ci perde: li' di NOME non
-# ce n'e', quindi le AREA non competono con nulla ed entrano lo stesso — la
-# categoria in coda cede solo dove c'e' qualcosa di piu' schietto da mettere.
+# I NOME stanno davanti ai residui perche' sono le sole coordinate letterali che
+# un grep ritrova, e non le ripete nessun altro campo dell'indice. Le AREA in
+# parte sono gia' dette: accanto alla riga d'indice compaiono path e H1 del file,
+# che il perimetro lo dichiarano gratis.
+#
+# La testa esiste perche' una precedenza applicata in blocco si rovescia sui file
+# ricchi di simboli — coi NOME tutti davanti il cap finisce dentro l'elenco dei
+# nomi, e la riga esce senza una parola di contesto. Misurato su cc/agent-sdk.md:
+# 25 nomi nudi, zero aree, zero errori, zero sintomi, e fuori dalla riga restava
+# CLAUDE_SDK_CAN_USE_TOOL_SHADOWED, cioe' il gotcha del file. Tre voci di testa
+# costano un centinaio di caratteri e dicono di cosa parla il file; il ventesimo
+# nome no. Un file di sola metodologia non ci perde in nessuno dei due regimi:
+# li' di NOME non ce n'e', quindi le AREA non competono con nulla.
 #
 # La precedenza sta qui e non nel prompt perche' e' una regola fissa: al potatore
 # resta l'unico giudizio che questo script non puo' dare, cioe' quali voci della
-# stessa categoria valgono di piu'. Storia delle due politiche gia' provate e
-# scartate — taglio dalla coda di una resa raggruppata (uccideva tutti i NOME) e
-# pavimenti per categoria (spostano il difetto su un'altra classe di file) — in
+# stessa categoria valgono di piu'. Storia delle politiche gia' provate e
+# scartate — taglio dalla coda di una resa raggruppata (uccideva tutti i NOME),
+# pavimenti per categoria (spostano il difetto su un'altra classe di file) e
+# precedenza di categoria in blocco (la riga di soli nomi nudi qui sopra) — in
 # runtime/inbox/T132-produttore-tldr-ordine-merito.md del cappello.
 #
 # Le superstiti si rendono poi nell'ordine inverso, AREA in testa e NOME in coda:
@@ -141,6 +150,34 @@ while [[ $# -gt 0 ]]; do
         *) echo "[tldr] unknown arg: $1" >&2; exit 1 ;;
     esac
 done
+
+# Il canale che consegna l'envelope di un subagent al chiamante puo' neutralizzare
+# `<` `>` `&` in entita' HTML. Il nome resta quello giusto, cambia la codifica in
+# transito — ma un confronto letterale non lo sa e lo tratterebbe da fabbricazione,
+# che e' il verdetto opposto. Misurato sul giro di rigenerazione dei 55 file di
+# reference/: 61 ancore perse cosi', concentrate sui nomi che portano un segnaposto
+# angolato (`<pid>`, `<slug>`), cioe' le firme di comando e i path di registry.
+#
+# Il ripristino sta qui e non nel prompt dell'orchestratore perche' li' e' a
+# giudizio: tre lotti su otto lo fecero di propria iniziativa, tre no.
+#
+# Serve a DUE stadi, e ripararne uno solo sposta il difetto invece di chiuderlo:
+# il `gate` legge i candidati del raccoglitore, `componi` legge le voci del
+# potatore, e sono due envelope distinti che passano per lo stesso canale.
+# Misurato su cc/agent-sdk.md con la decodifica nel solo gate: 111 candidati su
+# 111 passati, e poi le stesse tre voci bocciate NON-VERBATIM da `componi`.
+#
+# Due giri, perche' un `&amp;lt;` va decodificato due volte.
+_decodifica() {
+    local s="$1" _g
+    for _g in 1 2; do
+        s="${s//&lt;/<}"
+        s="${s//&gt;/>}"
+        s="${s//&quot;/\"}"
+        s="${s//&amp;/&}"
+    done
+    printf '%s' "$s"
+}
 
 # `componi` non tocca il file sorgente: lavora sulle due liste e basta.
 if [[ "$VERB" != "componi" ]]; then
@@ -198,23 +235,7 @@ gate() {
         frammento="${frammento#"${frammento%%[![:space:]]*}"}"
         frammento="${frammento%"${frammento##*[![:space:]]}"}"
 
-        # Il canale che consegna l'envelope di un subagent al chiamante puo'
-        # neutralizzare `<` `>` `&` in entita' HTML. Il nome resta quello giusto,
-        # cambia la codifica in transito — ma il grep qui sotto non lo sa e lo
-        # scarterebbe come fabbricato, che e' il verdetto opposto. Misurato sul
-        # giro di rigenerazione dei 55 file di reference/: 61 ancore perse cosi',
-        # concentrate sui nomi che portano un segnaposto angolato (`<pid>`,
-        # `<slug>`), cioe' le firme di comando e i path di registry. Il ripristino
-        # sta qui e non nel prompt dell'orchestratore perche' li' e' a giudizio:
-        # tre lotti su otto lo fecero di propria iniziativa, tre no. Due giri, che
-        # un `&amp;lt;` va decodificato due volte.
-        local _g
-        for _g in 1 2; do
-            frammento="${frammento//&lt;/<}"
-            frammento="${frammento//&gt;/>}"
-            frammento="${frammento//&quot;/\"}"
-            frammento="${frammento//&amp;/&}"
-        done
+        frammento="$(_decodifica "$frammento")"
 
         case "$etichetta" in
             AREA|ORIENTAMENTO|NOME|ERRORE|SINTOMO|TESI|META) ;;
@@ -304,6 +325,9 @@ componi() {
         [[ -z "${voce//[[:space:]]/}" ]] && continue
         voce="${voce#"${voce%%[![:space:]]*}"}"
         voce="${voce%"${voce##*[![:space:]]}"}"
+        # Stessa codifica in transito che il gate ripara sui candidati: la lista
+        # filtrata porta gia' la forma decodificata, la voce del potatore no.
+        voce="$(_decodifica "$voce")"
         rese=$((rese+1))
 
         local et="${ETICHETTA_DI[$voce]:-}"
@@ -339,25 +363,47 @@ componi() {
         exit 1
     fi
 
-    # Ordine di SACRIFICIO: precedenza di categoria NOME > ERRORE > SINTOMO >
-    # AREA, e dentro ogni categoria l'ordine di merito in cui il potatore ha
-    # reso. La precedenza e' una regola fissa, quindi la applica lo script: al
-    # potatore resta il giudizio che solo lui puo' dare, cioe' quali voci della
-    # stessa categoria valgono di piu'.
-    local -a sac=() sac_et=()
-    local cat et_i
-    for cat in NOME ERRORE SINTOMO AREA; do
+    # ORIENTAMENTO e' il nome che AREA aveva prima: da qui in giu' una grafia sola.
+    for (( i=0; i<${#etichette[@]}; i++ )); do
+        [[ "${etichette[$i]}" == ORIENTAMENTO ]] && etichette[$i]=AREA
+    done
+
+    # Ordine di SACRIFICIO, in tre blocchi: una voce per ciascuna categoria di
+    # contesto (primo ERRORE, prima AREA, primo SINTOMO), poi TUTTI i NOME, poi i
+    # residui di contesto. Dentro ogni categoria vale l'ordine di merito in cui il
+    # potatore ha reso.
+    #
+    # La testa esiste perche' una precedenza di categoria applicata in blocco si
+    # rovescia sui file ricchi di simboli: coi NOME tutti davanti il cap finisce
+    # dentro l'elenco dei nomi e la riga esce senza una parola di contesto.
+    # Misurato su cc/agent-sdk.md: 25 nomi nudi, zero aree, zero errori, zero
+    # sintomi — e fuori restava `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED`, cioe' il
+    # gotcha del file. Tre voci di testa costano un centinaio di caratteri e
+    # dicono di cosa parla il file; il ventesimo nome no.
+    #
+    # I residui stanno dopo i NOME e non prima: la seconda AREA di un file pieno
+    # di simboli e' la voce che compete peggio col nome che sposta.
+    local -a sac=() sac_et=() preso=()
+    local cat
+    for (( i=0; i<${#scelte[@]}; i++ )); do preso[$i]=0; done
+
+    for cat in ERRORE AREA SINTOMO; do
         for (( i=0; i<${#scelte[@]}; i++ )); do
-            et_i="${etichette[$i]}"
-            [[ "$et_i" == ORIENTAMENTO ]] && et_i=AREA
-            [[ "$et_i" == "$cat" ]] || continue
-            sac+=("${scelte[$i]}"); sac_et+=("$et_i")
+            [[ "${preso[$i]}" == 0 && "${etichette[$i]}" == "$cat" ]] || continue
+            sac+=("${scelte[$i]}"); sac_et+=("$cat"); preso[$i]=1
+            break
+        done
+    done
+    for cat in NOME ERRORE AREA SINTOMO; do
+        for (( i=0; i<${#scelte[@]}; i++ )); do
+            [[ "${preso[$i]}" == 0 && "${etichette[$i]}" == "$cat" ]] || continue
+            sac+=("${scelte[$i]}"); sac_et+=("$cat"); preso[$i]=1
         done
     done
     scelte=("${sac[@]}"); etichette=("${sac_et[@]}")
 
-    # Il taglio prende dalla coda dell'ordine appena costruito: prima muoiono le
-    # AREA di merito piu' basso, per ultimo il primo NOME.
+    # Il taglio prende dalla coda dell'ordine appena costruito: prima muoiono i
+    # residui di contesto, poi i NOME di merito piu' basso; la testa e' l'ultima.
     local n=${#scelte[@]} tagliate=0 riga="" v i
     while :; do
         riga=""
