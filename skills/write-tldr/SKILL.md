@@ -73,7 +73,9 @@ Copiare qui una riga cambiandola vanifica il gate: da questo punto in poi nessun
     --out <TMPDIR_TLDR>/<basename>.filtrata.txt
 ```
 
-**Ogni** candidato deve comparire letteralmente nella copia: chi non passa esce qui. Le tre etichette — `NOME`, `ERRORE`, `SEZIONE` — sono tutte estrazione letterale, quindi il gate non ha eccezioni e nessuna voce entra senza verifica. Le righe `SCARTATO` e `MALFORMATO` su stderr sono **dati del report**, non errori — un nome fabbricato scartato è il gate che lavora. Il gate esce comunque zero: un exit non-zero è un problema d'uso (file assente, lista assente), e lì il file si salta.
+**Ogni** candidato deve comparire letteralmente nella copia: chi non passa esce qui. Le tre etichette — `NOME`, `ERRORE`, `SEZIONE` — sono tutte estrazione letterale, quindi il gate non ha eccezioni e nessuna voce entra senza verifica. Esce qui anche la `SEZIONE` che porta `-` al posto della domanda, con verdetto proprio `SENZA-DOMANDA`: nessuno arriva a un heading come `Rischi residui` con un problema in mano, e il potatore non deve spendere una scelta su una voce già condannata.
+
+Le righe `SCARTATO`, `SENZA-DOMANDA` e `MALFORMATO` su stderr sono **dati del report**, non errori — un nome fabbricato scartato è il gate che lavora. Tienili distinti anche nel report: `SCARTATO` misura quanto il raccoglitore fabbrica ed è l'unico dei tre che dice qualcosa sul suo prompt. Il gate esce comunque zero: un exit non-zero è un problema d'uso (file assente, lista assente), e lì il file si salta.
 
 **1e. Potatura.** `Task` con `subagent_type: doc-helper` **e `model: sonnet`**:
 
@@ -123,4 +125,4 @@ rm -rf "$TMPDIR_TLDR"
 
 Non committi e non lanci `build-index.sh`: il commit e l'indice sono del chiamante, che ti invoca appunto prima di rigenerarlo.
 
-Report, una riga per file: candidati raccolti · scartati dal gate d'ingresso (col frammento, che è la fabbricazione intercettata) · scartati dal gate d'uscita per categoria · voci nella riga finale e lunghezza · saltati e perché. In coda i red flag: `confidence` non alta, liste anomale, file saltati, e ogni `NON-VERBATIM` — quello è il potatore che esce dal proprio contratto, non un dato di routine.
+Report, una riga per file: candidati raccolti · scartati dal gate d'ingresso (col frammento, che è la fabbricazione intercettata) · sezioni cadute per `SENZA-DOMANDA`, contate a parte · scartati dal gate d'uscita per categoria · voci nella riga finale e lunghezza · saltati e perché. In coda i red flag: `confidence` non alta, liste anomale, file saltati, e ogni `NON-VERBATIM` — quello è il potatore che esce dal proprio contratto, non un dato di routine.

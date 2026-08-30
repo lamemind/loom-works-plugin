@@ -47,10 +47,22 @@
 #
 # Formato di una riga: `ETICHETTA | frammento | domanda`. La domanda e' il
 # problema con cui uno arriva a quel candidato, `-` quando il raccoglitore non ha
-# saputo formularla; il gate non la giudica e la lascia passare intatta, perche'
-# a scartare su quella base e' il potatore. Una riga fuori formato viene scartata;
-# una che inizia per `#` e' l'intestazione della lista — il path del file
-# d'origine — e attraversa il gate intatta.
+# saputo formularla. Su una SEZIONE quel trattino e' un verdetto — nessuno arriva
+# a `Rischi residui` con un problema in mano — e il gate lo applica: la riga esce
+# come SENZA-DOMANDA, prima ancora di essere cercata nel file, perche' verificare
+# la presenza di un candidato gia' condannato e' lavoro buttato. Su un NOME o un
+# ERRORE il trattino passa intatto: un simbolo e' gia' la stringa che qualcuno
+# digita, e li' la domanda e' facoltativa per contratto.
+#
+# La regola stava nel prompt del potatore, ed era l'unica delle sue che nessuno
+# verificava — `componi` misura verbatim, vocabolario e cap, ma la domanda a quel
+# punto non ce l'ha piu'. Qui e' applicata invece che dichiarata. Il verdetto e'
+# tenuto distinto da SCARTATO perche' quello misura una cosa sola, cioe' quanto il
+# raccoglitore fabbrica, ed e' il segnale che dice se il suo prompt e' rotto:
+# fondere i due numeri lo renderebbe illeggibile.
+#
+# Una riga fuori formato viene scartata; una che inizia per `#` e' l'intestazione
+# della lista — il path del file d'origine — e attraversa il gate intatta.
 #
 # Il confronto e' letterale (`grep -F`) e il `--` che chiude le opzioni NON e'
 # opzionale: senza, ogni frammento che inizia per trattino (`--tab`, `--drainable`)
@@ -248,7 +260,7 @@ gate() {
     local dest
     dest="$(mktemp)"
 
-    local totale=0 passati=0 scartati=0 malformati=0
+    local totale=0 passati=0 scartati=0 malformati=0 senza_domanda=0
 
     while IFS= read -r riga; do
         [[ -z "${riga//[[:space:]]/}" ]] && continue
@@ -290,6 +302,15 @@ gate() {
                 continue ;;
         esac
 
+        # Prima del grep: una SEZIONE senza domanda esce comunque, quindi cercarla
+        # nel file e' lavoro buttato. Verdetto distinto da SCARTATO, che misura
+        # solo le fabbricazioni del raccoglitore.
+        if [[ "$etichetta" == "SEZIONE" && "$domanda" == "-" ]]; then
+            echo "[tldr] SENZA-DOMANDA: ${frammento}" >&2
+            senza_domanda=$((senza_domanda+1))
+            continue
+        fi
+
         local nudo="$frammento"
         nudo="${nudo#\`}"
         nudo="${nudo%\`}"
@@ -310,7 +331,7 @@ gate() {
         rm -f "$dest"
     fi
 
-    echo "[tldr] gate ${FILE}: ${totale} candidati, ${passati} passati, ${scartati} scartati, ${malformati} malformati" >&2
+    echo "[tldr] gate ${FILE}: ${totale} candidati, ${passati} passati, ${scartati} scartati, ${senza_domanda} senza-domanda, ${malformati} malformati" >&2
 }
 
 # --- componi ------------------------------------------------------------------
