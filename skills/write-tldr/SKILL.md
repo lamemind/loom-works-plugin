@@ -95,9 +95,9 @@ Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim 
     --out <TMPDIR_TLDR>/<basename>.riga.txt
 ```
 
-Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (solo `NOME`, `ERRORE`, `SEZIONE`), **cap** (allocazione in due livelli, con la soglia presa da `lib-doc.sh`).
+Lo script ritrova l'etichetta di ogni voce nella lista filtrata, e con quella applica le tre regole che il potatore ha nel prompt e può comunque violare: **verbatim** (una voce che non si ritrova è una riformulazione, esce), **vocabolario** (solo `NOME`, `ERRORE`, `SEZIONE`), **cap** (water-filling pesato, con la soglia presa da `lib-doc.sh`).
 
-L'allocazione: `NOME` ed `ERRORE` si dividono il cap in parti uguali, chi domanda meno viene servito per primo e libera agli altri la quota che non gli serve; le `SEZIONE` prendono solo ciò che avanza. Le tre categorie non sono pari — nomi ed errori sono chiavi che qualcuno digita, le sezioni sono il ripiego per i file che di chiavi non ne hanno. Su un file di API le sezioni non entrano affatto, su un file di sola metodologia prendono tutto il cap. Le superstiti vengono rese raggruppate, `SEZIONE` in testa: è la leggibilità, non la priorità.
+L'allocazione: le tre categorie si dividono il cap con pesi **`NOME` 40, `ERRORE` 40, `SEZIONE` 20**, normalizzati sulle sole categorie presenti — con soli nomi e sezioni il rapporto resta due terzi contro un terzo. Chi domanda meno viene servito per primo e libera agli altri, in proporzione ai pesi, la quota che non gli serve. Il 20% delle sezioni è **garantito**, non un avanzo: un file con molti nomi e nessun errore altrimenti spende il cap intero in simboli e perde i titoli che dicono di cosa tratta. Le superstiti vengono rese raggruppate, `SEZIONE` in testa: è la leggibilità, non la priorità.
 
 `NON-VERBATIM`, `FUORI-VOCABOLARIO`, `OLTRE-CAP` su stderr sono dati del report. Exit 1 = nessuna voce utilizzabile: salta il file e dichiaralo.
 

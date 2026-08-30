@@ -72,27 +72,28 @@
 #      recupera dalla lista invece di essere richiesta al potatore, che non la
 #      rende.
 #   2. VOCABOLARIO — entrano NOME, ERRORE, SEZIONE. Nient'altro.
-#   3. CAP — allocazione in due livelli, sotto. Il cap viene da lib-doc.sh, sede
+#   3. CAP — water-filling pesato, sotto. Il cap viene da lib-doc.sh, sede
 #      unica: nessun numero di caratteri vive nei prompt dei due agent.
 #
-# L'ALLOCAZIONE, in due livelli.
+# L'ALLOCAZIONE — un water-filling pesato, un livello solo.
 #
-# Livello 1 — NOME ed ERRORE si dividono il cap con un water-filling max-min
-# fair: quota uguale a testa, si serve per prima la categoria che domanda meno,
-# quello che avanza dalla sua quota si redistribuisce in parti uguali sulle
-# altre, e si ripete. Termina in al piu' N passate ed e' generico su N categorie.
+# I pesi sono NOME 40, ERRORE 40, SEZIONE 20, e si normalizzano sulle sole
+# categorie PRESENTI: la quota di una categoria assente non resta ferma, si
+# ridistribuisce sulle altre mantenendo il loro rapporto. Poi si serve per prima
+# la categoria che domanda meno — cosi' libera subito la quota che non le serve —
+# e il suo avanzo va alle restanti in proporzione ai pesi, non in parti uguali.
+# Termina in al piu' N passate ed e' generico su N categorie.
 #
-# Livello 2 — le SEZIONE prendono SOLO cio' che avanza dal livello 1.
-#
-# Le tre categorie non sono pari, ed e' il motivo del secondo livello: NOME ed
-# ERRORE sono chiavi che qualcuno digita, SEZIONE e' il ripiego per i file che di
-# chiavi non ne hanno. Con una quota garantita anche alle sezioni, un file di API
-# paghe­rebbe un pezzo di riga per heading che non dicono niente — misurato su
-# cc/agent-sdk.md, dove `Identità e natura` e `Rischi residui` valgono da soli
-# quanto una decina di simboli. Cosi' invece i due estremi si servono da soli:
-# su un file ricco di simboli le sezioni non entrano affatto, su un file di sola
-# metodologia (zero NOME, zero ERRORE) il livello 1 non spende nulla e le sezioni
-# prendono tutto il cap.
+# Le tre categorie non sono pari, ed e' il motivo dei pesi: NOME ed ERRORE sono
+# chiavi che qualcuno digita, SEZIONE e' l'indice interno del file, utile ma piu'
+# caro per carattere. Il 20% e' una quota GARANTITA, non un residuo: e' la
+# correzione del regime precedente a due livelli, dove le sezioni prendevano solo
+# cio' che avanzava ai nomi. Con una sola categoria al livello 1 quel residuo era
+# sempre zero — misurato su cc/cc-hooks.md, un file con zero ERRORE, sessanta
+# NOME e nove SEZIONE buone: i nomi si prendevano il cap intero e la riga usciva
+# senza il cap 10.000, senza `cat A B C` e senza le due perdite silenziose di
+# inject-task.sh, cioe' senza nessuno dei fatti per cui quel file esiste, in
+# cambio di nomi generici come `Stop` e `PostToolUse` che stanno in dieci file.
 #
 # Passata finale — le voci sono atomiche, quindi una categoria puo' restare con
 # trenta caratteri in mano e una voce che ne chiede quarantacinque. Il residuo
@@ -417,15 +418,22 @@ componi() {
     local -A preso=()
     local usato=0
 
-    # --- livello 1: NOME ed ERRORE, water-filling max-min fair ----------------
+    # --- allocazione: water-filling pesato NOME 40 / ERRORE 40 / SEZIONE 20 ---
+    # I pesi si normalizzano sulle sole categorie PRESENTI, quindi una categoria
+    # assente non lascia in giro la propria quota: con soli NOME e SEZIONE il
+    # rapporto resta 40:20, cioe' due terzi contro un terzo del cap.
+    local -A peso=([NOME]=40 [ERRORE]=40 [SEZIONE]=20)
     local -a resta=()
-    [[ -n "$L_NOME"   ]] && resta+=("NOME")
-    [[ -n "$L_ERRORE" ]] && resta+=("ERRORE")
+    [[ -n "$L_NOME"    ]] && resta+=("NOME")
+    [[ -n "$L_ERRORE"  ]] && resta+=("ERRORE")
+    [[ -n "$L_SEZIONE" ]] && resta+=("SEZIONE")
 
     local -A budget=() spesa=()
     if (( ${#resta[@]} > 0 )); then
+        local peso_tot=0
+        for c in "${resta[@]}"; do peso_tot=$(( peso_tot + peso[$c] )); done
         for c in "${resta[@]}"; do
-            budget[$c]=$(( LW_DOC_TLDR_CAP / ${#resta[@]} ))
+            budget[$c]=$(( LW_DOC_TLDR_CAP * peso[$c] / peso_tot ))
             spesa[$c]=0
         done
         while (( ${#resta[@]} > 0 )); do
@@ -455,22 +463,18 @@ componi() {
             local -a ancora=()
             for c in "${resta[@]}"; do [[ "$c" == "$best" ]] || ancora+=("$c"); done
             resta=("${ancora[@]}")
+            # L'avanzo si redistribuisce in proporzione ai pesi, non in parti
+            # uguali: una quota liberata non deve capovolgere il rapporto che
+            # l'allocazione iniziale ha appena stabilito.
             if (( avanzo > 0 && ${#resta[@]} > 0 )); then
-                local quota=$(( avanzo / ${#resta[@]} ))
-                for c in "${resta[@]}"; do budget[$c]=$(( budget[$c] + quota )); done
+                local rp=0
+                for c in "${resta[@]}"; do rp=$(( rp + peso[$c] )); done
+                for c in "${resta[@]}"; do
+                    budget[$c]=$(( budget[$c] + avanzo * peso[$c] / rp ))
+                done
             fi
         done
-        for c in NOME ERRORE; do usato=$(( usato + ${spesa[$c]:-0} )); done
-    fi
-
-    # --- livello 2: le SEZIONE su cio' che avanza dal livello 1 ---------------
-    if [[ -n "$L_SEZIONE" ]]; then
-        local costo
-        for j in $L_SEZIONE; do
-            costo=$(( ${#scelte[$j]} + SEPW ))
-            (( usato + costo <= LW_DOC_TLDR_CAP )) || break
-            ammessi+=("$j"); preso[$j]=1; usato=$(( usato + costo ))
-        done
+        for c in NOME ERRORE SEZIONE; do usato=$(( usato + ${spesa[$c]:-0} )); done
     fi
 
     # --- passata finale: il residuo alle voci rimaste, la piu' corta per prima -
