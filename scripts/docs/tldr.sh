@@ -74,6 +74,14 @@
 #   2. VOCABOLARIO — entrano NOME, ERRORE, SEZIONE. Nient'altro.
 #   3. CAP — water-filling pesato, sotto. Il cap viene da lib-doc.sh, sede
 #      unica: nessun numero di caratteri vive nei prompt dei due agent.
+#   4. RIDONDANZA — una voce contenuta LETTERALMENTE in un'altra gia' ammessa
+#      esce, e sopravvive la piu' lunga. Il caso ricorrente e' il NOME che
+#      ricompare dentro il titolo della SEZIONE che lo tratta, ma vale anche
+#      dentro la stessa categoria (`--tab` dentro `--tab-with-profile=UUID`).
+#      Non e' una regola del potatore violata — lui rende per merito dentro la
+#      propria etichetta e fra etichette non decide, quindi la sovrapposizione
+#      non la puo' vedere: nasce solo quando l'allocazione mette le due voci
+#      nella stessa riga.
 #
 # L'ALLOCAZIONE — un water-filling pesato, un livello solo.
 #
@@ -180,13 +188,22 @@ done
 # 111 passati, e poi le stesse tre voci bocciate NON-VERBATIM da `componi`.
 #
 # Due giri, perche' un `&amp;lt;` va decodificato due volte.
+#
+# La `&` di `&amp;` va scritta `\&` nella REPLACEMENT: da bash 5.2 quel carattere
+# vale li' «il testo che ha fatto match», come in sed, quindi `${s//&amp;/&}`
+# rimpiazza `&amp;` con se stesso ed e' un no-op silenzioso. Su bash 5.1 e
+# precedenti funzionava, per questo il difetto e' arrivato fin qui: chi lo
+# scrisse girava su una bash che non aveva ancora quella regola. L'effetto e' che
+# ogni frammento con una `&` letterale — un `&&` in una guard di codice, un
+# `git add -- <path> && git commit` — esce SCARTATO dal gate pur essendo nel file,
+# cioe' indistinguibile da una fabbricazione del raccoglitore.
 _decodifica() {
     local s="$1" _g
     for _g in 1 2; do
         s="${s//&lt;/<}"
         s="${s//&gt;/>}"
         s="${s//&quot;/\"}"
-        s="${s//&amp;/&}"
+        s="${s//&amp;/\&}"
     done
     printf '%s' "$s"
 }
@@ -477,6 +494,66 @@ componi() {
         for c in NOME ERRORE SEZIONE; do usato=$(( usato + ${spesa[$c]:-0} )); done
     fi
 
+    # --- dedup: una voce contenuta in un'altra gia' ammessa non aggiunge nulla --
+    # Il caso ricorrente e' il NOME che compare anche dentro il titolo della
+    # SEZIONE che lo tratta — `cat A B C` accanto a
+    # «`cat A B C` in un comando unico — competizione per lo stesso budget» — ma
+    # vale anche dentro la stessa categoria: `--tab` dentro
+    # `--tab-with-profile=UUID`, `--session-id` dentro `claude --session-id <uuid>`.
+    # Le due voci pagano due volte lo stesso posto senza aprire una porta in piu':
+    # chi cerca la stringa corta la trova comunque, perche' e' letteralmente
+    # dentro quella lunga.
+    #
+    # Sopravvive la PIU' LUNGA, ed e' l'unica scelta che conserva la
+    # raggiungibilita' — al contrario, tenere la corta perderebbe il testo che la
+    # circonda. Il confronto e' sulla forma NUDA, senza backtick: nessuno cerca
+    # digitando un backtick, e la doc cita i simboli in entrambe le forme.
+    #
+    # E' anche CASE-INSENSITIVE, cosi' `permissionMode` e `PermissionMode`
+    # collassano in una voce sola invece di spendere due posti sullo stesso
+    # simbolo. Il prezzo dichiarato: chi cerca con un grep case-sensitive la
+    # variante che non e' sopravvissuta non la trova nella riga. E' un prezzo che
+    # si paga volentieri perche' la riga porta comunque al file giusto — e per la
+    # stessa ragione non serve distinguere una vera variante di grafia da due
+    # simboli diversi che si contengono (`Query` dentro `query()`): in entrambi i
+    # casi le due stringhe stanno nello stesso file, e il TLDR ancora, non insegna.
+    #
+    # Sta QUI, dopo l'allocazione e prima della passata finale, e l'ordine e'
+    # vincolante nei due versi. Prima dell'allocazione toglierebbe un NOME per una
+    # SEZIONE che poi puo' cadere per cap, perdendo entrambi. Dopo la passata
+    # finale libererebbe caratteri che nessuno spende piu'.
+    #
+    # `_nudo` rende la chiave di confronto — backtick via, tutto minuscolo — mai
+    # il testo che finisce nella riga, che resta la voce verbatim del potatore.
+    _nudo() { local s="$1"; s="${s#\`}"; s="${s%\`}"; printf '%s' "${s,,}"; }
+    local ridondanti=0
+    local -a tenuti=()
+    for idx in "${ammessi[@]}"; do
+        local mio contenuto=0 altro
+        mio="$(_nudo "${scelte[$idx]}")"
+        for jdx in "${ammessi[@]}"; do
+            (( jdx == idx )) && continue
+            altro="$(_nudo "${scelte[$jdx]}")"
+            # A parita' di testo ne sopravvive uno solo: vince l'indice minore.
+            if [[ "$altro" == "$mio" ]]; then
+                (( jdx < idx )) && { contenuto=1; break; }
+                continue
+            fi
+            case "$altro" in
+                *"$mio"*) contenuto=1; break ;;
+            esac
+        done
+        if (( contenuto )); then
+            echo "[tldr] RIDONDANTE scartata ${etichette[$idx]}: ${scelte[$idx]}" >&2
+            unset 'preso[$idx]'
+            usato=$(( usato - ${#scelte[$idx]} - SEPW ))
+            ridondanti=$((ridondanti+1))
+        else
+            tenuti+=("$idx")
+        fi
+    done
+    ammessi=("${tenuti[@]}")
+
     # --- passata finale: il residuo alle voci rimaste, la piu' corta per prima -
     # Le voci sono atomiche: una categoria puo' restare con trenta caratteri in
     # mano e una voce che ne chiede quarantacinque. Qui quel resto si spende.
@@ -486,6 +563,21 @@ componi() {
             [[ -n "${preso[$i]:-}" ]] && continue
             local costo=$(( ${#scelte[$i]} + SEPW ))
             (( usato + costo <= LW_DOC_TLDR_CAP )) || continue
+            # Il dedup vale anche qui, o la passata finale riammette proprio le
+            # voci che ha appena tolto — o ne ammette di nuove ridondanti con le
+            # ammesse, che nessun giro successivo ripulirebbe.
+            local cand ammessa dup=0
+            cand="$(_nudo "${scelte[$i]}")"
+            for j in "${ammessi[@]}"; do
+                ammessa="$(_nudo "${scelte[$j]}")"
+                case "$ammessa" in
+                    *"$cand"*) dup=1; break ;;
+                esac
+                case "$cand" in
+                    *"$ammessa"*) dup=1; break ;;
+                esac
+            done
+            (( dup )) && continue
             if (( scelto < 0 || costo < costo_scelto )); then
                 scelto=$i; costo_scelto=$costo
             fi
@@ -532,7 +624,7 @@ componi() {
         printf '%s\n' "$riga"
     fi
 
-    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${#riga} char, cap ${LW_DOC_TLDR_CAP}) — sez=${#sez_r[@]} err=${#err_r[@]} nomi=${#nome_r[@]}; scarti: ${non_verbatim} non-verbatim, ${fuori_vocabolario} fuori-vocabolario, ${tagliate} oltre-cap" >&2
+    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${#riga} char, cap ${LW_DOC_TLDR_CAP}) — sez=${#sez_r[@]} err=${#err_r[@]} nomi=${#nome_r[@]}; scarti: ${non_verbatim} non-verbatim, ${fuori_vocabolario} fuori-vocabolario, ${ridondanti} ridondanti, ${tagliate} oltre-cap" >&2
 }
 
 # --- set ----------------------------------------------------------------------
