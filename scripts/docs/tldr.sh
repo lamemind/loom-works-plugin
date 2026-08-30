@@ -29,6 +29,12 @@
 # tre voci su sette del TLDR nuovo venivano dal TLDR vecchio e da nessun'altra
 # riga del file, comprese le tesi che il produttore esiste per eliminare.
 #
+# E' anche il posto dove un file ESENTE esce dalla catena (exit 3), prima che
+# qualcuno spenda le due invocazioni di sonnet: la lista sta in lib-doc.sh
+# (doc_config_file) ed e' la stessa che sopprime SPLIT e MERGE? in doc-metrics.
+# Il gate sta qui e non nella skill perche' l'esenzione e' deterministica: se
+# fosse una riga di prompt, un file esente dipenderebbe da chi legge.
+#
 # --- gate ---------------------------------------------------------------------
 #
 # OGNI candidato deve comparire LETTERALMENTE nel file d'origine. Chi non passa
@@ -153,6 +159,7 @@
 #
 # Exit: 0 = fatto (per `gate` e `componi`: anche con scarti — uno scarto e' un
 #       dato, non un fallimento) · 1 = errore d'uso o file che non ha la forma attesa
+#       · 3 = (solo `prepara`) file esente dal produttore, catena da non aprire
 # =============================================================================
 
 set -uo pipefail
@@ -230,6 +237,11 @@ fi
 
 prepara() {
     [[ -n "$OUT" ]] || { echo "[tldr] ERROR: --out obbligatorio" >&2; exit 1; }
+
+    if doc_config_file "$FILE"; then
+        echo "[tldr] prepara ${FILE}: ESENTE — file di configurazione, TLDR scritto a mano" >&2
+        exit 3
+    fi
 
     local riga3 amputata=0
     riga3="$(sed -n '3p' "$FILE")"

@@ -26,11 +26,13 @@
 #   ONLINE    file @-importato da CLAUDE.md (si paga a ogni sessione)
 #   INBOX     nozione non ancora collocata — ne' SPLIT ne' MERGE?
 #   GEN       INDEX.md — esclusivo, nessun altro flag calcolato
-#   CONFIG    assumed-knowledge.md — sopprime SOLO SPLIT e MERGE?: il file e'
+#   CONFIG    file di configurazione dentro reference/ (lista in lib-doc.sh,
+#             doc_config_file) — sopprime SOLO SPLIT e MERGE?: il file e'
 #             configurazione, corto per natura, e una fusione per topologia gli
 #             farebbe perdere l'indirizzo fisso su cui il router conta. I flag
 #             di TLDR restano calcolati: sopprimerli renderebbe invisibile la
 #             sparizione del TLDR proprio sul file aperto a ogni giudizio.
+#             La stessa lista tiene il file fuori dal produttore di TLDR.
 #
 # Modo --inbox — la coda, ordine `created` crescente e niente altro:
 #   PATH · NATURA · INDEXED · DRAINABLE · BRANCH · NOZIONI · APERTE · CHAR ·
@@ -225,7 +227,7 @@ while IFS= read -r -d '' file; do
         flags="GEN"    # esclusivo: artefatto generato, nessun altro flag
     else
         is_config=0
-        [[ "$base" == "assumed-knowledge.md" && "$rel" == */reference/* ]] && is_config=1
+        doc_config_file "$rel" && is_config=1
 
         if [[ "$layer" != "inbox" && $is_config -eq 0 ]]; then
             if (( chars >= LW_DOC_SPLIT )); then

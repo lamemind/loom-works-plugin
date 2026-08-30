@@ -40,6 +40,8 @@ Due agent e quattro passi deterministici, alternati. Ogni agent è preso in mezz
 
 La copia è il file **senza la riga 3**. Da qui in avanti raccoglitore e gate lavorano sulla copia, mai sull'originale: se vedessero il TLDR precedente il raccoglitore ne riciclerebbe i frammenti e il gate li confermerebbe, perché nel file ci sono davvero. L'originale torna in scena solo al passo `set`.
 
+**Exit 3 = file esente**: passa al file successivo senza aprire nessuno degli altri cinque passi, e dichiaralo nel report come esente — non è né un errore né un file saltato per difetto. Sono i file di configurazione dentro `reference/`, elenchi di coppie chiave-valore senza prosa da cui estrarre: un produttore vincolato all'estrazione letterale non ha da cosa lavorare e sostituirebbe una riga scritta a mano con l'unico heading del file. La loro riga 3 la scrive una persona. La lista sta in `lib-doc.sh` (`doc_config_file`) ed è la stessa che li esenta da split e merge: qui non si giudica quali file siano esenti, si legge l'exit code.
+
 **1b. Raccolta.** `Task` con `subagent_type: doc-helper` **e `model: sonnet`**:
 
 ```
@@ -125,4 +127,4 @@ rm -rf "$TMPDIR_TLDR"
 
 Non committi e non lanci `build-index.sh`: il commit e l'indice sono del chiamante, che ti invoca appunto prima di rigenerarlo.
 
-Report, una riga per file: candidati raccolti · scartati dal gate d'ingresso (col frammento, che è la fabbricazione intercettata) · sezioni cadute per `SENZA-DOMANDA`, contate a parte · scartati dal gate d'uscita per categoria · voci nella riga finale e lunghezza · saltati e perché. In coda i red flag: `confidence` non alta, liste anomale, file saltati, e ogni `NON-VERBATIM` — quello è il potatore che esce dal proprio contratto, non un dato di routine.
+Report, una riga per file: candidati raccolti · scartati dal gate d'ingresso (col frammento, che è la fabbricazione intercettata) · sezioni cadute per `SENZA-DOMANDA`, contate a parte · scartati dal gate d'uscita per categoria · voci nella riga finale e lunghezza · saltati e perché · esenti, tenuti distinti dai saltati. In coda i red flag: `confidence` non alta, liste anomale, file saltati, e ogni `NON-VERBATIM` — quello è il potatore che esce dal proprio contratto, non un dato di routine.

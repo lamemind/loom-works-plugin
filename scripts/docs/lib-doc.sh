@@ -13,6 +13,8 @@
 #   - la precedenza di layer (doc_layer): inbox → online → offline → altro
 #   - le regex del formato inbox (usate SOLO da inbox.sh)
 #   - il perimetro escluso condiviso (doc_excluded): il runtime che non e' doc
+#   - la lista dei file di configurazione dentro reference/ (doc_config_file),
+#     condivisa fra doc-metrics.sh e tldr.sh
 #
 # Ogni regex del formato vive qui e in nessun altro posto. Una primitiva che ha
 # bisogno di leggere il formato inbox chiama `inbox.sh parse`, mai una propria
@@ -116,14 +118,42 @@ doc_layer() {  # <rel-to-project-root> → inbox|online|offline|altro
 #
 # SOLO cio' che ogni chiamante esclude: il runtime che non e' doc. Un'esclusione
 # che vale per un chiamante solo e' una regola di quel chiamante e sta scritta
-# li' — INDEX.md lo esclude solo check-doc-links, assumed-knowledge.md e' il
-# flag CONFIG di doc-metrics, che ne e' l'unico proprietario.
+# li' — INDEX.md lo esclude solo check-doc-links.
 
 doc_excluded() {  # <rel-path> → 0 se fuori dal perimetro doc
     case "$1" in
         */tasks/*|tasks/*|*/current-task.md|current-task.md) return 0 ;;
     esac
     return 1
+}
+
+# ---- File di configurazione dentro reference/ --------------------------------
+#
+# Un file che sta sotto reference/ ma NON e' prosa: un elenco di coppie
+# chiave-valore che altri attori del sistema doc leggono a un indirizzo fisso.
+# Sta qui e non in doc-metrics.sh perche' i consumer sono due, e la lista deve
+# essere una sola: doc-metrics ne sopprime SPLIT e MERGE? (una fusione per
+# topologia gli farebbe perdere l'indirizzo fisso), tldr.sh lo tiene fuori dal
+# produttore di TLDR.
+#
+# Il produttore lo esenta perche' e' vincolato all'estrazione letterale dal
+# corpo, e su un file senza prosa non ha da cosa estrarre: misurato su
+# assumed-knowledge.md, 2 candidati raccolti e una riga 3 di 38 caratteri —
+# l'unico heading del file ricopiato — al posto dei 314 della riga scritta a
+# mano, che dice cose che nel corpo non compaiono affatto (chi governa il
+# verdetto `noto` del router, le regole di glossa del writer). Nessun estrattore
+# vincolato al corpo puo' riprodurla: la sua riga 3 resta scritta a mano.
+#
+# Cio' che l'esenzione NON copre: i flag TLDR di doc-metrics (NOTLDR, TLDR>CAP)
+# restano calcolati anche qui. Sopprimerli renderebbe invisibile la sparizione
+# del TLDR proprio sul file che ogni giudizio apre.
+
+doc_config_file() {  # <path, assoluto o relativo> → 0 se e' configurazione
+    case "$1" in
+        */reference/*|reference/*) ;;
+        *) return 1 ;;
+    esac
+    [[ "$(basename -- "$1")" == "assumed-knowledge.md" ]]
 }
 
 # ---- Formato inbox (usate solo da inbox.sh) ----------------------------------
