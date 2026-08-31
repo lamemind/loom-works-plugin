@@ -134,10 +134,14 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
 lw_git_add_n_commit "docs(drain): <basename> — <N> nozioni collocate[, residuo: <violazione dichiarata>]" \
     <path del file inbox> <i file doc toccati> "{docs_root}/reference/INDEX.md"
 git rm -q <path del file inbox>
-git commit -qm "docs(drain): <basename> smaltito — registro in cronologia nel commit precedente" -- <path del file inbox>
+"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"
+git commit -qm "docs(drain): <basename> smaltito — registro in cronologia nel commit precedente" \
+    -- <path del file inbox> "{docs_root}/reference/INDEX.md"
 ```
 
 Il primo commit porta il file inbox **completo** — registro incluso — più la doc derivata: è l'indirizzo storico del lavoro (parent del commit che elimina). Il secondo elimina il file. Poi passa al file successivo (da 2a).
+
+**L'indice si rigenera dopo il `git rm`, non solo al 2e.** `build-index.sh` fotografa `inbox/` nel momento in cui gira: al 2e il file drenato esiste ancora, quindi entra nell'indice legittimamente, e senza una seconda passata resta elencato come nozione ancora da collocare — l'indice riflette lo stato prima del proprio delete e dopo tutti i precedenti, cioè è indietro di un file. Per la stessa ragione la pathspec del secondo commit nomina anche `INDEX.md`: rigenerato e non committato, resterebbe dirty nel worktree, dove la guardia d'ingresso del file successivo lo trova e ferma il drain.
 
 ## 3. Chiusura
 
