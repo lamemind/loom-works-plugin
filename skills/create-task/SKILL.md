@@ -129,7 +129,7 @@ Estrai e popola la sezione `## Doc Impact` nel task file come bullet list concis
 
 Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emersa al create-task.*`
 
-**Nessun marker.** La voce resta nel task file **viva** (clessidra): finché la task è attiva si riscrive e si elimina, e preflight, run e checkpoint la tengono allineata al codice. Il trasloco in inbox è del `checkpoint-task` — al rilascio o alla chiusura, subito per le nozioni di mondo — mai di questa skill.
+**Nessun marker.** La voce resta nel task file **viva**: finché la task è attiva si riscrive e si elimina, e preflight, run e il riesame del checkpoint la tengono allineata al codice. Il trasloco in inbox è del `checkpoint-task` — al rilascio o alla chiusura, subito per le nozioni di mondo — mai di questa skill.
 
 **Pattern dell'utente**: se l'input contiene "come appena discusso", "come discusso", "come emerso" o varianti, la discussione precedente è la sorgente principale — non chiedere conferme, cattura e procedi.
 

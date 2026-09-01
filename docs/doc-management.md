@@ -4,7 +4,7 @@ Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive
 
 ## Il paradigma: la doc è l'as-is di prod
 
-Il codice cambia da più fonti — le task, i merge altrui, i commit spot — e un commit non è un rilascio. **La doc descrive prod.** Le nozioni emerse restano nel task file finché la feature non è materializzata (clessidra); il rilascio le muove in inbox; il drain le colloca. La cronaca sta in git, l'intenzione nel task file, il cantiere nella task folder, lo sviluppo non rilasciato negli inbox di branch.
+Il codice cambia da più fonti — le task, i merge altrui, i commit spot — e un commit non è un rilascio. **La doc descrive prod.** Le nozioni emerse restano nel task file finché la feature non è materializzata, riesaminate a ogni checkpoint; il rilascio le muove in inbox; il drain le colloca. La cronaca sta in git, l'intenzione nel task file, il cantiere nella task folder, lo sviluppo non rilasciato negli inbox di branch.
 
 ## I quattro layer
 
@@ -47,7 +47,7 @@ Due coppie sono la stessa nozione a due stadi di maturazione: **scarto → sente
 
 ## Imbuto — i criteri indipendenti
 
-Si rispondono guardando la sola nozione, senza aprire niente, e sono i soli che si applicano **in clessidra e al trasloco**:
+Si rispondono guardando la sola nozione, senza aprire niente, e sono i soli che si applicano **al riesame e al trasloco**:
 
 ```
 sopravvive alla task?          no → non scriverla
@@ -63,7 +63,7 @@ Tutti gli altri — *eco*, *sorpresa*, *sopravvive al refactor* (dipendono dal c
 
 **La doc non si scrive a mano**: ogni scrittura passa da una skill.
 
-- nozione emersa in una task → resta in `## Doc Impact`, viva (clessidra); il **trasloco** al rilascio o alla chiusura la porta in inbox (`checkpoint-task`)
+- nozione emersa in una task → resta in `## Doc Impact`, viva, **riesaminata** a ogni checkpoint; il **trasloco** al rilascio o alla chiusura la porta in inbox (`checkpoint-task`)
 - file inbox `nozioni` drainable → `drain-notions` (router → writer → validator, registro nel file)
 - file inbox `derivazione` → `derive-notions` (dal diff a un file `nozioni` nuovo)
 - file inbox `sweep` → `align-doc` (estrazione + stesura, su branch `doc/sweep-<slug>` con PR)

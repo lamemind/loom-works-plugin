@@ -239,7 +239,7 @@ Una `D{N}` che rende vero un fatto durevole — un comportamento nuovo, un vinco
 Regole di scrittura, tutte già note e nessuna nuova:
 
 - **La sezione `## Doc Impact` sta fra `## Testing Notes` e `## Prod Validation`.** Se manca, creala lì. Se contiene solo il placeholder `*Nessuna nozione documentale emersa al create-task.*`, sostituiscilo con le tue voci.
-- **La voce resta viva (clessidra).** Niente marker: finché la task è attiva la voce si riscrive e si elimina, e sei autorizzato a farlo tu su quelle esistenti quando una decisione di questo giro le smentisce. Il trasloco in inbox è del `checkpoint-task`, al rilascio o alla chiusura.
+- **La voce resta viva.** Niente marker: finché la task è attiva la voce si riscrive e si elimina, e sei autorizzato a **riesaminare** quelle esistenti quando una decisione di questo giro le smentisce. Il trasloco in inbox è del `checkpoint-task`, al rilascio o alla chiusura.
 - **Non decidere il target doc.** Dove la nozione atterri lo decide `drain-notions`, in differita.
 
 Se nessuna decisione tocca la doc, **non scrivere niente** — nessun placeholder, nessuna sezione vuota. `## Doc Impact` non è il registro delle decisioni, quello è `## Decisions`.

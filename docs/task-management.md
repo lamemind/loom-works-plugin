@@ -97,9 +97,9 @@ Vincoli:
 - **No file overlap**: se due task detached toccano gli stessi file, evita conflitti tu (sequenza, non parallelismo reale).
 - **Checkpoint sequenziali**: due `checkpoint-task` simultanei possono fare race su `tasks.md` e `git`. Coordinali tu.
 
-### Doc Impact — clessidra e trasloco
+### Doc Impact — riesame e trasloco
 
-Le voci `## Doc Impact` restano nel task file, **vive** (clessidra): ogni `checkpoint-task` le manutiene — riscrive o elimina — applicando i soli criteri indipendenti (`doc-management.md` §Imbuto). Nessun marker di esito, nessun inbox automatico: **la doc segue il rilascio, non il commit**.
+Le voci `## Doc Impact` restano nel task file, **vive**: ogni `checkpoint-task` le **riesamina** — riscrive o elimina — applicando i soli criteri indipendenti (`doc-management.md` §Imbuto). Nessun marker di esito, nessun inbox automatico: **la doc segue il rilascio, non il commit**.
 
 Il **trasloco** le muove in un file inbox nuovo, e scatta in tre casi: subito per le **nozioni di mondo** (gotcha, servizi esterni, fatti d'ambiente) · al **rilascio** rilevato in conversazione, per le voci della feature · alla **chiusura**, per tutto il residuo (materializzazione incerta → unica domanda ammessa: drainable sì/no). Ordine vincolante: commit del task file **con** le voci, poi il file inbox (`inbox.sh new`, cappello = parent aperto o task stessa), poi al posto delle voci resta `→ inbox <basename> · storia: <sha>`.
 

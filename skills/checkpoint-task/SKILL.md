@@ -1,6 +1,6 @@
 ---
 name: checkpoint-task
-description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: clessidra (manutiene le nozioni vive nel task file) e trasloco in inbox al rilascio o alla chiusura.
+description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nel task file e toglie quelle che il codice ha smentito) e trasloco in inbox al rilascio o alla chiusura.
 allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion
 model: sonnet
 ---
@@ -13,7 +13,7 @@ model: sonnet
 
 Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna il task file e `{docs_root}/tasks.md`, committa e pusha. **La doc segue il rilascio, non il commit**: le nozioni restano vive nel task file (clessidra) e il trasloco le muove in inbox solo al rilascio, alla chiusura, o subito se sono nozioni di mondo.
+Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna il task file e `{docs_root}/tasks.md`, committa e pusha. **La doc segue il rilascio, non il commit**: le nozioni restano vive nel task file (riesame) e il trasloco le muove in inbox solo al rilascio, alla chiusura, o subito se sono nozioni di mondo.
 
 **Ogni file inbox nasce non-drainable**, qualunque sia il caso che lo ha prodotto: la drenabilità la accende la **chiusura della task** (6.6), su tutti i suoi inbox in un colpo solo. Trasloco e drenabilità restano quindi due decisioni distinte — la prima dice *dove* vive la nozione, la seconda *quando* la doc può assorbirla.
 
@@ -102,24 +102,24 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    ```
    `--task` fissa il task file all'ID risolto; lo script lo aggiunge da sé alla pathspec. Con `TASK_SRC=env` e nessuna pathspec lo script esce in errore.
 
-6. **Fase doc — clessidra e trasloco**
+6. **Fase doc — riesame e trasloco**
 
    Nessuno spawn di subagent. L'unica domanda ammessa all'utente è quella del punto 6.4 (drainable a chiusura incerta): il flusso è presidiato per natura.
 
-   **6.1 — Clessidra: manutieni, non smaltire.** Leggi ogni voce di `## Doc Impact`. La voce è **viva**: riscrivila se il codice di questo checkpoint l'ha cambiata, eliminala se l'ha resa falsa o inutile. Applichi i **soli criteri indipendenti** — *sopravvive alla task* · *costo di scoperta* · le nove parole leggibili nel testo (cronaca, intenzione, ipotesi, cantiere, scarto, eco, inventario, calco, cornice: le prime cinque si giudicano qui, le altre dipendono da fonti e le paga il drain). **Nessun marker di esito, nessun inbox automatico**: il default è che le voci restano qui.
+   **6.1 — Riesame: rigiudica, non smaltire.** Leggi ogni voce di `## Doc Impact`. La voce è **viva**: riscrivila se il codice di questo checkpoint l'ha cambiata, eliminala se l'ha resa falsa o inutile. Applichi i **soli criteri indipendenti** — *sopravvive alla task* · *costo di scoperta* · le nove parole leggibili nel testo (cronaca, intenzione, ipotesi, cantiere, scarto, eco, inventario, calco, cornice: le prime cinque si giudicano qui, le altre dipendono da fonti e le paga il drain). **Nessun marker di esito, nessun inbox automatico**: il default è che le voci restano qui.
 
    **6.2 — Nozioni di mondo: trasloco subito.** Le voci su gotcha, vincoli di servizi esterni, fatti d'ambiente — il cui as-is non dipende dal rilascio del codice della task — traslocano adesso, `indexed` (punto 6.5).
 
-   **6.3 — Rilevazione del rilascio.** La conversazione di QUESTO checkpoint contiene un deploy, un publish, un merge in prod? Se sì, traslocano le voci della feature rilasciata, `indexed` — più `branch:<nome>` se la task dichiara `**Branch**:` (lo sblocco del branch è di `pull-repos`, al merge, ed è un gate suo, indipendente dalla drenabilità). Fallback benigno: il rilascio è avvenuto altrove → le voci restano in clessidra.
+   **6.3 — Rilevazione del rilascio.** La conversazione di QUESTO checkpoint contiene un deploy, un publish, un merge in prod? Se sì, traslocano le voci della feature rilasciata, `indexed` — più `branch:<nome>` se la task dichiara `**Branch**:` (lo sblocco del branch è di `pull-repos`, al merge, ed è un gate suo, indipendente dalla drenabilità). Fallback benigno: il rilascio è avvenuto altrove → le voci restano vive nel task file.
 
    **6.4 — Chiusura della task** (step 4): traslocano **tutte** le voci residue, `indexed` come sopra. Dopo il trasloco di chiusura il task file non ha più nozioni, solo puntatori.
 
    **6.5 — Il trasloco**, per ogni perimetro deciso sopra. Ordine vincolante:
 
-   1. **Commit del task file CON le voci**, se ha modifiche non committate (la manutenzione 6.1 lo sporca): 
+   1. **Commit del task file CON le voci**, se ha modifiche non committate (il riesame 6.1 lo sporca): 
       ```bash
       source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
-      lw_git_add_n_commit "task(${taskId}): clessidra pre-trasloco" "${task_file}"
+      lw_git_add_n_commit "task(${taskId}): riesame nozioni pre-trasloco" "${task_file}"
       ```
       Poi lo sha di storia: `sha=$(git log -1 --format=%h -- "${task_file}")`.
    2. **Risolvi il cappello**: leggi `**Parent Task**: T{N}` dal task file. Il cappello è `T{N}` se il campo c'è, `{docs_root}/tasks/T{N}-*.md` esiste, e la sua Prog in `tasks.md` **non** è `✔️`. Altrimenti è la task corrente — dichiaralo in output con quale ramo è scattato.
@@ -173,7 +173,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    Output vuoto → salta lo step. Altrimenti pathspec esplicita, identica in linked e detached:
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --doc-message "docs(${taskId}): trasloco in inbox" "checkpoint(${taskId}): Prog + clessidra" -- "{docs_root}/tasks.md" "{docs_root}/inbox/<ogni file inbox toccato>.md" "{docs_root}/reference/INDEX.md"
+   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --doc-message "docs(${taskId}): trasloco in inbox" "checkpoint(${taskId}): Prog + riesame" -- "{docs_root}/tasks.md" "{docs_root}/inbox/<ogni file inbox toccato>.md" "{docs_root}/reference/INDEX.md"
    ```
 
    La pathspec nomina **ogni file inbox toccato**, non solo quello appena creato: il 6.6 riscrive la riga marker anche di inbox nati in checkpoint precedenti, e un file modificato ma fuori pathspec resta dirty nel worktree — dove la guardia d'ingresso di `drain-notions` lo trova e ferma il drain.
@@ -184,7 +184,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    - **`--task`** è obbligatorio anche in linked: se la task si è chiusa allo step 4 il symlink non c'è più.
 
 9. **Feedback finale**
-   Riporta: avanzamento registrato, cosa è rimasto in clessidra, cosa è traslocato e con quali marker, e — se la task si è chiusa — quali inbox sono diventati drainable e quali sono stati saltati (già drenati, o congelati da `branch:`). Poi il ping TTS:
+   Riporta: avanzamento registrato, cosa il riesame ha lasciato vivo nel task file, cosa è traslocato e con quali marker, e — se la task si è chiusa — quali inbox sono diventati drainable e quali sono stati saltati (già drenati, o congelati da `branch:`). Poi il ping TTS:
    ```bash
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "checkpoint $(say_id ${taskId}) done"
    ```
@@ -202,7 +202,7 @@ Topic = argomento concreto della domanda. NO generici.
 
 - **Due script**: analyze per raccogliere info (solo linked), commit per eseguire.
 - **Due fasi di commit**: la fase codice (step 5) chiude e pusha il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e l'eventuale trasloco con pathspec esplicita. Un fallimento della fase doc non porta con sé il codice.
-- **Clessidra ≠ archivio**: la manutenzione (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola.
+- **Riesame ≠ archivio**: il riesame (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola.
 - **Il file inbox nasce congelato**: dopo la creazione nessuno lo appende né lo riconcilia — un trasloco successivo dello stesso cappello produce un file NUOVO. Le uniche scritture su un file esistente riguardano la riga marker (l'accensione del 6.6, lo sblocco di `pull-repos`) o il registro del drain: il corpo delle nozioni non si tocca più.
 - **Baseline del diff**: derivato, mai storato — dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD`.
 - **Detached**: niente analyze script, niente symlink. Stage selettivo obbligatorio.
