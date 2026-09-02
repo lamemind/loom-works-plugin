@@ -6,7 +6,8 @@
 # =============================================================================
 #
 # Proprietario UNICO di:
-#   - le quattro soglie del contratto doc (readonly, niente override da CLI)
+#   - le soglie del contratto doc (readonly, niente override da CLI): le quattro
+#     della topologia di reference/ piu' quella di avviso sulle nozioni di un inbox
 #   - il parser dell'override di test LOOM_DOC_THRESHOLDS_OVERRIDE
 #   - la regex del TLDR (doc_tldr), condivisa fra i layer: riga 3 per reference/,
 #     riga 4 per l'inbox — la riga e' un PARAMETRO, cosi' l'implementazione resta una
@@ -24,9 +25,9 @@
 # diverso faceva misurare lo script contro un numero e giudicare l'agent contro
 # quello nel proprio prompt, senza che nessun passo lo rilevasse. Resta un solo
 # canale, per il banco di test: LOOM_DOC_THRESHOLDS_OVERRIDE
-# ("split=N,merge=N,tldr=N,regroup=N"). Quando e' settato, chi lo subisce APRE
-# l'output con la riga `# soglie: ... (OVERRIDE)`: un override dichiarato e' una
-# configurazione, uno silenzioso e' il difetto v1.
+# ("split=N,merge=N,tldr=N,regroup=N,inbox=N"). Quando e' settato, chi lo subisce
+# APRE l'output con la riga `# soglie: ... (OVERRIDE)`: un override dichiarato e'
+# una configurazione, uno silenzioso e' il difetto v1.
 # =============================================================================
 
 # ---- Soglie ------------------------------------------------------------------
@@ -35,6 +36,7 @@ LW_DOC_SPLIT=15000
 LW_DOC_MERGE=3000
 LW_DOC_TLDR_CAP=500
 LW_DOC_REGROUP=60000
+LW_DOC_INBOX_NOZIONI=100
 LW_DOC_OVERRIDE=0
 
 if [[ -n "${LOOM_DOC_THRESHOLDS_OVERRIDE:-}" ]]; then
@@ -47,6 +49,7 @@ if [[ -n "${LOOM_DOC_THRESHOLDS_OVERRIDE:-}" ]]; then
             merge)   LW_DOC_MERGE="$_lw_v" ;;
             tldr)    LW_DOC_TLDR_CAP="$_lw_v" ;;
             regroup) LW_DOC_REGROUP="$_lw_v" ;;
+            inbox)   LW_DOC_INBOX_NOZIONI="$_lw_v" ;;
             *) echo "[lib-doc] WARN override ignoto: ${_lw_k}" >&2 ;;
         esac
     done
@@ -54,10 +57,16 @@ if [[ -n "${LOOM_DOC_THRESHOLDS_OVERRIDE:-}" ]]; then
 fi
 
 readonly LW_DOC_SPLIT LW_DOC_MERGE LW_DOC_TLDR_CAP LW_DOC_REGROUP LW_DOC_OVERRIDE
+readonly LW_DOC_INBOX_NOZIONI
 
 # La riga che dichiara contro cosa e' stata presa una misura. Il modo testo la
 # stampa sempre; il TSV solo sotto override (e' il marchio dell'override, non
 # una cortesia di lettura).
+#
+# LW_DOC_INBOX_NOZIONI resta FUORI da questa riga: le quattro soglie sopra
+# governano la topologia dei file di reference/ e le misura doc-metrics, mentre
+# quella governa un avviso di checkpoint su un file inbox — un consumer diverso,
+# che dichiara da se' il numero contro cui ha misurato dentro il proprio avviso.
 doc_soglie_line() {
     local suffix=""
     (( LW_DOC_OVERRIDE )) && suffix=" (OVERRIDE)"

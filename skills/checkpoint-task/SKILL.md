@@ -164,6 +164,16 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    - **Materializzazione incerta** — non sai se la feature è davvero in esercizio: `AskUserQuestion` all'utente, drainable sì/no. `No` salta l'intero giro, inbox vecchi compresi: la task è chiusa ma la doc non deve ancora assorbirla.
    - Un `marker` su un file già drainable è un no-op scritto: nessun danno, la riga 3 si riscrive identica.
 
+   **6.5 — Conteggio dell'inbox.** Ultimo passo della fase doc, sullo stato finale del file:
+
+   ```bash
+   source "${CLAUDE_PLUGIN_ROOT}/scripts/docs/lib-doc.sh"
+   n=$("${CLAUDE_PLUGIN_ROOT}/scripts/docs/inbox.sh" parse --file "{docs_root}/inbox/<basename>" --format tsv | grep -c $'^NOZIONE\t')
+   (( n > LW_DOC_INBOX_NOZIONI )) && echo "[inbox] ${n} nozioni, soglia ${LW_DOC_INBOX_NOZIONI}"
+   ```
+
+   Sopra soglia riporta la riga in output e **prosegui**: non tagli, non splitti, non apri una task. È un dato per chi legge il checkpoint, non un cancello — la soglia vive in `lib-doc.sh` e l'avviso dichiara il numero contro cui ha misurato.
+
 7. **Aggiorna {docs_root}/tasks.md**
    1. Nella tabella Tasks Overview trova la riga `| {taskId} |`
    2. Aggiorna la colonna Prog: `✔️` se completata (step 4), altrimenti `🟡`
@@ -213,4 +223,4 @@ Topic = argomento concreto della domanda. NO generici.
 - **Il file inbox è WIP finché la task è aperta**: l'owner è la task, e il corpo si appende, si riscrive e si pota a ogni checkpoint — le tre operazioni e la regola degli id stanno in `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`. Il congelamento arriva con `drainable` (6.4), quando la proprietà passa al sistema documentale: da lì le uniche scritture ammesse sono la riga marker (lo sblocco di `pull-repos`) e il registro del drain.
 - **Baseline del diff**: derivato, mai storato — dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD`.
 - **Detached**: niente analyze script, niente symlink. Stage selettivo obbligatorio.
-- **Nessuna allerta di coda**: l'accumulo in inbox è libero — nessun cap, nessun tetto. A drenare sono `drain-notions` / il giro notturno, non un invito a fine checkpoint.
+- **Nessuna allerta di coda**: l'accumulo *della coda* inbox è libero — nessun cap sul numero di file, nessun tetto. A drenare sono `drain-notions` / il giro notturno, non un invito a fine checkpoint. L'unico conteggio è quello del 6.5, dentro un singolo file, e stampa un numero senza chiedere niente.
