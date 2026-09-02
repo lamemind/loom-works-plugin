@@ -108,7 +108,11 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
    **La sede delle nozioni è una sola in ogni momento, e la dichiara il task file.** `## Doc Impact` porta le voci finché l'inbox della task non esiste; dal primo trasloco in poi porta la sola riga `- → inbox <basename> · storia: <sha>`, e la sede è quel file. **Leggila prima di tutto il resto**: decide su cosa gira il riesame e se il trasloco deve girare affatto.
 
-   **6.1 — Riesame: rigiudica, non smaltire.** Leggi ogni voce di `## Doc Impact`. La voce è **viva**: riscrivila se il codice di questo checkpoint l'ha cambiata, eliminala se l'ha resa falsa o inutile. Applichi i **soli criteri indipendenti** — *sopravvive alla task* · *costo di scoperta* · le nove parole leggibili nel testo (cronaca, intenzione, ipotesi, cantiere, scarto, eco, inventario, calco, cornice: le prime cinque si giudicano qui, le altre dipendono da fonti e le paga il drain). **Nessun marker di esito, nessun inbox automatico**: il default è che le voci restano qui.
+   **6.1 — Riesame: rigiudica, non smaltire.** Leggi ogni voce **nella sede corrente** — `## Doc Impact` finché l'inbox non esiste, il file inbox da lì in avanti. La voce è **viva**: riscrivila se il codice di questo checkpoint l'ha cambiata, eliminala se l'ha resa falsa o inutile. Applichi i **soli criteri indipendenti** — *sopravvive alla task* · *costo di scoperta* · le nove parole leggibili nel testo (cronaca, intenzione, ipotesi, cantiere, scarto, eco, inventario, calco, cornice: le prime cinque si giudicano qui, le altre dipendono da fonti e le paga il drain). **Nessun marker di esito**: una voce eliminata sparisce, non viene marcata.
+
+   Sull'inbox le operazioni sono tre e hanno una regola sola non ovvia — **gli id non si rinumerano mai**, i buchi sono attesi. Apri `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md` prima di scrivere: porta il formato, le tre operazioni e gli snippet.
+
+   **Un inbox `drainable` non si tocca**: la proprietà è passata al sistema documentale, e il drain può averlo già in lavorazione. Capita su una task riaperta dopo la chiusura — leggi la riga 3 con `inbox.sh parse`, e se il token c'è dichiara in output che il riesame è saltato e perché.
 
    **6.2 — Il trasloco: una volta sola per task.** Scatta al **primo** checkpoint che trova voci in `## Doc Impact`, e crea l'inbox della task. Non è condizionato al rilascio né alla chiusura: quelle governano `drainable` (6.4), non *dove* vive la nozione. Se il puntatore c'è già, il trasloco non gira — le nozioni sono già nella loro sede.
 
@@ -205,7 +209,7 @@ Topic = argomento concreto della domanda. NO generici.
 
 - **Due script**: analyze per raccogliere info (solo linked), commit per eseguire.
 - **Due fasi di commit**: la fase codice (step 5) chiude e pusha il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e l'eventuale trasloco con pathspec esplicita. Un fallimento della fase doc non porta con sé il codice.
-- **Riesame ≠ archivio**: il riesame (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola.
+- **Riesame ≠ archivio**: il riesame (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta — ed è il grosso del lavoro dopo il primo, perché da lì in avanti c'è solo lui. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola. Sull'inbox vale di più che sul task file: rigiudica un file già pubblicato e indicizzato, letto da chi non ha la task in mano.
 - **Il file inbox è WIP finché la task è aperta**: l'owner è la task, e il corpo si appende, si riscrive e si pota a ogni checkpoint — le tre operazioni e la regola degli id stanno in `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`. Il congelamento arriva con `drainable` (6.4), quando la proprietà passa al sistema documentale: da lì le uniche scritture ammesse sono la riga marker (lo sblocco di `pull-repos`) e il registro del drain.
 - **Baseline del diff**: derivato, mai storato — dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD`.
 - **Detached**: niente analyze script, niente symlink. Stage selettivo obbligatorio.
