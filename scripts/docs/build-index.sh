@@ -22,6 +22,12 @@
 #     prod, fra loro in ordine alfabetico: la precedenza e' qualificata dal
 #     branch, quindi varia da voce a voce e un'intestazione collettiva direbbe
 #     che una condizione esiste senza dire quale ti riguarda.
+#   - `drainable` separa DUE SEMANTICHE, non due code. Un file drainable descrive
+#     un rilascio che la doc consolidata non ha assorbito: li' prevalere su
+#     reference/ e' corretto. Uno non-drainable descrive lavoro in corso, che il
+#     checkpoint successivo puo' smentire: la stessa etichetta gli darebbe
+#     un'affidabilita' che non ha. Va quindi in una sezione propria, dichiarato
+#     come inconsistenza e con accanto l'id della task che lo scrive.
 #   - Le sezioni si emettono SOLO se contengono almeno un file indicizzabile:
 #     una regola di precedenza che sopravvive a un'inbox vuota drifterebbe da sola.
 #
@@ -143,14 +149,14 @@ if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
             continue
         fi
 
-        natura=""; indexed=""; branch=""; titolo=""; tldr=""; tldr_len=0
+        natura=""; indexed=""; drainable=""; branch=""; titolo=""; tldr=""; tldr_len=0
         # tab tradotto in unit separator: con IFS=$'\t' i tab sono whitespace e i
         # campi vuoti in mezzo collassano (un `nozioni · branch:` senza indexed
         # sposterebbe il branch nella colonna sbagliata)
         while IFS=$'\x1f' read -r kind f1 f2 f3 f4 _; do
             case "$kind" in
                 TITOLO) titolo="$f1" ;;
-                MARKER) natura="$f1"; indexed="$f2"; branch="$f4" ;;
+                MARKER) natura="$f1"; indexed="$f2"; drainable="$f3"; branch="$f4" ;;
                 TLDR)   tldr="$f1"; tldr_len="$f2" ;;
             esac
         done < <(tr '\t' '\037' <<< "$parse_out")
@@ -167,7 +173,15 @@ if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
             voce="*${titolo}*"
         fi
 
-        echo "${branch}|$(basename "$file")|${voce}" >> "$INBOX_TMP"
+        fname="$(basename "$file")"
+        # Id della task dal nome del file: e' il cappello che inbox.sh new ci ha
+        # messo davanti. Serve solo ai non-drainable, dove la voce non vale da
+        # sola e chi legge deve poter risalire a chi la sta scrivendo.
+        tid=""
+        [[ "$fname" =~ ^(T[0-9]+)- ]] && tid="${BASH_REMATCH[1]}"
+
+        if [[ "$drainable" == "drainable" ]]; then tipo=0; else tipo=1; fi
+        echo "${tipo}|${branch}|${fname}|${tid}|${voce}" >> "$INBOX_TMP"
     done < <(find "$INBOX_SCAN_DIR" -maxdepth 1 -type f -name '*.md' -print0 | sort -z)
 fi
 
@@ -203,25 +217,39 @@ fi
     done
 
     if [[ -s "$INBOX_TMP" ]]; then
-        # prod prima (branch vuoto ordina in testa con sort -k1,1), poi una
-        # sezione per branch in ordine alfabetico
-        current_branch="__unset__"
-        LC_ALL=C sort -t'|' -k1,1 -k2,2 "$INBOX_TMP" | while IFS='|' read -r branch fname voce; do
-            if [[ "$branch" != "$current_branch" ]]; then
+        # Ordine a due livelli: prima la tipologia (drainable = descrive un
+        # rilascio, poi non-drainable = descrive lavoro in corso), poi il branch
+        # dentro ciascuna. Il caso incrociato — non-drainable con branch — cade
+        # cosi' dove gli compete senza aprire una quarta semantica.
+        current_key="__unset__"
+        LC_ALL=C sort -t'|' -k1,1 -k2,2 -k3,3 "$INBOX_TMP" | while IFS='|' read -r tipo branch fname tid voce; do
+            if [[ "${tipo}|${branch}" != "$current_key" ]]; then
                 echo ""
-                if [[ -z "$branch" ]]; then
+                if [[ "$tipo" == "0" && -z "$branch" ]]; then
                     echo "## inbox — nozioni non ancora collocate"
                     echo ""
                     echo "> Precedenza: in caso di contraddizione con un file di \`reference/\`, **prevale la voce inbox** — descrive un rilascio che la doc consolidata non ha ancora assorbito."
-                else
+                elif [[ "$tipo" == "0" ]]; then
                     echo "## inbox — branch \`${branch}\`"
                     echo ""
                     echo "> As-is di uno sviluppo, non di prod: vale **solo lavorando su \`${branch}\`**, e per chi sta su prod non ha nessuna precedenza sulla doc consolidata."
+                elif [[ -z "$branch" ]]; then
+                    echo "## inbox — in lavorazione"
+                    echo ""
+                    echo "> Inconsistenza, non precedenza: descrivono lavoro in corso, non un rilascio — la doc è a disposizione ma non garantita, e la task che la scrive può ancora cambiare tutto. Vale meno di \`reference/\`, non di più: leggi la task accanto alla voce prima di fidarti."
+                else
+                    echo "## inbox — in lavorazione · branch \`${branch}\`"
+                    echo ""
+                    echo "> Inconsistenza, non precedenza: lavoro in corso su \`${branch}\`, non ancora rilasciato — nessuna precedenza sulla doc consolidata, nemmeno per chi sta su quel branch. Leggi la task accanto alla voce prima di fidarti."
                 fi
                 echo ""
-                current_branch="$branch"
+                current_key="${tipo}|${branch}"
             fi
-            echo "- \`${fname}\` — ${voce}"
+            if [[ "$tipo" != "0" && -n "$tid" ]]; then
+                echo "- \`${fname}\` — **${tid}** · ${voce}"
+            else
+                echo "- \`${fname}\` — ${voce}"
+            fi
         done
     fi
 } > "$OUTPUT_FILE"
