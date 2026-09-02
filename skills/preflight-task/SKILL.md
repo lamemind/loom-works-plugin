@@ -229,7 +229,7 @@ L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `start-task` le
 
 ## 3b. Le decisioni che producono una nozione documentale
 
-Una `D{N}` che rende vero un fatto durevole — un comportamento nuovo, un vincolo scoperto, un trade-off risolto — produce una nozione. Appendila alla sezione `## Doc Impact` del task file:
+Una `D{N}` che rende vero un fatto durevole — un comportamento nuovo, un vincolo scoperto, un trade-off risolto — produce una nozione. Appendila alla sede che `## Doc Impact` dichiara — la sezione stessa, o il file inbox che la sua riga `- → inbox <basename> · storia: <sha>` nomina (formato e operazioni: `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`; id `max(nN)+1`, mai rinumerati; un inbox `drainable` è congelato e non si tocca):
 
 ```markdown
 - **<la nozione: cosa diventa vero, non cosa si è deciso>**
@@ -239,7 +239,7 @@ Una `D{N}` che rende vero un fatto durevole — un comportamento nuovo, un vinco
 Regole di scrittura, tutte già note e nessuna nuova:
 
 - **La sezione `## Doc Impact` sta fra `## Testing Notes` e `## Prod Validation`.** Se manca, creala lì. Se contiene solo il placeholder `*Nessuna nozione documentale emersa al create-task.*`, sostituiscilo con le tue voci.
-- **La voce resta viva.** Niente marker: finché la task è attiva la voce si riscrive e si elimina, e sei autorizzato a **riesaminare** quelle esistenti quando una decisione di questo giro le smentisce. Il trasloco in inbox è del `checkpoint-task`, al rilascio o alla chiusura.
+- **La voce resta viva.** Niente marker: finché la task è attiva la voce si riscrive e si elimina, e sei autorizzato a **riesaminare** quelle esistenti — nella sede corrente — quando una decisione di questo giro le smentisce. Il trasloco è del `checkpoint-task` e gira una volta sola.
 - **Non decidere il target doc.** Dove la nozione atterri lo decide `drain-notions`, in differita.
 
 Se nessuna decisione tocca la doc, **non scrivere niente** — nessun placeholder, nessuna sezione vuota. `## Doc Impact` non è il registro delle decisioni, quello è `## Decisions`.
@@ -284,7 +284,7 @@ Dopo commit+push, mostra all'utente:
 ## Note
 
 - **Non esegue codice**: preflight congela decisioni e cattura le nozioni che ne discendono (step 3b). Implementazione resta a `run-task`.
-- **Due sezioni, due mestieri.** `## Decisions` porta *cosa si è deciso* ed è cronaca datata: nessuno la legge a valle. `## Doc Impact` porta *cosa è diventato vero*, e il trasloco del checkpoint la porta in inbox. Scrivere la decisione in `## Doc Impact` è il modo tipico di sbagliare: quella riga arriverebbe al drain come intenzione e verrebbe scartata.
+- **Due sezioni, due mestieri.** `## Decisions` porta *cosa si è deciso* ed è cronaca datata: nessuno la legge a valle e resta sempre nel task file. `## Doc Impact` porta *cosa è diventato vero*, e dal primo trasloco in poi è solo il puntatore all'inbox della task. Scrivere la decisione in `## Doc Impact` è il modo tipico di sbagliare: quella riga arriverebbe al drain come intenzione e verrebbe scartata.
 - **Idempotenza parziale**: ri-eseguire preflight su una task aggiunge un nuovo blocco datato. Lo storico delle decisioni resta intatto. Ogni giro produce il suo commit dedicato.
 - **Task piccole / nessuna ambiguità**: se l'analisi (step 1) non trova ambiguità reali, salta l'intero step 2 — **recap compreso** — ma **scrivi comunque il marker** in `## Decisions` (step 3, caso nessuna ambiguità) e committalo (step 4, messaggio `nessuna ambiguità`). Serve a `start-task` per distinguere "preflight già passata, niente da decidere" da "preflight mai eseguita". Mostra: `🛫 Nessuna ambiguità rilevata — marker registrato. Task pronta per run-task.`
   Il recap esiste per rendere prendibile una decisione: senza domande non ha bersaglio e diventerebbe volume gratuito sul ramo di maggioranza. Chi vuole il quadro di una task senza decidere niente ha già `recap-status-task`.

@@ -97,13 +97,13 @@ Vincoli:
 - **No file overlap**: se due task detached toccano gli stessi file, evita conflitti tu (sequenza, non parallelismo reale).
 - **Checkpoint sequenziali**: due `checkpoint-task` simultanei possono fare race su `tasks.md` e `git`. Coordinali tu.
 
-### Doc Impact — riesame e trasloco
+### Doc Impact — sede unica, riesame, trasloco
 
-Le voci `## Doc Impact` restano nel task file, **vive**: ogni `checkpoint-task` le **riesamina** — riscrive o elimina — applicando i soli criteri indipendenti (`doc-management.md` §Imbuto). Nessun marker di esito, nessun inbox automatico: **la doc segue il rilascio, non il commit**.
+Le nozioni di una task vivono in **un posto solo per volta**, e il task file dichiara quale: `## Doc Impact` finché porta le voci, il file inbox della task quando al loro posto porta `→ inbox <basename> · storia: <sha>`. Ogni `checkpoint-task` **riesamina** la sede corrente — riscrive o elimina — coi soli criteri indipendenti (`doc-management.md` §Imbuto). Nessun marker di esito.
 
-Il **trasloco** le muove in un file inbox nuovo, e scatta in tre casi: subito per le **nozioni di mondo** (gotcha, servizi esterni, fatti d'ambiente) · al **rilascio** rilevato in conversazione, per le voci della feature · alla **chiusura**, per tutto il residuo (materializzazione incerta → unica domanda ammessa: drainable sì/no). Ordine vincolante: commit del task file **con** le voci, poi il file inbox (`inbox.sh new`, cappello = parent aperto o task stessa), poi al posto delle voci resta `→ inbox <basename> · storia: <sha>`.
+Il **trasloco** gira **una volta sola**, al primo checkpoint con voci da spostare, e crea l'inbox della task (`inbox.sh new`, cappello = parent aperto o task stessa). Ordine vincolante: commit del task file **con** le voci, poi il file inbox, poi la riga puntatore. Da lì l'inbox è WIP e appartiene alla task — si appende, si riscrive, si pota (`inbox-format.md`) — finché la **chiusura** accende `drainable` e lo congela.
 
-Una task su branch dichiara `**Branch**:` nel task file (si scrive a mano come `Parent Task`; assente = `main`); il suo trasloco porta `branch:<nome>` e mai `drainable` — lo sblocco è di `pull-repos`, quando trova il file su main. Dove una nozione atterri lo decide `drain-notions`, in differita.
+Una task su branch dichiara `**Branch**:` nel task file (si scrive a mano come `Parent Task`; assente = `main`); il suo inbox porta `branch:<nome>` e mai `drainable` — lo sblocco è di `pull-repos`, quando trova il file su main. `branch:` non congela per la task che ne è owner. Dove una nozione atterri lo decide `drain-notions`, in differita.
 
 **La fase doc gira dopo il commit e il push del codice**, mai prima: il push rende il lavoro visibile alle altre sessioni, e un fallimento della fase doc non porta con sé il codice.
 

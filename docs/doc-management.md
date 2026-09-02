@@ -4,7 +4,7 @@ Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive
 
 ## Il paradigma: la doc è l'as-is di prod
 
-Il codice cambia da più fonti — le task, i merge altrui, i commit spot — e un commit non è un rilascio. **La doc descrive prod.** Le nozioni emerse restano nel task file finché la feature non è materializzata, riesaminate a ogni checkpoint; il rilascio le muove in inbox; il drain le colloca. La cronaca sta in git, l'intenzione nel task file, il cantiere nella task folder, lo sviluppo non rilasciato negli inbox di branch.
+Il codice cambia da più fonti — le task, i merge altrui, i commit spot — e un commit non è un rilascio. **La doc descrive prod.** Le nozioni emerse restano della task finché la feature non è materializzata, riesaminate a ogni checkpoint; la chiusura le rende drenabili; il drain le colloca. La cronaca sta in git, l'intenzione nel task file, il cantiere nella task folder, lo sviluppo non rilasciato negli inbox di branch.
 
 ## I quattro layer
 
@@ -23,9 +23,11 @@ Nei primi due la doc **è** la verità. Negli altri due la verità sta altrove, 
 
 `{docs_root}/inbox/` tiene i file in attesa di smaltimento. Non è un quinto verdetto: è uno **stato di transizione** verso i quattro. Tre nature, dichiarate dal marker in riga 3 del file (`nozioni` · `derivazione` · `sweep`); il formato e il vocabolario dei token sono degli script (`scripts/docs/inbox.sh`), mai di un prompt.
 
-- Un file inbox **nasce congelato**: il contenuto non cambia più. Le uniche scritture ammesse sono lo sblocco del marker (`pull-repos`) e il registro del drain (sub-bullet per nozione).
-- **Accumulo libero**: nessun cap, nessuna soglia, nessun warning. Un file non-drainable può restare a tempo indeterminato — è comunque indicizzato se `indexed`, quindi già utile.
-- **Precedenza**: se un file inbox contraddice un file di `reference/`, **vince l'inbox** — descrive un rilascio che la doc consolidata non ha ancora assorbito; **se porta `branch:<nome>`, la precedenza vale solo per chi lavora su quel branch** — per chi sta su prod non conta niente.
+- **`drainable` è un passaggio di proprietà.** Senza il token l'owner è la task che scrive il file: nessun consumer lo prende, quindi non c'è consistenza da proteggere e il corpo si appende, si riscrive e si pota a ogni checkpoint (`inbox-format.md`). Col token il file passa al sistema documentale e **si congela**: da lì le uniche scritture sono il marker (`pull-repos`) e il registro del drain.
+- **Una task, un inbox**: il primo trasloco lo crea, e da lì è l'unica sede delle nozioni di quella task. Un file per trasloco moltiplicherebbe i file senza moltiplicare il contenuto, e il costo del drain scala col numero di file.
+- **Accumulo libero**: nessun cap sulla coda, nessuna soglia che blocchi. Sul singolo file il checkpoint conta le nozioni e stampa un avviso sopra `LW_DOC_INBOX_NOZIONI` (`lib-doc.sh`), senza tagliare né splittare.
+- **Due stati, due semantiche.** Un file **drainable** descrive un rilascio che la doc consolidata non ha ancora assorbito: se contraddice `reference/`, **vince l'inbox**. Un file **non-drainable** descrive lavoro in corso, che il checkpoint successivo può smentire: è **inconsistenza, non precedenza** — a disposizione, non garantito, e si legge insieme alla task che lo scrive. `build-index.sh` li tiene in due sezioni distinte.
+- **`branch:<nome>`** qualifica *per chi* la nozione è vera: la precedenza vale solo per chi lavora su quel branch, per chi sta su prod non conta niente. Non congela il file per la task che ne è owner.
 - **Esente da split e merge**: un file inbox aggrega un trasloco e nasce per morire al drain.
 - La ridondanza in inbox è ammessa: «è già scritto altrove» è un criterio dipendente e si paga allo smaltimento, non alla transizione.
 
@@ -63,7 +65,7 @@ Tutti gli altri — *eco*, *sorpresa*, *sopravvive al refactor* (dipendono dal c
 
 **La doc non si scrive a mano**: ogni scrittura passa da una skill.
 
-- nozione emersa in una task → resta in `## Doc Impact`, viva, **riesaminata** a ogni checkpoint; il **trasloco** al rilascio o alla chiusura la porta in inbox (`checkpoint-task`)
+- nozione emersa in una task → vive nella sede che il task file dichiara (`## Doc Impact`, poi l'inbox della task dal primo trasloco), **riesaminata** a ogni checkpoint (`checkpoint-task`)
 - file inbox `nozioni` drainable → `drain-notions` (router → writer → validator, registro nel file)
 - file inbox `derivazione` → `derive-notions` (dal diff a un file `nozioni` nuovo)
 - file inbox `sweep` → `align-doc` (estrazione + stesura, su branch `doc/sweep-<slug>` con PR)

@@ -35,8 +35,8 @@
 *Criteri di test e validazione*
 
 ## Doc Impact
-*Chi cattura (`create-task`, `preflight-task`, `run-task`) scrive: **nozione + ancora primaria**. La voce resta qui VIVA e ogni checkpoint la RIESAMINA: si riscrive o si elimina finché la task è attiva, nessun marker di esito, nessuna attesa.*
-*Il trasloco in inbox è del `checkpoint-task` — subito per le nozioni di mondo, al rilascio per la feature rilasciata, alla chiusura per tutto — e al posto delle voci lascia `→ inbox <file> · storia: <sha>`.*
+*Chi cattura (`create-task`, `preflight-task`, `run-task`, il modello in chat) scrive: **nozione + ancora primaria**. La voce resta VIVA e ogni checkpoint la RIESAMINA: si riscrive o si elimina finché la task è attiva, nessun marker di esito, nessuna attesa.*
+*Il primo `checkpoint-task` con voci da spostare le trasloca nell'inbox della task e lascia qui `→ inbox <file> · storia: <sha>`. **Da quel momento le nozioni nuove si scrivono nell'inbox, non qui**: la sede è una sola, e questa riga dice quale.*
 
 {{doc_impact}}
 

@@ -149,6 +149,8 @@ Output intermedi che non sono codice del progetto (dump, analisi, findings, scri
 
 ## Doc Impact (append libero durante l'esecuzione)
 
-Se durante run-task emergono nozioni documentali (decisioni di design, pattern non-ovvi, gotcha, conoscenza che merita doc), **appendile direttamente** alla sezione `## Doc Impact` del task file. Format: bullet con **nozione** + **ancora primaria** (tag/keyword/comando/pattern).
+Se durante run-task emergono nozioni documentali (decisioni di design, pattern non-ovvi, gotcha, conoscenza che merita doc), **appendile direttamente** alla sede corrente. Format: bullet con **nozione** + **ancora primaria** (tag/keyword/comando/pattern).
 
-**La voce resta viva, senza marker.** Finché la task è attiva le voci si riscrivono e si eliminano, e sei autorizzato — anzi tenuto — a farlo sulle voci esistenti quando il codice che stai scrivendo le smentisce: anche run-task riesamina, non è un archivio ad append. Il trasloco in inbox è del `checkpoint-task`, al rilascio o alla chiusura; dove una nozione atterri lo decide `drain-notions`, in differita.
+**La sede la dichiara `## Doc Impact` del task file**, ed è una sola: se la sezione porta le voci, scrivi lì; se porta la riga `- → inbox <basename> · storia: <sha>`, il `checkpoint-task` ha già traslocato e la sede è quel file — scrivi in `{docs_root}/inbox/<basename>`, con id `max(nN)+1` e senza rinumerare niente. Formato e operazioni: `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`. Un inbox che porta `drainable` nella riga 3 è congelato: non scriverci, riporta la nozione all'utente.
+
+**La voce resta viva, senza marker.** Finché la task è attiva le voci si riscrivono e si eliminano, e sei autorizzato — anzi tenuto — a farlo sulle voci esistenti quando il codice che stai scrivendo le smentisce: anche run-task riesamina, non è un archivio ad append. Dove una nozione atterri lo decide `drain-notions`, in differita.

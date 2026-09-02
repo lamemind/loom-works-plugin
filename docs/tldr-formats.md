@@ -20,4 +20,4 @@ Due sedi: **riga 3** per i file di `reference/`, **riga 4** per i file inbox di 
 - ✅ `cache prompt Anthropic per subagent · prefisso cachabile · misura dai transcript`
 - ❌ `Nozioni emerse durante il lavoro sulla task.`
 
-Un file inbox nasce **congelato**: il TLDR si scrive una volta, alla creazione (`inbox.sh new --tldr`), e nessuno lo riscrive dopo — un trasloco successivo dello stesso cappello produce un file nuovo, col TLDR suo.
+Il TLDR di un inbox si scrive una volta, alla creazione (`inbox.sh new --tldr`), e **nessuno lo riscrive dopo** — nemmeno i checkpoint che continuano ad appendere nozioni nel file. Regge perché descrive un **perimetro**, non un contenuto: il cerchio del lavoro della task, non l'area di ciò che il file contiene adesso. Una riga che enumerasse le voci presenti sarebbe vera solo nell'istante in cui è scritta.

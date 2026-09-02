@@ -1,6 +1,6 @@
 ---
 name: checkpoint-task
-description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nel task file e toglie quelle che il codice ha smentito) e trasloco in inbox al rilascio o alla chiusura.
+description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nella loro sede e toglie quelle che il codice ha smentito), trasloco nell'inbox della task e accensione di drainable alla chiusura.
 allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion
 model: sonnet
 ---

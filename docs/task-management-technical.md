@@ -74,7 +74,7 @@ Salvataggio del progresso. Commit delle modifiche.
 - A fine giornata (checkpoint intermedio)
 - Prima di passare ad altra task
 
-**Doc Impact**: le voci restano vive nel task file e ogni checkpoint le **riesamina** coi soli criteri indipendenti — riscrive o elimina, nessun marker. Il trasloco le porta in inbox al rilascio, alla chiusura, o subito per le nozioni di mondo, lasciando al loro posto `→ inbox <file> · storia: <sha>`. Nessuna scelta utente, nessuno spawn. Dettagli: [Task Management §Doc Impact — riesame e trasloco](./task-management.md).
+**Doc Impact**: le voci restano vive nella sede che il task file dichiara e ogni checkpoint le **riesamina** coi soli criteri indipendenti — riscrive o elimina, nessun marker. Il primo trasloco le porta nell'inbox della task, lasciando al loro posto `→ inbox <file> · storia: <sha>`; da lì la sede è quel file, finché la chiusura non lo congela con `drainable`. Nessuna scelta utente, nessuno spawn. Dettagli: [Task Management §Doc Impact](./task-management.md).
 
 ### Pattern di Iterazione
 
