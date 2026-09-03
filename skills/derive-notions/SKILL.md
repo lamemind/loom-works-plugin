@@ -15,7 +15,7 @@ Usa il valore ovunque sotto compaia `{docs_root}`.
 
 Consumi i file inbox di natura `derivazione`: ognuno è un **ordine di analisi in prosa** con l'ancora di un diff. Il tuo prodotto non è doc — è un file inbox di natura `nozioni` nuovo, che il flusso standard (`drain-notions`) collocherà. **Rifornisci la coda, non la chiudi**: è la differenza col drain, ed è il fatto che chi ti lancia di notte deve sapere.
 
-Nessuna domanda all'utente: giri anche nel notturno.
+Nessuna domanda all'utente: giri anche in `nightly-doc`.
 
 ## Note utente
 ~~~human
@@ -26,7 +26,7 @@ Una derivazione nominata in `$ARGUMENTS` → la coda è quel solo file, e lo ste
 
 **Come si nomina.** Basta il nome, non il path: la cartella la sai già. Accetta il path completo, il basename con o senza `.md`, e il match è case-insensitive contro i file di `{docs_root}/inbox/`. Più di un file che matcha → elenca i candidati e fermati; nessuno → dillo, e non ripiegare sulla coda intera.
 
-**Un file nominato si consuma anche senza `drainable`.** Quel token governa la **coda automatica** — chi il notturno può prendere da sé — non il permesso di consumare: nominare un file È la decisione che il token dichiarerebbe. Non aggiungere il token e non committare niente per «sbloccarlo». Resta escluso il solo `branch:`, che congela il file per chiunque.
+**Un file nominato si consuma anche senza `drainable`.** Quel token governa la **coda automatica** — chi `nightly-doc` può prendere da sé — non il permesso di consumare: nominare un file È la decisione che il token dichiarerebbe. Non aggiungere il token e non committare niente per «sbloccarlo». Resta escluso il solo `branch:`, che congela il file per chiunque.
 
 ## 0. Guardia d'ingresso
 
@@ -98,4 +98,4 @@ Senza `--cappello`: il file nasce da un diff, non da una task — la sua proveni
 lw_git_push
 ```
 
-Report: derivazioni consumate (→ quale file nozioni, quante nozioni), saltate e perché (`range` assente o morto), red flag. Le nozioni prodotte le colloca `drain-notions` — non invocarlo tu: la composizione dei flussi è del giro notturno o dell'utente.
+Report: derivazioni consumate (→ quale file nozioni, quante nozioni), saltate e perché (`range` assente o morto), red flag. Le nozioni prodotte le colloca `drain-notions` — non invocarlo tu: la composizione dei flussi è del giro `nightly-doc` o dell'utente.

@@ -26,7 +26,7 @@ Un file inbox nominato in `$ARGUMENTS` → la coda è quel solo file, e lo step 
 
 **Come si nomina.** Basta il nome, non il path: la cartella la sai già. Accetta il path completo, il basename con o senza `.md`, e il match è case-insensitive contro i file di `{docs_root}/inbox/`. Più di un file che matcha → elenca i candidati e fermati; nessuno → dillo, e non ripiegare sulla coda intera.
 
-**Un file nominato si drena anche senza `drainable`.** Quel token governa la **coda automatica** — chi il notturno può prendere da sé — non il permesso di drenare: nominare un file È la decisione che il token dichiarerebbe. Non aggiungere il token e non committare niente per «sbloccarlo». Resta escluso il solo `branch:`, che congela il file per chiunque.
+**Un file nominato si drena anche senza `drainable`.** Quel token governa la **coda automatica** — chi `nightly-doc` può prendere da sé — non il permesso di drenare: nominare un file È la decisione che il token dichiarerebbe. Non aggiungere il token e non committare niente per «sbloccarlo». Resta escluso il solo `branch:`, che congela il file per chiunque.
 
 ## Costanti
 

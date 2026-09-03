@@ -1,5 +1,5 @@
 ---
-name: notturno
+name: nightly-doc
 description: Il giro notturno del sistema doc — composizione dei pezzi, zero logica propria: derivazione dai commit spot delle 24h, pull-repos, derive-notions, drain-notions, align-doc (gli sweep, ognuno sul suo branch con PR), report. Replicabile a mano lanciando le skill nello stesso ordine.
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Task, Skill
 model: sonnet
@@ -29,7 +29,7 @@ printf '%s\n' "Riallinea la doc ai commit spot delle ultime 24 ore: confronta le
     --slug align-spot-<data-iso-del-giro> --natura derivazione --drainable \
     --ancora "range:<sha del commit spot più vecchio>~1..HEAD"
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
-lw_git_add_n_commit "docs(notturno): derivazione sui commit spot" <INBOX_PATH>
+lw_git_add_n_commit "docs(nightly-doc): derivazione sui commit spot" <INBOX_PATH>
 ```
 
 ## 1–4. La composizione

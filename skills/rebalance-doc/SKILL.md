@@ -15,7 +15,7 @@ Usa il valore ovunque sotto compaia `{docs_root}`.
 
 La topologia è tua: split, merge di file e regroup sono operazioni **cross-file**, e nessun attore del drain le può fare — il router punta un file, il writer ne tocca uno. **Lo script dà i flag (chi guardare, mai cosa fare); tu decidi e applichi.** Il contenuto si muove **verbatim**, senza riscritture: dei file nati da uno split scrivi il titolo, il resto si sposta com'è e la riga 3 la produce `write-tldr`. L'helper haiku fa le analisi (trigger di ricerca, mappa dei TLDR) e la **verifica di non-perdita** — l'unico controllo esterno rimasto, che vale di più proprio perché chi decide è anche chi applica.
 
-Non stai nel notturno e giri presidiata: in dubbio su un taglio o una fusione, chiedi.
+Non stai in `nightly-doc` e giri presidiata: in dubbio su un taglio o una fusione, chiedi.
 
 ## 0. Guardia e misura
 

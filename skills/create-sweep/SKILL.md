@@ -94,7 +94,7 @@ Prima di `AskUserQuestion`, il ping:
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su perimetro dello sweep"
 ```
 
-- **`drainable`** — sempre. Scrivere un ordine e volerlo far eseguire da solo sono due decisioni distinte: il token apre la **coda automatica** del notturno, non il permesso di eseguire. Un file parcheggiato resta comunque lanciabile a mano nominandolo.
+- **`drainable`** — sempre. Scrivere un ordine e volerlo far eseguire da solo sono due decisioni distinte: il token apre la **coda automatica** di `nightly-doc`, non il permesso di eseguire. Un file parcheggiato resta comunque lanciabile a mano nominandolo.
 - **`modo`** — sempre. `integra` assorbe la doc preesistente, `riscrivi` la rasa e riparte dal referto.
 - **`online`** — **solo se** l'analisi ha trovato materiale pertinente nella doc online (i file @-importati da `CLAUDE.md`). Presentala nominando le pagine trovate; se non ce n'è, la domanda non si pone. La **lista** degli @-import resta fuori comunque: è topologia, mestiere di `rebalance-doc`.
 

@@ -15,7 +15,7 @@ Usa il valore ovunque sotto compaia `{docs_root}`.
 
 Esegui gli **sweep**: ordini di riscrittura della doc in prosa, scritti da `create-sweep` su intenzione umana. Catena corta e senza giudici — leggi l'ordine, estrai, riscrivi, apri una PR. Nessun router davanti (non collochi niente di nuovo: riscrivi ciò che è già collocato) e nessun validator dietro (una doc driftata non offre un metro, e un giudice puntiglioso su una riscrittura di massa produce rumore). **La sicurezza è git**: su main non atterra niente finché qualcuno non mergia. Che il risultato sia perfetto non è un'attesa — su un perimetro grande è scontato che non lo sia, e la PR è dove lo si constata.
 
-Nessuna domanda all'utente: giri anche nel notturno, e il presidio umano è asincrono — la review della PR.
+Nessuna domanda all'utente: giri anche in `nightly-doc`, e il presidio umano è asincrono — la review della PR.
 
 ## Note utente
 ~~~human
@@ -26,7 +26,7 @@ Uno sweep nominato in `$ARGUMENTS` → la coda è quel solo file, e lo step 1 no
 
 **Come si nomina.** Basta il nome, non il path: la cartella la sai già. Accetta il path completo, il basename con o senza `.md`, e il match è case-insensitive contro i file di `{docs_root}/inbox/` — `T126-loom-deck.md`, `t126-loom-deck` e `runtime/inbox/T126-loom-deck.md` sono lo stesso file. Più di un file che matcha → elenca i candidati e fermati; nessuno → dillo, e non ripiegare sulla coda intera.
 
-**Un file nominato si esegue anche senza `drainable`.** Quel token governa la **coda automatica** — chi il notturno può prendere da sé — non il permesso di eseguire: nominare un file È la decisione che il token dichiarerebbe, e pretenderlo significa chiedere due volte la stessa cosa. Non aggiungere il token e non committare niente per «sbloccarlo»: eseguilo e basta. Resta escluso il solo `branch:`, che congela il file per chiunque.
+**Un file nominato si esegue anche senza `drainable`.** Quel token governa la **coda automatica** — chi `nightly-doc` può prendere da sé — non il permesso di eseguire: nominare un file È la decisione che il token dichiarerebbe, e pretenderlo significa chiedere due volte la stessa cosa. Non aggiungere il token e non committare niente per «sbloccarlo»: eseguilo e basta. Resta escluso il solo `branch:`, che congela il file per chiunque.
 
 ## 0. Guardia d'ingresso
 
@@ -54,7 +54,7 @@ Ordine `created` crescente. Coda vuota → report e fine.
 git branch --list "doc/sweep-<slug>"; git ls-remote --heads origin "doc/sweep-<slug>" 2>/dev/null
 ```
 
-Branch esistente (locale o remoto) = **sweep in volo**, la PR è aperta: salta il file. È ciò che permette a un notturno di girare due sere di fila senza ripartire da capo. Poi la guardia, di nuovo (stessa invocazione dello step 0).
+Branch esistente (locale o remoto) = **sweep in volo**, la PR è aperta: salta il file. È ciò che permette a `nightly-doc` di girare due sere di fila senza ripartire da capo. Poi la guardia, di nuovo (stessa invocazione dello step 0).
 
 **2b. Leggi l'ordine.**
 

@@ -56,7 +56,7 @@ Then bootstrap the project structure:
 | `/loom-works:pull-repos` | Pull umbrella + submodules, unlock `branch:` inboxes found on main, derive from foreign merges |
 | `/loom-works:rebalance-doc` | Doc topology: split / merge review / regroup on doc-metrics flags |
 | `/loom-works:write-tldr` | Produce line 3 of touched `reference/` files: collector → grep gate → pruner |
-| `/loom-works:notturno` | Nightly composition: spot-commit derivation, pull, derive, drain, sweeps |
+| `/loom-works:nightly-doc` | Nightly composition: spot-commit derivation, pull, derive, drain, sweeps |
 | `/loom-works:statusline-task` | Manage the 📌 active-task widget in the global statusline (default patch, token `unpatch`) |
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |
 | `/loom-works:set-task-folder` | Attach a task folder to an existing task |

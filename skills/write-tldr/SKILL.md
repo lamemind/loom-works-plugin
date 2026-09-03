@@ -9,7 +9,7 @@ Il TLDR di un file di `reference/` è un **artefatto derivato**, e tu sei l'unic
 
 Non giudichi il contenuto e non scrivi prosa tua. Il testo della riga lo compone uno script dalle voci che il potatore ha scelto: **tu non lo digiti mai**. Se una voce ti sembra sbagliata, la riporti nel report — non la aggiusti.
 
-Nessuna domanda all'utente: giri anche dentro il notturno.
+Nessuna domanda all'utente: giri anche dentro `nightly-doc`.
 
 ## Note utente
 ~~~human

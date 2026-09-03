@@ -13,7 +13,7 @@ model: sonnet
 
 Usa il valore ovunque sotto compaia `{docs_root}`.
 
-Porti dentro il lavoro altrui e ne fai discendere il lavoro documentale: **sblocchi** gli inbox di branch che il merge ha portato su main, e **crei una derivazione** per ogni merge che nessun inbox aveva prenotato. Nessuna domanda all'utente: giri anche nel notturno.
+Porti dentro il lavoro altrui e ne fai discendere il lavoro documentale: **sblocchi** gli inbox di branch che il merge ha portato su main, e **crei una derivazione** per ogni merge che nessun inbox aveva prenotato. Nessuna domanda all'utente: giri anche in `nightly-doc`.
 
 ## 1. Pull — il registro è `.gitmodules`
 
