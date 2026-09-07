@@ -114,6 +114,14 @@ Lo step 1 produce **candidate**, non domande. Un elenco di classi di ambiguità 
 
 Se la risposta dipende da uno di questi, la candidata è una **domanda** → `D{N}`. Se no, è **del modello** → **proposta** `P{N}`: la scelta, con la ragione — il dato del repo che la decide — smentibile con una parola (forma in §2a). Dove collocare un filtro, quale forma dà a una riga d'indice, quale exit code, se un predicato è dedicato o generico, quale delle due fonti deterministiche già esistenti si usa: su T140 erano tutte e nove di questo tipo, e nessuna aveva bisogno dell'utente.
 
+### Il pavimento — nessuna istruzione lo abbassa
+
+Le sei classi sopra dichiarano un dato assente dal repo, non una soglia di importanza: se la risposta dipende da uno di quei dati, la candidata resta una **domanda** qualunque istruzione porti l'invocazione — una nota che chiede sintesi, fretta, meno volume, o perfino un'istruzione che nomina esplicitamente «le domande» («fai solo quelle che davvero non puoi decidere da solo»). Quell'istruzione non sospende il discriminante: lo riformula con altre parole, e la candidata che ci cade resta `D{N}` a prescindere da come viene chiesto di limitarla.
+
+Un'istruzione del genere governa la **forma** del turno — corpi più corti, strade viste tagliate, recap compresso (§2b) — e mai la sua **esistenza**: non sopprime una voce, e non la retrocede a `P{N}` scavalcando il discriminante. Vale per le domande quanto per le proposte non ancora chiuse: una `P{N}` soppressa per abbreviare il turno è non smentita per assenza, non per silenzio dell'utente, ed è il fallimento che §2f esiste per prevenire. Vale anche per l'**esplicitezza**: una domanda non evapora nel corpo di un recap o di una proposta senza il suo id — in quella forma non passa da nessun controllo, compreso quello che dovrebbe accorgersi che è sparita.
+
+Chi ha fretta non è senza via d'uscita: resta rispondere, e «non decido ora» con la sua motivazione è già un verdetto ammesso (§2h). È la sola forma che il pavimento riconosce — un default che abbassa da sé il numero di domande sotto pressione si perderebbe proprio nei giri in cui si va di fretta, per una formulazione infelice invece che per una scelta esplicita di chi risponde.
+
 ### Non è una domanda, è una misura
 
 **Se la risposta si ottiene contando qualcosa nel repo, si conta.** File, occorrenze, righe, commit: `Grep`, `wc`, `git log`. La cifra decide la candidata da sola o entra in una proposta con il suo numero — mai in una domanda. **Nessuna cifra a spanne nel corpo di una `D{N}`**: «qualche centinaio», «facilmente», «circa» dentro una domanda sono il sintomo che la misura manca, e la stima è libera di essere sbagliata senza che nulla lo segnali. Su T144 `D6` «qualche centinaio di span fra backtick» su un file da 12.000 caratteri erano 62, 69 e 79 su tre file contati: a quel volume la domanda non aveva più oggetto.
