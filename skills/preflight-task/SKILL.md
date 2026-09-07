@@ -155,7 +155,7 @@ intro / header
 
 Vale la stessa economia del recap senza freni di volume (§2b): un minuto di lettura in più costa meno di una decisione sbagliata congelata in `## Decisions` ed eseguita da `run-task`.
 
-**Il layout a tre tempi vale sempre**, anche nei casi degeneri — un solo sottosistema, o tutte le domande generali. Nessun collasso a un blocco solo: una regola sola, applicata uguale, costa meno di un criterio di collasso da valutare a ogni giro.
+**Il layout a tempi vale sempre, a qualunque numero di domande** — con una sola, con nessuna e sole proposte, con un solo sottosistema, con tutte le voci generali. Nessun collasso a un blocco solo, nessuna soglia sotto cui il turno si accorcia. Il test di §1b riduce le domande, non il layout: quello che resta dopo il test sono per lo più proposte, e una proposta è smentibile solo col recap che la motiva sotto gli occhi — collassare il layout quando le domande sono poche toglierebbe il contesto proprio alle voci che l'utente non ha chiesto e che deve poter rifiutare. Su T140 un giro con una domanda sola ha preso tre decisioni senza mostrarle: il layout pieno, coi suoi `Proposte` per sottosistema, è ciò che le avrebbe fatte comparire. Il costo del layout su un giro leggero è lo scroll, che è gratuito; un criterio di soglia è una regola in più da valutare a ogni giro, compreso quello da tredici domande dove il layout serve davvero.
 
 **Separazione visiva** (§2c, §2d, §2e la usano tutte):
 
