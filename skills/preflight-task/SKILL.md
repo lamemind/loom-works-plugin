@@ -64,6 +64,44 @@ Sul primo dato, tre precisazioni:
 
   Vale anche il contrario: la comparsa di domande generali è un **sintomo**, non un caso ordinario da gestire. Se l'architettura sopra la task fosse completa, ogni domanda cadrebbe dentro un perimetro suo.
 
+## 1b. Il test di appartenenza — da candidata a domanda, proposta o misura
+
+Lo step 1 produce **candidate**, non domande. Un elenco di classi di ambiguità è una quota di produzione: chi lo applica formula una voce per ogni classe che riesce a riempire, e il numero di voci finisce per misurare la ricchezza dell'analisi, non il numero di decisioni che sono davvero dell'utente. Sul corpus di 12 giri col contratto precedente, 52 domande su 134 erano dell'utente; su T140 zero su nove, e una frase nell'invocazione le ha fatte sparire tutte senza che il modello leggesse niente di nuovo — le sapeva già mentre le scriveva. Il test qui sotto è quella frase, scritta nel contratto.
+
+**Ogni candidata passa il test prima di diventare una `D{N}`, e ha esattamente una di tre uscite.**
+
+### Il discriminante: dove sta il dato che risolve
+
+**Una decisione è dell'utente quando la risposta dipende da un dato che nel repo non c'è.** Non «è importante», non «è architetturale», non «ha più strade»: il codice è già stato letto da chi formula la candidata, e tutto ciò che si ricava dal codice, dai contratti, dai precedenti già in uso e dai principi già scritti appartiene a chi l'ha appena letto. I dati che nel repo non ci sono hanno un nome, e sono questi:
+
+- **tolleranza di spesa** — quante invocazioni a pagamento, quanto diff su quanti file, quanto tempo: rigenerare 55 TLDR per ~110 chiamate haiku (T144 `D3`)
+- **roadmap e sequenza fra task aperte** — quale delle due va prima, chi assorbe un disallineamento: T140 tocca le stesse tre skill che T139 riscriverà per un motivo suo (T144 `D2`, T139 `D2`)
+- **perimetro della task** — se un difetto trovato per strada entra, se la task si spacca in figlie, quanto può crescere oltre i DLV dichiarati (T138 `D13` `D14`, T141 `D3`)
+- **intento dietro un criterio ambiguo** — un AC che dice «ogni script del sistema doc» senza definirlo: solo chi l'ha scritto sa cosa intendeva (T139 `D1`)
+- **abitudini di lavoro e lettori** — chi legge la doc, come si usano i log oggi, quanti turni l'utente vuole spendere adesso (T141 `D1` `D2`)
+- **appetito al rischio** — quanto blast radius accettare su consumer fuori perimetro, quanta autonomia dare a un'automazione notturna (T139 `D4` `D11`)
+
+Se la risposta dipende da uno di questi, la candidata è una **domanda** → `D{N}`. Se no, è **del modello** → **proposta** `P{N}`: la scelta, con la ragione — il dato del repo che la decide — smentibile con una parola (forma in §2a). Dove collocare un filtro, quale forma dà a una riga d'indice, quale exit code, se un predicato è dedicato o generico, quale delle due fonti deterministiche già esistenti si usa: su T140 erano tutte e nove di questo tipo, e nessuna aveva bisogno dell'utente.
+
+### Non è una domanda, è una misura
+
+**Se la risposta si ottiene contando qualcosa nel repo, si conta.** File, occorrenze, righe, commit: `Grep`, `wc`, `git log`. La cifra decide la candidata da sola o entra in una proposta con il suo numero — mai in una domanda. **Nessuna cifra a spanne nel corpo di una `D{N}`**: «qualche centinaio», «facilmente», «circa» dentro una domanda sono il sintomo che la misura manca, e la stima è libera di essere sbagliata senza che nulla lo segnali. Su T144 `D6` «qualche centinaio di span fra backtick» su un file da 12.000 caratteri erano 62, 69 e 79 su tre file contati: a quel volume la domanda non aveva più oggetto.
+
+Vale anche per la **misura già fatta**: se un paragrafo del tuo stesso turno — il recap, una cifra che hai appena riportato — risolve la candidata, la candidata è chiusa. Su T144 `D11` la misura stava quattro paragrafi sopra la domanda (4 ancore orfane su 1.296, 3 sul file esente) e la domanda è stata posta comunque; su T139 `D12` il recap arrivava alla risposta e la domanda seguiva. Otto delle 134 domande del corpus erano di questa forma, e in tutte la cifra era nel repo o già nel turno.
+
+### Casi limite
+
+- **Il caso misto si spacca, ma non in due domande.** Una candidata con una metà di preferenza e una metà tecnica pone la sola metà dell'utente; la metà del modello **non diventa una `D{N}` a parte** — va sotto la domanda come conseguenza già derivata per ciascuna risposta possibile («se A, il TLDR si riproduce a ogni checkpoint; se B, solo al rilascio»), o come proposta. Su T138 la scelta fra trasloco a ogni checkpoint e trasloco al rilascio (`D1`, dell'utente) ha generato `D6` e `D7` come domande separate, ed erano le sue conseguenze tecniche: due domande in più per una decisione sola.
+- **L'incertezza del modello non è un dato assente dal repo.** Una candidata su cui sei incerto fra due strade resta del modello: l'incertezza è lettura non finita, non una preferenza dell'utente. Si legge ancora finché una strada vince, e si propone con la ragione; se dopo aver letto le due strade sono davvero pari, la proposta lo dice e sceglie — l'utente smentisce con una parola.
+- **Il coordinamento con un'altra task aperta è sempre dell'utente**, anche quando il modello vede benissimo qual è l'ordine migliore: la sequenza è roadmap, e la roadmap non sta nel repo. La proposta di ordine può accompagnare la domanda, non sostituirla.
+- **Una premessa non è una candidata.** Un'affermazione di meccanismo su cui la task poggia si verifica **prima** dello step 1 (§0b): arrivata qui, una premessa falsa si presenta come fatto stabilito e passa il test senza essere guardata. Su T143 sette domande su sette taravano il rimedio a un canale che nessuno aveva misurato.
+
+### Una uscita per candidata, e il conto si fa per voce
+
+Ogni candidata esce dal test una volta: `D{N}`, `P{N}`, o chiusa da una misura. **Una proposta copre una candidata**; se ne copre due, le nomina entrambe. Niente «il resto lo decido io»: su T56 il modello ha dichiarato di aver deciso da sé 7 domande su 9, e le quattro proposte che ha scritto ne coprivano 5 — le altre quattro erano tornate fuse a coppie nelle due domande «vere». La copertura si verifica voce per voce, non per differenza.
+
+Il numero di domande che ne esce **non è un obiettivo in nessuna direzione**: una domanda dell'utente in meno è una decisione presa al posto suo, una del modello in più è il costo che il test esiste per togliere. Il test non accorcia il turno — sposta le decisioni dove il dato sta.
+
 ## 2. Il turno delle domande — recap e domande intrecciati, blocco unico in coda
 
 Le domande si pongono **scrivendo in chat**, non con `AskUserQuestion`, e arrivano tutte in un turno solo. L'utente risponde in prosa nel turno successivo.
