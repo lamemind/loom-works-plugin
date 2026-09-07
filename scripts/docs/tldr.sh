@@ -37,10 +37,12 @@
 #
 # --- gate ---------------------------------------------------------------------
 #
-# OGNI candidato deve comparire LETTERALMENTE nel file d'origine. Chi non passa
-# viene scartato prima di arrivare al potatore, che per contratto non puo'
-# correggere un nome falso e non ha il file per accorgersene: un errore del
-# raccoglitore che superasse il gate diventerebbe incorreggibile.
+# OGNI candidato deve comparire nel file d'origine — letteralmente, o attraverso
+# la cascata di tolleranza di `_riancora` (sopra) quando la trascrizione ha un
+# margine che il file non contiene davvero. Chi non passa neanche cosi' viene
+# scartato prima di arrivare al potatore, che per contratto non puo' correggere
+# un nome falso e non ha il file per accorgersene: un errore del raccoglitore
+# che superasse il gate diventerebbe incorreggibile.
 #
 # Il vocabolario e' NOME, ERRORE, SEZIONE — tre etichette che sono tutte
 # estrazione letterale, e per questo il gate non ha piu' eccezioni. Il regime
@@ -70,14 +72,17 @@
 # Una riga fuori formato viene scartata; una che inizia per `#` e' l'intestazione
 # della lista — il path del file d'origine — e attraversa il gate intatta.
 #
-# Il confronto e' letterale (`grep -F`) e il `--` che chiude le opzioni NON e'
-# opzionale: senza, ogni frammento che inizia per trattino (`--tab`, `--drainable`)
-# viene letto da grep come una sua opzione e riportato come fabbricazione. Misurato:
-# senza il `--` il gate riportava dieci scarti su novanta candidati, di cui sette
-# erano artefatti dello strumento.
+# Il primo gradino del confronto e' letterale (`grep -F`) e il `--` che chiude le
+# opzioni NON e' opzionale: senza, ogni frammento che inizia per trattino
+# (`--tab`, `--drainable`) viene letto da grep come una sua opzione e riportato
+# come fabbricazione. Misurato: senza il `--` il gate riportava dieci scarti su
+# novanta candidati, di cui sette erano artefatti dello strumento.
 #
-# Un frammento racchiuso in backtick viene provato anche nella forma nuda: la doc
-# cita i simboli col backtick, il sorgente li scrive senza.
+# Un frammento che il primo gradino non trova scende la cascata di `_riancora`:
+# decodificato, senza backtick, case-insensitive, a spazi collassati — e la riga
+# scritta in filtrata e' sempre la sottostringa che quel gradino ha preso dal
+# file, mai il frammento del raccoglitore. La doc cita i simboli col backtick, il
+# sorgente li scrive senza: e' il caso piu' comune del secondo gradino in poi.
 #
 # --- componi ------------------------------------------------------------------
 #
@@ -191,22 +196,30 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Il canale che consegna l'envelope di un subagent al chiamante puo' neutralizzare
-# `<` `>` `&` in entita' HTML. Il nome resta quello giusto, cambia la codifica in
-# transito — ma un confronto letterale non lo sa e lo tratterebbe da fabbricazione,
-# che e' il verdetto opposto. Misurato sul giro di rigenerazione dei 55 file di
-# reference/: 61 ancore perse cosi', concentrate sui nomi che portano un segnaposto
-# angolato (`<pid>`, `<slug>`), cioe' le firme di comando e i path di registry.
+# `<` `>` `&` in entita' HTML — una volta, con `"` esclusa (resta `\"`). Misurato
+# accoppiando lo stesso envelope su entrambi i lati del confine, 35 coppie su
+# quattro versioni del CLI: il canale esiste per davvero, ma da DLV1 non e' piu'
+# sul percorso di questo testo — raccoglitore e potatore scrivono la propria lista
+# direttamente su disco (write-tldr/SKILL.md), e l'unico envelope che sopravvive
+# porta un conteggio di controllo, mai il testo. Questa funzione resta come rete
+# di sicurezza per l'input che quel percorso non copre: un rilancio in regime
+# misto, un file preparato a mano.
 #
-# Il ripristino sta qui e non nel prompt dell'orchestratore perche' li' e' a
-# giudizio: tre lotti su otto lo fecero di propria iniziativa, tre no.
+# UN SOLO GIRO. Un secondo giro compensa una profondita' che il canale non ha, e
+# lo fa nei due versi sbagliati insieme: un'entita' scritta davvero nel file —
+# `${s//&amp;/\&}` — con due giri diventa `${s//&/\&}`, assente dal file, verdetto
+# "fabbricata" quando e' il contrario; `&amp;lt;` scritto alla lettera in un file
+# (per spiegare l'entita', non per usarla) con due giri diventa `<`, che nel file
+# compare ovunque e passa come ancora inutile. Il primo e' il caso da cui questa
+# funzione e' stata riscritta.
 #
-# Serve a DUE stadi, e ripararne uno solo sposta il difetto invece di chiuderlo:
-# il `gate` legge i candidati del raccoglitore, `componi` legge le voci del
-# potatore, e sono due envelope distinti che passano per lo stesso canale.
-# Misurato su cc/agent-sdk.md con la decodifica nel solo gate: 111 candidati su
-# 111 passati, e poi le stesse tre voci bocciate NON-VERBATIM da `componi`.
-#
-# Due giri, perche' un `&amp;lt;` va decodificato due volte.
+# Per lo stesso motivo la decodifica non va MAI applicata incondizionatamente
+# all'ingresso di un confronto: va provata solo dopo che la forma grezza ha gia'
+# fallito — e' il secondo gradino della cascata di tolleranza che il `gate`
+# applica in `_riancora` (sotto) e che `componi` applica sulle voci del potatore,
+# nello stesso ordine. Un'entita' scritta davvero nel file supera gia' il primo
+# gradino (letterale) e non arriva mai al secondo: decodificarla comunque e' il
+# difetto sopra, non una prudenza in piu'.
 #
 # La `&` di `&amp;` va scritta `\&` nella REPLACEMENT: da bash 5.2 quel carattere
 # vale li' «il testo che ha fatto match», come in sed, quindi `${s//&amp;/&}`
@@ -217,14 +230,55 @@ done
 # `git add -- <path> && git commit` — esce SCARTATO dal gate pur essendo nel file,
 # cioe' indistinguibile da una fabbricazione del raccoglitore.
 _decodifica() {
-    local s="$1" _g
-    for _g in 1 2; do
-        s="${s//&lt;/<}"
-        s="${s//&gt;/>}"
-        s="${s//&quot;/\"}"
-        s="${s//&amp;/\&}"
-    done
+    local s="$1"
+    s="${s//&lt;/<}"
+    s="${s//&gt;/>}"
+    s="${s//&quot;/\"}"
+    s="${s//&amp;/\&}"
     printf '%s' "$s"
+}
+
+# Cascata di tolleranza del gate: letterale → decodificato (un giro, sopra) →
+# senza backtick → case-insensitive → spazi collassati. Si scende un gradino solo
+# se il precedente non trova, e ogni gradino AGGIUNGE tolleranza al precedente
+# invece di sostituirlo — un candidato gia' senza backtick al gradino 3 resta lo
+# stesso ai gradini 4 e 5. Ritorna su stdout la sottostringa presa DAL FILE, mai
+# il testo del candidato: e' il solo modo per cui la riga 3 non porti mai un byte
+# reso da un modello, anche quando il modello ha trascritto con margine (backtick
+# aggiunti o tolti, maiuscola diversa, spazi doppi). Niente in stdout + exit 1
+# quando nessun gradino trova — SCARTATO, come prima di questa cascata.
+_riancora() {  # <frammento> <file> → stdout: sottostringa dal file
+    local frammento="$1" file="$2" dec nudo hit esc pattern
+
+    grep -qF -- "$frammento" "$file" && { printf '%s' "$frammento"; return 0; }
+
+    dec="$(_decodifica "$frammento")"
+    if [[ "$dec" != "$frammento" ]] && grep -qF -- "$dec" "$file"; then
+        printf '%s' "$dec"; return 0
+    fi
+
+    nudo="${dec#\`}"; nudo="${nudo%\`}"
+    if [[ -n "$nudo" && "$nudo" != "$dec" ]] && grep -qF -- "$nudo" "$file"; then
+        printf '%s' "$nudo"; return 0
+    fi
+    [[ -z "$nudo" ]] && nudo="$dec"
+
+    hit="$(grep -Fio -- "$nudo" "$file" 2>/dev/null | head -1)"
+    [[ -n "$hit" ]] && { printf '%s' "$hit"; return 0; }
+
+    # L'ordine dentro la classe non e' cosmetico: `[` seguito da `.` dentro una
+    # bracket expression apre la sintassi POSIX del simbolo di collazione
+    # (`[.x.]`) invece di restare un carattere letterale — misurato, sed esce con
+    # "comando 's' non terminato". `[` va per ultimo, appena prima della `]` di
+    # chiusura, dove non puo' precedere ne' `.` ne' `:` ne' `=`.
+    esc="$(printf '%s' "$nudo" | sed -e 's/\\/\\\\/g' -e 's/[].^$()+*?{|[]/\\&/g')"
+    pattern="$(printf '%s' "$esc" | sed -E 's/[[:space:]]+/[[:space:]]+/g')"
+    if [[ -n "$pattern" ]]; then
+        hit="$(grep -Eio -- "$pattern" "$file" 2>/dev/null | head -1)"
+        [[ -n "$hit" ]] && { printf '%s' "$hit"; return 0; }
+    fi
+
+    return 1
 }
 
 # `componi` non tocca il file sorgente: lavora sulle due liste e basta.
@@ -303,7 +357,6 @@ gate() {
         domanda="${domanda#"${domanda%%[![:space:]]*}"}"
         domanda="${domanda%"${domanda##*[![:space:]]}"}"
 
-        frammento="$(_decodifica "$frammento")"
         [[ -n "$domanda" ]] || domanda="-"
 
         case "$etichetta" in
@@ -323,12 +376,9 @@ gate() {
             continue
         fi
 
-        local nudo="$frammento"
-        nudo="${nudo#\`}"
-        nudo="${nudo%\`}"
-
-        if grep -qF -- "$frammento" "$FILE" || grep -qF -- "$nudo" "$FILE"; then
-            printf '%s | %s | %s\n' "$etichetta" "$frammento" "$domanda" >> "$dest"
+        local trovato
+        if trovato="$(_riancora "$frammento" "$FILE")"; then
+            printf '%s | %s | %s\n' "$etichetta" "$trovato" "$domanda" >> "$dest"
             passati=$((passati+1))
         else
             echo "[tldr] SCARTATO ${etichetta}: ${frammento}" >&2
@@ -409,12 +459,22 @@ componi() {
         [[ -z "${voce//[[:space:]]/}" ]] && continue
         voce="${voce#"${voce%%[![:space:]]*}"}"
         voce="${voce%"${voce##*[![:space:]]}"}"
-        # Stessa codifica in transito che il gate ripara sui candidati: la lista
-        # filtrata porta gia' la forma decodificata, la voce del potatore no.
-        voce="$(_decodifica "$voce")"
         rese=$((rese+1))
 
+        # Confronto grezzo prima che decodificato — stesso ordine della cascata
+        # di `_riancora`: con DLV1 la voce del potatore e' gia' la grafia del
+        # file, e decodificarla per prima romperebbe un'entita' scritta davvero
+        # (stesso difetto descritto sopra `_decodifica`). La forma decodificata
+        # resta un secondo tentativo per l'input residuo che non passa da li'.
         local et="${ETICHETTA_DI[$voce]:-}"
+        if [[ -z "$et" ]]; then
+            local vdec
+            vdec="$(_decodifica "$voce")"
+            if [[ "$vdec" != "$voce" && -n "${ETICHETTA_DI[$vdec]:-}" ]]; then
+                voce="$vdec"
+                et="${ETICHETTA_DI[$voce]:-}"
+            fi
+        fi
         if [[ -z "$et" ]]; then
             # Prima di bocciare, riprova sulla chiave normalizzata: se la voce
             # differisce dal candidato solo per i backtick, il potatore non ha
