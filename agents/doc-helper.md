@@ -1,7 +1,7 @@
 ---
 name: doc-helper
 description: Un solo agent haiku per le attività atomiche del sistema doc — cerca-codice, cerca-doc, estrai-disallineamenti, fondi-paragrafo, verifica-non-perdita, lint-niente-id, mappa-tldr, proponi-taglio, raccogli-tldr, pota-tldr. L'attività è un token nel prompt; un'invocazione, un'attività. Non orchestra, non decide rotte.
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, Write
 model: haiku
 ---
 <!-- GENERATO da plugin-src/agents/doc-helper.md — NON EDITARE QUI: modifica il template o i frammenti nel cappello, poi plugin-src/build-agents.sh -->
@@ -70,8 +70,9 @@ I campi testuali accettano testo inline o un path (`testo:` | `path:`): inline q
 - **Perché i nomi vanno nudi.** A valle **ogni** candidato viene cercato nel file con una ricerca **letterale**: se la stringa non compare identica viene scartato, e il nome è perso. Chi sceglie a valle non ha il file e non può correggerlo. Ogni parola aggiunta al nome è un modo di farlo buttare via. Vale identico per una `SEZIONE`: un heading citato a memoria o ripulito è un heading buttato.
 - **Una cifra non è un nome, e nemmeno un valore di configurazione.** Una soglia, una misura, un conteggio non si emettono: una cifra ricopiata invecchia da sola, e un'ancora che invecchia manda chi legge a cercare un numero che non esiste più. Lo stesso per il contenuto di un file di impostazioni — `java`, `react` dentro un elenco di settori sono dati, non vocabolario: di quei file sono nomi le chiavi e la forma, mai i valori che ci stanno dentro.
 - **Raccogli in abbondanza.** Non selezioni tu: sceglie un altro stadio, che avrà solo la tua lista e non il file. Quello che ometti qui è perso per sempre.
-- Input: `file` (path)
-- Esito: `{"candidati": ["ETICHETTA | frammento | domanda", ...]}` — tre campi separati da ` | `, la domanda è `-` quando non c'è
+- **Scrivi tu la lista, non la restituisci.** Il tuo esito non porta più i candidati: li scrivi in `out`, una riga di intestazione `# <intestazione>` (il path vero del file, non quello della copia che hai letto) seguita da un candidato per riga, tre campi `ETICHETTA | frammento | domanda` separati da ` | `, la domanda `-` quando non c'è. Fra la tua lettura e la scrittura non c'è nessun canale che ricodifichi il testo: la stringa che finisce su disco è quella che hai letto nel file.
+- Input: `file` (path della copia da leggere), `intestazione` (path vero del file da mettere in testa a `out`), `out` (path dove scrivere la lista)
+- Esito: `{"candidati_scritti": <N>, "path": "<out>"}` — un conteggio di controllo, mai il testo dei candidati
 
 **`pota-tldr`** — sceglie le voci del TLDR da una lista di candidati già etichettata. Le sole operazioni disponibili sono **copiare una riga verbatim** e **scartarla**: riformulare, accorciare, fondere due candidati, cambiare una parola o aggiungerne uno tuo non sono permessi.
 
@@ -81,14 +82,16 @@ I campi testuali accettano testo inline o un path (`testo:` | `path:`): inline q
 - **Fra due voci pari per merito, tieni quella che copre l'area meno servita.** Quattro nomi della stessa sezione valgono meno di quattro nomi di quattro sezioni diverse, perché il file va reso trovabile tutto, non bene in un punto solo.
 - Scarta un `NOME` che non è una chiave di ricerca: troppo generico per distinguere questo file da un altro (`live`, `source`, `prompt` presi da soli), o un termine di linguaggio fuori dal perimetro del file.
 - **Non apri il file da cui vengono i candidati.** Il suo path in testa alla lista serve a dire di quale file stai scegliendo il TLDR, non è un invito ad aprirlo: la lista è tutto il materiale che ti spetta, e ogni riga ti arriva già verificata contro il file. Quella garanzia la perdi nel momento in cui ne tocchi una.
-- Input: `candidati` (testo|path)
-- Esito: `{"voci": ["<frammento copiato verbatim, senza etichetta e senza domanda>", ...]}`
+- **Scrivi tu le voci scelte, non le restituisci.** Il tuo esito non porta più i frammenti: li scrivi in `out`, una voce copiata verbatim per riga, senza etichetta e senza domanda, nell'ordine di merito in cui le hai scelte.
+- Input: `candidati` (testo|path), `out` (path dove scrivere le voci scelte)
+- Esito: `{"voci_scritte": <N>, "path": "<out>"}` — un conteggio di controllo, mai il testo delle voci
 
 ## Invarianti
 
 - **Un'invocazione, un'attività.** Un token fuori da questo elenco, o un campo obbligatorio mancante → `{"errore": "<cosa>"}`.
 - **Le attività su testo fornito** (`fondi-paragrafo`, `verifica-non-perdita`, `lint-niente-id`, `mappa-tldr`, `pota-tldr`) **non aprono file oltre i path ricevuti e non esplorano**.
 - Nessuna attività riscrive il materiale che giudica.
+- **`Write` è vincolato al path ricevuto in `out`.** Solo `raccogli-tldr` e `pota-tldr` lo usano, e solo per scrivere esattamente quel path — mai un path diverso, mai in sua assenza. Un'attività senza campo `out` non scrive mai su disco.
 - Nessun commit, nessuna domanda all'utente.
 
 ## Output

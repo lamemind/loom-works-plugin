@@ -1,7 +1,7 @@
 ---
 name: write-tldr
 description: Produce la riga 3 — il TLDR-ancora — dei file di reference/ toccati da un writer. Due agent haiku (raccoglitore e potatore) alternati a passi deterministici che li controllano a monte e a valle. Unico attore autorizzato a scrivere quella riga.
-allowed-tools: Bash(*), Read, Write, Task
+allowed-tools: Bash(*), Read, Task
 model: sonnet
 ---
 
@@ -47,26 +47,17 @@ La copia è il file **senza la riga 3**. Da qui in avanti raccoglitore e gate la
 ```
 attività: raccogli-tldr
 file: <TMPDIR_TLDR>/<basename>.copia.md
+intestazione: <path del file vero>
+out: <TMPDIR_TLDR>/<basename>.txt
 ```
 
 Il modello si forza qui, invocazione per invocazione, invece di cambiarlo nel body dell'agent: `doc-helper` serve dieci attività e le altre nove stanno bene su haiku. Su questa no — haiku fabbrica nomi che nel file non esistono (parentesi aggiunte a un simbolo nudo, un prefisso di cartella inventato), e ogni fabbricazione è un'ancora persa: il gate la scarta correttamente, ma quel nome non entra più nell'indice. Misurato sui 55 file di `reference/`: una ventina di scarti con haiku, zero con sonnet a parità di file.
 
-L'envelope ritorna `{"candidati": ["ETICHETTA | frammento | domanda", ...]}`. Una lista corta o una `confidence` non alta sono red flag da riportare, non motivi per rilanciare.
+L'agent scrive da sé i candidati in `out` — una riga di intestazione `# <path vero>` (quello passato in `intestazione:`, non quello della copia che ha letto) seguita da un candidato per riga, tre campi `ETICHETTA | frammento | domanda`, il terzo `-` quando l'agent non ha saputo formulare la domanda. L'envelope torna solo `{"candidati_scritti": N, "path": "..."}`: fra la lettura del file e la scrittura della lista non c'è più nessun canale che possa ricodificare il testo, perché il testo non attraversa più `task-notification`. Una lista corta o una `confidence` non alta sono red flag da riportare, non motivi per rilanciare.
 
-**1c. La lista su disco.** Scrivi i candidati in `<TMPDIR_TLDR>/<basename>.txt`, **uno per riga, verbatim dall'envelope**, preceduti da una riga di intestazione col path **vero** del file — non quello della copia, che al potatore non direbbe nulla:
+**1c. Controllo e gate d'ingresso.**
 
-```
-# <path del file>
-SEZIONE | <…> | <il problema con cui uno ci arriva>
-NOME | <…> | <…>
-ERRORE | <…> | -
-```
-
-Tre campi separati da ` | `, il terzo è la domanda e vale `-` quando il raccoglitore non ha saputo formularla. Non riempirla tu e non toglierla: è il criterio con cui il potatore scarta, e un trattino è un dato che gli serve.
-
-Copiare qui una riga cambiandola vanifica il gate: da questo punto in poi nessuno ha più il file per accorgersene.
-
-**1d. Gate d'ingresso.**
+Prima di leggerla, verifica che `<basename>.txt` esista e non sia vuoto. Un `Write` negato in silenzio — permesso mancante, tipicamente in un giro headless come `nightly-doc` — non fa fallire l'agent: lo dichiara in una nota e tira dritto, e senza questo controllo il gate lavorerebbe su un file assente o su una lista dell'invocazione precedente. Assente o vuoto → salta il file, dichiaralo nel report, nessun retry.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/tldr.sh" gate \
@@ -75,22 +66,23 @@ Copiare qui una riga cambiandola vanifica il gate: da questo punto in poi nessun
     --out <TMPDIR_TLDR>/<basename>.filtrata.txt
 ```
 
-**Ogni** candidato deve comparire letteralmente nella copia: chi non passa esce qui. Le tre etichette — `NOME`, `ERRORE`, `SEZIONE` — sono tutte estrazione letterale, quindi il gate non ha eccezioni e nessuna voce entra senza verifica. Esce qui anche la `SEZIONE` che porta `-` al posto della domanda, con verdetto proprio `SENZA-DOMANDA`: nessuno arriva a un heading come `Rischi residui` con un problema in mano, e il potatore non deve spendere una scelta su una voce già condannata.
+**Ogni** candidato deve comparire nella copia: chi non passa neanche attraverso la cascata di tolleranza del gate — letterale, poi decodificato, poi senza backtick, poi case-insensitive, poi a spazi collassati — esce qui. Le tre etichette — `NOME`, `ERRORE`, `SEZIONE` — sono tutte estrazione letterale, quindi il gate non ha eccezioni di vocabolario; l'imprecisione di trascrizione che la cascata assorbe non è un'eccezione, è la correzione della voce alla grafia **del file**, mai quella resa dall'agent. Esce qui anche la `SEZIONE` che porta `-` al posto della domanda, con verdetto proprio `SENZA-DOMANDA`: nessuno arriva a un heading come `Rischi residui` con un problema in mano, e il potatore non deve spendere una scelta su una voce già condannata.
 
 Le righe `SCARTATO`, `SENZA-DOMANDA` e `MALFORMATO` su stderr sono **dati del report**, non errori — un nome fabbricato scartato è il gate che lavora. Tienili distinti anche nel report: `SCARTATO` misura quanto il raccoglitore fabbrica ed è l'unico dei tre che dice qualcosa sul suo prompt. Il gate esce comunque zero: un exit non-zero è un problema d'uso (file assente, lista assente), e lì il file si salta.
 
-**1e. Potatura.** `Task` con `subagent_type: doc-helper` **e `model: sonnet`**:
+**1d. Potatura.** `Task` con `subagent_type: doc-helper` **e `model: sonnet`**:
 
 ```
 attività: pota-tldr
 candidati: path:<TMPDIR_TLDR>/<basename>.filtrata.txt
+out: <TMPDIR_TLDR>/<basename>.voci.txt
 ```
 
-Passi il **path della lista filtrata**, mai il path del file d'origine e mai il suo contenuto: il potatore sceglie su ciò che il gate ha già verificato. L'envelope ritorna `{"voci": [...]}` — solo i frammenti, senza etichetta e senza domanda.
+Passi il **path della lista filtrata**, mai il path del file d'origine e mai il suo contenuto: il potatore sceglie su ciò che il gate ha già verificato. L'agent scrive da sé le voci scelte in `out`, **una per riga, verbatim, nell'ordine in cui le ha rese**. Dentro una stessa etichetta quell'ordine è di merito, ed è la sola decisione che il potatore prende su cosa sopravvive al taglio: riordinarle sarebbe scegliere al suo posto, con in mano molto meno di quello che aveva lui. Fra etichette diverse non decide lui — l'allocazione la applica `componi`. L'envelope torna solo `{"voci_scritte": N, "path": "..."}`.
 
-Scrivi le voci in `<TMPDIR_TLDR>/<basename>.voci.txt`, **una per riga, verbatim dall'envelope, nell'ordine in cui le ha rese**. Dentro una stessa etichetta quell'ordine è di merito, ed è la sola decisione che il potatore prende su cosa sopravvive al taglio: riordinare qui significa scegliere al posto suo, con in mano molto meno di quello che aveva lui. Fra etichette diverse non decide né lui né tu — l'allocazione la applica `componi`.
+**1e. Controllo e gate d'uscita.**
 
-**1f. Gate d'uscita e composizione.**
+Stesso controllo del passo 1c, su `<basename>.voci.txt`: assente o vuoto → salta il file, dichiaralo, nessun retry.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/tldr.sh" componi \
@@ -105,7 +97,7 @@ L'allocazione: le tre categorie si dividono il cap con pesi **`NOME` 40, `ERRORE
 
 `NON-VERBATIM`, `FUORI-VOCABOLARIO`, `OLTRE-CAP` su stderr sono dati del report. Exit 1 = nessuna voce utilizzabile: salta il file e dichiaralo.
 
-**1g. La riga sul file.**
+**1f. La riga sul file.**
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/docs/tldr.sh" set \
