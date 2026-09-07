@@ -48,6 +48,7 @@ Modalità detached: la task viene attivata SENZA creare il symlink `{docs_root}/
    1. Leggi il file task appena attivato
    2. **Calcola stato preflight** dalla sezione `## Decisions` del task file:
       - **✅ fatto · ${data} · ${N} decisioni** — esiste ≥1 blocco `### Preflight` con ≥1 bullet `**D{N}**`. `${data}` = data del blocco `### Preflight` più recente; `${N}` = totale bullet `**D{N}**` su tutti i blocchi Preflight.
+      - **⛔ premesse da ricostruire · ${data}** — il blocco `### Preflight` più recente porta `— premessa decaduta` nel heading: il preflight si è fermato davanti a una premessa smentita dalla misura, senza porre domande. Va letto **prima** dei due casi sopra, perché anche lui è un blocco datato senza bullet `**D{N}**` e altrimenti passerebbe per «non necessario».
       - **➖ non necessario · ${data}** — esiste ≥1 blocco `### Preflight` ma zero bullet `**D{N}**` (marker "nessuna ambiguità" lasciato da preflight-task).
       - **⚠️ da fare** — nessun blocco `### Preflight` (o sezione `## Decisions` assente).
    3. Estrai e mostra (formato compatto, identico a run-task):
@@ -65,6 +66,8 @@ Modalità detached: la task viene attivata SENZA creare il symlink `{docs_root}/
       ```
    4. Se preflight è **⚠️ da fare**, aggiungi sotto il footer la riga:
       `   🛫 Preflight non eseguita → valuta /loom-works:preflight-task ${taskId se detached, altrimenti vuoto} prima di run-task.`
+   5. Se preflight è **⛔ premesse da ricostruire**, aggiungi invece:
+      `   🛫 Premessa decaduta → ricostruisci le premesse nel task file, poi /loom-works:preflight-task ${taskId se detached, altrimenti vuoto}.`
 
 ## Note
 

@@ -81,6 +81,8 @@ Il piano dev'essere chiaro **prima** di scrivere codice. Chi congela le aspettat
 
 «Preflight fatto» lo attesta il blocco `## Decisions` datato nel task file — vale anche un marker esplicito di «nessuna ambiguità». La Prog 🟢 è il glifo derivato, la fonte è il file.
 
+**Non vale un blocco il cui heading porta `— premessa decaduta`**: è il preflight che si è fermato davanti a una premessa smentita dalla misura, e non ha posto domande. Se è il blocco `### Preflight` più recente, fermati **a ogni Size** e rimanda alla ricostruzione delle premesse nel task file, poi a `/loom-works:preflight-task ${taskId}`: i DLV poggiano su un meccanismo che la misura ha smentito, ed eseguirli produce lavoro ben formato su un terreno falso.
+
 ## 4. Rito di validazione — lo sceglie `Size`
 
 `Size` e perimetro sono **ortogonali**: Size decide quanta validazione e pianificazione precedono il codice, il perimetro su quali DLV si lavora.

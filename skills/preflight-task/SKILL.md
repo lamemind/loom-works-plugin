@@ -37,6 +37,37 @@ Stampa header compatto identico a run-task:
 🛫 Preflight
 ```
 
+## 0b. Verifica delle premesse — prima di cercare ambiguità
+
+Una task poggia su affermazioni di meccanismo: «il canale che consegna l'envelope codifica in entità HTML», «un file da 12.000 caratteri porta qualche centinaio di span», «il body della skill entra nel transcript come record utente». Lo step 1 non le vede per costruzione — cerca ciò che **non è deciso**, e una premessa si presenta come fatto stabilito, quindi passa. Il layout dello step 2 poi la peggiora: entra nel recap, ne esce glossata ed esplicitata, e chi risponde la legge scritta meglio di com'era. Su T143 sette domande su sette taravano il rimedio a un canale che nessuno aveva misurato; la premessa era falsa e la task è morta superseduta. Ne discende che le premesse si verificano **qui, prima**, non dentro l'analisi.
+
+1. **Elenca** le affermazioni di meccanismo su cui poggia **più di un DLV, o un AC**: Description, Dependencies, Implementation Notes. Un'affermazione che regge un solo DLV si verifica quando quel DLV si esegue, non qui.
+2. **Marca** ognuna: `misurata` — il task file o il materiale porta la misura (una cifra contata, l'output di un comando, un transcript nominato) — oppure `asserita` — detta come fatto, senza una misura accanto.
+3. **Le asserite le misuri tu, adesso, quando la misura è una lettura**: `Read`, `Grep`, `git log`, un conteggio, un transcript aperto. È analisi, non implementazione — questa skill vieta di scrivere codice, non di leggere. Quando la misura richiede **eseguire codice o toccare un sistema vivo** (lanciare un job, chiamare un servizio, costruire un banco) non la fai: diventa una proposta `P{N}` di primo deliverable — «DLV0: misurare X prima di tutto» — che l'utente vede nel turno accanto alle altre (§2).
+4. **Esito per premessa**, uno dei tre: `✅ misurata` con la cifra o il comando · `⏸ da misurare` con la `P{N}` che la porta a DLV · `❌ decaduta`.
+
+Il blocco delle premesse **apre il turno** dello step 2, prima delle generali, come lista compatta — una riga per premessa, esito e prova accanto. Se la task non porta affermazioni di meccanismo che reggano più di un DLV, la lista lo dice in una riga e non si scrive altro.
+
+### Premessa decaduta — decade tutto
+
+Se la misura smentisce una premessa su cui poggia più di un DLV, **il preflight non pone domande**. Le domande costruite su un terreno falso producono decisioni ben formate e inutili, e ognuna verrebbe riscritta tre volte con sempre più dettaglio dal layout. Invece:
+
+- **in chat**, per esteso: la premessa com'era scritta nel task file, la misura che la smentisce, i DLV e gli AC che ci poggiano;
+- **nel task file**, in `## Decisions`, un blocco che dice la stessa cosa e nessuna `D{N}`:
+
+  ```markdown
+  ### Preflight ${YYYY-MM-DD HH:mm} — premessa decaduta
+
+  - **Premessa**: ${testuale, com'era scritta}
+  - **Misura**: ${cosa hai misurato, come, la cifra o l'output}
+  - **Poggiano su di lei**: ${DLV e AC}
+  - _Nessuna domanda posta. Ricostruire le premesse nel task file, poi rilanciare il preflight._
+  ```
+
+- **commit del solo task file** (§4, messaggio `task(${taskId}): preflight - premessa decaduta`), **nessuna promozione** — §3c non gira, la task non è pronta — poi **termina**.
+
+La ricostruzione delle premesse è dell'utente, in questa conversazione o in un'altra: per questo lo stato sta nel file e non solo in chat. Un preflight rilanciato dopo legge il blocco, riparte da qui e non dallo step 1. Il heading porta `— premessa decaduta` perché `start-task` e `run-task` distinguono per costruzione questo blocco dal marker «nessuna ambiguità», che è anche lui un blocco datato senza `D{N}`: senza la dicitura, una task fermata davanti a una premessa falsa risulterebbe pronta per `run-task`.
+
 ## 1. Analisi ambiguità
 
 Leggi tutto il task file. Identifica punti dove l'esecuzione richiederebbe scelte non documentate:
