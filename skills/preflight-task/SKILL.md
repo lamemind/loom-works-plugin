@@ -122,6 +122,12 @@ Se la risposta dipende da uno di questi, la candidata è una **domanda** → `D{
 
 Vale anche per la **misura già fatta**: se un paragrafo del tuo stesso turno — il recap, una cifra che hai appena riportato — risolve la candidata, la candidata è chiusa. Su T144 `D11` la misura stava quattro paragrafi sopra la domanda (4 ancore orfane su 1.296, 3 sul file esente) e la domanda è stata posta comunque; su T139 `D12` il recap arrivava alla risposta e la domanda seguiva. Otto delle 134 domande del corpus erano di questa forma, e in tutte la cifra era nel repo o già nel turno.
 
+### Non è una proposta, è esecuzione
+
+Una candidata del modello diventa `P{N}` **solo se la strada scartata è una che qualcuno potrebbe ragionevolmente preferire** — costa diverso, rompe qualcosa di diverso, resta visibile dopo. Se la strada scartata non ha nessuno dalla sua parte, non c'è niente da smentire: la scelta è **esecuzione**, la prende `run-task` e si legge nel diff. Quale script numera i DLV, se due template si fondono in uno, a che passo del turno gira un controllo: nessuna di queste è una proposta.
+
+Il test è una frase: «se l'utente la smentisse, cosa direbbe?». Se non c'è una risposta che non sia «fai come ti pare», la `P` non nasce. Una proposta senza avversario è una quota di produzione spostata dalle domande alle proposte: il turno si allunga di una voce che nessuno leggerà, e le proposte che contano affogano in mezzo.
+
 ### Casi limite
 
 - **Il caso misto si spacca, ma non in due domande.** Una candidata con una metà di preferenza e una metà tecnica pone la sola metà dell'utente; la metà del modello **non diventa una `D{N}` a parte** — va sotto la domanda come conseguenza già derivata per ciascuna risposta possibile («se A, il TLDR si riproduce a ogni checkpoint; se B, solo al rilascio»), o come proposta. Su T138 la scelta fra trasloco a ogni checkpoint e trasloco al rilascio (`D1`, dell'utente) ha generato `D6` e `D7` come domande separate, ed erano le sue conseguenze tecniche: due domande in più per una decisione sola.

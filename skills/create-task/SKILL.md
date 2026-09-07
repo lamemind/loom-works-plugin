@@ -79,6 +79,8 @@ Output: ID completo pronto all'uso (es: T319, T320). Prefix `T` hardcoded.
 7. **Acceptance criteria**
 8. **Deliverables**
 
+**Una cifra in un AC è contata, non stimata** — vale anche in YOLO. Se la soglia dipende da una misura — byte di un file, occorrenze, righe, tempo — la misura si fa prima di scrivere la riga, e la riga porta il punto di partenza accanto al bersaglio (`da 43.206 a ≤ 26.000`), oppure il bersaglio è relativo a quel punto (`sotto il 60% di oggi`). Una cifra tonda senza la misura accanto è una promessa che il preflight smonterà al primo `wc -c`.
+
 ### 2b. Lane e dipendenze (AskUserQuestion)
 
 Dopo i dettagli base, due domande con AskUserQuestion. Prima di ognuna esegui il ping pre-domanda (vedi §Convenzione TTS):
