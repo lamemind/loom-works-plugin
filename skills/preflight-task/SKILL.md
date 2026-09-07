@@ -291,11 +291,17 @@ Formato:
   - **Razionale**: ${se presente, altrimenti omettere riga}
 
 - **D2** — ...
+
+**Proposte mostrate nel turno.** Decisioni prese dal preflight col dato del repo e passate davanti all'utente prima di questo commit.
+
+- **P1** — ${la maniglia, la stessa mostrata in chat} — *non smentita*
+  ${la scelta e la ragione, com'erano nel turno}
+- **P2** — ${maniglia} — *smentita → D4* ${oppure → P5}
 ```
 
-Tre regole sulla scrittura del blocco:
+Quattro regole sulla scrittura del blocco:
 
-- **Gli id sono quelli mostrati in chat**, uno per uno. Non si rinumera e non si ricompatta: l'utente ha risposto citandoli, e cambiarli qui li fa scadere. `D{N}` riparte da `D1` solo alla prossima **esecuzione** della skill, che è un blocco datato nuovo.
+- **Gli id sono quelli mostrati in chat**, uno per uno. Non si rinumera e non si ricompatta: l'utente ha risposto citandoli, e cambiarli qui li fa scadere. `D{N}` e `P{N}` ripartono da 1 solo alla prossima **esecuzione** della skill, che è un blocco datato nuovo.
 - **Ogni `D{N}` del giro compare, con il suo esito.** Non decisa dall'utente:
 
   ```markdown
@@ -303,10 +309,13 @@ Tre regole sulla scrittura del blocco:
     - **Non decisa**: ${motivazione dell'utente, testuale}
   ```
 
-  È l'unica forma ammessa oltre a `**Scelta**`, e rende leggibile a `run-task` la differenza fra «qui sei libero» e «qualcuno si è dimenticato». Se una domanda è ancora senza esito, **non sei allo step 3**: torna al giro di domande (§2g).
-- **Una scelta derivata da un collasso non smentito porta la derivazione accanto**: `- **Scelta**: ${risposta} — *derivata da D1, non smentita*`.
+  Risolta per implicazione da una risposta (§2g): `- **Scelta**: ${risposta} — *risolta da P7, non smentita*`, e `P7` sta fra le proposte con la sua ragione. Sono le sole forme ammesse oltre a `**Scelta**`, e rendono leggibile a `run-task` la differenza fra «qui sei libero» e «qualcuno si è dimenticato». Se una domanda è ancora senza esito, **non sei allo step 3**: torna al giro (§2g).
+- **Ogni `P{N}` mostrata compare, con il suo esito**: *non smentita*, o *smentita →* la voce che ne è nata. Una proposta smentita non sparisce dal file: la sua riga dice dove è finita la scelta, e la voce nuova porta la ragione dell'utente.
+- **Nel blocco entrano solo id che sono comparsi in chat prima di scriverlo.** Una derivazione che nasce **mentre scrivi** — «scrivendo `D4` vedo che il nome del flag discende da `D1`» — non è una riga in più, è un giro in più: torna a §2g, mostrala come `P{N}`, e scrivi il blocco solo dopo. «Non smentita» presuppone che chi poteva smentire abbia **visto**; una derivazione dichiarata dopo il push con «smentiscila adesso» è una decisione presa a cose fatte, comunicata con la forma di una proposta. Il §2h vieta di chiudere una domanda senza esito; questa regola vieta di aprire una decisione senza turno — ed è quella che morde sulle derivazioni, perché nascono quando lo step delle domande è già dichiarato chiuso.
 
-**Caso nessuna ambiguità (step 1 vuoto)**: scrivi comunque il blocco header datato, senza decisioni:
+**Verifica prima del commit, meccanica e non opzionale.** Scritto il blocco, estrai gli id dal blocco datato di questa esecuzione — `grep -oE '\*\*[DP][0-9]+\*\*' "${task_file}"` sulle righe sotto `### Preflight ${data}` — e confrontali uno per uno con gli id dei tuoi turni in questa conversazione. Un id nel file che nessun turno ha mostrato: **non committare**, togli la riga, torna a §2g. La verifica è a carico tuo perché nessuno script legge i turni; il fallimento che previene è silenzioso, produce un blocco ben formato.
+
+**Caso nessuna ambiguità (step 1 vuoto e nessuna proposta)**: scrivi comunque il blocco header datato, senza decisioni:
 
 ```markdown
 ### Preflight ${YYYY-MM-DD HH:mm}
@@ -314,7 +323,7 @@ Tre regole sulla scrittura del blocco:
 - _Nessuna ambiguità rilevata._ Task pronta per `run-task` senza decisioni da congelare.
 ```
 
-L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `start-task` legge come "preflight verificata, nessuna decisione" (distinto da "preflight mai eseguita" = blocco assente).
+L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `start-task` legge come "preflight verificata, nessuna decisione" (distinto da "preflight mai eseguita" = blocco assente, e da «premessa decaduta» = heading con la dicitura, §0b). Un giro con zero domande e una o più proposte **non è** questo caso: le proposte sono decisioni, passano dal turno (§2) e si scrivono nel blocco come sopra.
 
 ## 3b. Le decisioni che producono una nozione documentale
 
@@ -351,20 +360,20 @@ Appena promossa la Prog, committa **subito** task file e `tasks.md` (commit dedi
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
-# N≥1 → "...- ${N} decisioni congelate" | N=0 (nessuna ambiguità) → "...- nessuna ambiguità"
+# N≥1 → "...- ${N} decisioni congelate" | N=0 (nessuna ambiguità) → "...- nessuna ambiguità" | premessa decaduta → "...- premessa decaduta" (§0b)
 lw_git_add_n_commit "task(${taskId}): preflight - ${N} decisioni congelate" "${task_file}" "${tasks_md}"
 lw_git_push
 ```
 
 - Committa **solo** quei due file: `lw_git_add_n_commit` stagia e committa con la stessa pathspec, quindi ciò che altre sessioni hanno lasciato in stage nello stesso worktree resta fuori. Non usare `git commit -m` nudo — senza pathspec committa l'intero indice. `tasks.md` entra perché lo step 3c può averne cambiato la riga; se la promozione non è scattata il file è pulito e non produce diff.
 - Messaggio: `task(${taskId}): preflight - ${N} decisioni congelate` se `${N}` ≥ 1, altrimenti `task(${taskId}): preflight - nessuna ambiguità`.
-- `${N}` = numero di `D{N}` scritte da **questa** esecuzione, le non-decise comprese: hanno un esito dichiarato come le altre (0 nel caso nessuna ambiguità).
+- `${N}` = `D{N}` scritte da **questa** esecuzione, le non-decise comprese, **più** le `P{N}` non smentite: sono decisioni congelate quanto le altre, e lo sono diventate passando dal turno. 0 nel caso nessuna ambiguità.
 - Push subito dopo il commit, coerente con `create-task` / `checkpoint-task` (tutte pushano). Senza remote `lw_git_push` avvisa su stderr ed esce 0: la skill prosegue, il commit resta locale.
 
 Dopo commit+push, mostra all'utente:
 
 ```
-✅ Preflight completato: ${N} decisioni congelate in ${task_file}
+✅ Preflight completato: ${N} decisioni congelate in ${task_file} — ${D} domande, ${P} proposte non smentite
    📌 Committate e pushate: task(${taskId}): preflight - ${N} decisioni congelate
    📝 ${M} nozioni in Doc Impact  ← solo se ${M} > 0
    Pronta per /loom-works:run-task
