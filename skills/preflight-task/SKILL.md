@@ -39,18 +39,16 @@ Stampa header compatto identico a run-task:
 
 ## 0b. Verifica delle premesse — prima di cercare ambiguità
 
-Una task poggia su affermazioni di meccanismo: «il canale che consegna l'envelope codifica in entità HTML», «un file da 12.000 caratteri porta qualche centinaio di span», «il body della skill entra nel transcript come record utente». Lo step 1 non le vede per costruzione — cerca ciò che **non è deciso**, e una premessa si presenta come fatto stabilito, quindi passa. Il layout dello step 2 poi la peggiora: entra nel recap, ne esce glossata ed esplicitata, e chi risponde la legge scritta meglio di com'era. Su T143 sette domande su sette taravano il rimedio a un canale che nessuno aveva misurato; la premessa era falsa e la task è morta superseduta. Ne discende che le premesse si verificano **qui, prima**, non dentro l'analisi.
+Una task poggia su affermazioni di meccanismo: «il canale che consegna l'envelope codifica in entità HTML», «un file da 12.000 caratteri porta qualche centinaio di span», «il body della skill entra nel transcript come record utente». Lo step 1 non le vede per costruzione — cerca ciò che **non è deciso**, e una premessa si presenta come fatto stabilito, quindi passa; il layout dello step 2 poi la peggiora, perché entra nel recap e ne esce glossata come se fosse sempre stata verificata. Su T143 sette domande su sette taravano il rimedio a un canale che nessuno aveva misurato, e la task è morta superseduta. Ne discende che le premesse si verificano **qui, prima**, non dentro l'analisi.
 
 1. **Elenca** le affermazioni di meccanismo su cui poggia **più di un DLV, o un AC**: Description, Dependencies, Implementation Notes. Un'affermazione che regge un solo DLV si verifica quando quel DLV si esegue, non qui.
 2. **Marca** ognuna: `misurata` — il task file o il materiale porta la misura (una cifra contata, l'output di un comando, un transcript nominato) — oppure `asserita` — detta come fatto, senza una misura accanto.
 3. **Le asserite le misuri tu, adesso, quando la misura è una lettura**: `Read`, `Grep`, `git log`, un conteggio, un transcript aperto. È analisi, non implementazione — questa skill vieta di scrivere codice, non di leggere. Quando la misura richiede **eseguire codice o toccare un sistema vivo** (lanciare un job, chiamare un servizio, costruire un banco) non la fai: diventa una proposta `P{N}` di primo deliverable — «DLV0: misurare X prima di tutto» — che l'utente vede nel turno accanto alle altre (§2).
-4. **Esito per premessa**, uno dei tre: `✅ misurata` con la cifra o il comando · `⏸ da misurare` con la `P{N}` che la porta a DLV · `❌ decaduta`.
-
-Il blocco delle premesse **apre il turno** dello step 2, prima delle generali, come lista compatta — una riga per premessa, esito e prova accanto. Se la task non porta affermazioni di meccanismo che reggano più di un DLV, la lista lo dice in una riga e non si scrive altro.
+4. **Esito per premessa**, uno dei tre: `✅ misurata` con la cifra o il comando · `⏸ da misurare` con la `P{N}` che la porta a DLV · `❌ decaduta`. Il blocco delle premesse **apre il turno** dello step 2, prima delle generali, come lista compatta — una riga per premessa, esito e prova accanto; se la task non porta affermazioni che reggano più di un DLV, la lista lo dice in una riga e non si scrive altro.
 
 ### Premessa decaduta — decade tutto
 
-Se la misura smentisce una premessa su cui poggia più di un DLV, **il preflight non pone domande**. Le domande costruite su un terreno falso producono decisioni ben formate e inutili, e ognuna verrebbe riscritta tre volte con sempre più dettaglio dal layout. Invece:
+Se la misura smentisce una premessa su cui poggia più di un DLV, **il preflight non pone domande**: le domande costruite su un terreno falso producono decisioni ben formate e inutili. Invece:
 
 - **in chat**, per esteso: la premessa com'era scritta nel task file, la misura che la smentisce, i DLV e gli AC che ci poggiano;
 - **nel task file**, in `## Decisions`, un blocco che dice la stessa cosa e nessuna `D{N}`:
@@ -66,7 +64,7 @@ Se la misura smentisce una premessa su cui poggia più di un DLV, **il preflight
 
 - **commit del solo task file** (§4, messaggio `task(${taskId}): preflight - premessa decaduta`), **nessuna promozione** — §3c non gira, la task non è pronta — poi **termina**.
 
-La ricostruzione delle premesse è dell'utente, in questa conversazione o in un'altra: per questo lo stato sta nel file e non solo in chat. Un preflight rilanciato dopo legge il blocco, riparte da qui e non dallo step 1. Il heading porta `— premessa decaduta` perché `start-task` e `run-task` distinguono per costruzione questo blocco dal marker «nessuna ambiguità», che è anche lui un blocco datato senza `D{N}`: senza la dicitura, una task fermata davanti a una premessa falsa risulterebbe pronta per `run-task`.
+La ricostruzione delle premesse è dell'utente, in questa conversazione o in un'altra: per questo lo stato sta nel file e non solo in chat, e un preflight rilanciato dopo legge il blocco e riparte da qui, non dallo step 1. Il heading porta `— premessa decaduta` perché `start-task` e `run-task` lo distinguono per costruzione dal marker «nessuna ambiguità» (anche lui un blocco datato senza `D{N}`): senza la dicitura, una task fermata davanti a una premessa falsa risulterebbe pronta per `run-task`.
 
 ## 1. Analisi ambiguità — produce candidate, non domande
 
@@ -99,7 +97,7 @@ Sul primo dato, tre precisazioni:
 
 ## 1b. Il test di appartenenza — da candidata a domanda, proposta o misura
 
-Lo step 1 produce **candidate**, non domande. Un elenco di classi di ambiguità è una quota di produzione: chi lo applica formula una voce per ogni classe che riesce a riempire, e il numero di voci finisce per misurare la ricchezza dell'analisi, non il numero di decisioni che sono davvero dell'utente. Sul corpus di 12 giri col contratto precedente, 52 domande su 134 erano dell'utente; su T140 zero su nove, e una frase nell'invocazione le ha fatte sparire tutte senza che il modello leggesse niente di nuovo — le sapeva già mentre le scriveva. Il test qui sotto è quella frase, scritta nel contratto.
+Lo step 1 produce **candidate**, non domande. Un elenco di classi di ambiguità è una quota di produzione: chi lo applica formula una voce per ogni classe che riesce a riempire, e il numero di voci finisce per misurare la ricchezza dell'analisi, non il numero di decisioni che sono davvero dell'utente. Il test qui sotto è la frase che le distingue.
 
 **Ogni candidata passa il test prima di diventare una `D{N}`, e ha esattamente una di tre uscite.**
 
@@ -120,7 +118,9 @@ Se la risposta dipende da uno di questi, la candidata è una **domanda** → `D{
 
 **Se la risposta si ottiene contando qualcosa nel repo, si conta.** File, occorrenze, righe, commit: `Grep`, `wc`, `git log`. La cifra decide la candidata da sola o entra in una proposta con il suo numero — mai in una domanda. **Nessuna cifra a spanne nel corpo di una `D{N}`**: «qualche centinaio», «facilmente», «circa» dentro una domanda sono il sintomo che la misura manca, e la stima è libera di essere sbagliata senza che nulla lo segnali. Su T144 `D6` «qualche centinaio di span fra backtick» su un file da 12.000 caratteri erano 62, 69 e 79 su tre file contati: a quel volume la domanda non aveva più oggetto.
 
-Vale anche per la **misura già fatta**: se un paragrafo del tuo stesso turno — il recap, una cifra che hai appena riportato — risolve la candidata, la candidata è chiusa. Su T144 `D11` la misura stava quattro paragrafi sopra la domanda (4 ancore orfane su 1.296, 3 sul file esente) e la domanda è stata posta comunque; su T139 `D12` il recap arrivava alla risposta e la domanda seguiva. Otto delle 134 domande del corpus erano di questa forma, e in tutte la cifra era nel repo o già nel turno.
+Vale anche per la **misura già fatta**: se un paragrafo del tuo stesso turno — il recap, una cifra che hai appena riportato — risolve la candidata, la candidata è chiusa. Su T144 `D11` la misura stava quattro paragrafi sopra la domanda (4 ancore orfane su 1.296, 3 sul file esente) e la domanda è stata posta comunque; su T139 `D12` il recap arrivava alla risposta e la domanda seguiva.
+
+**Una misura decide un fatto, non un intento.** Quando un criterio è ambiguo — un AC che dice «ogni script del sistema doc» senza definire il perimetro — contare quanti script esistono risolve «quanti sono», non «quali intendeva chi ha scritto il criterio»: sono due domande diverse, e la seconda resta dell'utente anche dopo che la prima è stata contata (§Il discriminante, «intento dietro un criterio ambiguo»). Una candidata di questo tipo non si chiude con la cifra: la cifra entra nel corpo della domanda come misura già fatta, e la domanda resta `D{N}`.
 
 ### Non è una proposta, è esecuzione
 
@@ -137,7 +137,7 @@ Il test è una frase: «se l'utente la smentisse, cosa direbbe?». Se non c'è u
 
 ### Una uscita per candidata, e il conto si fa per voce
 
-Ogni candidata esce dal test una volta: `D{N}`, `P{N}`, o chiusa da una misura. **Una proposta copre una candidata**; se ne copre due, le nomina entrambe. Niente «il resto lo decido io»: su T56 il modello ha dichiarato di aver deciso da sé 7 domande su 9, e le quattro proposte che ha scritto ne coprivano 5 — le altre quattro erano tornate fuse a coppie nelle due domande «vere». La copertura si verifica voce per voce, non per differenza.
+Ogni candidata esce dal test una volta: `D{N}`, `P{N}`, o chiusa da una misura. **Una proposta copre una candidata**; se ne copre due, le nomina entrambe. Niente «il resto lo decido io»: la copertura si verifica voce per voce, non per differenza.
 
 Il numero di domande che ne esce **non è un obiettivo in nessuna direzione**: una domanda dell'utente in meno è una decisione presa al posto suo, una del modello in più è il costo che il test esiste per togliere. Il test non accorcia il turno — sposta le decisioni dove il dato sta.
 
@@ -154,14 +154,14 @@ intro / header
 ⓪ le premesse verificate (§0b): una riga per premessa, esito e prova accanto
 ① le domande e le proposte generali, precedute dal loro recap contestualizzante        (§2c)
 ② per ogni sottosistema toccato: il suo recap, poi le sue domande, poi le sue proposte  (§2d)
-③ il blocco finale: tutte le domande e tutte le proposte insieme, generali comprese       (§2e)
+③ la copertura per DLV, poi il blocco finale: domande verbatim, proposte a maniglia         (§2e)
 ```
 
-**Ogni domanda e ogni proposta compare quindi due volte, ed è voluto: non è ridondanza da potare.** Le due occorrenze servono a due momenti diversi della lettura. Sotto il sottosistema la voce arriva mentre il materiale che la risolve è ancora sotto gli occhi — chi decide non deve rimappare a memoria quale paragrafo di recap serviva a quale `D{N}`, e la maniglia verbo+oggetto identifica la voce ma non riporta indietro il contesto. In coda il blocco unico resta il posto dove si risponde in fila senza risalire il documento, e l'unico da cui si copiano gli id. Chi rilegge questo prompt e vede la stessa voce due volte sta guardando il meccanismo, non un residuo.
+**Ogni voce compare due volte, ed è voluto: non è ridondanza da potare — ma le due occorrenze non pesano uguale.** La prima, sotto il sottosistema, arriva mentre il materiale che la risolve è ancora sotto gli occhi — chi decide non deve rimappare a memoria quale paragrafo di recap serviva a quale voce, e la maniglia verbo+oggetto identifica la voce ma non riporta indietro il contesto. La seconda è dove si risponde: per una domanda è il posto dove l'utente scrive la sua prosa, e dev'essere completa quanto la prima; per una proposta è dove l'utente la smentisce citando l'id, e la maniglia basta — il corpo che la motiva è a poche righe sopra, letto una volta sola. Chi rilegge questo prompt e vede una domanda ripetuta due volte sta guardando il meccanismo, non un residuo.
 
 Vale la stessa economia del recap senza freni di volume (§2b): un minuto di lettura in più costa meno di una decisione sbagliata congelata in `## Decisions` ed eseguita da `run-task`.
 
-**Il layout a tempi vale sempre, a qualunque numero di domande** — con una sola, con nessuna e sole proposte, con un solo sottosistema, con tutte le voci generali. Nessun collasso a un blocco solo, nessuna soglia sotto cui il turno si accorcia. Il test di §1b riduce le domande, non il layout: quello che resta dopo il test sono per lo più proposte, e una proposta è smentibile solo col recap che la motiva sotto gli occhi — collassare il layout quando le domande sono poche toglierebbe il contesto proprio alle voci che l'utente non ha chiesto e che deve poter rifiutare. Su T140 un giro con una domanda sola ha preso tre decisioni senza mostrarle: il layout pieno, coi suoi `Proposte` per sottosistema, è ciò che le avrebbe fatte comparire. Il costo del layout su un giro leggero è lo scroll, che è gratuito; un criterio di soglia è una regola in più da valutare a ogni giro, compreso quello da tredici domande dove il layout serve davvero.
+**Il layout a tempi vale sempre, a qualunque numero di domande** — con una sola, con nessuna e sole proposte, con un solo sottosistema, con tutte le voci generali. Nessun collasso a un blocco solo, nessuna soglia sotto cui il turno si accorcia. Il test di §1b riduce le domande, non il layout: quello che resta dopo il test sono per lo più proposte, e valgono per loro la stessa ragione sopra — collassare il layout quando le domande sono poche toglierebbe il contesto proprio alle voci che l'utente non ha chiesto e che deve poter rifiutare. Il costo del layout su un giro leggero è lo scroll, che è gratuito; un criterio di soglia è una regola in più da valutare a ogni giro, compreso quello da tredici domande dove il layout serve davvero.
 
 **Separazione visiva** (§2c, §2d, §2e la usano tutte):
 
@@ -199,9 +199,8 @@ La proposta:
   *Smentibile con una parola.*
 ```
 
-- **Le due occorrenze portano lo stesso testo, parola per parola.** Non «la stessa forma» in senso lato: maniglia, corpo e riga di chiusura sono **identici** nelle due posizioni, e la seconda si ottiene ricopiando la prima, non riscrivendola. La regola è **simmetrica** e va letta nei due versi: nessuna delle due si accorcia in una forma breve, e nessuna delle due si arricchisce di qualcosa che l'altra non ha.
-
-  Il verso che cede è il secondo, non il primo. Riscrivere un testo già scritto lo comprime per gravità — la seconda stesura di una domanda esce più corta, con le strade viste ridotte a due parole ciascuna — e il risultato è un blocco finale che sembra un riepilogo del turno invece del posto dove si risponde. Chi risponde legge la versione povera e decide su meno materiale di quello che gli era stato mostrato dieci righe prima.
+- **Le due occorrenze di una domanda portano lo stesso testo, parola per parola.** Non «la stessa forma» in senso lato: maniglia, corpo e riga di chiusura sono **identici** nelle due posizioni, e la seconda si ottiene ricopiando la prima, non riscrivendola. Il verso che cede non è mai il primo: riscrivere un testo già scritto lo comprime per gravità — la seconda stesura esce più corta, con le strade viste ridotte a due parole ciascuna — e chi risponde decide sulla versione povera invece che su quella mostrata dieci righe prima.
+- **Una proposta non si ricopia: nella sua seconda occorrenza, nel blocco finale (§2e), compare come sola maniglia puntata al posto dove sta il corpo** — `- **P7** — exit code del gate → ③ Guardie deterministiche`. Il corpo di una proposta si legge una volta sola, sotto il sottosistema (§2d) o le generali (§2c), accanto al recap che la motiva: chi vuole smentirla risale lì, chi tace lascia la maniglia così com'è. Vale solo per il primo turno — dal secondo giro in poi (§2g) una proposta nuova non ha nessun sottosistema sopra cui stare, e torna col corpo intero.
 - **Ogni voce porta una maniglia verbo+oggetto**, la prima citazione compresa. `D3` da solo è una coordinata opaca: non porta contenuto proprio, e un blocco di sette righe `D1`…`D7` nude costringe a rileggere per capire di cosa si parla — esattamente il costo che questo formato esiste per togliere.
 - **Le strade candidate di una domanda stanno in riga separata sotto**, mai dentro il suo corpo, e sono dichiarate non vincolanti. Dentro la prosa si leggerebbero come il ventaglio delle possibilità; in riga a parte si leggono come materiale. Ometti la riga quando non hai candidati: nominarne di finti è peggio che tacere.
 - **La ragione di una proposta sta nel corpo, ed è un dato del repo.** «Mi sembra più pulito» non è una ragione: lo sono la regola che lo dice (`plugin-dev.md` fissa il discriminante sul consumo), il precedente già in uso (`doc_config_file` è già lo scope di `reference/`), la cifra contata (62 span, non «qualche centinaio»). Una proposta senza il dato che la decide è una domanda travestita, e va rimessa al test (§1b).
@@ -235,17 +234,24 @@ Per ogni sottosistema toccato, nell'ordine che hai scelto allo step 1:
 3. le **proposte di quel sottosistema**, nella forma di §2a, sotto un heading di livello 3 `Proposte`;
 4. il separatore `---`.
 
-Poi il sottosistema successivo. Il giro copre **tutti** i sottosistemi registrati, anche quello con una voce sola. **Un sottosistema che porta solo proposte compare lo stesso, col suo recap**: è la forma normale dopo il test — su una task tecnica precisa può non restare nessuna domanda — e una proposta senza il materiale che la motiva sotto gli occhi non è smentibile, è un fatto compiuto. Se un tempo non ha domande, il heading `Domande` non si scrive; lo stesso per `Proposte`.
+Poi il sottosistema successivo. Il giro copre **tutti** i sottosistemi registrati, anche quello con una voce sola. **Un sottosistema che porta solo proposte compare lo stesso, col suo recap**: è la forma normale dopo il test — su una task tecnica precisa può non restare nessuna domanda — e vale la ragione di §2 (il recap sotto gli occhi è ciò che rende una proposta smentibile). Se un tempo non ha domande, il heading `Domande` non si scrive; lo stesso per `Proposte`.
 
-### 2e. Terzo tempo — il blocco finale, tutte le voci insieme
+### 2e. Copertura per DLV, poi il blocco finale
 
-Chiuso il giro, **ricopia** tutte le voci in un blocco unico: prima tutte le domande nell'ordine degli id, poi tutte le proposte nell'ordine degli id — le generali e quelle di ogni sottosistema, ognuna una volta sola anche se ne tocca due.
+Prima del blocco finale, una riga per ogni deliverable ancora aperto — `${CLAUDE_PLUGIN_ROOT}/scripts/task/task-deliverables.sh ${taskId}` numera gli stessi DLV che `run-task --scope` userà, ed è la lista da cui partire: i DLV già `[x]` restano fuori. Per ciascuno, le voci (`D{N}`, `P{N}`) che lo toccano, o la dichiarazione esplicita che non ne tocca nessuna:
 
-**Ricopia, non riassumere e non riscrivere.** Ogni voce arriva qui **verbatim** come l'hai scritta sopra — stessa maniglia, stesso corpo, stessa riga di chiusura (§2a). Se la voce in coda è più corta di quella sopra, il blocco è sbagliato anche quando si legge bene: hai prodotto un riepilogo del turno, e chi risponde decide sulla versione povera di una voce che sopra era completa.
+```markdown
+- DLV3 — potatura della prosa: `D2`, `P6`
+- DLV4 — gate preflight: nessuna decisione aperta
+```
 
-**È la seconda occorrenza, ed è quella su cui l'utente risponde.** Non è un indice di rimandi: chi risponde in fila deve poter leggere la voce intera lì dove risponde, senza risalire al sottosistema che la conteneva. Ometterlo, o ridurlo a un elenco di id, rimette esattamente il costo che il resto del layout ha appena tolto.
+**Un DLV non nominato affatto è un turno da rifare.** «Nessuna decisione aperta» è una dichiarazione passata davanti all'utente, smentibile come le altre; il silenzio su un DLV intero non lo è — è indistinguibile da una dimenticanza.
 
-**Alle proposte l'utente risponde solo se le smentisce: il silenzio su una `P{N}` vale accettazione**, ed è così che finisce nel file (§3). Per questo la proposta in coda dev'essere completa quanto la domanda: chi tace su una versione povera accetta qualcosa che non ha letto.
+Poi, chiuso il giro, il **blocco finale**: prima tutte le domande nell'ordine degli id, poi tutte le proposte nell'ordine degli id — le generali e quelle di ogni sottosistema, ognuna una volta sola anche se ne tocca due.
+
+**Le domande si ricopiano, non si riassumono.** Ogni domanda arriva qui **verbatim** come l'hai scritta sopra — stessa maniglia, stesso corpo, stessa riga di chiusura (§2a). Se la domanda in coda è più corta di quella sopra, il blocco è sbagliato anche quando si legge bene: hai prodotto un riepilogo del turno, e chi risponde decide sulla versione povera di una voce che sopra era completa. **È la seconda occorrenza, ed è quella su cui l'utente risponde**: chi risponde in fila deve poter leggere la domanda intera lì dove risponde, senza risalire al sottosistema che la conteneva.
+
+**Le proposte compaiono come sola maniglia** (§2a). Alle proposte l'utente risponde solo se le smentisce: il silenzio su una `P{N}` vale accettazione, ed è così che finisce nel file (§3). Il silenzio è su una proposta già letta per intero pochi paragrafi sopra, non su una versione povera ricopiata in coda — è quella ripetizione, non l'assenza, che su una task con più proposte che domande produce il muro che nessuno rilegge.
 
 ### 2f. Il turno finisce qui
 
@@ -257,7 +263,7 @@ Questo vincolo è un'istruzione, non un meccanismo. `AskUserQuestion` sospendeva
 
 L'utente risponde alle domande che ha in mente adesso, smentisce le proposte che vuole smentire e lascia il resto. Non è un caso degradato: è come funziona. Ma le risposte date **non lasciano intatte** le voci rimaste — alcune domande le risolvono per implicazione, altre ne riducono il dominio senza chiuderlo, e una proposta smentita riapre una scelta.
 
-Il giro successivo quindi **ricalcola** le voci aperte invece di riproporle immutate — vincolo opposto a quello del blocco finale (§2e), e non è una contraddizione: dentro **un** turno la stessa voce si ricopia verbatim, fra **due** turni si ricalcola su ciò che l'utente ha appena risposto.
+Il giro successivo quindi **ricalcola** le voci aperte invece di riproporle immutate — vincolo opposto a quello del blocco finale (§2e), e non è una contraddizione: dentro **un** turno una domanda si ricopia verbatim, fra **due** turni si ricalcola su ciò che l'utente ha appena risposto.
 
 - **domanda risolta per implicazione** → diventa una proposta nuova, nella forma di §2a, con la risposta derivata **e il perché** — es. *P7 — nome del flag → `--glyphs`, discende da D1*. Non chiuderla in silenzio: metterebbe nel file una decisione che nessuno ha visto, ed è un errore invisibile perché produce una voce ben formata come tutte le altre. È lo stesso meccanismo del primo giro (§1b): al primo giro la decisione discende dal repo, qui da una risposta.
 - **domanda solo ristretta** → ripresentala con meno strade, dichiarando quali sono cadute e per quale risposta.
@@ -267,7 +273,7 @@ Il giro successivo quindi **ricalcola** le voci aperte invece di riproporle immu
 
 Nessuna voce sparisce senza passare davanti all'utente, nessuna derivazione entra nel file senza essere stata mostrata. Gli id restano gli stessi: `D6` resta `D6`, e una voce nuova prende l'id successivo del suo contatore.
 
-**Dal secondo giro in poi cade il layout a tempi: solo il blocco delle domande aperte e delle proposte nuove.** Niente giro sui sottosistemi, niente recap riscritto, niente doppia occorrenza. La ripetizione accanto al contesto paga la prima volta che quel contesto viene letto: al secondo giro il materiale è già stato letto una volta e le voci aperte sono un sottoinsieme, quindi il guadagno cade mentre il costo in volume resta. Se una voce ricalcolata ha bisogno di contesto nuovo — perché la risposta ne ha spostato il terreno — quel pezzo si scrive accanto a lei, non ricostruendo il recap del sottosistema.
+**Dal secondo giro in poi cade il layout a tempi: solo il blocco delle domande aperte e delle proposte nuove.** Niente giro sui sottosistemi, niente recap riscritto, niente doppia occorrenza. La ripetizione accanto al contesto paga la prima volta che quel contesto viene letto: al secondo giro il materiale è già stato letto una volta e le voci aperte sono un sottoinsieme, quindi il guadagno cade mentre il costo in volume resta. Se una voce ricalcolata ha bisogno di contesto nuovo — perché la risposta ne ha spostato il terreno — quel pezzo si scrive accanto a lei, non ricostruendo il recap del sottosistema. **Le proposte nuove tornano col corpo intero**, non a maniglia: la riduzione a maniglia (§2a, §2e) vale solo quando il corpo sta altrove nello stesso turno, e dal secondo giro non c'è nessun sottosistema sopra cui stare — a maniglia arriverebbero senza la loro ragione da nessuna parte.
 
 Vale a ogni giro il resto dello step 2: le forme di voce di §2a, un ping TTS solo, e il turno che finisce dopo il blocco.
 
