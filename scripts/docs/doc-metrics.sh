@@ -23,6 +23,11 @@
 #   TLDR>CAP  TLDR oltre il cap (il numero sta nella riga # soglie:, non nel nome)
 #   NOTLDR    file sotto reference/ senza TLDR in riga 3 — NON si applica
 #             all'inbox: un nozioni con indexed senza TLDR e' legittimo
+#   TLDR-ORFANA  almeno un'ancora della riga 3 non compare nel corpo del file
+#             (grep -F, tolleranza backtick) — l'invariante che nessun altro
+#             passo del sistema doc misura. Si applica anche ai CONFIG, che
+#             restano esenti solo da SPLIT e MERGE?. Conteggio aggregato nel
+#             report testuale, mai nel nome del flag
 #   ONLINE    file @-importato da CLAUDE.md (si paga a ogni sessione)
 #   INBOX     nozione non ancora collocata — ne' SPLIT ne' MERGE?
 #   GEN       INDEX.md — esclusivo, nessun altro flag calcolato
@@ -104,6 +109,24 @@ char_count() { wc -m < "$1" | tr -d ' '; }
 
 cappello_of() {  # <basename> → ID dal nome, vuoto se il nome non ne porta uno
     [[ "$1" =~ ^([A-Za-z]+[0-9]+)- ]] && echo "${BASH_REMATCH[1]}" || echo ""
+}
+
+# Custode dell'invariante «ogni ancora della riga 3 compare nel corpo dello
+# stesso file»: nessun altro passo del sistema doc lo misura (ne' build-index.sh
+# ne' check-doc-links.sh confrontano il testo del TLDR col corpo), quindi un
+# produttore che scrive un'ancora assente fallisce in silenzio finche' nessuno
+# guarda qui. La riga 3 va esclusa dal corpo prima del confronto, o ogni ancora
+# risulterebbe trovata banalmente in se stessa — stessa esclusione di
+# `tldr.sh prepara`. Tolleranza SOLO backtick: dopo il gate di `tldr.sh` che
+# ri-ancora alla fonte le ancore sono byte del file, e una divergenza di case o
+# di spazi e' drift vero, non rumore da assorbire (coerente con `_chiave`/`_nudo`
+# di `tldr.sh`, che pero' tollerano anche quello per un motivo diverso: li' il
+# confronto e' contro cio' che un modello ha reso, qui contro il file stesso).
+tldr_ancora_viva() {  # <ancora> <corpo-senza-riga3> → 0 se trovata
+    local anc="$1" corpo="$2" nudo
+    grep -qF -- "$anc" <<< "$corpo" && return 0
+    nudo="${anc#\`}"; nudo="${nudo%\`}"
+    [[ "$nudo" != "$anc" ]] && grep -qF -- "$nudo" <<< "$corpo"
 }
 
 # --- Modo --inbox --------------------------------------------------------------
@@ -202,6 +225,7 @@ TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
 n_files=0; n_split=0; n_merge=0; n_overcap=0; n_notldr=0; total_char=0
+n_ancore_tot=0; n_ancore_orfane=0
 n_online=0; n_offline=0; n_inbox=0; n_altro=0
 c_online=0; c_offline=0; c_inbox=0; c_altro=0
 declare -A DIR_CHAR=() DIR_FILES=()
@@ -241,6 +265,20 @@ while IFS= read -r -d '' file; do
                 if (( tldr_len > LW_DOC_TLDR_CAP )); then
                     flags="${flags:+$flags }TLDR>CAP"; n_overcap=$((n_overcap+1))
                 fi
+                # Invariante riga3 ⊂ corpo, per file: si applica anche ai CONFIG
+                # (A11) — un TLDR scritto a mano con un'ancora assente e' rotto
+                # quanto uno generato.
+                corpo_senza_tldr="$(sed '3d' "$file")"
+                orfane_qui=0
+                while IFS= read -r anc; do
+                    [[ -z "$anc" ]] && continue
+                    n_ancore_tot=$((n_ancore_tot+1))
+                    if ! tldr_ancora_viva "$anc" "$corpo_senza_tldr"; then
+                        orfane_qui=$((orfane_qui+1))
+                        n_ancore_orfane=$((n_ancore_orfane+1))
+                    fi
+                done < <(printf '%s\n' "$tldr" | sed 's/ · /\n/g')
+                (( orfane_qui > 0 )) && flags="${flags:+$flags }TLDR-ORFANA"
             elif [[ "$rel" == */reference/* ]]; then
                 flags="${flags:+$flags }NOTLDR"; n_notldr=$((n_notldr+1))
             fi
@@ -290,6 +328,7 @@ else
     echo "- sotto pavimento merge, da riesaminare: ${n_merge}"
     echo "- TLDR sopra cap: ${n_overcap}"
     echo "- senza TLDR (fuori dall'INDEX): ${n_notldr}"
+    echo "- ancore riga 3: ${n_ancore_tot}  ·  orfane (assenti dal corpo): ${n_ancore_orfane}"
     echo
     echo "LAYER"
     printf '%-40s %6s %10s\n' "LAYER" "FILE" "CHAR"
