@@ -2,7 +2,6 @@
 name: preflight-task
 description: Interactive Q&A to freeze design decisions on a task before execution.
 allowed-tools: Bash(*), Read, Edit, Glob, AskUserQuestion
-model: opus
 ---
 
 Fase di preparazione prima di `run-task`. Verifica le premesse della task, identifica le ambiguità, le passa dal test di appartenenza — **pone all'utente solo le decisioni che sono sue** e mostra come **proposte smentibili** quelle che prende da sé — **in chat, in un turno solo, ognuna sotto il recap del sottosistema che tocca e di nuovo tutte insieme in un blocco finale**, scrive risposte e proposte non smentite come decisioni congelate nel task file e **committa immediatamente** il task file. Le decisioni restano così tracciate separatamente dall'implementazione.

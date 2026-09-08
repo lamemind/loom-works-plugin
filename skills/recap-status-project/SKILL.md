@@ -2,7 +2,6 @@
 name: recap-status-project
 description: Recap del progetto intero — quadro di cosa è aperto, in che stato, quali fili sono vivi, con cross-check doc↔git/fs. Nessuna proposta di cosa fare adesso.
 allowed-tools: Bash(*), Read, Glob
-model: opus
 ---
 
 **Docs root** — primo passo, prima di ogni altra cosa:

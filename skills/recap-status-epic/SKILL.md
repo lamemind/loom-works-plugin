@@ -2,7 +2,6 @@
 name: recap-status-epic
 description: Recap di una task cappello — stato dell'epica a zoom alto, poi le figlie con cifre DLV/AC e stato del preflight, interdipendenze, e un punto d'ingresso a due livelli (quale figlia, quale voce).
 allowed-tools: Bash(*), Read, Glob
-model: opus
 ---
 
 **Docs root** — primo passo, prima di ogni altra cosa:

@@ -2,7 +2,6 @@
 name: recap-status-task
 description: Recap di una singola task — stato reale vs dichiarato, DLV e AC aperti voce per voce, documenti prodotti, interdipendenze interne, e una proposta nominata di cosa fare adesso.
 allowed-tools: Bash(*), Read, Glob
-model: opus
 ---
 
 **Docs root** — primo passo, prima di ogni altra cosa:

@@ -2,7 +2,6 @@
 name: recap-status
 description: Recap dispatcher — risolve la task attiva, classifica e passa a recap-status-project|task|epic. Da usare quando si chiede un recap senza nominare il livello.
 allowed-tools: Bash(*), Read, Skill
-model: opus
 ---
 
 **Docs root** — primo passo, prima di ogni altra cosa:

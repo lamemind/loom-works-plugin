@@ -2,7 +2,6 @@
 name: run-task
 description: Esegue i deliverable di una task — perimetro dichiarabile sui DLV, un commit per DLV chiuso, rito di validazione scelto da Size.
 allowed-tools: Bash(*), Task, Read, Edit, Write, Glob, Grep, TodoWrite
-model: sonnet
 ---
 
 **Docs root** — primo passo, prima di ogni altra cosa:
