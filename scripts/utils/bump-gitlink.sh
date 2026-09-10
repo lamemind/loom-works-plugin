@@ -32,6 +32,12 @@
 #    sua copia quel commit ce l'ha — e si manifesta nel clone di qualcun altro,
 #    giorni dopo.
 #
+#    La guardia e' il controllo sui remote-tracking ref; il `fetch` che la
+#    precede serve solo a rinfrescarli, e un suo fallimento NON blocca il
+#    membro: si legge la fotografia vecchia, che un commit davvero non pushato
+#    lo ferma comunque, e la rinuncia si dichiara nella riga. Altrimenti il
+#    bump sarebbe impossibile su ogni macchina che il remote non lo vede.
+#
 # COSA NON FA: non pusha il cappello. Il bump si ferma al commit locale, perche'
 # un gitlink committato per sbaglio si annulla con un `git reset` che non tocca
 # nessun remote, mentre uno gia' pushato e' nella copia di chiunque abbia
@@ -44,6 +50,10 @@
 #
 # Stati: allineato · non-inizializzato · conflitto · avanti · indietro ·
 #        non-pushato · remote-irraggiungibile · bumpato
+#
+# `remote-irraggiungibile` vuole DUE fatti insieme: il fetch e' fallito E i ref
+# remoti locali non coprono HEAD. Col fetch fallito ma i ref che lo coprono il
+# membro si bumpa, e il dettaglio porta «(remote non ricontattato)».
 #
 # `avanti` = passa entrambe le guardie (dry-run: «lo bumperei»). `bumpato` =
 # entrato nel commit appena fatto. Sono due fatti diversi e portano due nomi: un
@@ -98,6 +108,10 @@ declare -a BUMP_PATHS=()
 declare -a BUMP_OLD=()
 declare -a BUMP_NEW=()
 declare -a BUMP_SUBJECT=()
+# La riserva sul remote non ricontattato: viaggia con la riga di stato, mai col
+# messaggio di commit. Il commit registra cosa e' stato pinnato, non in quali
+# condizioni di rete si trovava la macchina che l'ha fatto.
+declare -a BUMP_CAVEAT=()
 
 row() {  # <path> <stato> <dettaglio>
     ROWS+=("$1"$'\t'"$2"$'\t'"$3")
@@ -185,17 +199,39 @@ while IFS= read -r line; do
     # famiglia — repo sempre, remote opzionale (lib.sh, lw_has_remote) — e
     # rifiutare qui il bump renderebbe impossibile per sempre l'allineamento su
     # una famiglia tenuta solo in locale.
+    #
+    # UN FETCH FALLITO NON E' UN VETO. La guardia vera e' il controllo locale
+    # sotto; il fetch serve solo a rinfrescare la fotografia dei remote-tracking
+    # ref prima di leggerla. Che la fotografia non si sia potuta aggiornare non
+    # e' la prova che il commit manchi dal remote — e trattarlo come tale
+    # rendeva il bump impossibile su ogni macchina che il remote non lo vede:
+    # una senza VPN, una che riceve i ref per un altro canale (un sync di
+    # cartella fra due PC). Si prosegue quindi col controllo locale, che un
+    # commit davvero non pushato lo blocca comunque, e la rinuncia si dichiara —
+    # nel dettaglio della riga se il bump avviene, nello stato se non avviene.
+    #
+    # Cosa si perde: il caso in cui un ref locale nomina un commit poi sparito
+    # dal remote (force-push, branch cancellato). Con la fotografia vecchia la
+    # guardia lo lascia passare. E' il rischio residuo gia' noto della verifica
+    # locale, non uno nuovo: chiuderlo davvero vuole `git ls-remote`, cioe' la
+    # rete, cioe' esattamente quello che qui manca.
+    stale_remote=0
     if git -C "$sub" remote get-url origin >/dev/null 2>&1; then
         if [[ "$DRY_RUN" -eq 0 ]]; then
-            if ! git -C "$sub" fetch -q origin 2>/dev/null; then
-                row "$path" "remote-irraggiungibile" "git -C ${path} fetch origin"
-                continue
-            fi
+            git -C "$sub" fetch -q origin 2>/dev/null || stale_remote=1
         fi
         # Vuoto = ogni commit fino a HEAD e' raggiungibile da un remote-tracking
         # ref. `-n 1` basta: si sta misurando l'esistenza, non il conteggio.
         if [[ -n "$(git -C "$sub" rev-list -n 1 "$head_sha" --not --remotes 2>/dev/null)" ]]; then
-            row "$path" "non-pushato" "git -C ${path} push"
+            if [[ "$stale_remote" -eq 1 ]]; then
+                # I ref locali non coprono HEAD, ma sono anche vecchi: puo'
+                # essere un commit non pushato come uno pushato da un'altra
+                # macchina. Il gesto che scioglie il dubbio e' il fetch, non il
+                # push — e su una macchina offline nessuno dei due parte.
+                row "$path" "remote-irraggiungibile" "git -C ${path} fetch origin"
+            else
+                row "$path" "non-pushato" "git -C ${path} push"
+            fi
             continue
         fi
     fi
@@ -203,6 +239,8 @@ while IFS= read -r line; do
     subject="$(git -C "$sub" log -1 --format=%s 2>/dev/null)"
     old_short="$(short "$sub" "$gitlink")"
     new_short="$(short "$sub" "$head_sha")"
+    caveat=''
+    [[ "$stale_remote" -eq 1 ]] && caveat=' (remote non ricontattato)'
     if [[ "$DRY_RUN" -eq 1 ]]; then
         row "$path" "avanti" "${old_short}→${new_short} ${subject}"
     else
@@ -210,6 +248,7 @@ while IFS= read -r line; do
         BUMP_OLD+=("$old_short")
         BUMP_NEW+=("$new_short")
         BUMP_SUBJECT+=("$subject")
+        BUMP_CAVEAT+=("$caveat")
     fi
 done <<< "$status_out"
 
@@ -240,7 +279,7 @@ if [[ "$DRY_RUN" -eq 0 && ${#BUMP_PATHS[@]} -gt 0 ]]; then
     case $? in
         0)
             for i in "${!BUMP_PATHS[@]}"; do
-                row "${BUMP_PATHS[$i]}" "bumpato" "${BUMP_OLD[$i]}→${BUMP_NEW[$i]} ${BUMP_SUBJECT[$i]}"
+                row "${BUMP_PATHS[$i]}" "bumpato" "${BUMP_OLD[$i]}→${BUMP_NEW[$i]} ${BUMP_SUBJECT[$i]}${BUMP_CAVEAT[$i]}"
             done
             ;;
         2)
