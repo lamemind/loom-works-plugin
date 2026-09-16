@@ -31,6 +31,13 @@
 #   ONLINE    file @-importato da CLAUDE.md (si paga a ogni sessione)
 #   INBOX     nozione non ancora collocata — ne' SPLIT ne' MERGE?
 #   GEN       INDEX.md — esclusivo, nessun altro flag calcolato
+#   REGROUP   (per CARTELLA, non per file) somma dei char oltre la soglia di
+#             regroup. Il modo principale emette DUE tabelle: quella dei file
+#             (PATH · CHAR · TLDR · FLAGS) e, in coda allo stesso stream, quella
+#             delle cartelle (DIR · FILES · CHAR · FLAGS, flag REGROUP o `-`).
+#             In TSV le separa una riga vuota e le distingue l'header. Un solo
+#             spawn misura entrambe: un consumer non somma i char per cartella
+#             ne' conosce la soglia, che vive solo in lib-doc.sh.
 #   CONFIG    file di configurazione dentro reference/ (lista in lib-doc.sh,
 #             doc_config_file) — sopprime SOLO SPLIT e MERGE?: il file e'
 #             configurazione, corto per natura, e una fusione per topologia gli
@@ -306,12 +313,39 @@ while IFS= read -r -d '' file; do
     total_char=$((total_char + chars))
 done < <(find "$DIR" -type f -name '*.md' -print0 | sort -z)
 
+# Le righe della tabella CARTELLE — `DIR \t FILES \t CHAR \t FLAGS`, ordine char
+# decrescente, flag `REGROUP` o `-`. Una sola implementazione per i due formati:
+# il testo le incolonna con printf, il TSV le emette com'e'. Due copie
+# divergerebbero al primo flag di cartella aggiunto, e il consumer del TSV
+# leggerebbe una tabella che il report testuale non conferma.
+dir_rows() {
+    local d ch
+    for d in "${!DIR_CHAR[@]}"; do printf '%s\t%s\n' "${DIR_CHAR[$d]}" "$d"; done \
+        | sort -t$'\t' -k1,1nr -k2,2 \
+        | while IFS=$'\t' read -r ch d; do
+              if (( ch >= LW_DOC_REGROUP )); then
+                  printf '%s\t%s\t%s\tREGROUP\n' "$d" "${DIR_FILES[$d]}" "$ch"
+              else
+                  printf '%s\t%s\t%s\t-\n' "$d" "${DIR_FILES[$d]}" "$ch"
+              fi
+          done
+}
+
 # --- Output ---------------------------------------------------------------------
 if [[ "$FORMAT" == "tsv" ]]; then
     if [[ -s "$TMP" ]]; then
         (( LW_DOC_OVERRIDE )) && doc_soglie_line
         printf 'PATH\tCHAR\tTLDR\tFLAGS\n'
         sort -t$'\t' -k2,2nr "$TMP"
+        # Seconda tabella nello STESSO stream, separata da una riga vuota: un solo
+        # spawn misura file e cartelle, e il flag di cartella arriva al consumer
+        # senza che sommi i char per cartella ne' conosca la soglia di regroup,
+        # che vive solo in lib-doc.sh. Il consumer riconosce la tabella
+        # dall'header `DIR`; uno che non la trova legge il TSV di prima e basta —
+        # la coda e' additiva, quindi un lettore vecchio non si rompe.
+        printf '\n'
+        printf 'DIR\tFILES\tCHAR\tFLAGS\n'
+        dir_rows
     fi
 else
     doc_soglie_line
@@ -342,12 +376,12 @@ else
     echo "CARTELLE"
     printf '%-56s %6s %10s  %s\n' "DIR" "FILE" "CHAR" "FLAGS"
     n_regroup=0
-    while IFS=$'\t' read -r ch d; do
-        rf=""
-        if (( ch >= LW_DOC_REGROUP )); then rf="REGROUP"; n_regroup=$((n_regroup+1)); fi
-        printf '%-56s %6s %10s  %s\n' "$d" "${DIR_FILES[$d]}" "$ch" "${rf:--}"
-    done < <(for d in "${!DIR_CHAR[@]}"; do printf '%s\t%s\n' "${DIR_CHAR[$d]}" "$d"; done \
-             | sort -t$'\t' -k1,1nr -k2,2)
+    # Process substitution e non pipe: il contatore deve sopravvivere al loop, e
+    # dentro una pipe girerebbe in una subshell che lo butta via all'uscita.
+    while IFS=$'\t' read -r d nf ch fl; do
+        printf '%-56s %6s %10s  %s\n' "$d" "$nf" "$ch" "$fl"
+        [[ "$fl" == "REGROUP" ]] && n_regroup=$((n_regroup+1))
+    done < <(dir_rows)
     echo
     echo "- cartelle oltre soglia regroup: ${n_regroup}"
 fi
