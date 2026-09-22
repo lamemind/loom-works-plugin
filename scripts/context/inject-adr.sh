@@ -3,6 +3,9 @@
 #
 # stdout -> additionalContext, come ogni entry SessionStart.
 #
+# Stato e requisiti rinviati: factory · T16 §Custodia — un limite di questo
+# registro si segnala lì, non si apre una task qui.
+#
 # Perche' un emitter e non un `cat` diretto di docs/adr.md: il testo deve portare
 # un comando ESEGUIBILE, e CLAUDE_PLUGIN_ROOT non e' nell'ambiente del tool Bash
 # (verificato: la env e' interpolata nei body di skill e agent e nei command degli

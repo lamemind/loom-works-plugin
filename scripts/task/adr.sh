@@ -10,6 +10,16 @@
 #   adr.sh cerca  <ancora> [--superate]
 # =============================================================================
 #
+# Stato e requisiti rinviati: factory · T16 §Custodia — un limite di questo
+# registro si segnala lì, non si apre una task qui.
+#
+# Questa e' la v0 di una feature progettata in factory: cio' che non fa e' scritto
+# nel custode col segnale che lo renderebbe dovuto. Chi urta un limite usando il
+# registro non ricostruisce da se' cosa manca e non apre una task in questo repo:
+# il piano di crescita sta in un posto solo, e la riga sopra dice quale. Sta
+# nell'artefatto e non nella doc perche' la doc e' as-is e non ammette id di task,
+# e non in un task file perche' clean-tasks lo purga.
+#
 # Il registro delle decisioni sta FUORI dal sistema documentale: la doc e' as-is
 # e una decisione e' datata e motivata per costruzione. Formato del record, sede
 # e regole di supersessione: ${CLAUDE_PLUGIN_ROOT}/docs/adr-format.md.
