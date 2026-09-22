@@ -128,10 +128,17 @@ doc_layer() {  # <rel-to-project-root> → inbox|online|offline|altro
 # SOLO cio' che ogni chiamante esclude: il runtime che non e' doc. Un'esclusione
 # che vale per un chiamante solo e' una regola di quel chiamante e sta scritta
 # li' — INDEX.md lo esclude solo check-doc-links.
+#
+# adr/ e' il registro delle decisioni (docs/adr-format.md): sta sotto la docs-root
+# perche' e' stato di task, come tasks/, ma non e' doc — nessun layer, nessun
+# instradamento, nessuna soglia. Senza l'esclusione ogni record sotto
+# LW_DOC_MERGE prenderebbe MERGE? e il registro diventerebbe una coda di lavoro
+# per rebalance-doc su file che per contratto non si riscrivono.
 
 doc_excluded() {  # <rel-path> → 0 se fuori dal perimetro doc
     case "$1" in
         */tasks/*|tasks/*|*/current-task.md|current-task.md) return 0 ;;
+        */adr/*|adr/*) return 0 ;;
     esac
     return 1
 }

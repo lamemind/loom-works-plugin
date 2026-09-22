@@ -76,7 +76,10 @@ while IFS= read -r -d '' f; do
     # sono copie dei TLDR, gia' verificati nel file d'origine: segnalarli li raddoppia.
     # inbox/ e' fuori perimetro: i suoi `router → <target>` puntano a file non ancora
     # creati, DANGLING per costruzione fino alla fine del ciclo di drain.
-    case "$rel" in */tasks/*|*/current-task.md|*/INDEX.md|*/inbox/*) continue ;; esac
+    # adr/ e' fuori perimetro: un record e' immutabile per contratto (docs/adr-format.md),
+    # quindi un path che sparisce dopo la sua data lo renderebbe DANGLING per sempre
+    # su un file che nessuno puo' riparare — un verdetto senza rimedio non e' un verdetto.
+    case "$rel" in */tasks/*|*/current-task.md|*/INDEX.md|*/inbox/*|*/adr/*) continue ;; esac
     FILES+=("$f")
 done < <(find "$DIR" -type f -name '*.md' -print0 | sort -z)
 
