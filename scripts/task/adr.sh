@@ -7,6 +7,7 @@
 #                 --ancora <path> [--ancora <path>]...
 #                 [--supera <id>[#<voce>]]... [--perche <testo>] [--no-commit]
 #                 [< il perché su stdin, in alternativa a --perche]
+#   adr.sh cerca  <ancora> [--superate]
 # =============================================================================
 #
 # Il registro delle decisioni sta FUORI dal sistema documentale: la doc e' as-is
@@ -26,6 +27,9 @@
 #   scarta   0 record scritto
 #            1 input malformato o ancora inesistente — NESSUNA scrittura
 #            2 record gia' esistente — NESSUNA scrittura
+#   cerca    0 almeno un record vivo trovato (elencato su stdout)
+#            2 nessuno — e' il verdetto che l'agente legge prima di risollevare
+#            1 errore d'uso
 #
 # Il `2` distingue il rifiuto di riscrittura dall'input rotto: nelle famiglie di
 # exit code del repo `2` e' sempre un VERDETTO e `1` un errore. Chi chiama sa
@@ -216,11 +220,125 @@ cmd_scarta() {
 }
 
 # =============================================================================
+# cerca
+# =============================================================================
+#
+# Match TESTUALE sul record intero — segnalazione, header e perché. Una regola
+# sola copre path, keyword e id task, che stanno gia' dentro il testo: un campo
+# ancora tipizzato in piu' sarebbe una seconda sorgente per la stessa ricerca, e
+# le due divergerebbero al primo record scritto a mano.
+#
+# Un id task si cerca a PAROLA INTERA — `T16` non trova `T161` — come in
+# resolve-task.sh --children. Tutto il resto e' sottostringa case-insensitive.
+cmd_cerca() {
+    local query="" mostra_superate=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --superate) mostra_superate=1; shift ;;
+            -*) fail 1 "argomento ignoto: $1" ;;
+            *) [[ -n "$query" ]] && fail 1 "una sola ancora per volta (ricevuto anche: $1)"
+               query="$1"; shift ;;
+        esac
+    done
+    [[ -n "$query" ]] || fail 1 "ancora richiesta: adr.sh cerca <ancora> [--superate]"
+
+    if [[ ! -d "$ADR_DIR" ]]; then
+        echo "[adr] registro vuoto: ${ADR_REL} non esiste" >&2
+        return 2
+    fi
+
+    local -a records=()
+    local f
+    while IFS= read -r f; do records+=("$f"); done \
+        < <(find "$ADR_DIR" -maxdepth 1 -type f -name '*.md' | sort)
+    if [[ ${#records[@]} -eq 0 ]]; then
+        echo "[adr] registro vuoto: nessun record in ${ADR_REL}" >&2
+        return 2
+    fi
+
+    # --- mappa della supersessione -------------------------------------------
+    # Si costruisce sul registro INTERO, non sui soli match: un record superato
+    # da uno che la query non trova resta superato.
+    local -A sup_intero=() sup_voci=()
+    local rid campo v tid frag
+    for f in "${records[@]}"; do
+        campo="$(sed -n 's/^- \*\*Supera\*\*:[[:space:]]*//p' "$f" | head -1)"
+        [[ -n "$campo" ]] || continue
+        rid="$(basename "$f" .md)"
+        while IFS= read -r v; do
+            v="${v#"${v%%[![:space:]]*}"}"; v="${v%"${v##*[![:space:]]}"}"
+            [[ -z "$v" ]] && continue
+            tid="${v%%#*}"; frag=""
+            [[ "$v" == *#* ]] && frag="${v#*#}"
+            if [[ -z "$frag" ]]; then
+                sup_intero["$tid"]="${sup_intero[$tid]:+${sup_intero[$tid]}, }${rid}"
+            else
+                sup_voci["$tid"]="${sup_voci[$tid]:+${sup_voci[$tid]}, }${frag}"
+            fi
+        done < <(tr ',' '\n' <<< "$campo")
+    done
+
+    # --- selezione ------------------------------------------------------------
+    local -a grep_opts
+    if [[ "$query" =~ ^T[0-9]+$ ]]; then
+        grep_opts=(-q -w -F --)
+    else
+        grep_opts=(-q -i -F --)
+    fi
+
+    local trovati=0 nascosti=0 id titolo chi data ancore
+    for f in "${records[@]}"; do
+        grep "${grep_opts[@]}" "$query" "$f" || continue
+        id="$(basename "$f" .md)"
+
+        # Superato INTERO -> fuori dalla query. Superato per VOCE -> resta, con
+        # l'annotazione: nascondere un record intero perche' un altro ne supera
+        # una voce sola sarebbe nascondere cio' che e' ancora vivo.
+        if [[ -n "${sup_intero[$id]:-}" ]] && (( ! mostra_superate )); then
+            nascosti=$((nascosti+1))
+            continue
+        fi
+
+        titolo="$(sed -n '1s/^#[[:space:]]*//p' "$f")"
+        chi="$(sed -n 's/^- \*\*Chi\*\*:[[:space:]]*//p' "$f" | head -1)"
+        data="$(sed -n 's/^- \*\*Data\*\*:[[:space:]]*//p' "$f" | head -1)"
+        ancore="$(sed -n 's/^- \*\*Ancore\*\*:[[:space:]]*//p' "$f" | head -1)"
+
+        printf '%s · %s · %s' "$id" "${chi:-?}" "${data:-?}"
+        [[ -n "${sup_intero[$id]:-}" ]] && printf '   [SUPERATO da %s]' "${sup_intero[$id]}"
+        printf '\n'
+        printf '  %s\n' "$titolo"
+        [[ -n "$ancore" ]] && printf '  ancore: %s\n' "$ancore"
+        # L'annotazione stampa i FRAMMENTI trovati nei Supera altrui, non il testo
+        # della voce: non richiede un parser di voci, e resta vera quando i record
+        # con voci arriveranno.
+        [[ -n "${sup_voci[$id]:-}" ]] && printf '  voci superate: %s\n' "${sup_voci[$id]}"
+        printf '  file: %s/%s.md\n\n' "$ADR_REL" "$id"
+        trovati=$((trovati+1))
+    done
+
+    if (( trovati == 0 )); then
+        # `nascosti` vale "0" quando non ce ne sono, e "0" e' una stringa non
+        # vuota: il ramo si sceglie sul NUMERO, non sulla presenza della variabile.
+        if (( nascosti > 0 )); then
+            echo "[adr] nessun record vivo per '${query}' (${nascosti} superati, nascosti — rilancia con --superate)" >&2
+        else
+            echo "[adr] nessun record per '${query}'" >&2
+        fi
+        return 2
+    fi
+    (( nascosti > 0 )) && echo "[adr] ${nascosti} record superati non mostrati (--superate per vederli)" >&2
+    return 0
+}
+
+# =============================================================================
 # dispatch
 # =============================================================================
-[[ $# -gt 0 ]] || fail 1 "sottocomando richiesto: scarta"
+[[ $# -gt 0 ]] || fail 1 "sottocomando richiesto: scarta | cerca"
 SUB="$1"; shift
 case "$SUB" in
     scarta) cmd_scarta "$@" ;;
-    *) fail 1 "sottocomando ignoto: ${SUB} (atteso: scarta)" ;;
+    cerca)  cmd_cerca "$@" ;;
+    *) fail 1 "sottocomando ignoto: ${SUB} (attesi: scarta, cerca)" ;;
 esac
