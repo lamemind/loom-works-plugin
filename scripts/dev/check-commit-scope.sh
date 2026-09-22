@@ -5,8 +5,8 @@
 # lasciato da un'altra sessione sta in stage quando la skill committa, e un
 # `git commit -m` senza pathspec lo rastrella sotto un messaggio che parla d'altro.
 # Questo gate sporca l'indice di un repo temporaneo con path estranei, poi esegue
-# ogni attore che committa (create-task, lo snippet di preflight, checkpoint nei due
-# regimi, clean-tasks, cleanup-done-tasks) e misura:
+# ogni attore che committa (create-task, lo snippet di preflight, promote-wip, adr,
+# checkpoint nei due regimi, clean-tasks, cleanup-done-tasks) e misura:
 #   - i file dentro ogni commit prodotto (solo quelli attesi)
 #   - cio' che resta in stage dopo (i path estranei, intatti)
 #   - la timbratura "Done at" dentro il commit di checkpoint
@@ -155,6 +155,21 @@ expect "commit = tasks.md + task file" "$(committed HEAD)" docs/tasks.md docs/ta
 grep -qE '^\| T01 \| ⚡ \| 🟡 \|' docs/tasks.md && pass "cella Prog a 🟡" || fail "cella Prog non promossa"
 [ -z "$(git status --porcelain -- docs/tasks.md)" ] && pass "tasks.md pulito dopo la promozione" || fail "tasks.md ancora dirty"
 expect_foreign_staged "promote-wip"
+
+# ── 3c. adr.sh scarta ────────────────────────────────────────────────────────
+# Attore nuovo nel gate: committa per conto del modello in chat, non di una skill,
+# ed e' il caso in cui l'indice sporco e' piu' probabile — una sessione detached
+# che scarta una segnalazione mentre altre stanno lavorando nello stesso worktree.
+echo "3c. adr.sh scarta (commit del solo file del record)"
+ADR_NOW=1754820000
+ADR_REC="docs/adr/$(date -d "@$ADR_NOW" '+%Y-%m-%d-%H%M')-gate-scarto.md"
+LOOM_ADR_NOW="$ADR_NOW" "$TASK_SCRIPTS/adr.sh" scarta --slug gate-scarto --chi agente \
+  --segnalazione "Segnalazione scartata dentro il gate di perimetro" \
+  --ancora src/code.txt \
+  --perche "Il record deve entrare da solo nel commit, con i path estranei intatti in stage." \
+  >/dev/null 2>&1 || fail "adr.sh scarta exit $?"
+expect "commit = solo il file del record" "$(committed HEAD)" "$ADR_REC"
+expect_foreign_staged "adr scarta"
 
 # ── 4. checkpoint-task-commit.sh detached ───────────────────────────────────
 echo "4. checkpoint-task-commit.sh detached (\$LOOM_TASK, pathspec dopo --)"

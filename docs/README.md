@@ -5,6 +5,7 @@ Manuali, convenzioni e riferimenti tecnici del sistema che il plugin implementa.
 **Iniettato a `SessionStart`** — una hook entry per file, perché il cap di 10.000 char è per comando: un `cat A B C` unico condividerebbe il budget e affamerebbe gli ultimi in coda.
 
 - `task-management.md` — lane e task, ciclo di vita, grafo dipendenze, comandi
+- `adr.md` — registro ADR: interroga prima di risollevare una segnalazione, registra lo scarto motivato. Non lo inietta un `cat`, ma `scripts/context/inject-adr.sh`: il testo porta un comando eseguibile, e `CLAUDE_PLUGIN_ROOT` non è nell'ambiente del tool Bash — il segnaposto `{PLUGIN_ROOT}` lo riempie l'emitter
 
 **Iniettato a `UserPromptSubmit`**: `restamp.md` — nocciolo dei contratti doc e task ri-timbrato a ogni turno contro il drift. Unica entry a costo moltiplicativo, tetto 4.500 char scritto nel file stesso. Le regole di scrittura non ci stanno: le porta l'output style, che regge il drift da sé.
 
@@ -17,5 +18,6 @@ Manuali, convenzioni e riferimenti tecnici del sistema che il plugin implementa.
 - `tldr-formats.md` — le due sedi del TLDR (riga 3 di `reference/`, riga 4 dell'inbox), la formula `inbox/` e chi produce quella di `reference/`
 - `inbox-format.md` — struttura di un file inbox `nozioni` e le tre operazioni sul corpo (append, riscrittura, eliminazione). Lo apre chiunque scriva dentro l'inbox WIP di una task: le skill di cattura e il modello in chat
 - `path-conventions.md` — da dove parte un path scritto in un sorgente del plugin, e quale grafia porta un segnaposto
+- `adr-format.md` — **contratto del registro ADR**: sede `{docs_root}/adr/`, campi di un record, immutabilità, `Supera` multi-valore con indirizzo alla voce, e le due esclusioni che tengono il registro fuori dal sistema doc. Lo apre chi scrive o interroga il registro fuori dai due sottocomandi di `scripts/task/adr.sh`
 
 **Incluso a build time, non letto da path**: il **contratto di scrittura degli agent** — gemello di ciò che l'output style dà alla chat, senza la meccanica del terminale, il raggio e le domande all'utente — non vive qui. Il sorgente sta nel repo cappello (`plugin-src/fragments/agent-output.md`) e `plugin-src/build-agents.sh` lo interpola dentro il body di ogni agent tramite la direttiva `<!-- include: agent-output.md -->`. Nessun agent lo apre a runtime: un contratto consegnato per path ha due modi di non arrivare — il consumer che non lo legge e il permesso che glielo impedisce — e l'inclusione a build time li toglie entrambi.
