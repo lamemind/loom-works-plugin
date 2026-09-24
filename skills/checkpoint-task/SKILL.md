@@ -250,6 +250,27 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
   && lw_git_push "$(lw_current_branch)"
 ```
 
+### La risposta — prosa libera, lo scenario lo scrivi tu
+
+L'umano risponde come vuole: in prosa, dettando a voce, in ordine sparso, su una parte sola delle segnalazioni. Nessuna domanda a scelta e nessuna griglia da compilare — nessuno strumento presidia la risposta, la leggi tu nel turno dopo. Riconosci la segnalazione da `S1`, `s1`, `1` o «la prima», e per ogni segnalazione decisa scrivi uno scenario `--chi umano --momento flusso`:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto --chi umano \
+  --momento flusso --skill checkpoint-task [--ancora <path>]... --no-commit <<'SCENARIO'
+<la segnalazione, identica al testo della riga S{N}>
+<solo sullo scarto: il perché, anche su più righe>
+SCENARIO
+```
+
+Poi un commit solo per tutti, con lo snippet sopra.
+
+- **Nessun default.** La segnalazione su cui l'umano non dice niente non produce niente: non la decidi tu e non la ripresenti. Il recupero delle segnalazioni rimaste senza risposta si fa a posteriori, fuori da questa conversazione.
+- **«subito» nel flusso è operativo**: scrivi lo scenario e lo esegui. «Fallo subito ma in un subagente» resta `subito` — lo scenario registra l'uscita, mai il modo di esecuzione.
+- **«task»** registra la decisione e basta: la task la apre `create-task`, se l'umano la chiede.
+- **«scarto»** vuole il perché e un'ancora. Il perché sta di solito nella risposta stessa («S2 scarto: capita una volta l'anno»); se manca, chiedilo una volta sola, poi scrivi. L'ancora è il path che la segnalazione tocca. Lo script scrive anche il record ADR, e stampa il suo path da mettere nel commit.
+- **La conferma e il ribaltamento valgono uguale.** Sulla segnalazione che avevi marcato `☑ subito (agente)`, «ok» è uno scenario `subito` e «fanne una task» uno scenario `task`, entrambi `--chi umano`, accanto al tuo: non si riscrive niente, i due record sono il dato.
+- **Detta a posteriori, la stessa parola è un esito e non un'azione.** Chi rilegge il report da un'altra sessione registra con `--momento posteriori` e non esegue niente.
+
 ## Convenzione TTS
 
 Prima di ogni `AskUserQuestion`, esegui:
