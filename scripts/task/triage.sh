@@ -12,8 +12,7 @@
 #   triage.sh conta    [--dal <YYYY-MM-DD[ HH:MM]>] [--sessione <id>]
 # =============================================================================
 #
-# Stato e requisiti rinviati: factory · T12 §Custodia — un limite del triage si
-# segnala lì, non si apre una task qui.
+# Stato e requisiti rinviati: factory · T12 §Custodia — un limite del triage si segnala lì, non si apre una task qui.
 #
 # Questa e' la v0 di una feature progettata in factory: cio' che non fa e' scritto
 # nel custode col segnale che lo renderebbe dovuto. Chi urta un limite usando gli
