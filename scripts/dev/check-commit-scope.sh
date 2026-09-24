@@ -6,7 +6,7 @@
 # `git commit -m` senza pathspec lo rastrella sotto un messaggio che parla d'altro.
 # Questo gate sporca l'indice di un repo temporaneo con path estranei, poi esegue
 # ogni attore che committa (create-task, lo snippet di preflight, promote-wip, adr,
-# checkpoint nei due regimi, clean-tasks, cleanup-done-tasks) e misura:
+# triage, checkpoint nei due regimi, clean-tasks, cleanup-done-tasks) e misura:
 #   - i file dentro ogni commit prodotto (solo quelli attesi)
 #   - cio' che resta in stage dopo (i path estranei, intatti)
 #   - la timbratura "Done at" dentro il commit di checkpoint
@@ -195,6 +195,22 @@ LOOM_ADR_NOW="$ADR_NOW" "$TASK_SCRIPTS/adr.sh" scarta --slug gate-scarto --chi a
   >/dev/null 2>&1 || fail "adr.sh scarta exit $?"
 expect "commit = solo il file del record" "$(committed HEAD)" "$ADR_REC"
 expect_foreign_staged "adr scarta"
+
+# ── 3d. triage.sh scenario (scarto) ─────────────────────────────────────────
+# Stesso chiamante di adr.sh — il modello in chat, in una sessione detached — ma
+# sullo scarto il commit porta DUE file, lo scenario e il record ADR: si misura
+# che siano quei due e nient'altro.
+echo "3d. triage.sh scenario scarto (commit dello scenario + record ADR)"
+TRI_NOW=1756512000
+TRI_ID="$(date -d "@$TRI_NOW" '+%Y-%m-%d-%H%M')-gate-triage"
+LOOM_TRIAGE_NOW="$TRI_NOW" "$TASK_SCRIPTS/triage.sh" scenario --slug gate-triage \
+  --uscita scarto --chi umano --momento flusso --skill run-task --sessione gate \
+  --ancora src/code.txt \
+  --segnalazione "Segnalazione scartata dal clic dentro il gate di perimetro" \
+  --perche "Scenario e record ADR devono entrare da soli nel commit." \
+  </dev/null >/dev/null 2>&1 || fail "triage.sh scenario exit $?"
+expect "commit = scenario + record ADR" "$(committed HEAD)" "docs/triage/$TRI_ID.md" "docs/adr/$TRI_ID.md"
+expect_foreign_staged "triage scenario"
 
 # ── 4. checkpoint-task-commit.sh detached ───────────────────────────────────
 echo "4. checkpoint-task-commit.sh detached (\$LOOM_TASK, pathspec dopo --)"
