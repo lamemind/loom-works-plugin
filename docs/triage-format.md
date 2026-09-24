@@ -1,8 +1,26 @@
 # Il file degli scenari di triage — formato del record e sede
 
-Contratto per chi **scrive e conta** gli scenari di triage: la sede su disco, i campi di un record, la regola che manda lo scarto nel registro ADR, e l'assenza di ogni default.
+Contratto per chi **scrive e conta** gli scenari di triage: la sezione del report da cui nascono, la sede su disco, i campi di un record, la regola che manda lo scarto nel registro ADR, e l'assenza di ogni default.
 
 Uno **scenario** è la decisione presa su una segnalazione del report di fine skill: la segnalazione citata alla lettera, l'uscita scelta fra `subito` · `task` · `scarto`, e chi l'ha scelta. Il file degli scenari sta **fuori dal sistema documentale**, per la stessa ragione del registro ADR (`adr-format.md`): un record è datato, cita alla lettera e porta chi ha deciso, e nessuno di questi tratti ha posto in una doc as-is. È stato di task, e nessun attore del sistema doc lo legge, lo misura o lo instrada.
+
+## Il report e la risposta
+
+Il report finale di `run-task` e di `checkpoint-task` chiude con la sezione **`🚦 Segnalazioni`**, presente anche quando è vuota: a zero segnalazioni è la riga `**🚦 Segnalazioni** — nessuna`, così l'assenza è dichiarata e non presunta. Ogni segnalazione è una riga `**S{N}** — <segnalazione>`, numerata da 1 dentro il singolo report, con le tre uscite sulla riga sotto. Il testo dopo `— ` è quello che lo scenario cita in riga 1.
+
+Ciò che l'agente ha corretto di sua iniziativa sta **dentro** la sezione, con «subito» già marcato e `Chi: agente`, mai in un inciso del report: è una decisione già presa, e resta ribaltabile solo se l'umano la vede fra le segnalazioni. Il suo scenario si scrive prima di stampare la sezione. L'agente non scarta: una segnalazione che ritiene irrilevante la riporta comunque con le tre uscite.
+
+**La risposta dell'umano è prosa libera, e nessuno strumento la presidia.** Niente domande a scelta, niente griglie: in un terminale una forma imposta costa più di quanto renda, e la prosa è l'unica che si detta anche a voce. La legge l'agente della stessa conversazione, che riconosce la segnalazione da `S1`, `s1`, `1` o «la prima» e scrive uno scenario per ogni segnalazione decisa. La regola operativa sta nel body delle due skill, non in un contratto iniettato: il body è nel transcript quando la risposta arriva, e una sessione senza la skill non ha nessuna sezione a cui rispondere. Una risposta che arriva in un'altra sessione, o dopo un `/clear`, non ha più nessuno che la registri.
+
+Le tre uscite nel flusso:
+
+- **subito** — operativo: l'agente scrive lo scenario ed esegue.
+- **task** — registra la decisione; la task la apre `create-task`, se l'umano la chiede.
+- **scarto** — vuole il perché, di solito già nella risposta («S2 scarto: capita una volta l'anno»); se manca, l'agente lo chiede una volta sola. Lo scenario scrive anche il record ADR.
+
+La conferma vale quanto il ribaltamento: «ok» sulla segnalazione marcata dall'agente è uno scenario `subito` dell'umano accanto a quello dell'agente, e i due record sono il dato che misura quanto l'agente decide come l'umano.
+
+**Il modello della riga nel body delle skill porta `S{N}`, mai un numero.** Il body di una skill entra nel transcript a ogni invocazione: un id in grassetto con un numero vero lì verrebbe contato come segnalazione stampata da chi conta gli id a `grep` sui transcript. Il titolo invece compare per forza anche lì, e nei tool call che lo scrivono: chi lo cerca in un transcript filtra i blocchi di testo dell'assistente.
 
 ## La sede
 
