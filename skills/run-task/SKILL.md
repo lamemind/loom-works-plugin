@@ -136,7 +136,47 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "$(say_id ${task
 
 In caso di blocco reale: `say_auto "$(say_id ${taskId}) blocked"`.
 
-Poi riporta quali DLV sono chiusi e quali restano aperti nel task file, e suggerisci `/loom-works:checkpoint-task` per il checkpoint (Prog, Progress Log, fase doc).
+Poi riporta quali DLV sono chiusi e quali restano aperti nel task file, e suggerisci `/loom-works:checkpoint-task` per il checkpoint (Prog, Progress Log, fase doc). Il report chiude con la sezione `🚦 Segnalazioni` (§8), sempre.
+
+## 8. 🚦 Segnalazioni — la sezione fissa del report
+
+> Stato e requisiti rinviati: factory · T12 §Custodia — un limite del triage si segnala lì, non si apre una task qui.
+
+Una segnalazione è un problema incontrato durante il lavoro che chiede una decisione: un difetto fuori perimetro, un rischio, un residuo, una cosa che hai lasciato com'era, una cosa che hai corretto di tua iniziativa. Ogni segnalazione ha tre uscite — **subito** (si risolve ora), **task** (diventa una task), **scarto** (non si fa, con un motivo) — e ogni decisione diventa uno **scenario** su disco. Formato e sede: `${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md`.
+
+**La sezione c'è sempre, anche vuota**: l'assenza di segnalazioni è un fatto dichiarato, non una dimenticanza. La forma è fissa, perché è ciò che chi rilegge i transcript cerca:
+
+```
+**🚦 Segnalazioni**
+
+**S{N}** — <la segnalazione, su una riga>
+  subito · task · scarto
+**S{N}** — <ciò che hai corretto di tua iniziativa, su una riga>
+  ☑ subito (agente) · task · scarto
+```
+
+A zero segnalazioni, una riga sola: `**🚦 Segnalazioni** — nessuna`.
+
+- **`S{N}` numera da 1 dentro questo report**, e la riga porta l'id e la segnalazione, nient'altro: il testo dopo `— ` è quello che lo scenario cita byte per byte.
+- **Prima di stampare, interroga il registro ADR** su ogni segnalazione (`adr.sh cerca`, regola in contesto): exit `0` vuol dire già scartata con un motivo, e non la riporti.
+- **Ciò che hai corretto di tua iniziativa sta dentro la sezione, con «subito» già marcato e chi = agente — mai in un inciso del report.** «Ho corretto un difetto pre-esistente» è una decisione che hai già preso: resta ribaltabile solo se l'umano la vede fra le segnalazioni. Prima di stampare la sezione ne scrivi lo scenario:
+
+  ```bash
+  "${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito --chi agente \
+    --momento flusso --skill run-task --no-commit <<'SCENARIO'
+  <la segnalazione, identica al testo della riga S{N}>
+  SCENARIO
+  ```
+
+- **Tu non scarti.** Una segnalazione che ritieni irrilevante la riporti comunque con le tre uscite: uno scarto sbagliato è un segnale perso che nessuno recupera, e lo script rifiuta lo scarto con `--chi agente`.
+
+Gli scenari si scrivono con `--no-commit`, uno per segnalazione, e si committano insieme — i path sono quelli che lo script stampa (`-> scenario scritto:`, e `-> record ADR:` sullo scarto):
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
+  && lw_git_add_n_commit "triage(${taskId}): <N> scenari" <path>... \
+  && lw_git_push "$(lw_current_branch)"
+```
 
 ## Artefatti e materiale di lavoro
 
