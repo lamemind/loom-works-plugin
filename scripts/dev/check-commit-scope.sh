@@ -133,6 +133,31 @@ expect_foreign_staged "wrapper"
 BEFORE="$(git rev-parse HEAD)"
 [ "$(git rev-parse HEAD)" = "$BEFORE" ] && pass "nessun commit prodotto" || fail "ha committato"
 
+# ── 1b. wrapper con un path che non esiste e non e' tracciato ────────────────
+# Il checkpoint di un consumer cablato a un corpus di gruppo nomina
+# {docs_root}/reference/INDEX.md, che in quel repo non c'e': il path va scartato
+# da add, diff e commit, e gli altri file devono entrare lo stesso.
+echo "1b. lw_git_add_n_commit con un path assente e non tracciato"
+echo assente >> src/code.txt
+lw_git_add_n_commit "msg" src/code.txt docs/reference/assente.md >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && pass "committa il resto (exit 0)" || fail "atteso exit 0, trovato $rc"
+expect "commit = solo il path esistente" "$(committed HEAD)" src/code.txt
+expect_foreign_staged "path assente"
+BEFORE="$(git rev-parse HEAD)"
+lw_git_add_n_commit "msg" docs/reference/assente.md >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 2 ] && pass "solo path assenti: no-op (exit 2)" || fail "atteso exit 2, trovato $rc"
+[ "$(git rev-parse HEAD)" = "$BEFORE" ] && pass "nessun commit prodotto" || fail "ha committato"
+expect_foreign_staged "solo path assenti"
+# un path gia' `git rm`-ato non sta ne' su disco ne' nell'indice, ma HEAD lo
+# conosce: la cancellazione deve entrare nel commit
+echo via > src/via.txt
+git add src/via.txt && git commit -q -m "via" -- src/via.txt
+git rm -q src/via.txt
+lw_git_add_n_commit "msg" src/via.txt docs/reference/assente.md >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && pass "path git rm-ato: committa (exit 0)" || fail "atteso exit 0, trovato $rc"
+expect "commit = la cancellazione" "$(committed HEAD)" src/via.txt
+expect_foreign_staged "path git rm-ato"
+
 # ── 2. create-task.sh ────────────────────────────────────────────────────────
 echo "2. create-task.sh"
 task_file T01 foo "🔵 Backlog"

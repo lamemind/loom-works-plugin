@@ -302,13 +302,20 @@ lw_git_add() {
 # non esistono ne' su disco ne' nell'indice (gia' `git rm`-ati: l'add li rifiuta,
 # il commit con pathspec li accetta perche' HEAD li conosce).
 #
+# Diff e commit saltano a loro volta i path che non stanno ne' su disco, ne'
+# nell'indice, ne' in HEAD: un path cosi' non puo' produrre un diff, e passato a
+# `git commit -- <pathspec>` lo fa uscire 1 ("pathspec did not match") anche con
+# gli altri file in stage. Succede a chi nomina un file che in quel progetto non
+# esiste — il checkpoint che mette `{docs_root}/reference/INDEX.md` nella pathspec
+# di un consumer la cui doc vive in un corpus di gruppo, fuori dal repo.
+#
 # `-m` sta PRIMA di `--`: `--` chiude le opzioni, un `-m` dopo finirebbe fra i path.
 #
 # Exit: 0 = committato · 1 = add o commit falliti · 2 = nessuna modifica sui path
 #       (no-op, nessun commit) · 3 = nessuna pathspec passata
 lw_git_add_n_commit() {  # <msg> <path>...
     local msg="${1:-}" root p
-    local -a to_add=()
+    local -a to_add=() to_commit=()
     if [[ -z "$msg" ]]; then
         echo "ERROR: lw_git_add_n_commit: messaggio di commit mancante" >&2
         return 3
@@ -324,13 +331,19 @@ lw_git_add_n_commit() {  # <msg> <path>...
         if [[ -e "$p" || -L "$p" || -e "$root/$p" || -L "$root/$p" ]] \
            || [[ -n "$(git -C "$root" ls-files --cached -- "$p" 2>/dev/null)" ]]; then
             to_add+=("$p")
+            to_commit+=("$p")
+        elif [[ -n "$(git -C "$root" ls-tree -r --name-only HEAD -- "$p" 2>/dev/null)" ]]; then
+            to_commit+=("$p")
         fi
     done
     if [[ ${#to_add[@]} -gt 0 ]]; then
         git -C "$root" add -A -- "${to_add[@]}" || return 1
     fi
-    git -C "$root" diff --cached --quiet -- "$@" && return 2
-    git -C "$root" commit -m "$msg" -- "$@" || return 1
+    # lista vuota = nessun path esistente: un diff senza pathspec guarderebbe
+    # l'intero indice, cioe' lo stage altrui
+    [[ ${#to_commit[@]} -eq 0 ]] && return 2
+    git -C "$root" diff --cached --quiet -- "${to_commit[@]}" && return 2
+    git -C "$root" commit -m "$msg" -- "${to_commit[@]}" || return 1
     return 0
 }
 

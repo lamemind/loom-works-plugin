@@ -140,7 +140,11 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
       - → inbox <basename del file creato> · storia: <sha>
       - Le nozioni nuove di questa task si scrivono **nell'inbox**, non qui.
       ```
-   5. Rigenera l'indice — `"${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"`. Exit 2 = indice scritto ma un TLDR sfora il cap: se è il tuo, accorcialo e rilancia.
+   5. Rigenera l'indice, solo se il progetto tiene una `reference/` propria:
+      ```bash
+      [[ -d "{docs_root}/reference" ]] && "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"
+      ```
+      Cartella assente = la doc del progetto vive in un corpus di gruppo, fuori da questo repo: l'indice lo rigenera chi drena lì, e da qui non c'è niente da fare. Exit 2 = indice scritto ma un TLDR sfora il cap: se è il tuo, accorcialo e rilancia.
 
    **6.3 — Riconciliazione.** Se il puntatore esiste **e** `## Doc Impact` porta comunque delle voci, qualcuno ha scritto nella sede sbagliata (una skill non allineata, il modello in chat prima di leggere il puntatore). Spostale nell'inbox con `Edit`, con id `max+1`, e togli le righe dal task file. Non è un secondo trasloco: nessun file nuovo, nessuna riga puntatore in più.
 
