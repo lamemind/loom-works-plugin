@@ -79,7 +79,9 @@ while IFS= read -r -d '' f; do
     # adr/ e' fuori perimetro: un record e' immutabile per contratto (docs/adr-format.md),
     # quindi un path che sparisce dopo la sua data lo renderebbe DANGLING per sempre
     # su un file che nessuno puo' riparare — un verdetto senza rimedio non e' un verdetto.
-    case "$rel" in */tasks/*|*/current-task.md|*/INDEX.md|*/inbox/*|*/adr/*) continue ;; esac
+    # triage/ per la stessa ragione: uno scenario e' append-only (docs/triage-format.md)
+    # e la sua riga 1 cita alla lettera una segnalazione, path compresi.
+    case "$rel" in */tasks/*|*/current-task.md|*/INDEX.md|*/inbox/*|*/adr/*|*/triage/*) continue ;; esac
     FILES+=("$f")
 done < <(find "$DIR" -type f -name '*.md' -print0 | sort -z)
 

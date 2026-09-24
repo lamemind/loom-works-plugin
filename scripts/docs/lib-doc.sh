@@ -134,11 +134,16 @@ doc_layer() {  # <rel-to-project-root> → inbox|online|offline|altro
 # instradamento, nessuna soglia. Senza l'esclusione ogni record sotto
 # LW_DOC_MERGE prenderebbe MERGE? e il registro diventerebbe una coda di lavoro
 # per rebalance-doc su file che per contratto non si riscrivono.
+#
+# triage/ e' il file degli scenari di triage (docs/triage-format.md): stessa
+# natura del registro ADR — record datati, citati alla lettera, append-only — e
+# stessa ragione dell'esclusione.
 
 doc_excluded() {  # <rel-path> → 0 se fuori dal perimetro doc
     case "$1" in
         */tasks/*|tasks/*|*/current-task.md|current-task.md) return 0 ;;
         */adr/*|adr/*) return 0 ;;
+        */triage/*|triage/*) return 0 ;;
     esac
     return 1
 }
