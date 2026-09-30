@@ -380,7 +380,7 @@ cmd_conta() {
             if (!aperto) return
             aperto = 0
             if (sessione != "" && ses != sessione) return
-            ok = (usc ~ /^(subito|task|scarto)$/ && chi ~ /^(umano|agente)$/ &&
+            ok = (usc ~ /^(subito|task|scarto|ignora)$/ && chi ~ /^(umano|agente)$/ &&
                   mom ~ /^(flusso|posteriori)$/ && dat ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$/)
             conta("tot", ok, usc, chi, mom, dat)
             if (dal != "" && dat >= dal) conta("dal", ok, usc, chi, mom, dat)
@@ -399,9 +399,11 @@ cmd_conta() {
         /^- \*\*Sessione\*\*:/ { ses = campo($0) }
         END {
             chiudi()
-            split("scenari umano agente subito.umano subito.agente task.umano task.agente scarto.umano scarto.agente flusso posteriori malformati", chiavi, " ")
+            # Il numero di righe lo da split: una chiave aggiunta alla lista
+            # entra nella tabella senza toccare il ciclo.
+            nchiavi = split("scenari umano agente subito.umano subito.agente task.umano task.agente scarto.umano scarto.agente ignora.umano ignora.agente flusso posteriori malformati", chiavi, " ")
             printf "chiave\ttotale"; if (dal != "") printf "\tdal %s", dal; printf "\n"
-            for (i = 1; i <= 12; i++) {
+            for (i = 1; i <= nchiavi; i++) {
                 c = chiavi[i]
                 printf "%s\t%d", c, n["tot", c]; if (dal != "") printf "\t%d", n["dal", c]; printf "\n"
             }
