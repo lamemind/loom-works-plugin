@@ -68,29 +68,6 @@ fail() {  # <exit> <messaggio>
     exit "$rc"
 }
 
-# --- Normalizzazione di un'ancora ---------------------------------------------
-#
-# Stampa il path root-relative; return 1 se non esiste, 2 se sta fuori dal
-# project root. Il path si verifica sul FILESYSTEM e non su `git ls-files`:
-# e' cio' che il futuro rilevatore «path modificato dopo la data del record»
-# leggera', accoppiando `test -e` a `git log --since`.
-norm_ancora() {  # <path>
-    local p="$1" abs
-    if [[ "$p" == /* ]]; then
-        abs="$p"
-    elif [[ -e "${ROOT}/${p}" ]]; then
-        abs="${ROOT}/${p}"
-    else
-        abs="${PWD}/${p}"
-    fi
-    abs="$(realpath -m -- "$abs" 2>/dev/null)" || return 1
-    [[ -e "$abs" ]] || return 1
-    case "$abs" in
-        "$ROOT"/?*) printf '%s\n' "${abs#"${ROOT}/"}" ;;
-        *) return 2 ;;
-    esac
-}
-
 # =============================================================================
 # scarta
 # =============================================================================
@@ -143,11 +120,13 @@ cmd_scarta() {
         || fail 1 "il perché e' obbligatorio: passalo con --perche o su stdin — uno scarto senza motivo non e' uno scarto, e' un rinvio"
 
     # --- ancore ---------------------------------------------------------------
+    # La normalizzazione e' lw_norm_ancora di lib.sh, la stessa dello scenario
+    # ignora di triage.sh: lo stesso file produce la stessa stringa nei due registri.
     [[ ${#ancore_raw[@]} -gt 0 ]] || fail 1 "--ancora obbligatoria (almeno una): senza un path il record non e' raggiungibile da chi cerca"
     local -a ancore=()
     local a norm rc
     for a in "${ancore_raw[@]}"; do
-        norm="$(norm_ancora "$a")"; rc=$?
+        norm="$(lw_norm_ancora "$ROOT" "$a")"; rc=$?
         case "$rc" in
             0) ancore+=("$norm") ;;
             2) fail 1 "ancora fuori dal project root (${ROOT}): ${a}" ;;

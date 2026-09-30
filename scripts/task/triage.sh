@@ -3,8 +3,8 @@
 # =============================================================================
 # triage.sh — l'unico script che sa scrivere e contare gli scenari di triage
 # Usage:
-#   triage.sh scenario --slug <slug> --uscita subito|task|scarto --chi umano|agente
-#                      --momento flusso|posteriori --skill <nome>
+#   triage.sh scenario --slug <slug> --uscita subito|task|scarto|ignora
+#                      --chi umano|agente --momento flusso|posteriori --skill <nome>
 #                      [--progetto <id>] [--sessione <id>]
 #                      [--ancora <path>]... [--no-commit]
 #                      [--segnalazione <testo>] [--perche <testo>]
@@ -22,8 +22,8 @@
 # e non in un task file perche' clean-tasks lo purga.
 #
 # Uno SCENARIO e' la decisione presa su una segnalazione del report di fine skill:
-# la segnalazione alla lettera, l'uscita (subito|task|scarto), chi l'ha presa.
-# Formato del record, sede e regole: ${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md.
+# la segnalazione alla lettera, l'uscita (subito|task|scarto|ignora), chi l'ha
+# presa. Formato del record, sede e regole: ${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md.
 #
 # Sede: {docs_root}/triage/, un file per record, il nome del file E' l'id
 # (YYYY-MM-DD-HHMM-<slug>). Un file per record e non un file unico perche' chi
@@ -38,10 +38,22 @@
 # scenario. `--segnalazione` e `--perche` restano per chi chiama da uno script;
 # con `--segnalazione` lo stdin non si legge affatto.
 #
-# CONTRATTO ASIMMETRICO — l'agente non scarta: uno scarto con --chi agente e' un
-# rifiuto, prima di ogni scrittura. Fra le tre uscite e' l'unico errore che nessuno
-# recupera: una task in piu' si cancella, un subito sbagliato si ripristina con un
-# diff, uno scarto sbagliato e' un segnale perso.
+# CONTRATTO ASIMMETRICO — l'agente non scarta e non ignora: scarto e ignora con
+# --chi agente sono un rifiuto, prima di ogni scrittura. Lo scarto e' l'unico
+# errore che nessuno recupera: una task in piu' si cancella, un subito sbagliato si
+# ripristina con un diff, uno scarto sbagliato e' un segnale perso. L'ignora
+# dell'agente e' una segnalazione non stampata, e l'agente riporta tutto.
+#
+# IGNORA → NESSUN REGISTRO ADR. Scarto e ignora chiudono entrambi «non si fa», e
+# li separa la ricorrenza. Il record ADR serve a far tacere una segnalazione che
+# torna: lo scarto dice «tornera', e deve tacere». L'ignora dice «non tornera', e
+# se torna parla»: scrive solo lo scenario, e una segnalazione che torna arriva di
+# nuovo all'umano. Le ancore sono obbligatorie e stanno nel campo Ancore dello
+# scenario — sono la chiave che accoppia la segnalazione che torna all'ignora di
+# prima, e un record scritto senza non si completa dopo. La normalizzazione e'
+# lw_norm_ancora di lib.sh, la stessa di adr.sh: lo stesso file produce la
+# stessa stringa nei due registri. L'ignora non ha perché: la sua ragione e' la
+# marginalita', e lo scenario non ha corpo.
 #
 # NESSUN DEFAULT: nessun flag scrive un record per una segnalazione non decisa.
 # Uno scenario e' sempre una risposta vera; il recupero delle segnalazioni senza
@@ -58,8 +70,9 @@
 #
 # Exit code per sottocomando:
 #   scenario 0 scenario scritto (e record ADR, sullo scarto)
-#            1 input malformato, scarto con chi = agente, ancora inesistente,
-#              progetto o sessione non risolvibili — NESSUNA scrittura
+#            1 input malformato, scarto o ignora con chi = agente, ancora
+#              assente o inesistente, progetto o sessione non risolvibili —
+#              NESSUNA scrittura
 #            2 scenario o record ADR gia' esistenti con lo stesso id — NESSUNA
 #              scrittura
 #   conta    0 tabella stampata (anche a zero record: 0 e' un numero, non un verdetto)
@@ -125,9 +138,9 @@ cmd_scenario() {
 
     # --- uscita e chi: prima di tutto, e' il contratto asimmetrico ------------
     case "$uscita" in
-        subito|task|scarto) ;;
-        "") fail 1 "--uscita obbligatoria (subito|task|scarto) — senza default: una segnalazione non decisa non produce uno scenario" ;;
-        *)  fail 1 "--uscita deve essere subito|task|scarto (ricevuto: '${uscita}')" ;;
+        subito|task|scarto|ignora) ;;
+        "") fail 1 "--uscita obbligatoria (subito|task|scarto|ignora) — senza default: una segnalazione non decisa non produce uno scenario" ;;
+        *)  fail 1 "--uscita deve essere subito|task|scarto|ignora (ricevuto: '${uscita}')" ;;
     esac
     case "$chi" in
         umano|agente) ;;
@@ -136,6 +149,9 @@ cmd_scenario() {
     esac
     if [[ "$uscita" == scarto && "$chi" == agente ]]; then
         fail 1 "l'agente non scarta: uno scarto sbagliato e' un segnale perso che nessuno recupera — riporta la segnalazione e lascia la decisione all'umano"
+    fi
+    if [[ "$uscita" == ignora && "$chi" == agente ]]; then
+        fail 1 "l'agente non ignora: un ignora dell'agente e' una segnalazione non stampata — riportala e lascia la decisione all'umano"
     fi
 
     # --- momento, skill, slug -------------------------------------------------
@@ -193,20 +209,51 @@ cmd_scenario() {
     while [[ "$perche" == $'\n'* ]]; do perche="${perche#$'\n'}"; done
     while [[ "$perche" == *$'\n' ]]; do perche="${perche%$'\n'}"; done
 
-    # --- perché e ancore: solo sullo scarto -----------------------------------
-    # Il record di subito e task non ha un campo dove metterli: accettarli li
-    # perderebbe in silenzio.
-    if [[ "$uscita" == scarto ]]; then
-        [[ -n "${perche//[[:space:]]/}" ]] \
-            || fail 1 "lo scarto vuole il perché: righe di stdin dopo la segnalazione, o --perche — uno scarto senza motivo non e' uno scarto, e' un rinvio"
-        [[ ${#ancore[@]} -gt 0 ]] \
-            || fail 1 "lo scarto vuole almeno un --ancora: il record ADR senza un path non e' raggiungibile da chi cerca"
-    else
-        [[ -n "${perche//[[:space:]]/}" ]] \
-            && fail 1 "il perché vale solo con --uscita scarto: lo scenario di '${uscita}' non ha dove scriverlo"
-        [[ ${#ancore[@]} -gt 0 ]] \
-            && fail 1 "--ancora vale solo con --uscita scarto: lo scenario di '${uscita}' non ha dove scriverla"
-    fi
+    # --- perché e ancore --------------------------------------------------------
+    # Perché: obbligatorio sullo scarto, che lo porta nel record ADR; altrove
+    # rifiutato, perche' lo scenario non ha corpo. Ancore: obbligatorie su scarto
+    # (le porta il record ADR) e ignora (le porta lo scenario, campo Ancore);
+    # rifiutate su subito e task. Un valore accettato senza un campo dove
+    # metterlo si perderebbe in silenzio.
+    case "$uscita" in
+        scarto)
+            [[ -n "${perche//[[:space:]]/}" ]] \
+                || fail 1 "lo scarto vuole il perché: righe di stdin dopo la segnalazione, o --perche — uno scarto senza motivo non e' uno scarto, e' un rinvio"
+            [[ ${#ancore[@]} -gt 0 ]] \
+                || fail 1 "lo scarto vuole almeno un --ancora: il record ADR senza un path non e' raggiungibile da chi cerca"
+            ;;
+        ignora)
+            [[ -n "${perche//[[:space:]]/}" ]] \
+                && fail 1 "l'ignora non ha perché: la sua ragione e' la marginalita', e lo scenario non ha corpo — se il motivo conta, e' uno scarto"
+            [[ ${#ancore[@]} -gt 0 ]] \
+                || fail 1 "l'ignora vuole almeno un --ancora: e' la chiave che accoppia la segnalazione che torna a questo scenario, e non si aggiunge dopo"
+            ;;
+        *)
+            [[ -n "${perche//[[:space:]]/}" ]] \
+                && fail 1 "il perché vale solo con --uscita scarto: lo scenario di '${uscita}' non ha dove scriverlo"
+            [[ ${#ancore[@]} -gt 0 ]] \
+                && fail 1 "--ancora vale solo con --uscita scarto|ignora: lo scenario di '${uscita}' non ha dove scriverla"
+            ;;
+    esac
+
+    # Le ancore si normalizzano QUI, prima di ogni scrittura, con la regola di
+    # lib.sh: sull'ignora finiscono nel campo Ancore, sullo scarto passano ad
+    # adr.sh gia' root-relative (la normalizzazione e' idempotente).
+    local -a ancore_norm=()
+    local a norm rc
+    for a in ${ancore[@]+"${ancore[@]}"}; do
+        norm="$(lw_norm_ancora "$ROOT" "$a")"; rc=$?
+        case "$rc" in
+            0) ancore_norm+=("$norm") ;;
+            2) fail 1 "ancora fuori dal project root (${ROOT}): ${a}" ;;
+            *) fail 1 "ancora inesistente: ${a} — un path che non c'e' non e' un'ancora" ;;
+        esac
+    done
+    # Join a mano e non con IFS + ${arr[*]}: un separatore di campo globale
+    # riscriverebbe anche un path che contiene una virgola. Stesso separatore
+    # del campo Ancore del record ADR.
+    local campo_ancore="" x
+    for x in ${ancore_norm[@]+"${ancore_norm[@]}"}; do campo_ancore+="${campo_ancore:+, }${x}"; done
 
     # --- id e path ------------------------------------------------------------
     local now="${LOOM_TRIAGE_NOW:-$(date +%s)}"
@@ -231,8 +278,7 @@ cmd_scenario() {
     if [[ "$uscita" == scarto ]]; then
         local -a adr_args=(scarta --slug "$slug" --chi "$chi" --segnalazione "$segnalazione"
                            --perche "$perche" --no-commit)
-        local a
-        for a in "${ancore[@]}"; do adr_args+=(--ancora "$a"); done
+        for a in "${ancore_norm[@]}"; do adr_args+=(--ancora "$a"); done
         adr_out="$(LOOM_ADR_NOW="$now" "$ADR_SH" "${adr_args[@]}" < /dev/null 2>&1)"
         adr_rc=$?
         if (( adr_rc != 0 )); then
@@ -256,7 +302,11 @@ cmd_scenario() {
         printf -- '- **Progetto**: %s\n' "$progetto"
         printf -- '- **Sessione**: %s\n' "$sessione"
         printf -- '- **Data**: %s\n' "$rec_data"
+        # Ultimo campo: ADR sullo scarto, Ancore sull'ignora — i due non
+        # coesistono mai. Sullo scarto le ancore stanno nel record ADR, e una
+        # copia qui divergerebbe.
         [[ -n "$adr_id" ]] && printf -- '- **ADR**: %s\n' "$adr_id"
+        [[ "$uscita" == ignora ]] && printf -- '- **Ancore**: %s\n' "$campo_ancore"
         true
     } > "$rec_file"; then
         # Il record ADR e' appena nato, non committato, e senza il suo scenario

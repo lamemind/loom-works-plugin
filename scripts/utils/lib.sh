@@ -99,6 +99,38 @@ lw_docs_root() {
     echo "${LOOM_DOCS_ROOT:-docs}"
 }
 
+# ---- Ancora di un record -----------------------------------------------------
+#
+# Stampa il path relativo a <root>; return 1 se non esiste, 2 se sta fuori da
+# <root>. Un path relativo si prova prima sotto <root>, poi sotto $PWD.
+#
+# UNA REGOLA SOLA per tutti i registri che portano ancore — il record ADR
+# (adr.sh scarta) e lo scenario ignora (triage.sh scenario). Lo stesso file deve
+# produrre la stessa stringa in entrambi: chi accoppia due record sullo stesso
+# path (`sort | uniq -d` sulle ancore, o un join fra triage/ e adr/) si regge su
+# quella uguaglianza, e due copie della regola divergerebbero in silenzio.
+#
+# Il path si verifica sul FILESYSTEM e non su `git ls-files`: e' cio' che un
+# rilevatore «path modificato dopo la data del record» legge, accoppiando
+# `test -e` a `git log --since`.
+
+lw_norm_ancora() {  # <root> <path>
+    local root="$1" p="$2" abs
+    if [[ "$p" == /* ]]; then
+        abs="$p"
+    elif [[ -e "${root}/${p}" ]]; then
+        abs="${root}/${p}"
+    else
+        abs="${PWD}/${p}"
+    fi
+    abs="$(realpath -m -- "$abs" 2>/dev/null)" || return 1
+    [[ -e "$abs" ]] || return 1
+    case "$abs" in
+        "$root"/?*) printf '%s\n' "${abs#"${root}/"}" ;;
+        *) return 2 ;;
+    esac
+}
+
 # ---- Task attiva: cascata di risoluzione -------------------------------------
 #
 # Contratto di famiglia, gemello di inject-task.sh (hook SessionStart) e della
