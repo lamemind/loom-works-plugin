@@ -142,7 +142,7 @@ Poi riporta quali DLV sono chiusi e quali restano aperti nel task file, e sugger
 
 > Stato e requisiti rinviati: factory · T12 §Custodia — un limite del triage si segnala lì, non si apre una task qui.
 
-Una segnalazione è un problema incontrato durante il lavoro che chiede una decisione: un difetto fuori perimetro, un rischio, un residuo, una cosa che hai lasciato com'era, una cosa che hai corretto di tua iniziativa. Ogni segnalazione ha tre uscite — **subito** (si risolve ora), **task** (diventa una task), **scarto** (non si fa, con un motivo) — e ogni decisione diventa uno **scenario** su disco. Formato e sede: `${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md`.
+Una segnalazione è un problema incontrato durante il lavoro che chiede una decisione: un difetto fuori perimetro, un rischio, un residuo, una cosa che hai lasciato com'era, una cosa che hai corretto di tua iniziativa. Ogni segnalazione ha quattro uscite — **subito** (si risolve ora), **task** (diventa una task), **scarto** (non si fa, e se torna deve tacere: un motivo nel registro ADR), **ignora** (non si fa, e se torna parla: nessun record ADR) — e ogni decisione diventa uno **scenario** su disco. Formato e sede: `${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md`.
 
 **La sezione c'è sempre, anche vuota**: l'assenza di segnalazioni è un fatto dichiarato, non una dimenticanza. La forma è fissa, perché è ciò che chi rilegge i transcript cerca:
 
@@ -150,9 +150,9 @@ Una segnalazione è un problema incontrato durante il lavoro che chiede una deci
 **🚦 Segnalazioni**
 
 **S{N}** — <la segnalazione, su una riga>
-  subito · task · scarto
+  subito · task · scarto · ignora
 **S{N}** — <ciò che hai corretto di tua iniziativa, su una riga>
-  ☑ subito (agente) · task · scarto
+  ☑ subito (agente) · task · scarto · ignora
 ```
 
 A zero segnalazioni, una riga sola: `**🚦 Segnalazioni** — nessuna`.
@@ -168,7 +168,7 @@ A zero segnalazioni, una riga sola: `**🚦 Segnalazioni** — nessuna`.
   SCENARIO
   ```
 
-- **Tu non scarti.** Una segnalazione che ritieni irrilevante la riporti comunque con le tre uscite: uno scarto sbagliato è un segnale perso che nessuno recupera, e lo script rifiuta lo scarto con `--chi agente`.
+- **Tu non scarti e non ignori.** Una segnalazione che ritieni irrilevante la riporti comunque con le quattro uscite: uno scarto sbagliato è un segnale perso che nessuno recupera, un tuo ignora è una segnalazione non stampata, e lo script rifiuta entrambi con `--chi agente`.
 
 Gli scenari si scrivono con `--no-commit`, uno per segnalazione, e si committano insieme — i path sono quelli che lo script stampa (`-> scenario scritto:`, e `-> record ADR:` sullo scarto):
 
@@ -183,10 +183,10 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
 L'umano risponde come vuole: in prosa, dettando a voce, in ordine sparso, su una parte sola delle segnalazioni. Nessuna domanda a scelta e nessuna griglia da compilare — nessuno strumento presidia la risposta, la leggi tu nel turno dopo. Riconosci la segnalazione da `S1`, `s1`, `1` o «la prima», e per ogni segnalazione decisa scrivi uno scenario `--chi umano --momento flusso`:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto --chi umano \
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto|ignora --chi umano \
   --momento flusso --skill run-task [--ancora <path>]... --no-commit <<'SCENARIO'
 <la segnalazione, identica al testo della riga S{N}>
-<solo sullo scarto: il perché, anche su più righe>
+<solo sullo scarto: il perché, anche su più righe — mai sull'ignora>
 SCENARIO
 ```
 
@@ -195,7 +195,8 @@ Poi un commit solo per tutti, con lo snippet sopra.
 - **Nessun default.** La segnalazione su cui l'umano non dice niente non produce niente: non la decidi tu e non la ripresenti. Il recupero delle segnalazioni rimaste senza risposta si fa a posteriori, fuori da questa conversazione.
 - **«subito» nel flusso è operativo**: scrivi lo scenario e lo esegui. «Fallo subito ma in un subagente» resta `subito` — lo scenario registra l'uscita, mai il modo di esecuzione.
 - **«task»** registra la decisione e basta: la task la apre `create-task`, se l'umano la chiede.
-- **«scarto»** vuole il perché e un'ancora. Il perché sta di solito nella risposta stessa («S2 scarto: capita una volta l'anno»); se manca, chiedilo una volta sola, poi scrivi. L'ancora è il path che la segnalazione tocca. Lo script scrive anche il record ADR, e stampa il suo path da mettere nel commit.
+- **«scarto»** vuole il perché e un'ancora. Lo scrivi solo quando la risposta nomina lo scarto o porta un perché («S2 scarto: capita una volta l'anno», «S2 no, capita una volta l'anno»); nominato senza perché, chiedilo una volta sola, poi scrivi. L'ancora è il path che la segnalazione tocca. Lo script scrive anche il record ADR, e stampa il suo path da mettere nel commit.
+- **«ignora», e ogni rifiuto nudo** — «S2 no», «lascia perdere», «non vale la pena»: nessun motivo e nessuna parola «scarto» — lo scrivi subito, senza chiedere niente. Vuole l'ancora, il path che la segnalazione tocca, e nessun perché: lo script rifiuta il perché sull'ignora. Non scrive nessun record ADR, quindi se la segnalazione torna la riporti di nuovo. Nel dubbio fra i due scegli l'ignora, perché è l'errore che si recupera: un ignora scritto dove l'umano voleva uno scarto torna nel report se la segnalazione torna, uno scarto scritto dove voleva un ignora è un record ADR che nessuna query colpirà.
 - **La conferma e il ribaltamento valgono uguale.** Sulla segnalazione che avevi marcato `☑ subito (agente)`, «ok» è uno scenario `subito` e «fanne una task» uno scenario `task`, entrambi `--chi umano`, accanto al tuo: non si riscrive niente, i due record sono il dato.
 - **Detta a posteriori, la stessa parola è un esito e non un'azione.** Chi rilegge il report da un'altra sessione registra con `--momento posteriori` e non esegue niente.
 
