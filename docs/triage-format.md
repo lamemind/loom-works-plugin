@@ -15,7 +15,7 @@ Ciò che l'agente ha corretto di sua iniziativa sta **dentro** la sezione, con �
 Le quattro uscite nel flusso:
 
 - **subito** — operativo: l'agente scrive lo scenario ed esegue.
-- **task** — registra la decisione; la task la apre `create-task`, se l'umano la chiede.
+- **task** — operativo: l'agente scrive lo scenario e apre subito la task con `create-task` in modalità YOLO, senza chiedere. «task» è già la richiesta: una decisione registrata senza la task che ne segue lascia il lavoro da nessuna parte.
 - **scarto** — vuole il perché, di solito già nella risposta («S2 scarto: capita una volta l'anno»). Lo scenario scrive anche il record ADR.
 - **ignora** — vuole l'ancora e nessun perché. Non scrive nessun record ADR: se la segnalazione torna, l'agente la riporta di nuovo.
 
@@ -85,7 +85,7 @@ Lo scenario di un ignora chiude con le ancore al posto del campo `ADR`:
 
 **`Chi` non ha default**, ed è ciò che separa i due usi del file: gli scenari con `umano` sono il corpus su cui si misura un triage delegato, quelli con `agente` sono il campione delle decisioni che l'agente ha già preso da sé.
 
-**`Momento` distingue la decisione che ha avuto effetto da quella che non l'ha avuto.** Nel flusso — l'umano risponde al report nella stessa conversazione — «subito» è operativo, e l'agente lo esegue. A posteriori — una sessione aperta dopo, che rilegge i transcript — la stessa parola è un esito: registra che si sarebbe voluto farlo, e nessuno lo esegue. La data non basta a distinguerli, perché una risposta a posteriori sulla segnalazione di ieri porta la data di oggi. Il campo sta nel formato dal primo record per la stessa ragione di `Supera` nel registro ADR: aggiunto dopo, lascerebbe su disco due generazioni di record che un parser legge in modo diverso.
+**`Momento` distingue la decisione che ha avuto effetto da quella che non l'ha avuto.** Nel flusso — l'umano risponde al report nella stessa conversazione — «subito» e «task» sono operativi: l'agente esegue il primo e apre la task del secondo. A posteriori — una sessione aperta dopo, che rilegge i transcript — le stesse parole sono un esito: registrano che si sarebbe voluto farlo, e nessuno lo esegue. La data non basta a distinguerli, perché una risposta a posteriori sulla segnalazione di ieri porta la data di oggi. Il campo sta nel formato dal primo record per la stessa ragione di `Supera` nel registro ADR: aggiunto dopo, lascerebbe su disco due generazioni di record che un parser legge in modo diverso.
 
 **Lo scenario registra l'uscita, mai il modo di esecuzione.** «Fallo subito ma in un subagente» resta `subito`: il modo non è un dato di triage, e un campo per registrarlo aprirebbe un dominio che nessuno sa contare.
 
