@@ -4,6 +4,7 @@ DOC (doc-management.md) — quattro layer: online = la mappa, @-import in CLAUDE
 NON VA IN DOC: cronaca (cosa è successo, in ordine) · intenzione · ipotesi · cantiere · scarto · eco · inventario · calco (una cifra o una classifica ricopiata da una fonte che si muove) · cornice (il testo che annuncia il testo).
 Al riesame e al trasloco si applicano SOLO i criteri indipendenti, quelli che si leggono nella frase. Eco, calco, inventario, sorpresa, «è già scritto altrove» e la scelta del layer dipendono da codice, fonte viva o resto della doc: li paga il drain, non la transizione.
 Solo as-is DI PROD: presente indicativo, stato corrente, niente date né task inline. La doc segue il RILASCIO, non il commit.
+PATH in doc: `🏠/…` parte da project root e solo da lì (progetto fratello: `🏠/../<fratello>/…`); `./…` e `../…` senza marcatore partono dalla cartella del file che li cita.
 
 TASK (task-management.md) — task attiva, cascata unica: arg esplicito → $LOOM_TASK → symlink {docs_root}/current-task.md. TASK_SRC symlink = linked (git add -A), env/arg = detached (stage selettivo).
 Il materiale di lavoro sta nella task folder, in project root, dot-prefixed; sotto {docs_root}/tasks/ stanno SOLO i task file .md. Il nome lo assegna set-task-folder (o scratch-new) nel campo **Folder**, mai a mano; la folder non esiste finché non ci scrivi il primo file.

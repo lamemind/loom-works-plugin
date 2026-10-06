@@ -19,6 +19,16 @@ Nei primi due la doc **è** la verità. Negli altri due la verità sta altrove, 
 
 **Quattro verdetti**, uno per nozione: `online` · `offline` · `→ codice` · `→ fonte viva`. I due rimandi hanno forma diversa e non sono intercambiabili.
 
+## La base di un path
+
+Un path in doc dichiara la propria base con la grafia. Dal token nudo `check-doc-links.sh` non può sapere da dove l'autore lo intendesse, e provare entrambe le basi darebbe per buono un riferimento rotto che trova un omonimo dall'altra parte.
+
+- **`🏠/<path>`** parte da project root, e solo da lì, anche quando risale sopra la root: un riferimento a un progetto fratello (il corpus di gruppo) si scrive `🏠/../<fratello>/…`. Il checker lo verifica solo da project root, senza ripiego sulla cartella del file.
+- **`./…` e `../…` senza marcatore** partono dalla cartella del file che li cita, mai da project root. È la forma dei link markdown, l'unica che un editor risolve: un `../<fratello>/…` scritto pensando alla root risulta appeso anche quando il file esiste.
+- **Un path nudo con almeno una barra** (`{docs_root}/reference/x.md`) si prova dalla cartella del file e poi da project root. Il marcatore è additivo: i path nudi restano validi.
+
+Un target fuori da project root compare nell'output del checker con la stessa grafia, `🏠/../…`.
+
 ## L'inbox — stato di transizione
 
 `{docs_root}/inbox/` tiene i file in attesa di smaltimento. Non è un quinto verdetto: è uno **stato di transizione** verso i quattro. Tre nature, dichiarate dal marker in riga 3 del file (`nozioni` · `derivazione` · `sweep`); il formato e il vocabolario dei token sono degli script (`scripts/docs/inbox.sh`), mai di un prompt.

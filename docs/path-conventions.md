@@ -8,6 +8,8 @@ Un path scritto in un sorgente del plugin è **project-root-relative**, e la bas
 
 Ne discende che una risorsa **interna al plugin** non si scrive relativa mai — sempre `${CLAUDE_PLUGIN_ROOT}/...`. Un `docs/task-management.md` nudo esiste in due mondi e ne indica due diversi (la `docs/` del plugin, e la docs-root di default di un progetto), quindi non fallisce: risolve al posto sbagliato in silenzio su ogni progetto che non ha personalizzato la docs-root.
 
+La doc di un progetto non ha una base sola: vi convivono link markdown relativi al file e path relativi alla root, e la base la dichiara la grafia — `🏠/` davanti a un path vuol dire «parte da project root» (regola completa: `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md` §La base di un path). Nei sorgenti del plugin la base è già la root, quindi il marcatore non serve a leggerli. Serve a ciò che i sorgenti fanno scrivere: un template, un prompt o un agent che mette in doc un path a un progetto fratello lo scrive `🏠/../<fratello>/…`, perché un `../<fratello>/…` nudo parte dalla cartella del file che lo cita e `check-doc-links.sh` lo riporta appeso anche quando il file esiste.
+
 ## Due segnaposto
 
 - `{project_root}` — la root del progetto, dove serve nominarla esplicita.
