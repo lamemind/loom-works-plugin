@@ -1,6 +1,6 @@
 ---
 name: drop-lane
-description: Destroy a lane WITHOUT merging — removes worktree, branch and Ptyxis profile.
+description: Destroy a lane WITHOUT merging — removes worktree and branch.
 allowed-tools: Bash(*), Read, AskUserQuestion, Edit
 model: sonnet
 ---
@@ -58,7 +58,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/drop-lane.sh \
     "${lane}" --yes
 ```
 
-Lo script: rimuove profilo Ptyxis (best-effort) → `git worktree remove --force` → `git branch -D feat/{lane}`.
+Lo script: `git worktree remove --force` → `git branch -D feat/{lane}`.
 
 ### 4. Pulizia sezione LANES in tasks.md
 
@@ -84,5 +84,4 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <top
 - **Distruttiva e non reversibile**: branch cancellato con `-D` (force), worktree con `--force`. Commit non mergiati persi.
 - Eseguire dal worktree base, non dal worktree lane (non puoi rimuovere il worktree in cui ti trovi)
 - Auto-detect: trova tutti i `*-{lane}` (multi-project rimuove tutti i sub-repo worktree della lane)
-- Profilo Ptyxis rimosso automaticamente (best-effort, noop senza Ptyxis)
 - Differenza da `merge-lane --cleanup`: quello **mergia poi** rimuove; drop-lane **NON mergia**

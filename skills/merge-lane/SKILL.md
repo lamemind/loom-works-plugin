@@ -64,4 +64,3 @@ Detection branch-agnostica (D3, git=verità): scansiona i worktree via `list-wor
 - Single-project: sync automatico di tasks.md nel worktree lane (per prossima task)
 - Multi-project: nessun sync di tasks.md (è già unico e non branchato)
 - `reconcile-tasks` serve solo in single-project (D5): in multi tasks.md non viene branchato
-- **Profilo terminale Ptyxis**: con `--cleanup`, lo script rimuove anche il profilo Ptyxis associato al worktree. Best-effort, noop senza Ptyxis.

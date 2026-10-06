@@ -77,5 +77,4 @@ Se exit 1 (errore), mostra il messaggio di errore e non procedere.
 - Dopo spawn: apri una sessione Claude nel worktree lane, poi `/loom-works:start-task`
 - `merge-lane` auto-rileva i worktrees `*-{lane}` → non serve ripetere i repo a merge
 - Worktrees sibling preservati dopo merge (default). `merge-lane --cleanup` per rimuovere.
-- **Profilo terminale Ptyxis**: se il progetto ha un profilo Ptyxis, lo script duplica automaticamente il profilo per il worktree (label `[lane]`, cd → worktree). Best-effort, noop su macchine senza Ptyxis.
 - **Hook on-lane-spawned**: se `user_config.on_lane_spawned_hook` è valorizzato, `spawn-lane` esegue quello script come ultimo step, **una sola volta**, sulla lane parent root `{project}-{lane}` (`$1` = CWD = lane root). Silent noop se la variabile è vuota o il file è assente/non-eseguibile. In caso di failure: warning evidente con comando di retry, ma spawn-lane prosegue. Env nell'hook: `LOOM_LANE`, `LOOM_WORKTREE`, `LOOM_PROJECT_ROOT`.

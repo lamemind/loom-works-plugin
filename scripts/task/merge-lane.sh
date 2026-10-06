@@ -210,9 +210,6 @@ if [[ "$CLEANUP" == true ]]; then
 
         echo "-> rimuovo worktree: ${wt}"
 
-        # Profilo terminale Ptyxis associato (best-effort, noop se assente)
-        "${SCRIPT_DIR}/../utils/ptyxis-profile.sh" remove "$wt" || true
-
         cd "$repo"
         git worktree remove "$wt" --force 2>/dev/null || true
         git branch -d "$branch_lane" 2>/dev/null || true

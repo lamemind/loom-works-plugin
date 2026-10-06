@@ -76,9 +76,6 @@ _spawn_one() {
     # Init worktree (copia settings.local.json, exclude parent)
     "${SCRIPT_DIR}/../utils/init-worktree.sh" "$wt_path" "$repo_dir"
 
-    # Profilo terminale Ptyxis (best-effort, noop se Ptyxis assente)
-    "${SCRIPT_DIR}/../utils/ptyxis-profile.sh" add "$repo_dir" "$wt_path" "$LANE" || true
-
     echo "-> ✔️ worktree=${wt_path} branch=${branch_lane}"
     echo "   cd ${wt_path} && claude"
 }

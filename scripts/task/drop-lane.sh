@@ -8,7 +8,6 @@ set -euo pipefail
 # Auto-detecta i worktrees *-{lane} in WORKTREE_BASE e li distrugge:
 #   - git worktree remove --force (perde modifiche uncommitted)
 #   - git branch -D feat/{lane}   (perde commit non mergiati)
-#   - rimuove profilo terminale Ptyxis associato
 #
 # SENZA --yes: dry-run. Mostra cosa verrebbe distrutto (worktrees, branch,
 #              commit non mergiati, file dirty) ed esce 0. NIENTE viene toccato.
@@ -115,9 +114,6 @@ for i in "${!LANE_WORKTREES[@]}"; do
     branch="$(git -C "$wt" branch --show-current 2>/dev/null || echo '')"
 
     echo "-> distruggo: $(basename "$wt")"
-
-    # Profilo Ptyxis (best-effort)
-    "${SCRIPT_DIR}/../utils/ptyxis-profile.sh" remove "$wt" || true
 
     # Rimuovi worktree (force: ignora dirty)
     if [[ -d "$repo" ]]; then
