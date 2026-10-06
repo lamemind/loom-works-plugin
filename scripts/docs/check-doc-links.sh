@@ -21,10 +21,23 @@
 # sa solo chi ha fatto lo split, e viaggia nel blocco SPLIT_MAP che doc-writer ritorna.
 # Qui si enumera, li' si mappa.
 #
-# Risoluzione di un path: prima relativo alla cartella del file che lo cita, poi
-# relativo a project root — la doc usa entrambe le forme. Ignorati: URL e path che
-# contengono un'interpolazione (`${CLAUDE_PLUGIN_ROOT}/...`), che non sono
-# riferimenti risolvibili staticamente.
+# Risoluzione di un path — la base la dichiara la grafia, il checker non la indovina:
+#
+#   🏠/a/b.md   relativo a project root, e SOLO a quella, anche quando risale sopra
+#               la root (🏠/../<fratello>/x.md): nessun ripiego sulla cartella del
+#               file che lo cita. Dal token nudo non si sa quale base intendesse
+#               l'autore, e provarle entrambe darebbe per buono un riferimento rotto
+#               che trova un omonimo dall'altra base.
+#   ./x ../x    token che inizia per '.': relativo alla cartella del file che lo
+#               cita, e SOLO a quella — un ../ senza marcatore non e' mai provato da
+#               project root. Un path da project root che risale sopra la root si
+#               scrive col marcatore.
+#   a/b.md      path nudo con almeno una barra: prima relativo alla cartella del
+#               file che lo cita, poi a project root — la doc usa entrambe le forme.
+#   ](x.md)     link markdown a nome nudo: relativo alla cartella del file.
+#
+# Ignorati: URL e path che contengono un'interpolazione (`${CLAUDE_PLUGIN_ROOT}/...`),
+# che non sono riferimenti risolvibili staticamente.
 #
 # Scansionati: {docs_root}/**/*.md (esclusi tasks/ e current-task.md, che sono
 # runtime, e inbox/ — v. sotto) + CLAUDE.md. `--also <file|dir>` aggiunge perimetri
@@ -186,6 +199,7 @@ function heads_hint(f,   i, out, h) {
     if (NH[f] > 5) out = out " · (+" (NH[f] - 5) ")"
     return out
 }
+BEGIN { ROOTMARK = "🏠" }
 FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir) }
 {
     rest = $0; before = ""
@@ -200,6 +214,11 @@ FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir) }
         # fratello nella stessa cartella, cioe la piu esposta a un regroup, che
         # sposta i file e lascia i link dove stavano.
         mdlink = (before ~ /\]\($/)
+        # Il marcatore di project root non sta nella classe del token: un path marcato
+        # arriva qui come token che comincia per barra, col marcatore in coda a before.
+        # Senza questo riconoscimento cadrebbe nel ramo del path assoluto.
+        rootmark = (tok ~ /^\// && length(before) >= length(ROOTMARK) &&
+                    substr(before, length(before) - length(ROOTMARK) + 1) == ROOTMARK)
         if (before ~ /https?:\/\/[^ )]*$/) skip = 1        # URL
         if (before ~ /[}$]$/)              skip = 1        # ${VAR}/path.md
         if (length(tok) < 4)               skip = 1
@@ -210,12 +229,15 @@ FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir) }
         if (tok !~ /\// && !mdlink)        skip = 1
 
         if (!skip) {
-            # Un path si prova prima relativo al file che lo cita, poi a project root:
-            # la doc usa entrambe le forme. Se nessuna delle due esiste, si RIPORTA
-            # quella che l autore intendeva — dir-relativa se il token inizia per '.',
-            # altrimenti root-relativa — o il messaggio manda a cercare nel posto sbagliato.
+            # La base la dichiara la grafia (v. testata). Marcato: solo project root,
+            # nessun ripiego — un omonimo dalla cartella del file non deve coprire un
+            # riferimento rotto. Token che inizia per ".": solo la cartella del file.
+            # Path nudo con barra: prima la cartella del file, poi project root, e se
+            # nessuna delle due esiste si RIPORTA la root-relativa, la forma che l autore
+            # intendeva, o il messaggio manda a cercare nel posto sbagliato.
             p = tok; sub(/^@/, "", p)
-            if (p ~ /^\//)                        abs = normpath(p)
+            if (rootmark)                         abs = normpath(ROOT p)
+            else if (p ~ /^\//)                   abs = normpath(p)
             else if (exists(normpath(dir "/" p))) abs = normpath(dir "/" p)
             else if (p ~ /^\./)                   abs = normpath(dir "/" p)
             else if (mdlink && p !~ /\//)         abs = normpath(dir "/" p)
