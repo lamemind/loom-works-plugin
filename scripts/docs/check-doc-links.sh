@@ -199,8 +199,26 @@ function heads_hint(f,   i, out, h) {
     if (NH[f] > 5) out = out " · (+" (NH[f] - 5) ")"
     return out
 }
-BEGIN { ROOTMARK = "🏠" }
-FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir) }
+# Come si stampa un path (colonne FROM e TARGET). Sotto project root: root-relativo,
+# senza marcatore. Fuori: il percorso da project root col marcatore in testa
+# (🏠/../x.md) — un ../ nudo si leggerebbe relativo al file che cita, e la stringa
+# stampata e la stessa che l autore scrive per citarlo. Il taglio della root e un
+# confronto letterale: ROOT usato come regex farebbe valere un punto del path
+# per qualunque carattere.
+function show(a,   na, nr, pa, pr, i, common, out) {
+    a = normpath(a)
+    if (index(a, ROOT "/") == 1) return substr(a, length(ROOT) + 2)
+    na = split(a, pa, "/")
+    nr = split(ROOT, pr, "/")
+    common = 0
+    while (common < na && common < nr && pa[common + 1] == pr[common + 1]) common++
+    out = ROOTMARK
+    for (i = common + 1; i <= nr; i++) out = out "/.."
+    for (i = common + 1; i <= na; i++) out = out "/" pa[i]
+    return out
+}
+BEGIN { ROOTMARK = "🏠"; ROOT = normpath(ROOT) }
+FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir); src = show(FILENAME) }
 {
     rest = $0; before = ""
     while (match(rest, /[A-Za-z0-9_.@\/-]*\.md/)) {
@@ -243,8 +261,7 @@ FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir) }
             else if (mdlink && p !~ /\//)         abs = normpath(dir "/" p)
             else                                  abs = normpath(ROOT "/" p)
 
-            rel = abs; sub("^" ROOT "/", "", rel)
-            src = FILENAME; sub("^" ROOT "/", "", src)
+            rel = show(abs)
 
             sec = ""
             ipos = index(tail, "§")
