@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # =============================================================================
-# lib-config.sh - Primitive config progetto (file + registry dconf + profili)
-# Sourced da register.sh / refresh.sh / materialize-profiles.sh
+# lib-config.sh - Primitive config progetto (file + registry dconf)
+# Sourced da register.sh / refresh.sh
 # =============================================================================
 #
 # Modello: runtime/project/project-config-architecture.md
@@ -10,7 +10,8 @@
 #   - Registry dconf /org/lamemind/loom/    = source of truth RUNTIME (macchina-locale)
 #   - label DERIVATA "{emoji} {name}", mai scritta nel file. `owner` resta nel
 #     file e nel registry come metadato organizzativo, ma nessun consumer lo legge.
-#   - profili Ptyxis DERIVATI dal registry (materializzazione)
+#   - nessun profilo Ptyxis: chi apre una tab del progetto la lancia sul profilo
+#     di default, e la chiave del canale stato è l'`id` del progetto
 #
 # Modello surface (ridisegno T32-reopen):
 #   - TRACKED (rigide): claude, deck → mappa `surfaces` bool. Match finestra + stato.
@@ -25,8 +26,6 @@
 #   Registry:  reg_available, reg_project_path, reg_set, reg_get, reg_list_projects,
 #              reg_write_surfaces, reg_write_launch, reg_set_binding, reg_get_binding,
 #              reg_pull
-#   Ptyxis:    ptx_available, ptx_list_uuids, ptx_label, ptx_profile_dir,
-#              ptx_find_for_surface, ptx_generate_claude, ptx_sync_claude_label
 # =============================================================================
 
 _LIBCFG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,15 +36,12 @@ source "${_LIBCFG_DIR}/../utils/lib.sh"
 REG_ROOT="/org/lamemind/loom"
 REG_PROJECTS="${REG_ROOT}/projects"
 
-PTX_ROOT="/org/gnome/Ptyxis"
-PTX_UUIDS="${PTX_ROOT}/profile-uuids"
-
 # ---- GVariant string helpers -------------------------------------------------
 #
 # Un valore stringa dconf è un GVariant single/double-quoted. Emoji/owner/name
 # non contengono apici in condizioni normali → single-quote. Se il valore
-# contiene un apice singolo (es. custom-command con 'label'), si passa a
-# double-quote con escape, replicando il formato che Ptyxis usa già.
+# contiene un apice singolo (es. un command di `launch[]` con un argomento
+# quotato), si passa a double-quote con escape, il formato che dconf stesso usa.
 
 gv_str() {  # <raw-string> → literal GVariant quotato
     local s="$1"
@@ -65,8 +61,7 @@ gv_unwrap() {  # <dconf-read-output> → raw string (inverso esatto di gv_str)
     elif [[ "$v" == \"*\" ]]; then
         v="${v#\"}"; v="${v%\"}"
         # Ordine inverso a gv_str, altrimenti un `gv_str "$(gv_unwrap …)"` (ciclo
-        # read-modify-write, es. il riallineamento della label in un
-        # custom-command) ri-escaperebbe ciò che è già escapato e i backslash
+        # read-modify-write) ri-escaperebbe ciò che è già escapato e i backslash
         # raddoppierebbero a ogni passaggio. Solo il ramo double-quote: quello
         # single-quote non escapa nulla neanche in scrittura.
         v="${v//\\\"/\"}"
@@ -240,102 +235,4 @@ reg_pull() {  # <project-dir> → id (o 1 su config invalido)
         dconf reset "$(reg_project_path "$id")/order" 2>/dev/null || true
     fi
     echo "$id"
-}
-
-# ---- Profili Ptyxis (materializzazione) -------------------------------------
-
-ptx_available() {
-    command -v dconf >/dev/null 2>&1 || return 1
-    local u; u="$(dconf read "$PTX_UUIDS" 2>/dev/null || echo '')"
-    [[ -n "$u" && "$u" != "@as []" && "$u" != "[]" ]]
-}
-
-ptx_list_uuids() {
-    dconf read "$PTX_UUIDS" 2>/dev/null | tr -d "[]' " | tr ',' '\n' | sed '/^$/d'
-}
-
-ptx_norm_path() {
-    local p="$1"; p="${p/#\~/$HOME}"
-    realpath -m "$p" 2>/dev/null || echo "$p"
-}
-
-ptx_cmd() { dconf read "${PTX_ROOT}/Profiles/$1/custom-command" 2>/dev/null || echo ''; }
-
-ptx_label() { gv_unwrap "$(dconf read "${PTX_ROOT}/Profiles/$1/label" 2>/dev/null || echo '')"; }
-
-# Estrae il path dopo "cd " dal custom-command, normalizzato (gestisce ~ e quote).
-ptx_profile_dir() {  # <uuid> → path o vuoto
-    local cmd raw
-    cmd="$(ptx_cmd "$1")"
-    [[ -z "$cmd" ]] && return 0
-    raw="$(echo "$cmd" | sed -nE 's/.*cd ([^&]+) &&.*/\1/p' | sed -E "s/^['\"]//; s/['\"[:space:]]+$//")"
-    [[ -z "$raw" ]] && return 0
-    ptx_norm_path "$raw"
-}
-
-# Trova l'UUID del profilo che serve <dir> per la surface <kind>.
-# claude → custom-command con 'claude --name'; deck → custom-command/label deck.
-ptx_find_for_surface() {  # <dir> <kind> → uuid o vuoto
-    local dir="$1" kind="$2" target u pdir cmd
-    target="$(ptx_norm_path "$dir")"
-    while read -r u; do
-        [[ -z "$u" ]] && continue
-        pdir="$(ptx_profile_dir "$u")"
-        [[ "$pdir" == "$target" ]] || continue
-        cmd="$(ptx_cmd "$u")"
-        if [[ "$kind" == "claude" && "$cmd" == *"claude --name"* ]]; then
-            echo "$u"; return 0
-        fi
-        if [[ "$kind" == "deck" && ( "$cmd" == *loom-deck* || "$cmd" == *"[deck]"* || "$cmd" == *"· deck"* ) ]]; then
-            echo "$u"; return 0
-        fi
-    done < <(ptx_list_uuids)
-    return 0
-}
-
-ptx_append_uuid() {  # <uuid>
-    local new="$1" cur
-    cur="$(dconf read "$PTX_UUIDS" 2>/dev/null || echo '')"
-    if [[ -z "$cur" || "$cur" == "@as []" || "$cur" == "[]" ]]; then
-        dconf write "$PTX_UUIDS" "['${new}']"
-    else
-        dconf write "$PTX_UUIDS" "${cur%]}, '${new}']"
-    fi
-}
-
-# Genera un profilo Ptyxis claude derivato dal registry. Echoes il nuovo UUID.
-ptx_generate_claude() {  # <dir> <label> → uuid
-    local dir="$1" label="$2" uuid d
-    uuid="$(uuidgen | tr -d '-')"
-    d="${PTX_ROOT}/Profiles/${uuid}"
-    dconf write "${d}/label" "$(gv_str "$label")"
-    dconf write "${d}/custom-command" "$(gv_str "bash -c \"cd ${dir} && claude --name '${label}'; exec bash\"")"
-    dconf write "${d}/use-custom-command" "true"
-    ptx_append_uuid "$uuid"
-    echo "$uuid"
-}
-
-# La label di una tab claude è congelata dentro il `custom-command` del profilo
-# (`claude --name '<label>'`), e l'adozione di un profilo esistente non lo
-# riscrive mai. Ogni cambio della formula-label lascia quindi dietro profili già
-# materializzati che titolano con la formula vecchia: il matcher window-level di
-# compass non li riconosce più e il coalescing manda le loro tab in una finestra
-# nuova. Qui si riallinea il solo argomento `--name`, non l'intero comando, per
-# non calpestare eventuali personalizzazioni del resto della riga.
-# Ritorna 0 se ha riscritto, 1 se era già allineato o non è un profilo claude.
-ptx_sync_claude_label() {  # <uuid> <label>
-    local uuid="$1" label="$2" cmd cur old_arg new_arg
-    cmd="$(gv_unwrap "$(ptx_cmd "$uuid")")"
-    [[ "$cmd" == *"claude --name '"* ]] || return 1
-    cur="$(sed -nE "s/.*claude --name '([^']*)'.*/\1/p" <<<"$cmd")"
-    [[ -n "$cur" && "$cur" != "$label" ]] || return 1
-    old_arg="claude --name '${cur}'"
-    new_arg="claude --name '${label}'"
-    dconf write "${PTX_ROOT}/Profiles/${uuid}/custom-command" \
-        "$(gv_str "${cmd//"$old_arg"/"$new_arg"}")"
-    # Il `label` del profilo è cosmetico (nome nel picker Ptyxis) e non entra nel
-    # match: si riallinea solo se era la label derivata, mai se l'utente l'ha
-    # ribattezzato a mano.
-    [[ "$(ptx_label "$uuid")" == "$cur" ]] && dconf write "${PTX_ROOT}/Profiles/${uuid}/label" "$(gv_str "$label")"
-    return 0
 }

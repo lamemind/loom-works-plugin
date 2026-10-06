@@ -56,7 +56,7 @@ Se l'input contiene `--force`, passa il flag (rigenera `tasks.md` e `INDEX.md` a
 
 ### 1b. Config progetto (`.claude/loom-works.json`) + registrazione dconf
 
-Identità del progetto per l'ecosistema loom (compass/deck). Modello: `project-config-architecture.md`. Il file `.claude/loom-works.json` è la **source of truth config** (portabile, committabile); il registry dconf `/org/lamemind/loom/` è il **runtime** (macchina-locale). La `label` (`{emoji} {name}`) e gli UUID profilo sono **derivati**, mai nel file.
+Identità del progetto per l'ecosistema loom (compass/deck). Modello: `project-config-architecture.md`. Il file `.claude/loom-works.json` è la **source of truth config** (portabile, committabile); il registry dconf `/org/lamemind/loom/` è il **runtime** (macchina-locale). La `label` (`{emoji} {name}`) è **derivata**, mai nel file. Nessun profilo Ptyxis dedicato: chi apre una tab del progetto (compass, deck) la lancia sul profilo di default, e la chiave di stato è l'`id`.
 
 **Deroga dichiarata a `output-styles/regole-output.md` §Domande all'utente.** Quella sezione prescrive «una chiamata per domanda»; qui non vale, e vale solo qui. I campi di questo step sono un blocco anagrafico omogeneo — chi è il progetto e come si apre — e chiederli uno per chiamata costringe l'utente a sei context-switch su un argomento solo, cioè l'affaticamento che quella regola esiste per ridurre. Le chiamate sotto sono **tre**, tagliate per oggetto.
 
@@ -109,13 +109,11 @@ Poi scrivi il file con `Write`. **Tutti i campi si scrivono sempre**, anche quan
 }
 ```
 
-**In entrambi i casi**, registra e materializza (idempotente; noop silenzioso su macchine senza dconf/Ptyxis):
+**In entrambi i casi**, registra (idempotente; noop silenzioso su macchine senza dconf):
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/config/register.sh
-${CLAUDE_PLUGIN_ROOT}/scripts/config/materialize-profiles.sh "<id>"
 ```
-- `register.sh` (cwd) scrive identità + surface nel registry dconf.
-- `materialize-profiles.sh <id>` adotta i profili Ptyxis esistenti del progetto (o genera il profilo `claude` se manca) e scrive i binding UUID. La surface `deck`, se non ha già un profilo, viene skippata con log (il lancio del deck è loom-deck-specifico).
+`register.sh` (cwd) scrive identità + surface nel registry dconf.
 
 ### 2. Integrazione CLAUDE.md
 
@@ -160,7 +158,7 @@ Caso C — **`CLAUDE.md` presente e già completo** su entrambi i blocchi: nessu
 
 ### 3. Report
 
-Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CLAUDE.md` **per blocco** (`@-import`: creato / righe aggiunte / già completo / snippet stampato da copiare — `User assumed knowledge`: idem), e la **config progetto** (`.claude/loom-works.json` creato interattivamente o aggiornato, coi campi cambiati rispetto al file precedente; esito di `register`/`materialize`: registrato in dconf, profili adottati/generati, oppure noop se dconf/Ptyxis assenti).
+Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CLAUDE.md` **per blocco** (`@-import`: creato / righe aggiunte / già completo / snippet stampato da copiare — `User assumed knowledge`: idem), e la **config progetto** (`.claude/loom-works.json` creato interattivamente o aggiornato, coi campi cambiati rispetto al file precedente; esito di `register`: registrato in dconf, oppure noop se dconf assente).
 
 ## Note
 
