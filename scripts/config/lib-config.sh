@@ -24,8 +24,7 @@
 #              cfg_launch_count, cfg_label
 #   GVariant:  gv_str (quote), gv_unwrap (unwrap)
 #   Registry:  reg_available, reg_project_path, reg_set, reg_get, reg_list_projects,
-#              reg_write_surfaces, reg_write_launch, reg_set_binding, reg_get_binding,
-#              reg_pull
+#              reg_write_surfaces, reg_write_launch, reg_pull
 # =============================================================================
 
 _LIBCFG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -178,14 +177,6 @@ reg_write_launch() {  # <id> <json-file>
         dconf write "${base}/${i}/label"   "$(gv_str "$label")"
         dconf write "${base}/${i}/command" "$(gv_str "$command")"
     done
-}
-
-reg_set_binding() {  # <id> <kind> <uuid>
-    dconf write "$(reg_project_path "$1")/bindings/$2/profile" "$(gv_str "$3")"
-}
-
-reg_get_binding() {  # <id> <kind> → uuid o vuoto
-    gv_unwrap "$(dconf read "$(reg_project_path "$1")/bindings/$2/profile" 2>/dev/null || echo '')"
 }
 
 # Pull: legge il file config di <project-dir> e scrive il registry. Usa l'id
