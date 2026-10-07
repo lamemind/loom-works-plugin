@@ -402,6 +402,12 @@ cmd_scenario() {
 # cella con `awk -F'\t' '$1=="scarto.agente"{print $2}'` senza sapere in anticipo
 # quali combinazioni esistono. Con --dal si aggiunge la colonna dei record da
 # quella data in poi — il conteggio «dall'ultima iterazione».
+#
+# La riga `approfondimento` conta gli scenari che portano il campo, cioe' le
+# risposte in cui l'umano ha detto il proprio criterio. Gli scarti non ci entrano
+# per costruzione — le loro parole stanno nel perché del record ADR — e stanno
+# gia' in `scarto.umano`: chi vuole tutte le risposte con parole registrate somma
+# le due righe.
 cmd_conta() {
     local dal="" sessione=""
 
@@ -434,26 +440,28 @@ cmd_conta() {
             if (sessione != "" && ses != sessione) return
             ok = (usc ~ /^(subito|task|scarto|ignora)$/ && chi ~ /^(umano|agente)$/ &&
                   mom ~ /^(flusso|posteriori)$/ && dat ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$/)
-            conta("tot", ok, usc, chi, mom, dat)
-            if (dal != "" && dat >= dal) conta("dal", ok, usc, chi, mom, dat)
+            conta("tot", ok, usc, chi, mom, dat, app)
+            if (dal != "" && dat >= dal) conta("dal", ok, usc, chi, mom, dat, app)
         }
-        function conta(k, ok, usc, chi, mom, dat) {
+        function conta(k, ok, usc, chi, mom, dat, app) {
             if (!ok) { n[k, "malformati"]++; return }
             n[k, "scenari"]++; n[k, chi]++; n[k, usc "." chi]++; n[k, mom]++
+            if (app) n[k, "approfondimento"]++
             if (primo[k] == "" || dat < primo[k]) primo[k] = dat
             if (dat > ultimo[k]) ultimo[k] = dat
         }
-        FNR == 1 { chiudi(); aperto = 1; usc = chi = mom = dat = ses = "" }
+        FNR == 1 { chiudi(); aperto = 1; usc = chi = mom = dat = ses = ""; app = 0 }
         /^- \*\*Uscita\*\*:/   { usc = campo($0) }
         /^- \*\*Chi\*\*:/      { chi = campo($0) }
         /^- \*\*Momento\*\*:/  { mom = campo($0) }
         /^- \*\*Data\*\*:/     { dat = campo($0) }
         /^- \*\*Sessione\*\*:/ { ses = campo($0) }
+        /^- \*\*Approfondimento\*\*:/ { app = 1 }
         END {
             chiudi()
             # Il numero di righe lo da split: una chiave aggiunta alla lista
             # entra nella tabella senza toccare il ciclo.
-            nchiavi = split("scenari umano agente subito.umano subito.agente task.umano task.agente scarto.umano scarto.agente ignora.umano ignora.agente flusso posteriori malformati", chiavi, " ")
+            nchiavi = split("scenari umano agente subito.umano subito.agente task.umano task.agente scarto.umano scarto.agente ignora.umano ignora.agente flusso posteriori approfondimento malformati", chiavi, " ")
             printf "chiave\ttotale"; if (dal != "") printf "\tdal %s", dal; printf "\n"
             for (i = 1; i <= nchiavi; i++) {
                 c = chiavi[i]
