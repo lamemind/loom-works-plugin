@@ -8,7 +8,9 @@
 #                      [--progetto <id>] [--sessione <id>]
 #                      [--ancora <path>]... [--no-commit]
 #                      [--segnalazione <testo>] [--perche <testo>]
-#                      [< riga 1 = la segnalazione, righe dopo = il perché dello scarto]
+#                      [--approfondimento <testo>]
+#                      [< riga 1 = la segnalazione, righe dopo = le parole dell'umano:
+#                         il perché sullo scarto, l'approfondimento su subito|task|ignora]
 #   triage.sh conta    [--dal <YYYY-MM-DD[ HH:MM]>] [--sessione <id>]
 # =============================================================================
 #
@@ -30,13 +32,30 @@
 # scrive e' una sessione detached: un file condiviso entrerebbe intero nel commit
 # della prima sessione che lo tocca, record altrui compresi.
 #
-# LA SEGNALAZIONE ARRIVA SU STDIN, riga 1; le righe dopo sono il perché dello
-# scarto. Un heredoc col delimitatore fra apici e' l'unico canale che porta un
-# testo arbitrario intatto — fra virgolette doppie la shell eseguirebbe i backtick,
-# fra apici singoli ogni apostrofo va spezzato a mano. Riga 1 e' scritta byte per
-# byte nella riga 1 del record: e' la chiave con cui il transcript si accoppia allo
-# scenario. `--segnalazione` e `--perche` restano per chi chiama da uno script;
-# con `--segnalazione` lo stdin non si legge affatto.
+# LA SEGNALAZIONE ARRIVA SU STDIN, riga 1; le righe dopo sono le parole
+# dell'umano — il perché sullo scarto, l'approfondimento sulle altre uscite. Una
+# grammatica sola per tutte e quattro: chi scrive non sceglie il canale a seconda
+# dell'uscita. Un heredoc col delimitatore fra apici e' l'unico canale che porta
+# un testo arbitrario intatto — fra virgolette doppie la shell eseguirebbe i
+# backtick, fra apici singoli ogni apostrofo va spezzato a mano. Riga 1 e' scritta
+# byte per byte nella riga 1 del record: e' la chiave con cui il transcript si
+# accoppia allo scenario. `--segnalazione`, `--perche` e `--approfondimento`
+# restano per chi chiama da uno script; con `--segnalazione` lo stdin non si legge
+# affatto, e lo stesso campo passato sui due canali e' un rifiuto.
+#
+# APPROFONDIMENTO — le parole con cui l'umano accompagna l'uscita, alla lettera:
+# il criterio con cui la sceglie, la forma dell'azione, il progetto dove
+# eseguirla. Un'uscita copre forme diverse («task» e' una task nuova, una task in
+# un altro progetto, un DLV aggiunto a una task che c'e' gia', l'umano che se ne
+# occupa da se'), e senza quelle parole due scenari `task` della stessa sessione
+# sono indistinguibili. Campo di header su UNA riga, dopo Data e prima di
+# ADR/Ancore, scritto solo quando c'e': i lettori del record (l'awk di `conta`, i
+# grep delle misure) cercano righe `- **Campo**:` su tutto il file, e un valore
+# scritto dopo l'etichetta non puo' essere scambiato per un campo, una riga di un
+# corpo libero si'. Rifiutato con --chi agente (sono parole dell'umano, e lo
+# scenario dell'agente nasce prima che una risposta esista) e sullo scarto, dove
+# le parole dell'umano sono il perché e stanno nel record ADR: una seconda copia
+# nello scenario divergerebbe.
 #
 # CONTRATTO ASIMMETRICO — l'agente non scarta e non ignora: scarto e ignora con
 # --chi agente sono un rifiuto, prima di ogni scrittura. Lo scarto e' l'unico
@@ -52,8 +71,9 @@
 # scenario — sono la chiave che accoppia la segnalazione che torna all'ignora di
 # prima, e un record scritto senza non si completa dopo. La normalizzazione e'
 # lw_norm_ancora di lib.sh, la stessa di adr.sh: lo stesso file produce la
-# stessa stringa nei due registri. L'ignora non ha perché: la sua ragione e' la
-# marginalita', e lo scenario non ha corpo.
+# stessa stringa nei due registri. L'ignora non ha perché (--perche e' un
+# rifiuto): la sua ragione e' la marginalita'. Le parole con cui l'umano lo
+# accompagna («S5 ignora: gia' gestito in S4») sono un approfondimento.
 #
 # NESSUN DEFAULT: nessun flag scrive un record per una segnalazione non decisa.
 # Uno scenario e' sempre una risposta vera; il recupero delle segnalazioni senza
@@ -71,7 +91,8 @@
 # Exit code per sottocomando:
 #   scenario 0 scenario scritto (e record ADR, sullo scarto)
 #            1 input malformato, scarto o ignora con chi = agente, ancora
-#              assente o inesistente, progetto o sessione non risolvibili —
+#              assente o inesistente, approfondimento con chi = agente o sullo
+#              scarto o su piu' righe, progetto o sessione non risolvibili —
 #              NESSUNA scrittura
 #            2 scenario o record ADR gia' esistenti con lo stesso id — NESSUNA
 #              scrittura
@@ -115,7 +136,8 @@ fail() {  # <exit> <messaggio>
 # =============================================================================
 cmd_scenario() {
     local slug="" uscita="" chi="" momento="" skill="" progetto="" sessione=""
-    local segnalazione="" perche="" no_commit=0 seg_flag=0 perche_flag=0
+    local segnalazione="" perche="" approfondimento="" no_commit=0
+    local seg_flag=0 perche_flag=0 appro_flag=0
     local -a ancore=()
 
     while [[ $# -gt 0 ]]; do
@@ -130,6 +152,7 @@ cmd_scenario() {
             --ancora)       ancore+=("${2:-}"); shift 2 ;;
             --segnalazione) segnalazione="${2:-}"; seg_flag=1; shift 2 ;;
             --perche)       perche="${2:-}"; perche_flag=1; shift 2 ;;
+            --approfondimento) approfondimento="${2:-}"; appro_flag=1; shift 2 ;;
             --no-commit)    no_commit=1; shift ;;
             # Nessun --default: la segnalazione non decisa non produce un record.
             *) fail 1 "argomento ignoto: $1" ;;
@@ -182,10 +205,11 @@ cmd_scenario() {
     [[ "$sessione" =~ ^[A-Za-z0-9._:-]+$ ]] \
         || fail 1 "sessione fuori formato: '${sessione}'"
 
-    # --- segnalazione e perché: flag, oppure stdin ----------------------------
-    # Grammatica di stdin fissa: riga 1 = la segnalazione, il resto = il perché.
-    # Si legge solo se --segnalazione manca: con due canali per lo stesso campo
-    # non si saprebbe quale vince.
+    # --- segnalazione e parole dell'umano: flag, oppure stdin -----------------
+    # Grammatica di stdin fissa: riga 1 = la segnalazione, il resto = le parole
+    # dell'umano, che l'uscita smista — il perché sullo scarto, l'approfondimento
+    # altrove. Si legge solo se --segnalazione manca: con due canali per lo stesso
+    # campo non si saprebbe quale vince.
     if (( ! seg_flag )) && [[ ! -t 0 ]]; then
         local input
         input="$(cat)"
@@ -193,8 +217,14 @@ cmd_scenario() {
             segnalazione="${input%%$'\n'*}"
             local resto="${input#*$'\n'}"
             if [[ -n "${resto//[[:space:]]/}" ]]; then
-                (( perche_flag )) && fail 1 "perché passato due volte: su stdin dopo la riga 1 e con --perche"
-                perche="$resto"
+                if [[ "$uscita" == scarto ]]; then
+                    (( perche_flag )) && fail 1 "perché passato due volte: su stdin dopo la riga 1 e con --perche"
+                    perche="$resto"
+                else
+                    (( appro_flag )) && fail 1 "approfondimento passato due volte: su stdin dopo la riga 1 e con --approfondimento"
+                    approfondimento="$resto"
+                    appro_flag=1
+                fi
             fi
         else
             segnalazione="$input"
@@ -205,13 +235,32 @@ cmd_scenario() {
     [[ "$segnalazione" == *$'\n'* ]] \
         && fail 1 "la segnalazione sta su UNA riga: e' la riga 1 del record, citata alla lettera"
 
-    # trim delle righe vuote di testa e coda del perché
+    # trim delle righe vuote di testa e coda delle parole dell'umano: gli a-capo
+    # di bordo li porta l'heredoc, non chi ha parlato
     while [[ "$perche" == $'\n'* ]]; do perche="${perche#$'\n'}"; done
     while [[ "$perche" == *$'\n' ]]; do perche="${perche%$'\n'}"; done
+    while [[ "$approfondimento" == $'\n'* ]]; do approfondimento="${approfondimento#$'\n'}"; done
+    while [[ "$approfondimento" == *$'\n' ]]; do approfondimento="${approfondimento%$'\n'}"; done
+
+    # --- approfondimento ------------------------------------------------------
+    # Le parole dell'umano, alla lettera e su una riga. Un valore accettato dove il
+    # record non lo scrive si perderebbe in silenzio: sullo scarto le parole sono
+    # il perché, con --chi agente non c'e' ancora nessuna risposta.
+    if (( appro_flag )); then
+        [[ -n "${approfondimento//[[:space:]]/}" ]] \
+            || fail 1 "approfondimento vuoto: senza parole dell'umano il campo non si scrive — ometti --approfondimento"
+        [[ "$uscita" == scarto ]] \
+            && fail 1 "sullo scarto le parole dell'umano sono il perché e stanno nel record ADR: passale come perché (righe di stdin dopo la segnalazione, o --perche), non come approfondimento"
+        [[ "$chi" == agente ]] \
+            && fail 1 "l'approfondimento porta le parole dell'umano: con --chi agente non c'e' ancora nessuna risposta da citare"
+        [[ "$approfondimento" == *$'\n'* ]] \
+            && fail 1 "l'approfondimento sta su UNA riga: e' un campo di header, e una riga in piu' potrebbe essere letta come un campo"
+    fi
 
     # --- perché e ancore --------------------------------------------------------
     # Perché: obbligatorio sullo scarto, che lo porta nel record ADR; altrove
-    # rifiutato, perche' lo scenario non ha corpo. Ancore: obbligatorie su scarto
+    # rifiutato, perche' lo scenario non ha corpo — le parole dell'umano sulle
+    # altre uscite sono l'approfondimento, non un perché. Ancore: obbligatorie su scarto
     # (le porta il record ADR) e ignora (le porta lo scenario, campo Ancore);
     # rifiutate su subito e task. Un valore accettato senza un campo dove
     # metterlo si perderebbe in silenzio.
@@ -302,6 +351,9 @@ cmd_scenario() {
         printf -- '- **Progetto**: %s\n' "$progetto"
         printf -- '- **Sessione**: %s\n' "$sessione"
         printf -- '- **Data**: %s\n' "$rec_data"
+        # Solo quando c'e': senza, il record e' identico a quello di prima del
+        # campo, e ADR/Ancore restano l'ultimo campo.
+        (( appro_flag )) && printf -- '- **Approfondimento**: %s\n' "$approfondimento"
         # Ultimo campo: ADR sullo scarto, Ancore sull'ignora — i due non
         # coesistono mai. Sullo scarto le ancore stanno nel record ADR, e una
         # copia qui divergerebbe.
