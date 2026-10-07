@@ -1,6 +1,6 @@
 # Il file degli scenari di triage — formato del record e sede
 
-Contratto per chi **scrive e conta** gli scenari di triage: la sezione del report da cui nascono, la sede su disco, i campi di un record, la regola che manda lo scarto nel registro ADR e tiene l'ignora fuori, e l'assenza di ogni default.
+Contratto per chi **scrive e conta** gli scenari di triage: la sezione del report da cui nascono, la sede su disco, i campi di un record — le parole dell'umano comprese —, la regola che manda lo scarto nel registro ADR e tiene l'ignora fuori, l'assenza di ogni default, e l'uscita eseguita in un altro progetto.
 
 Uno **scenario** è la decisione presa su una segnalazione del report di fine skill: la segnalazione citata alla lettera, l'uscita scelta fra `subito` · `task` · `scarto` · `ignora`, e chi l'ha scelta. Il file degli scenari sta **fuori dal sistema documentale**, per la stessa ragione del registro ADR (`adr-format.md`): un record è datato, cita alla lettera e porta chi ha deciso, e nessuno di questi tratti ha posto in una doc as-is. È stato di task, e nessun attore del sistema doc lo legge, lo misura o lo instrada.
 
@@ -15,9 +15,13 @@ Ciò che l'agente ha corretto di sua iniziativa sta **dentro** la sezione, con �
 Le quattro uscite nel flusso:
 
 - **subito** — operativo: l'agente scrive lo scenario ed esegue.
-- **task** — operativo: l'agente scrive lo scenario e apre subito la task con `create-task` in modalità YOLO, senza chiedere. «task» è già la richiesta: una decisione registrata senza la task che ne segue lascia il lavoro da nessuna parte.
+- **task** — operativo: l'agente scrive lo scenario e fa senza chiedere ciò che le parole dell'umano dicono; quando non dicono altro, apre la task con `create-task` in modalità YOLO. «task» è già la richiesta: una decisione registrata senza la task che ne segue lascia il lavoro da nessuna parte.
 - **scarto** — vuole il perché, di solito già nella risposta («S2 scarto: capita una volta l'anno»). Lo scenario scrive anche il record ADR.
 - **ignora** — vuole l'ancora e nessun perché. Non scrive nessun record ADR: se la segnalazione torna, l'agente la riporta di nuovo.
+
+**Un'uscita copre forme diverse, e le parole dell'umano dicono quale.** «task» è una task nuova nel progetto, una task in un altro progetto, un DLV aggiunto a una task che esiste già, oppure l'umano che se ne occupa da sé; «subito» può volere un subagente. L'agente esegue la forma che le parole dicono — «task» con «aggiungi un DLV alla task corrente» aggiunge il DLV e non apre nessuna task, «ci penso io» non esegue niente — e lo scenario le registra alla lettera nel campo `Approfondimento` (§Struttura di un record): senza, due scenari `task` della stessa sessione restano indistinguibili, e il criterio con cui l'umano ha scelto resta solo nel transcript. È il dato che la retroazione sul triage cerca, e l'umano lo dichiara da sé, prima di qualunque punteggio dell'agente, quindi senza ancoraggio.
+
+**L'approfondimento di una segnalazione è tutto ciò che l'umano dice su di lei**, alla lettera, parola d'uscita compresa: spesso l'uscita sta dentro la frase («è a metà tra subito e task… quindi task»), e toglierla vorrebbe dire riscrivere. Restano fuori solo l'identificatore (`S1`, «la prima») e la punteggiatura che la separa dalle vicine. È obbligatorio quando la risposta lo porta; un'uscita nuda, una conferma o un rifiuto nudo («subito», «ok», «no») non lo producono. Una frase che copre più segnalazioni entra nello scenario di ognuna, perché ogni scenario si legge da solo; i pezzi non contigui della stessa segnalazione si uniscono nell'ordine in cui compaiono, con ` […] ` a segnare il salto. Sullo scarto le parole dell'umano sono il perché, e stanno nel record ADR; sull'ignora nominato («S5 ignora: già gestito in S4») sono un approfondimento, mentre un rifiuto che porta un motivo senza nominare l'ignora resta uno scarto.
 
 **Un rifiuto nudo si legge come ignora.** «S2 no», «lascia perdere», «non vale la pena» — nessun motivo e nessuna parola «scarto» — sono un ignora, e l'agente lo scrive senza chiedere niente. Lo scarto si scrive solo quando la risposta lo nomina o porta un perché; nominato senza perché, l'agente lo chiede una volta sola. Fra i due errori possibili si accetta quello che la ricorrenza recupera (§Scarto e ignora): un ignora scritto dove l'umano voleva uno scarto torna nel report se la segnalazione torna, uno scarto scritto dove voleva un ignora è un record ADR che nessuna query colpirà.
 
@@ -51,8 +55,9 @@ Sta sotto la docs-root perché la docs-root è per-progetto: un progetto che tie
 ```
 
 - **Riga 1 è la segnalazione alla lettera**, byte per byte come stampata nel report dopo `**S{N}** — `: backtick, virgolette e spazi restano com'erano. È la chiave con cui una segnalazione ritrovata in un transcript si accoppia al suo scenario. Per questo il record è markdown e non JSON: un escaper fra il testo stampato e il file renderebbe la citazione un'altra stringa.
-- **L'header è a campi**, nell'ordine canonico della tabella sotto. `ADR` compare solo sullo scarto, `Ancore` solo sull'ignora: l'ultimo campo è l'uno o l'altro, e i due non coesistono mai.
+- **L'header è a campi**, nell'ordine canonico della tabella sotto. `Approfondimento` compare solo quando l'umano ha detto qualcosa oltre l'uscita, `ADR` solo sullo scarto, `Ancore` solo sull'ignora: l'ultimo campo è `ADR` o `Ancore` quando ci sono, e i due non coesistono mai.
 - **Nessun corpo.** Il perché di uno scarto sta nel record ADR: duplicarlo qui lo farebbe divergere al primo record scritto a mano. L'ignora non ha perché: la sua ragione è la marginalità, e chiederla costa più della decisione.
+- **Le parole dell'umano stanno in un campo di header, su una riga, mai in un corpo.** I lettori del record — l'awk di `conta` e i `grep` delle misure — cercano righe `- **Campo**:` su tutto il file, non solo nell'header: in un corpo libero una riga dell'umano che iniziasse come un campo verrebbe letta come campo, mentre un valore scritto dopo l'etichetta sulla stessa riga non può. Il comando rifiuta un a-capo nel valore, come nella segnalazione.
 
 Lo scenario di un ignora chiude con le ancore al posto del campo `ADR`:
 
@@ -69,6 +74,21 @@ Lo scenario di un ignora chiude con le ancore al posto del campo `ADR`:
 - **Ancore**: loom-deck/scripts/deck-run
 ```
 
+Le parole dell'umano, quando la risposta le porta, stanno nel campo `Approfondimento`, dopo `Data`:
+
+```markdown
+# Il banco del deck sfora il timeout del foreground e il turno si chiude sull'attesa
+
+- **Uscita**: task
+- **Chi**: umano
+- **Momento**: flusso
+- **Skill**: run-task
+- **Progetto**: loom-works
+- **Sessione**: 0a0f369d-c827-4fd4-ba34-ddc1b3be56c3
+- **Data**: 2026-09-24 18:44
+- **Approfondimento**: task, ma come DLV della task aperta sul banco: è lo stesso difetto di `run_in_background`, non uno nuovo
+```
+
 | Campo | Dominio | Regola |
 |---|---|---|
 | `Uscita` | `subito` \| `task` \| `scarto` \| `ignora` | vocabolario chiuso |
@@ -78,6 +98,7 @@ Lo scenario di un ignora chiude con le ancore al posto del campo `ADR`:
 | `Progetto` | `[A-Za-z0-9._-]+` | l'`id` di `.claude/loom-works.json`, override `--progetto` |
 | `Sessione` | `[A-Za-z0-9._:-]+` | `CLAUDE_CODE_SESSION_ID`, override `--sessione` |
 | `Data` | `YYYY-MM-DD HH:MM` | la scrive il comando |
+| `Approfondimento` | testo libero, una riga | le parole dell'umano alla lettera; solo con `Chi: umano` e `Uscita` diversa da `scarto`, presente solo quando la risposta le porta |
 | `ADR` | id di un record in `adr/` | solo con `Uscita: scarto`; lo scrive il comando |
 | `Ancore` | path relativi alla project root, separati da `, ` | solo con `Uscita: ignora`, almeno uno, ognuno deve esistere |
 
@@ -87,7 +108,9 @@ Lo scenario di un ignora chiude con le ancore al posto del campo `ADR`:
 
 **`Momento` distingue la decisione che ha avuto effetto da quella che non l'ha avuto.** Nel flusso — l'umano risponde al report nella stessa conversazione — «subito» e «task» sono operativi: l'agente esegue il primo e apre la task del secondo. A posteriori — una sessione aperta dopo, che rilegge i transcript — le stesse parole sono un esito: registrano che si sarebbe voluto farlo, e nessuno lo esegue. La data non basta a distinguerli, perché una risposta a posteriori sulla segnalazione di ieri porta la data di oggi. Il campo sta nel formato dal primo record per la stessa ragione di `Supera` nel registro ADR: aggiunto dopo, lascerebbe su disco due generazioni di record che un parser legge in modo diverso.
 
-**Lo scenario registra l'uscita, mai il modo di esecuzione.** «Fallo subito ma in un subagente» resta `subito`: il modo non è un dato di triage, e un campo per registrarlo aprirebbe un dominio che nessuno sa contare.
+**`Uscita` è il solo campo che si conta; le parole dell'umano si registrano, non si classificano.** «Fallo subito ma in un subagente» resta `subito`: il modo di esecuzione non ha un campo strutturato, perché aprirebbe un dominio che nessuno sa contare — e lo stesso vale per il progetto dove l'uscita si esegue e per ciò che ha prodotto. Quando l'umano li dice, entrano nell'`Approfondimento` alla lettera, con tutto il resto delle sue parole.
+
+**`Approfondimento` porta solo parole dell'umano.** Con `Chi: agente` è un rifiuto: lo scenario dell'agente si scrive prima di stampare la sezione, quando una risposta ancora non esiste. Sullo scarto è un rifiuto anche con `Chi: umano`: le parole dell'umano sono il perché, il record ADR le porta e lo scenario lo raggiunge col campo `ADR` — una seconda copia divergerebbe.
 
 **`Ancore` è lo stesso campo del record ADR**: stesso nome, stesso separatore `, `, stessa grafia relativa alla project root, e la stessa normalizzazione — `lw_norm_ancora` in `lib.sh`, che `adr.sh` e `triage.sh` chiamano entrambi. Lo stesso file produce quindi la stessa stringa nei due registri, e un solo pattern `^- \*\*Ancore\*\*:` li legge tutti e due: accoppiare due ignora sullo stesso path, o un ignora a uno scarto, è un confronto fra stringhe. Sull'ignora le ancore sono obbligatorie perché sono la chiave che accoppia una segnalazione che torna allo scenario di prima, e un record scritto senza non si completa dopo. Sullo scarto non si scrivono: stanno nel record ADR, e una copia divergerebbe come il perché. Su `subito` e `task` sono un rifiuto, perché nessuno le legge.
 
@@ -137,17 +160,35 @@ triage.sh scenario --slug <slug> --uscita subito|task|scarto|ignora --chi umano|
                    [--progetto <id>] [--sessione <id>] \
                    [--ancora <path>]... [--no-commit] <<'SCENARIO'
 <la segnalazione alla lettera, su una riga>
-<il perché dello scarto, anche su più righe — solo con --uscita scarto>
+<le parole dell'umano: il perché dello scarto, anche su più righe;
+ l'approfondimento su subito, task e ignora, su una riga>
 SCENARIO
 
 triage.sh conta [--dal <YYYY-MM-DD[ HH:MM]>] [--sessione <id>]
 ```
 
-**La segnalazione arriva su stdin**, riga 1, e le righe dopo sono il perché dello scarto. Un heredoc col delimitatore fra apici è l'unico canale che porta un testo arbitrario intatto: fra virgolette doppie la shell eseguirebbe i backtick come comandi, fra apici singoli ogni apostrofo va spezzato a mano. `--segnalazione` e `--perche` esistono per chi chiama da uno script.
+**La segnalazione arriva su stdin**, riga 1, e le righe dopo sono le parole dell'umano, che l'uscita smista: il perché sullo scarto, l'approfondimento su `subito`, `task` e `ignora`. Una grammatica sola per le quattro uscite, perché le parole dell'umano portano backtick e apostrofi quanto la segnalazione e vogliono lo stesso canale. Un heredoc col delimitatore fra apici è l'unico canale che porta un testo arbitrario intatto: fra virgolette doppie la shell eseguirebbe i backtick come comandi, fra apici singoli ogni apostrofo va spezzato a mano. `--segnalazione`, `--perche` e `--approfondimento` esistono per chi chiama da uno script; lo stesso campo passato sui due canali è un rifiuto.
 
 **`scenario` committa da sé** i propri file, con pathspec e senza push. Chi batcha — la skill che scrive più scenari dopo un report — passa `--no-commit` e committa i path che il comando stampa.
 
-**`conta` stampa una tabella a tab**, una riga per chiave: il totale, `umano` e `agente`, le otto coppie `<uscita>.<chi>`, i due momenti, i record malformati, la data del primo e dell'ultimo record. Con `--dal` aggiunge la colonna dei soli record da quella data in poi. Le righe `scarto.agente` e `ignora.agente` valgono 0 per costruzione.
+**`conta` stampa una tabella a tab**, una riga per chiave: il totale, `umano` e `agente`, le otto coppie `<uscita>.<chi>`, i due momenti, gli scenari con l'approfondimento, i record malformati, la data del primo e dell'ultimo record. Con `--dal` aggiunge la colonna dei soli record da quella data in poi. Le righe `scarto.agente` e `ignora.agente` valgono 0 per costruzione. La riga `approfondimento` non include gli scarti, le cui parole stanno nel record ADR: chi vuole tutte le risposte con parole registrate la somma a `scarto.umano`.
+
+## L'uscita eseguita in un altro progetto
+
+Una segnalazione decisa nel report di un progetto può riguardarne un altro: «task» va aperta nella lista task dell'altro progetto, «subito» si esegue nel suo repo. **Il destinatario lo porta la segnalazione**, che nomina di norma il progetto o i file che riguarda: «subito» e «task» agiscono lì, senza una conferma prima del lancio. Quando l'umano nomina un progetto nelle sue parole vince quello; quando nessuno ne nomina uno resta il progetto della sessione. Lo scenario si scrive nel progetto della sessione — `Progetto` è quello del report, non quello dell'esecuzione — e il destinatario sta nella riga 1 o nell'approfondimento.
+
+**Esegue una sessione figlia nella cartella del destinatario, non la sessione del report.** `claude -p --permission-mode auto` lanciato con cwd nel progetto destinazione ne carica `CLAUDE.md`, settings, skill e regole di commit: scrive il progetto che possiede il confine, col proprio contesto, e un progetto che tiene gli altri in sola lettura (un deny `Edit` sui fratelli) resta rispettato invece di essere aggirato da Bash. Il rischio è accettabile perché l'azione tipica è aprire una task, che si cancella con un clic. Due condizioni:
+
+- **Il binding di sessione e le variabili che spostano la scrittura non attraversano il confine.** Il figlio eredita l'ambiente intero del chiamante, e tre variabili gli arrivano e lo spostano: `LOOM_TASK` — gli id delle task valgono dentro un progetto, e il figlio risolverebbe una task che lì non esiste, o un'altra; `PROJECT_ROOT` — la ricerca della root le dà precedenza sulla cwd, e il figlio scriverebbe nel progetto del chiamante; `PTYXIS_PROFILE` — è la chiave con cui gli hook di stato annunciano a compass, e una sessione `claude -p` esegue gli hook come una interattiva: il figlio porterebbe a `done` il badge del progetto chiamante mentre il chiamante lavora ancora. Il lancio passa quindi per `env -u LOOM_TASK -u PROJECT_ROOT -u PTYXIS_PROFILE`. Le altre variabili di sessione o il figlio le riscrive da sé (`CLAUDE_CODE_SESSION_ID`, `CLAUDE_PID`), o non spostano né dove scrive né su quali canali parla.
+- **Il ritorno del figlio è self-report, e il chiamante lo riverifica su disco.** Il figlio dichiara cosa ha fatto in prosa, con un hash corto dentro; il gate non parte da lì, ma dall'intervallo fra due `HEAD` del destinatario.
+
+**Il gate legge l'intervallo, e il dichiarato lo restringe.** `HEAD` si fotografa prima del lancio; dopo, un commit atteso vuole almeno un commit nuovo, una task attesa vuole un commit che aggiunge un task file `T<N>-*.md` sotto la docs-root del destinatario e la riga di quell'id in `tasks.md` — l'id si ricava dal file aggiunto, non dal racconto. Una chiave presa solo dal racconto dipenderebbe da come si legge la prosa, e sarebbe verde anche su un commit vecchio citato da un figlio che non ha fatto niente. Se il figlio dichiara un hash, quell'hash deve stare nell'intervallo, e il gate guarda solo lui: è ciò che restringe il caso debole, una sessione parallela che committa nel destinatario nel frattempo. Per la stessa ragione due figli sullo stesso destinatario girano in sequenza — condividono l'intervallo e il contatore degli id delle task —, su destinatari diversi in parallelo. Sul rosso nessun secondo lancio: l'agente riporta all'umano il motivo e il path dell'output del figlio.
+
+**Ciò che si attende è il prodotto, non l'uscita.** «subito» attende un commit; «task» aperta con `create-task` attende una task; «task» che nelle parole dell'umano aggiunge un DLV a una task esistente attende un commit. Un destinatario senza lista task non ha dove aprire una task: lì «task» non parte, e l'agente lo dice; «subito» parte su qualunque repo git.
+
+**Dal nome alla cartella, sul registry dei progetti.** L'umano e le segnalazioni nominano un progetto ora per `id`, ora per nome della cartella, e i due non coincidono sempre (`shop-legacy` sta in `shop-v2_legacy`): la risoluzione prova prima l'`id`, poi il nome della cartella. Un risultato solo è la cartella; nessuno o più d'uno, e l'agente chiede all'umano e non lancia. Il registry è stato della macchina, e lo legge solo lo script: le skill non lo nominano.
+
+Lo script è `scripts/task/triage-altrove.sh`, con tre sottocomandi — `risolvi <nome>`, `prima --dest <dir> --atteso commit|task`, `verifica --dest <dir> --prima <sha> --atteso commit|task [--hash <sha>]...` —; exit `0` verde, `2` verdetto (non si lancia, o rosso), `1` errore d'uso. Il lancio sta nel body delle due skill.
 
 ## Il file degli scenari non entra nel sistema doc
 

@@ -22,8 +22,8 @@
 #
 # RISOLVI — dal nome che porta la segnalazione (o che l'umano dice) alla cartella,
 # sul registry dei progetti: prima per `id`, poi per nome della cartella. Servono
-# entrambe le chiavi perche' non coincidono sempre (`selectio-legacy` sta in
-# `selectio-v2_legacy`), e l'umano e le segnalazioni usano l'una o l'altra. Un
+# entrambe le chiavi perche' non coincidono sempre (`shop-legacy` sta in
+# `shop-v2_legacy`), e l'umano e le segnalazioni usano l'una o l'altra. Un
 # risultato solo stampa la cartella; nessuno o piu' d'uno e' un verdetto — chi
 # chiama chiede all'umano e non lancia. Il registry e' dconf, cioe' coupling di
 # macchina: sta qui, e le skill non lo nominano.
