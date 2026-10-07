@@ -258,19 +258,42 @@ L'umano risponde come vuole: in prosa, dettando a voce, in ordine sparso, su una
 "${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto|ignora --chi umano \
   --momento flusso --skill checkpoint-task [--ancora <path>]... --no-commit <<'SCENARIO'
 <la segnalazione, identica al testo della riga S{N}>
-<solo sullo scarto: il perché, anche su più righe — mai sull'ignora>
+<le parole dell'umano su quella segnalazione: il perché sullo scarto, l'approfondimento sulle altre uscite>
 SCENARIO
 ```
 
 Poi un commit solo per tutti, con lo snippet sopra.
 
 - **Nessun default.** La segnalazione su cui l'umano non dice niente non produce niente: non la decidi tu e non la ripresenti. Il recupero delle segnalazioni rimaste senza risposta si fa a posteriori, fuori da questa conversazione.
-- **«subito» nel flusso è operativo**: scrivi lo scenario e lo esegui. «Fallo subito ma in un subagente» resta `subito` — lo scenario registra l'uscita, mai il modo di esecuzione.
-- **«task» nel flusso è operativo come «subito»**: scrivi lo scenario e apri subito la task, senza chiedere niente — invoca `/loom-works:create-task` in modalità YOLO, con `yolo <la segnalazione>` come argomento, una task per segnalazione. «task» è già la richiesta della task: aspettare una seconda conferma lascerebbe la decisione registrata e il lavoro da nessuna parte.
+- **L'approfondimento è obbligatorio quando la risposta lo porta.** Sono le parole con cui l'umano accompagna l'uscita — il criterio con cui la sceglie, la forma dell'azione, il progetto dove eseguirla — e lo script le scrive alla lettera nel campo `Approfondimento` dello scenario: senza, due scenari `task` della stessa sessione restano indistinguibili. Il ritaglio di una `S{N}` è tutto ciò che l'umano dice su quella segnalazione, parola d'uscita compresa; restano fuori solo l'identificatore (`S1`, «la prima») e la punteggiatura che la separa dalle vicine. Non ritocchi niente, refusi compresi; parole dettate su più righe le unisci con uno spazio, perché il campo sta su una riga. Un'uscita nuda, una conferma o un rifiuto nudo («subito», «ok», «no») non hanno approfondimento: la seconda riga non si scrive. Una frase che vale per più segnalazioni entra nello scenario di ognuna, e i pezzi non contigui della stessa segnalazione si uniscono nell'ordine in cui compaiono con ` […] ` a segnare il salto: «S1 subito, S2 ignora ; AUTORIZZO» dà a S1 `subito […] AUTORIZZO`. Sullo scarto le parole dell'umano sono il perché e vanno nel record ADR; con `--chi agente` non c'è nessuna risposta da citare — in entrambi i casi lo script rifiuta il campo.
+- **Le parole dell'umano dettano la forma dell'esecuzione, non solo l'uscita.** «task» con «aggiungi un DLV alla task corrente» aggiunge il DLV e non apre nessuna task; «ci penso io» non esegue niente. Vale anche per il modo: «fallo subito ma in un subagente» resta `subito`, il modo sta nell'approfondimento, e `Uscita` resta il solo campo che si conta.
+- **«subito» nel flusso è operativo**: scrivi lo scenario ed esegui, nella forma che le parole dicono.
+- **«task» nel flusso è operativo come «subito»**: scrivi lo scenario e fai senza chiedere niente ciò che le parole dicono. Quando non dicono altro, apri la task: invoca `/loom-works:create-task` in modalità YOLO, con `yolo <la segnalazione>` come argomento, una task per segnalazione. «task» è già la richiesta della task: aspettare una seconda conferma lascerebbe la decisione registrata e il lavoro da nessuna parte.
 - **«scarto»** vuole il perché e un'ancora. Lo scrivi solo quando la risposta nomina lo scarto o porta un perché («S2 scarto: capita una volta l'anno», «S2 no, capita una volta l'anno»); nominato senza perché, chiedilo una volta sola, poi scrivi. L'ancora è il path che la segnalazione tocca. Lo script scrive anche il record ADR, e stampa il suo path da mettere nel commit.
-- **«ignora», e ogni rifiuto nudo** — «S2 no», «lascia perdere», «non vale la pena»: nessun motivo e nessuna parola «scarto» — lo scrivi subito, senza chiedere niente. Vuole l'ancora, il path che la segnalazione tocca, e nessun perché: lo script rifiuta il perché sull'ignora. Non scrive nessun record ADR, quindi se la segnalazione torna la riporti di nuovo. Nel dubbio fra i due scegli l'ignora, perché è l'errore che si recupera: un ignora scritto dove l'umano voleva uno scarto torna nel report se la segnalazione torna, uno scarto scritto dove voleva un ignora è un record ADR che nessuna query colpirà.
+- **«ignora», e ogni rifiuto nudo** — «S2 no», «lascia perdere», «non vale la pena»: nessun motivo e nessuna parola «scarto» — lo scrivi subito, senza chiedere niente. Vuole l'ancora, il path che la segnalazione tocca, e nessun perché: lo script rifiuta `--perche` sull'ignora. Le parole con cui l'umano lo nomina («S5 ignora: già gestito in S4») sono l'approfondimento, non un perché. Non scrive nessun record ADR, quindi se la segnalazione torna la riporti di nuovo. Nel dubbio fra i due scegli l'ignora, perché è l'errore che si recupera: un ignora scritto dove l'umano voleva uno scarto torna nel report se la segnalazione torna, uno scarto scritto dove voleva un ignora è un record ADR che nessuna query colpirà.
 - **La conferma e il ribaltamento valgono uguale.** Sulla segnalazione che avevi marcato `☑ subito (agente)`, «ok» è uno scenario `subito` e «fanne una task» uno scenario `task`, entrambi `--chi umano`, accanto al tuo: non si riscrive niente, i due record sono il dato.
 - **Detta a posteriori, la stessa parola è un esito e non un'azione.** Chi rilegge il report da un'altra sessione registra con `--momento posteriori` e non esegue niente.
+
+### L'uscita che riguarda un altro progetto
+
+**Il destinatario lo porta la segnalazione.** Una segnalazione nomina di norma il progetto o i file che riguarda, e «subito» e «task» agiscono lì, senza una conferma prima del lancio. Quando l'umano nomina un progetto nelle sue parole vince quello; quando nessuno ne nomina uno resta il progetto della sessione, e si esegue qui. Lo scenario si scrive comunque qui: il destinatario sta nella segnalazione o nell'approfondimento, e non ha un campo suo.
+
+Un altro progetto non lo scrivi da questa sessione: può tenerti in sola lettura, e una scrittura da Bash aggirerebbe il suo confine. Lo esegue una sessione figlia lanciata nella sua cartella, che ne carica `CLAUDE.md`, settings, skill e regole di commit. In ordine, con `A="${CLAUDE_PLUGIN_ROOT}/scripts/task/triage-altrove.sh"`:
+
+1. `"$A" risolvi <progetto>` stampa la cartella. Exit `2`: nessun progetto con quel nome, o più d'uno — chiedi la cartella all'umano e non lanciare. Se la cartella è quella di questa sessione, nessun figlio: esegui qui.
+2. `"$A" prima --dest <cartella> --atteso task|commit` stampa lo sha di `HEAD`, da passare al gate. `--atteso task` quando il figlio apre una task nuova, `commit` per «subito» e per ogni altra forma, come un DLV aggiunto a una task che c'è già. Exit `2`: l'uscita lì non parte (una task vuole la lista task del destinatario) — dillo all'umano.
+3. Scrivi il prompt del figlio in un file fuori dai due repo. Per una task nuova: `/loom-works:create-task yolo <la segnalazione, il contesto che serve a chi non ha questa conversazione, le parole dell'umano>`. Altrimenti: cosa fare, con la segnalazione e le parole dell'umano alla lettera, e la richiesta di committare con le regole del progetto e di chiudere dichiarando l'hash del commit.
+4. Lancia il figlio:
+
+   ```bash
+   cd <cartella> && env -u LOOM_TASK -u PROJECT_ROOT -u PTYXIS_PROFILE \
+     claude -p --permission-mode auto --output-format text < <prompt> > <out> 2>&1
+   ```
+
+   Le tre variabili arrivano al figlio, e nessuna deve attraversare il confine: `LOOM_TASK` è il binding di sessione, e gli id delle task valgono dentro un progetto — il figlio risolverebbe una task che lì non esiste, o un'altra; `PROJECT_ROOT` batte la cartella nella ricerca della root, e il figlio scriverebbe nel progetto di questa sessione; `PTYXIS_PROFILE` è la chiave con cui gli hook annunciano lo stato a compass, e il figlio porterebbe a `done` il badge di questo progetto mentre lavori ancora.
+5. `"$A" verifica --dest <cartella> --prima <sha> --atteso task|commit [--hash <l'hash che il figlio dichiara>]`. Il ritorno del figlio è self-report: il gate legge i commit nati nel destinatario dopo `prima`, e per una task vuole il task file aggiunto e la sua riga in `tasks.md`. Verde (exit `0`): riporta all'umano cosa è nato, id e hash. Rosso (exit `2`): nessun secondo lancio — riporta il motivo del gate e il path di `<out>`.
+
+Due figli sullo stesso destinatario girano in sequenza, perché condividono l'intervallo del gate e il contatore degli id; su destinatari diversi vanno in parallelo.
 
 ## Convenzione TTS
 
