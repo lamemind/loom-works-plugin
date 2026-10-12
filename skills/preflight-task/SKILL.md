@@ -79,7 +79,7 @@ Leggi tutto il task file. Identifica punti dove l'esecuzione richiederebbe scelt
 
 Per ogni punto, formula una **candidata** concreta e decidibile: deve nominare la scelta che l'esecuzione dovrà comunque fare, non chiedere un parere generico ("come faresti X?"). Poi la candidata passa dal test di appartenenza (§1b), che ha tre uscite e una sola per voce: **domanda** `D{N}` quando la risposta dipende da un dato che nel repo non c'è; **proposta** `P{N}` quando il dato sta nel repo e la decisione è tua, dichiarata con la sua ragione; **chiusa da una misura** quando la risposta si conta. Nessuna candidata diventa `D{N}` senza passare dal test: è il test, non l'elenco sopra, a decidere cosa arriva all'utente come domanda — l'elenco dice dove guardare, non cosa chiedere.
 
-Le domande restano **aperte**, senza ventaglio di opzioni da spuntare: chiudere il dominio adesso obbligherebbe a ritagliare tre alternative su un terreno che al momento della domanda è ancora aperto, e chi legge tre alternative tende a sceglierne una invece di produrne una quarta. Le proposte invece **scelgono**: una strada, la ragione, smentibile con una parola.
+Le domande restano **aperte**: le strade viste le accompagnano come materiale citabile per id (§2a), mai come il dominio chiuso delle risposte possibili. Chiudere il dominio adesso obbligherebbe a ritagliare tre alternative su un terreno che al momento della domanda è ancora aperto, e chi legge tre alternative tende a sceglierne una invece di produrne una quarta. Le proposte invece **scelgono**: una strada, la ragione, smentibile con una parola.
 
 Per ogni voce — domanda o proposta — registra internamente due cose che servono allo step 2:
 
@@ -195,7 +195,11 @@ La domanda:
 ```markdown
 - **D3** — dove collocare il parser dei glifi
   <la domanda per esteso, aperta>
-  *Strade viste (materiale, non un ventaglio da spuntare):* dentro `view.ts` · modulo nuovo `glyphs.ts` · inline nel renderer
+
+  *Strade viste — citabili per id, non esaustive:*
+  - **D3.A** — dentro `view.ts`
+  - **D3.B** — modulo nuovo `glyphs.ts`
+  - **D3.C** — inline nel renderer
 ```
 
 La proposta:
@@ -206,10 +210,10 @@ La proposta:
   *Smentibile con una parola.*
 ```
 
-- **Le due occorrenze di una domanda portano lo stesso testo, parola per parola.** Non «la stessa forma» in senso lato: maniglia, corpo e riga di chiusura sono **identici** nelle due posizioni, e la seconda si ottiene ricopiando la prima, non riscrivendola. Il verso che cede non è mai il primo: riscrivere un testo già scritto lo comprime per gravità — la seconda stesura esce più corta, con le strade viste ridotte a due parole ciascuna — e chi risponde decide sulla versione povera invece che su quella mostrata dieci righe prima.
+- **Le due occorrenze di una domanda portano lo stesso testo, parola per parola.** Non «la stessa forma» in senso lato: maniglia, corpo e strade viste sono **identici** nelle due posizioni, e la seconda si ottiene ricopiando la prima, non riscrivendola. Il verso che cede non è mai il primo: riscrivere un testo già scritto lo comprime per gravità — la seconda stesura esce più corta, con le strade viste ridotte a due parole ciascuna — e chi risponde decide sulla versione povera invece che su quella mostrata dieci righe prima.
 - **Una proposta non si ricopia: nella sua seconda occorrenza, nel blocco finale (§2e), compare come sola maniglia puntata al posto dove sta il corpo** — `- **P7** — exit code del gate → ③ Guardie deterministiche`. Il corpo di una proposta si legge una volta sola, sotto il sottosistema (§2d) o le generali (§2c), accanto al recap che la motiva: chi vuole smentirla risale lì, chi tace lascia la maniglia così com'è. Vale solo per il primo turno — dal secondo giro in poi (§2g) una proposta nuova non ha nessun sottosistema sopra cui stare, e torna col corpo intero.
 - **Ogni voce porta una maniglia verbo+oggetto**, la prima citazione compresa. `D3` da solo è una coordinata opaca: non porta contenuto proprio, e un blocco di sette righe `D1`…`D7` nude costringe a rileggere per capire di cosa si parla — esattamente il costo che questo formato esiste per togliere.
-- **Le strade candidate di una domanda stanno in riga separata sotto**, mai dentro il suo corpo, e sono dichiarate non vincolanti. Dentro la prosa si leggerebbero come il ventaglio delle possibilità; in riga a parte si leggono come materiale. Ometti la riga quando non hai candidati: nominarne di finti è peggio che tacere.
+- **Le strade candidate di una domanda stanno sotto il corpo, una per riga, ognuna col suo id `D{N}.<lettera>`** (`D3.A`, `D3.B`, …), mai dentro il corpo, e sono dichiarate non esaustive. Dentro la prosa si leggerebbero come il ventaglio delle possibilità; in lista a parte si leggono come materiale. Una riga per strada perché una strada è spesso una frase intera, e accodate con `·` diventano un paragrafo che nessuno rilegge. L'id esiste perché l'utente possa rispondere con `D3.B` quando una strada vista basta; la risposta in prosa con una strada nuova resta la forma piena, e la riga d'intestazione lo dice. Le lettere seguono l'ordine di presentazione e non si riassegnano mai, come gli id delle voci. Ometti la lista quando non hai candidati: nominarne di finti è peggio che tacere.
 - **La ragione di una proposta sta nel corpo, ed è un dato del repo.** «Mi sembra più pulito» non è una ragione: lo sono la regola che lo dice (`plugin-dev.md` fissa il discriminante sul consumo), il precedente già in uso (`doc_config_file` è già lo scope di `reference/`), la cifra contata (62 span, non «qualche centinaio»). Una proposta senza il dato che la decide è una domanda travestita, e va rimessa al test (§1b).
 - **Una proposta copre una candidata** (§1b); se ne copre due, le nomina entrambe nel corpo.
 - **Due numerazioni indipendenti, entrambe nell'ordine di presentazione**: le generali prime, poi sottosistema per sottosistema nell'ordine in cui il giro li percorre; dentro un sottosistema prima le domande poi le proposte. Non l'ordine in cui l'analisi ha trovato le candidate — chi legge incontra `D1`, `D2`, `D3` in fila, e un salto negli id qui si legge come una voce persa.
@@ -256,7 +260,7 @@ Prima del blocco finale, una riga per ogni deliverable ancora aperto — `${CLAU
 
 Poi, chiuso il giro, il **blocco finale**: prima tutte le domande nell'ordine degli id, poi tutte le proposte nell'ordine degli id — le generali e quelle di ogni sottosistema, ognuna una volta sola anche se ne tocca due.
 
-**Le domande si ricopiano, non si riassumono.** Ogni domanda arriva qui **verbatim** come l'hai scritta sopra — stessa maniglia, stesso corpo, stessa riga di chiusura (§2a). Se la domanda in coda è più corta di quella sopra, il blocco è sbagliato anche quando si legge bene: hai prodotto un riepilogo del turno, e chi risponde decide sulla versione povera di una voce che sopra era completa. **È la seconda occorrenza, ed è quella su cui l'utente risponde**: chi risponde in fila deve poter leggere la domanda intera lì dove risponde, senza risalire al sottosistema che la conteneva.
+**Le domande si ricopiano, non si riassumono.** Ogni domanda arriva qui **verbatim** come l'hai scritta sopra — stessa maniglia, stesso corpo, stesse strade viste (§2a). Se la domanda in coda è più corta di quella sopra, il blocco è sbagliato anche quando si legge bene: hai prodotto un riepilogo del turno, e chi risponde decide sulla versione povera di una voce che sopra era completa. **È la seconda occorrenza, ed è quella su cui l'utente risponde**: chi risponde in fila deve poter leggere la domanda intera lì dove risponde, senza risalire al sottosistema che la conteneva.
 
 **Le proposte compaiono come sola maniglia** (§2a). Alle proposte l'utente risponde solo se le smentisce: il silenzio su una `P{N}` vale accettazione, ed è così che finisce nel file (§3). Il silenzio è su una proposta già letta per intero pochi paragrafi sopra, non su una versione povera ricopiata in coda — è quella ripetizione, non l'assenza, che su una task con più proposte che domande produce il muro che nessuno rilegge.
 
@@ -273,7 +277,7 @@ L'utente risponde alle domande che ha in mente adesso, smentisce le proposte che
 Il giro successivo quindi **ricalcola** le voci aperte invece di riproporle immutate — vincolo opposto a quello del blocco finale (§2e), e non è una contraddizione: dentro **un** turno una domanda si ricopia verbatim, fra **due** turni si ricalcola su ciò che l'utente ha appena risposto.
 
 - **domanda risolta per implicazione** → diventa una proposta nuova, nella forma di §2a, con la risposta derivata **e il perché** — es. *P7 — nome del flag → `--glyphs`, discende da D1*. Non chiuderla in silenzio: metterebbe nel file una decisione che nessuno ha visto, ed è un errore invisibile perché produce una voce ben formata come tutte le altre. È lo stesso meccanismo del primo giro (§1b): al primo giro la decisione discende dal repo, qui da una risposta.
-- **domanda solo ristretta** → ripresentala con meno strade, dichiarando quali sono cadute e per quale risposta.
+- **domanda solo ristretta** → ripresentala con meno strade, dichiarando quali sono cadute e per quale risposta. Le strade rimaste tengono la loro lettera: se cade `D3.B`, restano `D3.A` e `D3.C`.
 - **domanda intatta** → ripresentala com'è.
 - **proposta smentita** → torna come `D{N}` nuova se la smentita apre una scelta dell'utente, o come `P{N}` nuova che recepisce la ragione dell'utente; mai riproposta uguale.
 - **proposta non smentita** → chiusa, non si ripresenta.
@@ -328,7 +332,7 @@ Quattro regole sulla scrittura del blocco:
     - **Non decisa**: ${motivazione dell'utente, testuale}
   ```
 
-  Risolta per implicazione da una risposta (§2g): `- **Scelta**: ${risposta} — *risolta da P7, non smentita*`, e `P7` sta fra le proposte con la sua ragione. Sono le sole forme ammesse oltre a `**Scelta**`, e rendono leggibile a `run-task` la differenza fra «qui sei libero» e «qualcuno si è dimenticato». Se una domanda è ancora senza esito, **non sei allo step 3**: torna al giro (§2g).
+  Risolta per implicazione da una risposta (§2g): `- **Scelta**: ${risposta} — *risolta da P7, non smentita*`, e `P7` sta fra le proposte con la sua ragione. Sono le sole forme ammesse oltre a `**Scelta**`, e rendono leggibile a `run-task` la differenza fra «qui sei libero» e «qualcuno si è dimenticato». Se una domanda è ancora senza esito, **non sei allo step 3**: torna al giro (§2g). Una risposta data con l'id di una strada si scrive per esteso — `**Scelta**: modulo nuovo glyphs.ts (D3.B)` — perché le strade viste non entrano nel file, e lì `D3.B` da solo resterebbe una coordinata che non porta a niente.
 - **Ogni `P{N}` mostrata compare, con il suo esito**: *non smentita*, o *smentita →* la voce che ne è nata. Una proposta smentita non sparisce dal file: la sua riga dice dove è finita la scelta, e la voce nuova porta la ragione dell'utente.
 - **Nel blocco entrano solo id che sono comparsi in chat prima di scriverlo.** Una derivazione che nasce **mentre scrivi** — «scrivendo `D4` vedo che il nome del flag discende da `D1`» — non è una riga in più, è un giro in più: torna a §2g, mostrala come `P{N}`, e scrivi il blocco solo dopo. «Non smentita» presuppone che chi poteva smentire abbia **visto**; una derivazione dichiarata dopo il push con «smentiscila adesso» è una decisione presa a cose fatte, comunicata con la forma di una proposta. Il §2h vieta di chiudere una domanda senza esito; questa regola vieta di aprire una decisione senza turno — ed è quella che morde sulle derivazioni, perché nascono quando lo step delle domande è già dichiarato chiuso.
 
