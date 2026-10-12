@@ -241,6 +241,62 @@ lw_task_children() {   # <task-id>
     done
 }
 
+# ---- Cella Prog della Tasks Overview -----------------------------------------
+#
+# Lettura e riscrittura della cella Prog di una riga `| T<n> | … |` in tasks.md,
+# per i tre script che promuovono (start-task, promote-wip, promote-ready): un awk
+# solo, invece di cinque copie che divergerebbero alla prima correzione.
+#
+# La colonna Prog si localizza dall'HEADER (`| ID | Pri | Prog | … |`), mai per
+# posizione: un indice cablato smette di matchare al primo cambio di forma della
+# tabella e produce un no-op muto.
+#
+# La tabella apre all'header e chiude alla PRIMA riga che non inizia con `|`; un
+# secondo header ne riapre una. Stesso confine del deck (`overviewRows` in
+# loom-deck/src/tasks.ts). Il confine serve perche' la prima cella `T<n>` non
+# basta: le righe cross-deps dell'Execution Plan (`| T07 | — | ✔️T08 |`) hanno la
+# stessa forma appena perdono il 🔒, e senza confine la promozione di T07
+# riscriveva la cella Cross Deps col glifo, cancellando la dipendenza.
+#
+# Prezzo del confine: una riga vuota o un commento DENTRO la tabella la chiude,
+# e le righe sotto non si trovano piu' — il chiamante lo riporta come WARN.
+_LW_TASKS_MD_AWK_HEAD='
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    function header_prog(   i) {
+        if ($0 !~ /^[ \t]*\|/ || trim($2) != "ID") return 0
+        for (i = 2; i <= NF; i++) if (trim($i) == "Prog") return i
+        return 0
+    }
+'
+
+# Stampa il glifo Prog della riga <task-id>, o niente se la riga non c'e'.
+lw_tasks_md_prog_get() {   # <tasks-file> <task-id>
+    awk -v id="$2" -F'|' "${_LW_TASKS_MD_AWK_HEAD}"'
+        (p = header_prog()) > 0 { prog = p; next }
+        prog > 0 && !/^[ \t]*\|/ { prog = 0; next }
+        prog > 0 && trim($2) == id { print trim($prog); exit }
+    ' "$1"
+}
+
+# Riscrive la cella Prog della riga <task-id> con <glifo>, in place.
+# Exit: 0 = riga riscritta · 1 = nessuna riga (file intatto)
+lw_tasks_md_prog_set() {   # <tasks-file> <task-id> <glifo>
+    local tmp
+    tmp=$(mktemp)
+    if awk -v id="$2" -v glyph="$3" -F'|' -v OFS='|' "${_LW_TASKS_MD_AWK_HEAD}"'
+        (p = header_prog()) > 0 { prog = p; print; next }
+        prog > 0 && !/^[ \t]*\|/ { prog = 0 }
+        prog > 0 && trim($2) == id { $prog = " " glyph " "; hit = 1; print; next }
+        { print }
+        END { exit(hit ? 0 : 1) }
+    ' "$1" > "$tmp"; then
+        mv "$tmp" "$1"
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
 # ---- Baseline del diff di checkpoint -----------------------------------------
 #
 # Da dove parte la finestra <base>..HEAD che checkpoint-task-analyze.sh mostra.

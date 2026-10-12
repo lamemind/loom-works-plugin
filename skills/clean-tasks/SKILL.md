@@ -7,7 +7,7 @@ model: sonnet
 
 Pota task su indicazione diretta. Operazione distruttiva ma recuperabile via git history.
 
-Tutto il lavoro lo fa lo script: per ogni task elimina il task file, la folder dot-prefixed e la riga in `tasks.md` (Overview + nodo Execution Plan), e fa **un commit atomico per task**. Il tuo compito è solo interpretare l'input, lanciare il dry-run, chiedere conferma quando serve, eseguire `--apply`. Non fare git/rm a mano e non aggiungere commit tuoi: lo script possiede l'intero flusso, range inclusi.
+Tutto il lavoro lo fa lo script: per ogni task elimina il task file, la folder dot-prefixed e la riga della Tasks Overview in `tasks.md` (l'Execution Plan non lo tocca: è design scritto a mano), e fa **un commit atomico per task**. Il tuo compito è solo interpretare l'input, lanciare il dry-run, chiedere conferma quando serve, eseguire `--apply`. Non fare git/rm a mano e non aggiungere commit tuoi: lo script possiede l'intero flusso, range inclusi.
 
 Input utente:
 ~~~human

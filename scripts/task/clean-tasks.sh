@@ -69,7 +69,12 @@ if [[ ! -f "$TASKS_FILE" ]]; then
     exit 1
 fi
 
-# Remove a task's Overview row + Execution Plan node from tasks.md.
+# Remove a task's Overview row from tasks.md — solo quella, confinata alla
+# sezione `## Tasks Overview`. L'Execution Plan e' design scritto a mano e nessuno
+# script lo pota: il token della task resta nelle catene di lane e nelle celle
+# Cross Deps finche' qualcuno lo toglie a mano. Un `sed "/\b<id>\b/d"` sul file
+# intero cancellerebbe anche la riga Overview di un'altra task il cui titolo
+# nomina l'id, lasciandone il task file senza riga.
 # Leaves the file staged (git add); the caller owns the commit.
 # Identica a cleanup-done-tasks.sh per garantire comportamento uniforme.
 remove_task_from_tasksmd() {  # <task_id>
@@ -81,8 +86,6 @@ remove_task_from_tasksmd() {  # <task_id>
         { print }
     ' "$TASKS_FILE" > "${TASKS_FILE}.tmp"
     mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
-    # Execution Plan node: lines containing the ID as a word token
-    sed -i "/\b${id}\b/d" "$TASKS_FILE" 2>/dev/null || true
     git -C "$PROJECT_ROOT" add "$TASKS_FILE"
 }
 
@@ -310,7 +313,7 @@ for c in "${CANDIDATES[@]}"; do
         echo "-> folder gia' rimossa da una task che la condivide: $(basename "$fp")/"
     fi
 
-    # Remove row + Execution Plan node from tasks.md
+    # Remove the Overview row from tasks.md
     remove_task_from_tasksmd "$id"
     echo "-> rimossa riga tasks.md: ${id}"
 

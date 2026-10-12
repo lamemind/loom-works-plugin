@@ -8,7 +8,7 @@
 # Dry-run di default: elenca candidati senza modifiche.
 # Con --apply: elimina task file + folder + riga tasks.md, un commit per task.
 # Inoltre riconcilia le righe ORFANE (Done in tasks.md ma file gia' assente):
-# rimuove riga+nodo, indipendentemente dalla soglia --days. Senza questo, l'ID
+# rimuove la riga, indipendentemente dalla soglia --days. Senza questo, l'ID
 # resterebbe vivo solo come riga e verrebbe riusato dall'allocatore -> collisione.
 #
 # Filtro opzionale: se passati task-id come argomenti, opera solo su quelli.
@@ -62,7 +62,12 @@ if [[ ! -f "$TASKS_FILE" ]]; then
     exit 1
 fi
 
-# Remove a task's Overview row + Execution Plan node from tasks.md.
+# Remove a task's Overview row from tasks.md — solo quella, confinata alla
+# sezione `## Tasks Overview`. L'Execution Plan e' design scritto a mano e nessuno
+# script lo pota: il token della task resta nelle catene di lane e nelle celle
+# Cross Deps finche' qualcuno lo toglie a mano. Un `sed "/\b<id>\b/d"` sul file
+# intero cancellerebbe anche la riga Overview di un'altra task il cui titolo
+# nomina l'id, lasciandone il task file senza riga.
 # Shared by candidate purge and orphan-row reconciliation. Leaves the file
 # staged (git add); the caller owns the commit.
 remove_task_from_tasksmd() {  # <task_id>
@@ -74,8 +79,6 @@ remove_task_from_tasksmd() {  # <task_id>
         { print }
     ' "$TASKS_FILE" > "${TASKS_FILE}.tmp"
     mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
-    # Execution Plan node: lines containing the ID as a word token
-    sed -i "/\b${id}\b/d" "$TASKS_FILE" 2>/dev/null || true
     git -C "$PROJECT_ROOT" add "$TASKS_FILE"
 }
 
@@ -117,7 +120,7 @@ for task_id in "${DONE_IDS[@]}"; do
     task_file=$(ls "${TASKS_DIR}/${task_id}-"*.md 2>/dev/null | head -1 || true)
     if [[ -z "$task_file" || ! -f "$task_file" ]]; then
         # Riga Done senza file: residuo da riconciliare. Nessun file da
-        # trattenere -> indipendente dalla soglia --days (rimuovi riga+nodo).
+        # trattenere -> indipendente dalla soglia --days (rimuovi la riga).
         ORPHANS+=("${task_id}")
         continue
     fi
@@ -306,7 +309,7 @@ for c in "${CANDIDATES[@]}"; do
         echo "-> folder gia' rimossa da una task che la condivide: $(basename "$fp")/"
     fi
 
-    # Remove row + Execution Plan node from tasks.md
+    # Remove the Overview row from tasks.md
     remove_task_from_tasksmd "$id"
     echo "-> rimossa riga tasks.md: ${id}"
 

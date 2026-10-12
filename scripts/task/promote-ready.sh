@@ -37,17 +37,9 @@ if [[ ! -f "$TASKS_FILE" ]]; then
     exit 0
 fi
 
-# Colonna Prog localizzata dall'HEADER, mai per posizione — stessa regola di
-# start-task.sh: un indice cablato smette di matchare al primo cambio di forma
-# della tabella e produce un no-op muto.
-CURRENT=$(awk -v id="$TASK_ID" -F'|' '
-    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
-    prog == 0 && /^[ \t]*\|/ && trim($2) == "ID" {
-        for (i = 2; i <= NF; i++) if (trim($i) == "Prog") prog = i
-        next
-    }
-    prog > 0 && /^[ \t]*\|/ && trim($2) == id { print trim($prog); exit }
-' "$TASKS_FILE")
+# Cella Prog letta dentro la Tasks Overview, colonna dall'header: un riscontro
+# mancato e' un WARN, mai un no-op muto (`lw_tasks_md_prog_get` in lib.sh).
+CURRENT=$(lw_tasks_md_prog_get "$TASKS_FILE" "$TASK_ID")
 
 if [[ -z "$CURRENT" ]]; then
     echo "WARN: nessuna riga ${TASK_ID} sotto un header con colonna Prog in ${TASKS_FILE} — Prog NON aggiornata" >&2
@@ -61,23 +53,9 @@ if [[ "$CURRENT" != "🔵" ]]; then
     exit 0
 fi
 
-TMP_TASKS=$(mktemp)
-if awk -v id="$TASK_ID" -F'|' -v OFS='|' '
-    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
-    prog == 0 && /^[ \t]*\|/ && trim($2) == "ID" {
-        for (i = 2; i <= NF; i++) if (trim($i) == "Prog") prog = i
-        print; next
-    }
-    prog > 0 && /^[ \t]*\|/ && trim($2) == id {
-        $prog = " 🟢 "; hit = 1; print; next
-    }
-    { print }
-    END { exit(hit ? 0 : 1) }
-' "$TASKS_FILE" > "$TMP_TASKS"; then
-    mv "$TMP_TASKS" "$TASKS_FILE"
+if lw_tasks_md_prog_set "$TASKS_FILE" "$TASK_ID" "🟢"; then
     echo "-> tasks.md aggiornato: ${TASK_ID} 🟢"
 else
-    rm -f "$TMP_TASKS"
     echo "WARN: riga ${TASK_ID} sparita fra lettura e scrittura — Prog NON aggiornata" >&2
     exit 0
 fi
