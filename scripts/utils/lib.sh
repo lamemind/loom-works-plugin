@@ -83,14 +83,33 @@ lw_has_remote() {
 #
 # Chi non puo' sourcare bash (il markdown delle skill) usa il wrapper CLI
 # scripts/utils/docs-root.sh, gemello di resolve-task.sh.
+#
+# DUE LETTURE del campo: `jq` quando e' nel PATH, una regex bash altrimenti. `jq`
+# non e' un prerequisito del plugin (Git for Windows non lo porta, `init` senza
+# `jq` avvisa e prosegue), e una lettura che ripiegasse su "docs" quando manca
+# rifarebbe il guasto silenzioso descritto sopra — su loom-works ogni script
+# girerebbe su docs/, che non esiste, uscendo 0. Un errore «jq richiesto» non e'
+# l'alternativa: questa funzione gira negli hook a ogni turno, e scatterebbe su
+# ogni chiamante per un dato che si legge senza.
+# La regex legge il file intero in una variabile (`read -d ''`, nessun processo
+# figlio): `[[:space:]]` copre anche l'a-capo, quindi chiave e valore su due righe
+# matchano come con `jq`, e il primo match vince — lo schema e' piatto, `docsRoot`
+# compare solo al primo livello. Le due letture si collaudano con un banco a due
+# giri, il secondo con un PATH senza `jq` (nel cappello:
+# plugin-tests/docs-root/run.sh).
 
 lw_docs_root() {
-    local cfg root
+    local cfg root from_file=""
     root="$(lw_find_project_root)"
     cfg="${root}/.claude/loom-works.json"
-    if [[ -f "$cfg" ]] && command -v jq >/dev/null 2>&1; then
-        local from_file
-        from_file="$(jq -r '.docsRoot // empty' "$cfg" 2>/dev/null)"
+    if [[ -f "$cfg" ]]; then
+        if command -v jq >/dev/null 2>&1; then
+            from_file="$(jq -r '.docsRoot // empty' "$cfg" 2>/dev/null)"
+        else
+            local json="" re='"docsRoot"[[:space:]]*:[[:space:]]*"([^"]*)"'
+            IFS= read -r -d '' json < "$cfg" || true
+            [[ "$json" =~ $re ]] && from_file="${BASH_REMATCH[1]}"
+        fi
         if [[ -n "$from_file" ]]; then
             echo "$from_file"
             return 0
