@@ -84,8 +84,8 @@ lw_has_remote() {
 # Chi non puo' sourcare bash (il markdown delle skill) usa il wrapper CLI
 # scripts/utils/docs-root.sh, gemello di resolve-task.sh.
 #
-# DUE LETTURE del campo: `jq` quando e' nel PATH, una regex bash altrimenti. `jq`
-# non e' un prerequisito del plugin (Git for Windows non lo porta, `init` senza
+# DUE LETTURE del campo: `jq` quando e' nel PATH e accetta il file, una regex bash
+# altrimenti. `jq` non e' un prerequisito del plugin (Git for Windows non lo porta, `init` senza
 # `jq` avvisa e prosegue), e una lettura che ripiegasse su "docs" quando manca
 # rifarebbe il guasto silenzioso descritto sopra — su loom-works ogni script
 # girerebbe su docs/, che non esiste, uscendo 0. Un errore «jq richiesto» non e'
@@ -97,15 +97,19 @@ lw_has_remote() {
 # compare solo al primo livello. Le due letture si collaudano con un banco a due
 # giri, il secondo con un PATH senza `jq` (nel cappello:
 # plugin-tests/docs-root/run.sh).
+# Anche un file che `jq` rifiuta (una virgola finale lasciata da un edit a mano)
+# passa alla regex: altrimenti l'esito dipenderebbe da quale binario ha la
+# macchina — `docs` con `jq`, il valore giusto senza — e il ripiego sarebbe di
+# nuovo silenzioso. Il file malformato lo segnala `cfg_validate`, non questa
+# lettura.
 
 lw_docs_root() {
     local cfg root from_file=""
     root="$(lw_find_project_root)"
     cfg="${root}/.claude/loom-works.json"
     if [[ -f "$cfg" ]]; then
-        if command -v jq >/dev/null 2>&1; then
-            from_file="$(jq -r '.docsRoot // empty' "$cfg" 2>/dev/null)"
-        else
+        if ! { command -v jq >/dev/null 2>&1 \
+                && from_file="$(jq -r '.docsRoot // empty' "$cfg" 2>/dev/null)"; }; then
             local json="" re='"docsRoot"[[:space:]]*:[[:space:]]*"([^"]*)"'
             IFS= read -r -d '' json < "$cfg" || true
             [[ "$json" =~ $re ]] && from_file="${BASH_REMATCH[1]}"
