@@ -112,10 +112,23 @@ DOCS_ROOT="$(lw_docs_root)"
 
 [[ -d "$DIR" ]] || usage_err "dir not found: $DIR"
 
-char_count() { wc -m < "$1" | tr -d ' '; }
+# I due cicli sui file non aprono processi oltre quelli che misurano: `wc -m`,
+# `git log` e `inbox.sh parse`. Gli helper qui sotto assegnano alla variabile che
+# il chiamante nomina invece di stampare, come le letture di lib-doc.sh: in Git
+# Bash su Windows ogni `$(…)` e' un fork emulato, e moltiplicato per i file e per
+# le ancore era quasi tutto il tempo dello script (lib-doc.sh §Lettura senza
+# sottoprocessi).
 
-cappello_of() {  # <basename> → ID dal nome, vuoto se il nome non ne porta uno
-    [[ "$1" =~ ^([A-Za-z]+[0-9]+)- ]] && echo "${BASH_REMATCH[1]}" || echo ""
+char_count() {  # <var> <file> → <var> = caratteri del file secondo `wc -m`
+    local _cc_n
+    _cc_n="$(wc -m < "$2")"
+    printf -v "$1" '%s' "${_cc_n//[[:space:]]/}"
+}
+
+cappello_of() {  # <var> <basename> → <var> = ID dal nome, vuoto se il nome non ne porta uno
+    local _co_id=""
+    [[ "$2" =~ ^([A-Za-z]+[0-9]+)- ]] && _co_id="${BASH_REMATCH[1]}"
+    printf -v "$1" '%s' "$_co_id"
 }
 
 # Custode dell'invariante «ogni ancora della riga 3 compare nel corpo dello
@@ -129,11 +142,14 @@ cappello_of() {  # <basename> → ID dal nome, vuoto se il nome non ne porta uno
 # di spazi e' drift vero, non rumore da assorbire (coerente con `_chiave`/`_nudo`
 # di `tldr.sh`, che pero' tollerano anche quello per un motivo diverso: li' il
 # confronto e' contro cio' che un modello ha reso, qui contro il file stesso).
+# Sottostringa di bash e non `grep -qF`: un'ancora sta su una riga sola, quindi
+# trovarla nel corpo intero equivale a trovarla in una sua riga, e il confronto
+# gira una volta per ancora, cioe' decine di volte per file.
 tldr_ancora_viva() {  # <ancora> <corpo-senza-riga3> → 0 se trovata
     local anc="$1" corpo="$2" nudo
-    grep -qF -- "$anc" <<< "$corpo" && return 0
+    [[ "$corpo" == *"$anc"* ]] && return 0
     nudo="${anc#\`}"; nudo="${nudo%\`}"
-    [[ "$nudo" != "$anc" ]] && grep -qF -- "$nudo" <<< "$corpo"
+    [[ "$nudo" != "$anc" && "$corpo" == *"$nudo"* ]]
 }
 
 # --- Modo --inbox --------------------------------------------------------------
@@ -146,14 +162,17 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
     if [[ -d "$INBOX_DIR" ]]; then
         while IFS= read -r -d '' file; do
             rel="${file#"$PROJECT_ROOT"/}"
-            created="$(cd "$PROJECT_ROOT" && git log --diff-filter=A --format=%at -- "$rel" 2>/dev/null | tail -1)"
+            # L'ultima riga del log, cioe' il commit di aggiunta piu' vecchio
+            created="$(git -C "$PROJECT_ROOT" log --diff-filter=A --format=%at -- "$rel" 2>/dev/null)"
+            created="${created##*$'\n'}"
             [[ "$created" =~ ^[0-9]+$ ]] || created="$(stat -c %Y "$file")"
 
             parse_out="$("${SCRIPT_DIR}/inbox.sh" parse --file "$file" --format tsv 2>/dev/null)"
             parse_rc=$?
 
             if [[ $parse_rc -eq 2 ]]; then
-                echo "[doc-metrics] WARN malformato: ${rel} — $(cut -f2 <<< "$parse_out")" >&2
+                ragione="${parse_out#*$'\t'}"; ragione="${ragione%%$'\t'*}"
+                echo "[doc-metrics] WARN malformato: ${rel} — ${ragione}" >&2
                 # escluso da qualunque filtro: nessun processo lo consuma, e non
                 # ha una natura che possa matchare --natura
                 if [[ -z "$NATURA_FILTER" && "$DRAINABLE_ONLY" -eq 0 ]]; then
@@ -180,16 +199,18 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
                         n_noz=$((n_noz+1))
                         [[ "$f2" == "aperta" ]] && n_aperte=$((n_aperte+1)) ;;
                 esac
-            done < <(tr '\t' '\037' <<< "$parse_out")
+            done <<< "${parse_out//$'\t'/$'\037'}"
 
             if [[ -n "$NATURA_FILTER" && "$natura" != "$NATURA_FILTER" ]]; then continue; fi
             if [[ "$DRAINABLE_ONLY" -eq 1 ]]; then
                 [[ "$drainable" == "si" && -z "$branch" ]] || continue
             fi
 
+            char_count chars "$file"
+            cappello_of cappello "${file##*/}"
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                 "$created" "$rel" "$natura" "$indexed" "$drainable" "$branch" \
-                "$n_noz" "$n_aperte" "$(char_count "$file")" "$(cappello_of "$(basename "$file")")" >> "$QTMP"
+                "$n_noz" "$n_aperte" "$chars" "$cappello" >> "$QTMP"
         done < <(find "$INBOX_DIR" -maxdepth 1 -type f -name '*.md' -print0 | sort -z)
     fi
 
@@ -241,15 +262,15 @@ while IFS= read -r -d '' file; do
     rel="${file#"$PROJECT_ROOT"/}"
     doc_excluded "$rel" && continue
 
-    chars="$(char_count "$file")"
-    layer="$(doc_layer "$rel")"
-    base="$(basename "$file")"
+    char_count chars "$file"
+    doc_layer_var layer "$rel"
+    base="${file##*/}"
 
     tldr=""; tldr_len=0
     if [[ "$layer" != "inbox" ]]; then
         # il TLDR dei file inbox sta in riga 4 e lo possiede inbox.sh: qui non
         # si legge (nessuna regex propria sul formato inbox)
-        tldr="$(doc_tldr "$file" 3)"
+        doc_tldr_var tldr "$file" 3
         tldr_len=${#tldr}
     fi
 
@@ -275,7 +296,11 @@ while IFS= read -r -d '' file; do
                 # Invariante riga3 ⊂ corpo, per file: si applica anche ai CONFIG
                 # (A11) — un TLDR scritto a mano con un'ancora assente e' rotto
                 # quanto uno generato.
-                corpo_senza_tldr="$(sed '3d' "$file")"
+                # Il file senza la riga 3, come `$(sed '3d' "$file")`: righe con
+                # newline, poi via i newline finali che la cattura toglierebbe.
+                mapfile -t righe < "$file"
+                printf -v corpo_senza_tldr '%s\n' "${righe[@]:0:2}" "${righe[@]:3}"
+                corpo_senza_tldr="${corpo_senza_tldr%"${corpo_senza_tldr##*[!$'\n']}"}"
                 orfane_qui=0
                 while IFS= read -r anc; do
                     [[ -z "$anc" ]] && continue
@@ -284,7 +309,7 @@ while IFS= read -r -d '' file; do
                         orfane_qui=$((orfane_qui+1))
                         n_ancore_orfane=$((n_ancore_orfane+1))
                     fi
-                done < <(printf '%s\n' "$tldr" | sed 's/ · /\n/g')
+                done <<< "${tldr//" · "/$'\n'}"
                 (( orfane_qui > 0 )) && flags="${flags:+$flags }TLDR-ORFANA"
             elif [[ "$rel" == */reference/* ]]; then
                 flags="${flags:+$flags }NOTLDR"; n_notldr=$((n_notldr+1))
@@ -304,7 +329,8 @@ while IFS= read -r -d '' file; do
         *)       n_altro=$((n_altro+1));     c_altro=$((c_altro + chars)) ;;
     esac
 
-    d="$(dirname "$rel")"
+    # Stessa resa di `dirname`: `.` senza barre, `/` per un file alla radice
+    if [[ "$rel" == */* ]]; then d="${rel%/*}"; d="${d:-/}"; else d="."; fi
     DIR_CHAR["$d"]=$(( ${DIR_CHAR[$d]:-0} + chars ))
     DIR_FILES["$d"]=$(( ${DIR_FILES[$d]:-0} + 1 ))
 
@@ -394,7 +420,7 @@ if [[ "$ONLINE" -eq 1 ]]; then
     if [[ -n "$LW_DOC_ONLINE_LIST" ]]; then
         while IFS= read -r rel; do
             [[ -f "${PROJECT_ROOT}/${rel}" ]] || continue
-            c="$(char_count "${PROJECT_ROOT}/${rel}")"
+            char_count c "${PROJECT_ROOT}/${rel}"
             online_total=$((online_total + c))
             printf '  @-import  %-52s %8s\n' "$rel" "$c"
         done <<< "$LW_DOC_ONLINE_LIST"

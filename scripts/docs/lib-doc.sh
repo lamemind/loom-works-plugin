@@ -114,6 +114,12 @@ doc_tldr() {  # <file> <riga> → stampa il TLDR (trim trailing), niente se asse
 # `read` e si assegna con `printf -v` alla variabile che il chiamante nomina:
 # nessun processo. I locali portano un prefisso perche' `printf -v` su un nome
 # uguale a un locale scriverebbe il locale invece della variabile del chiamante.
+#
+# Fine riga CRLF: `read` tiene il `\r`, il `sed` di Git Bash legge in modo testo e
+# lo toglie. Un checkout Windows con core.autocrlf=true e senza .gitattributes ha
+# i file in CRLF, e una riga marker con il `\r` in coda fallirebbe su un token
+# `drainable\r`. doc_line toglie quindi un `\r` prima del newline, come quel sed,
+# e su Linux come su Windows: lo stesso file si legge allo stesso modo ovunque.
 
 doc_line() {  # <var> <file> <riga> → <var> = riga N del file, vuota se assente (come `sed -n Np`)
     local _dl_line="" _dl_n=0
@@ -122,9 +128,13 @@ doc_line() {  # <var> <file> <riga> → <var> = riga N del file, vuota se assent
             _dl_n=$((_dl_n+1))
         done < "$2"
         # read fallisce sull'ultima riga senza newline finale ma la assegna:
-        # se e' la riga N la si tiene, come fa sed. Fallito prima, il file ha
-        # meno di N righe.
-        (( _dl_n + 1 >= $3 )) || _dl_line=""
+        # se e' la riga N la si tiene, come fa sed, e senza toccarne un `\r`
+        # (non e' un CRLF). Fallito prima, il file ha meno di N righe.
+        if (( _dl_n == $3 )); then
+            _dl_line="${_dl_line%$'\r'}"
+        elif (( _dl_n + 1 < $3 )); then
+            _dl_line=""
+        fi
     fi
     printf -v "$1" '%s' "$_dl_line"
 }
@@ -144,22 +154,33 @@ doc_load_online() {  # <project_root> — popola la lista degli @-import
     LW_DOC_ONLINE_LIST="$(grep -oE '@[^ )]+\.md' "$claude_md" 2>/dev/null | sed 's/^@//' | sort -u)"
 }
 
+# Riga intera della lista, come `grep -qxF`, ma senza processo: chi lo chiama lo
+# fa una volta per file (§Lettura senza sottoprocessi).
 doc_is_online() {  # <rel-to-project-root>
     [[ -z "$LW_DOC_ONLINE_LIST" ]] && return 1
-    grep -qxF "$1" <<< "$LW_DOC_ONLINE_LIST"
+    [[ $'\n'"$LW_DOC_ONLINE_LIST"$'\n' == *$'\n'"$1"$'\n'* ]]
+}
+
+# Due forme come per il TLDR: `doc_layer_var` assegna senza processi, `doc_layer`
+# stampa per chi cattura con `$(…)`.
+doc_layer_var() {  # <var> <rel-to-project-root> → <var> = inbox|online|offline|altro
+    local _dly_layer
+    if [[ "$2" == */inbox/* ]]; then
+        _dly_layer="inbox"
+    elif doc_is_online "$2"; then
+        _dly_layer="online"
+    elif [[ "$2" == */reference/* ]]; then
+        _dly_layer="offline"
+    else
+        _dly_layer="altro"
+    fi
+    printf -v "$1" '%s' "$_dly_layer"
 }
 
 doc_layer() {  # <rel-to-project-root> → inbox|online|offline|altro
-    local rel="$1"
-    if [[ "$rel" == */inbox/* ]]; then
-        echo "inbox"
-    elif doc_is_online "$rel"; then
-        echo "online"
-    elif [[ "$rel" == */reference/* ]]; then
-        echo "offline"
-    else
-        echo "altro"
-    fi
+    local _dl_out
+    doc_layer_var _dl_out "$1"
+    echo "$_dl_out"
 }
 
 # ---- Perimetro escluso condiviso ---------------------------------------------
@@ -213,7 +234,7 @@ doc_config_file() {  # <path, assoluto o relativo> → 0 se e' configurazione
         */reference/*|reference/*) ;;
         *) return 1 ;;
     esac
-    [[ "$(basename -- "$1")" == "assumed-knowledge.md" ]]
+    [[ "${1##*/}" == "assumed-knowledge.md" ]]
 }
 
 # ---- Formato inbox (usate solo da inbox.sh) ----------------------------------

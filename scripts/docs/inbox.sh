@@ -291,11 +291,13 @@ cmd_parse() {
     # La stessa passata trova la riga del separatore delle ancore, se il file ne
     # ha uno. Si prende l'ULTIMA occorrenza dopo la riga 3: le ancore stanno
     # sempre in coda al file, quindi un `---` che compare prima appartiene alla
-    # prosa e non apre il blocco. Conta solo su derivazione e sweep.
+    # prosa e non apre il blocco. Conta solo su derivazione e sweep. Il confronto
+    # ignora un `\r` in coda, come l'awk di Git Bash che lo cercava prima: in un
+    # file CRLF il separatore e' `---\r` (lib-doc.sh, doc_line).
     local line in_nozione=0 lineno=0 sep_line=0
     while IFS= read -r line; do
         lineno=$((lineno+1))
-        (( lineno > 3 )) && [[ "$line" == "$LW_DOC_ANCORE_SEP" ]] && sep_line=$lineno
+        (( lineno > 3 )) && [[ "${line%$'\r'}" == "$LW_DOC_ANCORE_SEP" ]] && sep_line=$lineno
         if [[ "$line" =~ $LW_DOC_RE_NOZIONE ]]; then
             in_nozione=1; continue
         fi
@@ -311,7 +313,7 @@ cmd_parse() {
     # L'ultima riga senza newline finale resta fuori dal ciclo (read la assegna
     # e fallisce): per il separatore la si guarda qui, perche' una riga che c'e'
     # e' una riga anche senza newline.
-    (( lineno + 1 > 3 )) && [[ "$line" == "$LW_DOC_ANCORE_SEP" ]] && sep_line=$((lineno+1))
+    (( lineno + 1 > 3 )) && [[ "${line%$'\r'}" == "$LW_DOC_ANCORE_SEP" ]] && sep_line=$((lineno+1))
     [[ "$MK_NATURA" == "nozioni" ]] && sep_line=0
 
     # Seconda passata: raccolta dati
