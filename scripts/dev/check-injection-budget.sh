@@ -49,6 +49,14 @@ command -v jq >/dev/null || { echo "jq richiesto" >&2; exit 2; }
 fail=0
 printf '%-18s %-52s %8s  %s\n' "EVENT" "ENTRY" "CHAR" "STATUS"
 
+# Caratteri = code point, contati sui byte: in UTF-8 ogni byte apre un carattere
+# tranne quelli di continuazione (0x80-0xBF), che si tolgono prima di contare.
+# Non `wc -m`, che dipende dal locale: su Linux conta code point, in Git Bash con
+# LANG vuota conta byte e con C.UTF-8 unita' UTF-16 (un'emoji vale 2) — lo stesso
+# contratto passava da Linux e sforava da Windows, con centinaia di caratteri
+# accentati e frecce contati due o tre volte.
+count_chars() { LC_ALL=C tr -d '\200-\277' | wc -c; }
+
 check() { # $1=event $2=label $3=chars
   local status="OK" limit="$THRESHOLD"
   # Il restamp risponde al proprio tetto, non a quello di piattaforma: e' l'entry
@@ -69,7 +77,7 @@ while IFS=$'\t' read -r ev cmd; do
       [ -f "$tf" ] || continue
       found=$((found+1))
       tid="$(basename "$tf")"; tid="${tid%%-*}"
-      n=$(LOOM_TASK="$tid" CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd" 2>/dev/null | wc -m)
+      n=$(LOOM_TASK="$tid" CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd" 2>/dev/null | count_chars)
       if [ "$n" -gt "$max" ]; then max=$n; maxid=$tid; fi
     done
     if [ "$found" -eq 0 ]; then
@@ -78,7 +86,7 @@ while IFS=$'\t' read -r ev cmd; do
       check "$ev" "$label (max su $found task: $maxid)" "$max"
     fi
   else
-    n=$( (unset LOOM_TASK; CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd") 2>/dev/null | wc -m )
+    n=$( (unset LOOM_TASK; CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd") 2>/dev/null | count_chars )
     check "$ev" "$label" "$n"
   fi
 done < <(jq -r '.hooks | to_entries[] | .key as $ev | .value[].hooks[].command | $ev + "\t" + .' "$HOOKS")

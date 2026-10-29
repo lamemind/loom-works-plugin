@@ -240,13 +240,23 @@ expect_foreign_staged "cleanup-done-tasks"
 
 # ── 6. checkpoint-task-commit.sh linked — per ultimo, consuma l'indice ──────
 echo "6. checkpoint-task-commit.sh linked (symlink, git add -A legittimo)"
-ln -s tasks/T02-bar.md docs/current-task.md
-echo linked >> src/code.txt
-sed -i 's/^- \*\*Progress\*\*: .*/- **Progress**: ✔️ Done/' docs/tasks/T02-bar.md
-"$TASK_SCRIPTS/checkpoint-task-commit.sh" "checkpoint(T02): y" >/dev/null 2>&1 || fail "checkpoint linked exit $?"
-expect "commit = tutto il worktree, rename compreso" "$(committed HEAD)" src/code.txt docs/tasks/T02-bar.md "${FOREIGN[@]}"
-git show HEAD:docs/tasks/T02-bar.md | grep -q "✔️ Done at 20" && pass "Done at dentro il commit" || fail "Done at assente dal commit"
-[ -z "$(staged)" ] && pass "indice vuoto dopo il commit linked" || fail "indice non vuoto: $(staged | tr '\n' ' ')"
+# Il regime linked esiste solo dove `ln -s` crea un symlink vero. In Git Bash su
+# Windows senza Modalita' sviluppatore `ln -s` copia il file: la timbratura finisce
+# sulla copia e il caso fallirebbe per la piattaforma, non per il perimetro dei
+# commit. Si dichiara saltato, col motivo, invece che rosso; gli altri casi restano
+# bloccanti.
+ln -s tasks/T02-bar.md docs/current-task.md 2>/dev/null
+if [ ! -L docs/current-task.md ]; then
+  rm -f docs/current-task.md
+  echo "  SKIP regime linked: ln -s non crea un symlink su questa macchina (Git Bash su Windows senza Modalita' sviluppatore)"
+else
+  echo linked >> src/code.txt
+  sed -i 's/^- \*\*Progress\*\*: .*/- **Progress**: ✔️ Done/' docs/tasks/T02-bar.md
+  "$TASK_SCRIPTS/checkpoint-task-commit.sh" "checkpoint(T02): y" >/dev/null 2>&1 || fail "checkpoint linked exit $?"
+  expect "commit = tutto il worktree, rename compreso" "$(committed HEAD)" src/code.txt docs/tasks/T02-bar.md "${FOREIGN[@]}"
+  git show HEAD:docs/tasks/T02-bar.md | grep -q "✔️ Done at 20" && pass "Done at dentro il commit" || fail "Done at assente dal commit"
+  [ -z "$(staged)" ] && pass "indice vuoto dopo il commit linked" || fail "indice non vuoto: $(staged | tr '\n' ' ')"
+fi
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "OK: ogni commit resta nel proprio perimetro"; exit 0; fi

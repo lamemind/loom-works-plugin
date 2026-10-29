@@ -61,15 +61,17 @@ VS16=$'\uFE0F'
 
 die() { echo "[inbox] ERROR: $*" >&2; exit 1; }
 
-# strip del variation selector: i glifi ✔️/✖️ viaggiano con o senza VS16 a
-# seconda dell'editor; la classificazione matcha sul carattere base
-novs() { printf '%s' "${1//"$VS16"/}"; }
+# Strip del variation selector, `${1//"$VS16"/}`: i glifi ✔️/✖️ viaggiano con o
+# senza VS16 a seconda dell'editor, e la classificazione matcha sul carattere
+# base. In linea e non in una funzione catturata con `$(…)`: le due funzioni qui
+# sotto girano tre volte per sub-bullet, e ogni sostituzione di comando e' un
+# processo (lib-doc.sh §Lettura senza sottoprocessi).
 
 # --- Classificazione di un sub-bullet -----------------------------------------
 # Ritorna via variabili globali: SUB_ATTORE, SUB_VERDETTO, SUB_TARGET, SUB_RESA
 # Return: 0 valido · 1 coppia attore-glifo fuori dalle quattro producibili
 classify_sub() {  # <contenuto dopo "  - ">
-    local s; s="$(novs "$1")"
+    local s="${1//"$VS16"/}"
     SUB_ATTORE=""; SUB_VERDETTO=""; SUB_TARGET=""; SUB_RESA=""
     if [[ "$s" =~ ^router\ →\ (.+)$ ]]; then
         local rest="${BASH_REMATCH[1]}"
@@ -97,7 +99,7 @@ classify_sub() {  # <contenuto dopo "  - ">
 }
 
 sub_is_chiusura() {  # <contenuto dopo "  - "> → 0 se chiude la nozione
-    local s; s="$(novs "$1")"
+    local s="${1//"$VS16"/}"
     [[ "$s" == "router ✖ "* || "$s" == "writer ✔ "* || "$s" == "writer ✖ "* ]]
 }
 
@@ -107,7 +109,7 @@ sub_is_chiusura() {  # <contenuto dopo "  - "> → 0 se chiude la nozione
 read_marker() {  # <file>
     MK_NATURA=""; MK_INDEXED=0; MK_DRAINABLE=0; MK_BRANCH=""; MK_REASON=""
     local line3
-    line3="$(sed -n '3p' "$1" 2>/dev/null)"
+    doc_line line3 "$1" 3
     if [[ ! "$line3" =~ ^\>\ \*\*INBOX\*\*:\ (.+)$ ]]; then
         if grep -qE '^> \*\*INBOX\*\*: ' "$1" 2>/dev/null; then
             local at
@@ -129,7 +131,7 @@ read_marker() {  # <file>
             branch:*)  MK_BRANCH="${tok#branch:}" ;;
             *) MK_REASON="token sconosciuto: ${tok}"; return 1 ;;
         esac
-    done < <(sed 's/ · /\n/g' <<< "$tokens")
+    done <<< "${tokens//" · "/$'\n'}"
     if (( n_nat == 0 )); then MK_REASON="natura assente"; return 1; fi
     if (( n_nat > 1 ));  then MK_REASON="natura doppia"; return 1; fi
     return 0
@@ -280,13 +282,20 @@ cmd_parse() {
     fi
 
     local titolo tldr=""
-    titolo="$(sed -n '1p' "$file")"; titolo="${titolo#\# }"
-    tldr="$(doc_tldr "$file" 4)"
+    doc_line titolo "$file" 1; titolo="${titolo#\# }"
+    doc_tldr_var tldr "$file" 4
 
     # Prima passata: valida i sub-bullet (un malformato non emette NESSUNA riga
     # di dato), poi seconda passata per l'output.
-    local line in_nozione=0
+    #
+    # La stessa passata trova la riga del separatore delle ancore, se il file ne
+    # ha uno. Si prende l'ULTIMA occorrenza dopo la riga 3: le ancore stanno
+    # sempre in coda al file, quindi un `---` che compare prima appartiene alla
+    # prosa e non apre il blocco. Conta solo su derivazione e sweep.
+    local line in_nozione=0 lineno=0 sep_line=0
     while IFS= read -r line; do
+        lineno=$((lineno+1))
+        (( lineno > 3 )) && [[ "$line" == "$LW_DOC_ANCORE_SEP" ]] && sep_line=$lineno
         if [[ "$line" =~ $LW_DOC_RE_NOZIONE ]]; then
             in_nozione=1; continue
         fi
@@ -299,14 +308,11 @@ cmd_parse() {
         fi
         [[ "$line" =~ ^-\  || -z "$line" ]] || in_nozione=0
     done < "$file"
-
-    # Riga del separatore delle ancore, se il file ne ha uno. Si prende
-    # l'ULTIMA occorrenza: le ancore stanno sempre in coda al file, quindi un
-    # `---` che compare prima appartiene alla prosa e non apre il blocco.
-    local sep_line=0
-    if [[ "$MK_NATURA" != "nozioni" ]]; then
-        sep_line="$(awk -v sep="$LW_DOC_ANCORE_SEP" 'NR>3 && $0==sep { n=NR } END { print n+0 }' "$file")"
-    fi
+    # L'ultima riga senza newline finale resta fuori dal ciclo (read la assegna
+    # e fallisce): per il separatore la si guarda qui, perche' una riga che c'e'
+    # e' una riga anche senza newline.
+    (( lineno + 1 > 3 )) && [[ "$line" == "$LW_DOC_ANCORE_SEP" ]] && sep_line=$((lineno+1))
+    [[ "$MK_NATURA" == "nozioni" ]] && sep_line=0
 
     # Seconda passata: raccolta dati
     local -a noz_id=() noz_stato=() noz_attore=() noz_verdetto=() noz_target=() noz_resa=()
@@ -340,11 +346,11 @@ cmd_parse() {
 
     local i
     if [[ "$format" == "tsv" ]]; then
+        local col_indexed="" col_drainable=""
+        (( MK_INDEXED ))   && col_indexed="indexed"
+        (( MK_DRAINABLE )) && col_drainable="drainable"
         printf 'TITOLO\t%s\n' "$titolo"
-        printf 'MARKER\t%s\t%s\t%s\t%s\n' "$MK_NATURA" \
-            "$( (( MK_INDEXED )) && echo indexed )" \
-            "$( (( MK_DRAINABLE )) && echo drainable )" \
-            "$MK_BRANCH"
+        printf 'MARKER\t%s\t%s\t%s\t%s\n' "$MK_NATURA" "$col_indexed" "$col_drainable" "$MK_BRANCH"
         [[ -n "$tldr" ]] && printf 'TLDR\t%s\t%s\n' "$tldr" "${#tldr}"
         for i in "${!noz_id[@]}"; do
             printf 'NOZIONE\t%s\t%s\t%s\t%s\t%s\n' \

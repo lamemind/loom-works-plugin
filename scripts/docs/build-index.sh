@@ -68,8 +68,11 @@ source "${SCRIPT_DIR}/../utils/lib.sh"
 # shellcheck source=lib-doc.sh
 source "${SCRIPT_DIR}/lib-doc.sh"
 
-[[ -z "$DIR" ]] && DIR="$(lw_docs_root)/reference"
-[[ -z "$INBOX_DIR" ]] && INBOX_DIR="$(lw_docs_root)/inbox"
+if [[ -z "$DIR" || -z "$INBOX_DIR" ]]; then
+    DOCS_ROOT="$(lw_docs_root)"
+    [[ -z "$DIR" ]] && DIR="${DOCS_ROOT}/reference"
+    [[ -z "$INBOX_DIR" ]] && INBOX_DIR="${DOCS_ROOT}/inbox"
+fi
 
 PROJECT_ROOT="$(lw_find_project_root)"
 SCAN_DIR="${PROJECT_ROOT}/${DIR}"
@@ -101,11 +104,17 @@ trap 'rm -f "$TMP" "$INBOX_TMP"' EXIT
 MISSING=0
 OVERCAP=0
 
+# Dentro i due cicli sui file l'unico processo e' `inbox.sh parse`, uno per file
+# inbox: niente `$(basename …)`, `$(dirname …)`, `$(sed …)`, ma espansioni di
+# parametro e le letture di lib-doc.sh che assegnano senza processi. In Git Bash
+# su Windows ogni `$(…)` e' un fork emulato, e moltiplicato per i file diventa
+# quasi tutto il tempo dello script (lib-doc.sh §Lettura senza sottoprocessi).
 while IFS= read -r -d '' file; do
-    [[ "$(basename "$file")" == "INDEX.md" ]] && continue
+    fname="${file##*/}"
+    [[ "$fname" == "INDEX.md" ]] && continue
     should_exclude "$file" && continue
 
-    tldr="$(doc_tldr "$file" 3)"
+    doc_tldr_var tldr "$file" 3
     if [[ -z "$tldr" ]]; then
         echo "[build-index] WARN no TLDR: ${file#"$PROJECT_ROOT"/}" >&2
         MISSING=$((MISSING+1))
@@ -118,15 +127,21 @@ while IFS= read -r -d '' file; do
     fi
 
     rel="${file#"$SCAN_DIR"/}"
-    reldir="$(dirname "$rel")"
-    fname="$(basename "$rel")"
-    [[ "$reldir" == "." ]] && reldir=""
+    if [[ "$rel" == */* ]]; then reldir="${rel%/*}"; else reldir=""; fi
 
     # Il titolo del documento entra nella riga d'indice accanto al TLDR. E' gia'
     # scritto, da chi il file lo conosce, e dice il perimetro meglio di quanto lo
     # direbbe un TLDR generato — che cosi' non ci spende caratteri e li mette
     # tutti in ancore. Un H1 assente non e' un errore: la riga porta solo il TLDR.
-    h1="$(sed -n '1s/^#[[:space:]]*//p' "$file")"
+    # Stessa regola di `sed -n '1s/^#[[:space:]]*//p'`: riga 1 solo se apre con
+    # `#`, senza quel `#` e senza gli spazi che lo seguono.
+    doc_line h1 "$file" 1
+    if [[ "$h1" == \#* ]]; then
+        h1="${h1#\#}"
+        h1="${h1#"${h1%%[![:space:]]*}"}"
+    else
+        h1=""
+    fi
     h1="${h1//|/ }"
 
     # Nessun escape di `|` sul TLDR: l'output e' a liste, e `read` assegna
@@ -159,7 +174,7 @@ if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
                 MARKER) natura="$f1"; indexed="$f2"; drainable="$f3"; branch="$f4" ;;
                 TLDR)   tldr="$f1"; tldr_len="$f2" ;;
             esac
-        done < <(tr '\t' '\037' <<< "$parse_out")
+        done <<< "${parse_out//$'\t'/$'\037'}"
 
         [[ "$natura" == "nozioni" && "$indexed" == "indexed" ]] || continue
 
@@ -173,7 +188,7 @@ if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
             voce="*${titolo}*"
         fi
 
-        fname="$(basename "$file")"
+        fname="${file##*/}"
         # Id della task dal nome del file: e' il cappello che inbox.sh new ci ha
         # messo davanti. Serve solo ai non-drainable, dove la voce non vale da
         # sola e chi legge deve poter risalire a chi la sta scrivendo.

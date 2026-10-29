@@ -9,7 +9,7 @@
 #   - le soglie del contratto doc (readonly, niente override da CLI): le quattro
 #     della topologia di reference/ piu' quella di avviso sulle nozioni di un inbox
 #   - il parser dell'override di test LOOM_DOC_THRESHOLDS_OVERRIDE
-#   - la regex del TLDR (doc_tldr), condivisa fra i layer: riga 3 per reference/,
+#   - la regex del TLDR (doc_tldr, doc_tldr_var), condivisa fra i layer: riga 3 per reference/,
 #     riga 4 per l'inbox — la riga e' un PARAMETRO, cosi' l'implementazione resta una
 #   - la precedenza di layer (doc_layer): inbox → online → offline → altro
 #   - le regex del formato inbox (usate SOLO da inbox.sh)
@@ -81,13 +81,52 @@ doc_soglie_line() {
 # ragione per cui la funzione deve essere una sola: due copie con due costanti
 # diverse driftano al primo ritocco. Chiamanti: inbox.sh sulla riga 4, i lettori
 # di reference/ sulla riga 3.
+#
+# Due forme, un'implementazione: `doc_tldr_var` assegna a una variabile del
+# chiamante e non apre processi, `doc_tldr` stampa per chi lo cattura con `$(…)`.
+# Dentro un ciclo sui file si usa la prima (§Lettura senza sottoprocessi). Nota:
+# doc_tldr_var esegue una regex nella shell del chiamante, quindi sovrascrive il
+# suo BASH_REMATCH — chi ne ha bisogno lo fotografa prima della chiamata.
 
-doc_tldr() {  # <file> <riga> → testo del TLDR (trim trailing), vuoto se assente
-    local line
-    line="$(sed -n "${2}p" "$1" 2>/dev/null)" || return 0
-    [[ "$line" =~ ^\>\ \*\*TLDR\*\*:\ (.+)$ ]] || return 0
-    local t="${BASH_REMATCH[1]}"
-    printf '%s\n' "${t%"${t##*[![:space:]]}"}"
+doc_tldr_var() {  # <var> <file> <riga> → <var> = testo del TLDR (trim trailing), vuoto se assente
+    local _dt_line _dt_t=""
+    doc_line _dt_line "$2" "$3"
+    if [[ "$_dt_line" =~ ^\>\ \*\*TLDR\*\*:\ (.+)$ ]]; then
+        _dt_t="${BASH_REMATCH[1]}"
+        _dt_t="${_dt_t%"${_dt_t##*[![:space:]]}"}"
+    fi
+    printf -v "$1" '%s' "$_dt_t"
+}
+
+doc_tldr() {  # <file> <riga> → stampa il TLDR (trim trailing), niente se assente
+    local _dt_out
+    doc_tldr_var _dt_out "$1" "$2"
+    [[ -n "$_dt_out" ]] && printf '%s\n' "$_dt_out"
+    return 0
+}
+
+# ---- Lettura senza sottoprocessi ---------------------------------------------
+#
+# In Git Bash su Windows ogni sostituzione di comando e' un fork emulato, piu'
+# un exec se lancia un binario: costa decine di volte quello che costa su Linux,
+# e un `$(sed -n 3p "$f")` dentro un ciclo sui file diventa il costo dominante
+# dello script, non la lettura del file. Qui la riga si legge con
+# `read` e si assegna con `printf -v` alla variabile che il chiamante nomina:
+# nessun processo. I locali portano un prefisso perche' `printf -v` su un nome
+# uguale a un locale scriverebbe il locale invece della variabile del chiamante.
+
+doc_line() {  # <var> <file> <riga> → <var> = riga N del file, vuota se assente (come `sed -n Np`)
+    local _dl_line="" _dl_n=0
+    if [[ -r "$2" ]]; then
+        while (( _dl_n < $3 )) && IFS= read -r _dl_line; do
+            _dl_n=$((_dl_n+1))
+        done < "$2"
+        # read fallisce sull'ultima riga senza newline finale ma la assegna:
+        # se e' la riga N la si tiene, come fa sed. Fallito prima, il file ha
+        # meno di N righe.
+        (( _dl_n + 1 >= $3 )) || _dl_line=""
+    fi
+    printf -v "$1" '%s' "$_dl_line"
 }
 
 # ---- Layer -------------------------------------------------------------------
