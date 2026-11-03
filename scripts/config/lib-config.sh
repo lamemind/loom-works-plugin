@@ -2,7 +2,7 @@
 
 # =============================================================================
 # lib-config.sh - Primitive config progetto (file + registry dconf)
-# Sourced da register.sh / refresh.sh
+# Sourced da register.sh / refresh.sh / project-config.sh
 # =============================================================================
 #
 # Modello: runtime/project/project-config-architecture.md
@@ -22,6 +22,7 @@
 # Fornisce:
 #   File:      cfg_file_path, cfg_validate, cfg_field, cfg_enabled_surfaces,
 #              cfg_launch_count, cfg_label
+#   Blocchi:   cfg_validate_blocks (taskFields, hooks), cfg_reserved_task_keys
 #   GVariant:  gv_str (quote), gv_unwrap (unwrap)
 #   Registry:  reg_available, reg_project_path, reg_set, reg_get, reg_list_projects,
 #              reg_write_surfaces, reg_write_launch, reg_pull
@@ -108,6 +109,117 @@ cfg_validate() {  # <json-file> → 0 valido, 1 invalido (messaggio su stderr)
     if ! jq -e '(.order == null) or ((.order|type)=="number" and (.order == (.order|floor)))' "$f" >/dev/null 2>&1; then
         echo "config invalido: order=$(jq -c '.order' "$f") non è un intero: $f" >&2; return 1
     fi
+    # taskFields e hooks (opzionali): stessi controlli del lettore delle skill.
+    cfg_validate_blocks "$f" || return 1
+}
+
+# ---- Blocchi taskFields e hooks ----------------------------------------------
+#
+# Due chiamanti, una sola funzione: `cfg_validate` (init e refresh) e il lettore
+# delle skill `scripts/config/project-config.sh` (ogni create-task, run-task,
+# checkpoint-task). La guardia sta anche nel lettore perché `cfg_validate` da
+# sola non basta: `register.sh` esce prima di validare quando dconf manca, quindi
+# su Windows non gira mai, e un blocco sbagliato arriverebbe alle skill intatto.
+#
+# Le chiavi RISERVATE di taskFields sono le righe `- **<k>**:` dell'header del
+# template del task file, non una lista scritta qui: un campo fisso aggiunto al
+# template diventa riservato da sé. Il confronto non distingue maiuscole. La
+# ragione è il parser dell'header del deck (`parseTaskDetail`), che tiene la
+# prima occorrenza di una chiave: un `Size` custom scritto prima del campo fisso
+# ne prenderebbe il posto. Per lo stesso motivo una chiave dichiarata due volte
+# è rifiutata.
+#
+# L'esistenza delle skill negli hook NON si controlla: una skill può stare nel
+# progetto, in ~/.claude/skills/ o in un plugin, e il file system del progetto
+# mostra solo il primo caso. Si scopre all'invocazione, dove una skill assente
+# vale come una che fallisce.
+#
+# Le regex di `pattern` sono nel dialetto di jq (test(), Oniguruma, dove `\d`
+# funziona): la funzione controlla che compilino, perché una regex rotta
+# farebbe fallire create-task alla prima risposta invece che qui.
+
+_CFG_TASK_TEMPLATE="${_LIBCFG_DIR}/../../templates/task-template.md"
+
+cfg_reserved_task_keys() {  # → chiavi fisse dell'header del template, separate da '|'
+    local line out="" re='^-[[:space:]]*\*\*([^*]+)\*\*:'
+    [[ -f "$_CFG_TASK_TEMPLATE" ]] || {
+        echo "template del task file non trovato: ${_CFG_TASK_TEMPLATE} (chiavi riservate non derivabili)" >&2
+        return 1
+    }
+    # Ciclo bash e non sed: su Windows ogni sottoprocesso costa ~150 ms, e questa
+    # funzione gira a ogni invocazione del lettore. L'header finisce al primo `## `.
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        [[ "$line" == '## '* ]] && break
+        [[ "$line" =~ $re ]] && out+="${out:+|}${BASH_REMATCH[1]}"
+    done < "$_CFG_TASK_TEMPLATE"
+    printf '%s' "$out"
+}
+
+# Un messaggio per riga, vuoto se i blocchi sono validi o assenti. `null` vale
+# assente, come `.launch // []` sopra.
+_CFG_BLOCKS_JQ='
+if type != "object" then "il file non è un oggetto JSON" else
+($reserved | split("|") | map(ascii_downcase)) as $res
+| (
+    if (.taskFields // null) == null then empty
+    elif (.taskFields | type) != "array" then "taskFields=\(.taskFields | tojson) non è una lista"
+    else
+      ( .taskFields | to_entries[] | .key as $i | .value as $v | "taskFields[\($i)]" as $at
+        | if ($v | type) != "object" then "\($at)=\($v | tojson) non è un oggetto"
+          else
+            ( $v | keys_unsorted[] | select(IN("key", "ask", "pattern", "inherit") | not)
+              | "\($at): proprietà sconosciuta \($q)\(.)\($q) (ammesse: key, ask, pattern, inherit)" ),
+            ( if ($v.key | type) != "string" or $v.key == "" then "\($at): voce senza key"
+              elif ($v.key | test("^[^*:|\\s]([^*:|\\r\\n]*[^*:|\\s])?$") | not)
+                then "\($at).key=\($q)\($v.key)\($q) non vale come chiave di header (niente * : | a capo, né spazi in testa o in coda)"
+              elif ($v.key | ascii_downcase | IN($res[]))
+                then "\($at).key=\($q)\($v.key)\($q) è un campo fisso del task file (riservato)"
+              else empty end ),
+            ( if ($v | has("ask")) and ($v.ask | type) != "string"
+                then "\($at).ask=\($v.ask | tojson) non è un testo" else empty end ),
+            ( if ($v | has("pattern") | not) then empty
+              elif ($v.pattern | type) != "string" then "\($at).pattern=\($v.pattern | tojson) non è un testo"
+              elif ($v.pattern | test("[\\r\\n]")) then "\($at).pattern contiene un a capo: un campo di header sta su una riga"
+              elif (try ("" | test($v.pattern) | false) catch true)
+                then "\($at).pattern=\($q)\($v.pattern)\($q) non è una regex valida (dialetto jq, Oniguruma)"
+              else empty end ),
+            ( if ($v | has("inherit")) and ($v.inherit | type) != "boolean"
+                then "\($at).inherit=\($v.inherit | tojson) non è un booleano" else empty end )
+          end ),
+      ( [ .taskFields[] | objects | .key | strings | select(. != "") ]
+        | group_by(ascii_downcase)[] | select(length > 1)
+        | "taskFields: key \($q)\(.[0])\($q) dichiarata \(length) volte" )
+    end
+  ),
+  (
+    if (.hooks // null) == null then empty
+    elif (.hooks | type) != "object" then "hooks=\(.hooks | tojson) non è un oggetto"
+    else
+      .hooks | to_entries[] | .key as $ev | .value as $l
+      | if ($ev | IN("deliverableDone", "taskDone") | not)
+          then "hooks.\($ev): evento sconosciuto (ammessi: deliverableDone, taskDone)"
+        elif ($l | type) != "array" or ($l | all(type == "string" and test("^\\S+$")) | not)
+          then "hooks.\($ev)=\($l | tojson) non è una lista di nomi di skill (stringhe non vuote, senza spazi)"
+        else empty end
+    end
+  )
+end
+'
+
+cfg_validate_blocks() {  # <json-file> → 0 validi o assenti, 1 invalidi (un messaggio per riga su stderr)
+    local f="$1" reserved errs line
+    command -v jq >/dev/null 2>&1 || { echo "jq assente (validazione di taskFields/hooks impossibile): $f" >&2; return 1; }
+    reserved="$(cfg_reserved_task_keys)" || return 1
+    errs="$(jq -r --arg reserved "$reserved" --arg q "'" "$_CFG_BLOCKS_JQ" "$f" 2>/dev/null)" \
+        || { echo "config non leggibile (JSON malformato): $f" >&2; return 1; }
+    [[ -z "$errs" ]] && return 0
+    # jq nativo di Windows scrive CRLF: il \r va tolto riga per riga.
+    while IFS= read -r line; do
+        line="${line%$'\r'}"
+        [[ -n "$line" ]] && echo "config invalido: ${line}: $f" >&2
+    done <<< "$errs"
+    return 1
 }
 
 cfg_field() {  # <json-file> <top-level-field> → valore scalare

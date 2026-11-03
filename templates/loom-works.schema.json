@@ -84,6 +84,82 @@
       "type": "integer",
       "minimum": 1,
       "description": "Soglia in giorni oltre la quale una task Done è contata come 'archiviabile' nell'header del deck. Opzionale, default 30 — metà del default di purge di cleanup-done-tasks.sh (60), così il contatore fa da preavviso e non da predizione di cosa poterebbe la skill. Solo informativo: il deck non pota nulla. Letto DIRETTAMENTE dal file dal deck (nessun passaggio dal registry dconf), come permissionMode."
+    },
+    "spawn": {
+      "type": "object",
+      "description": "Override di progetto delle azioni di spawn del deck. Chiave = id di un'azione del catalogo del deck (loom-deck/src/spawn-catalog.ts, SPAWN_ACTIONS); valore = le sole celle che il progetto cambia. Una chiave assente significa 'il default del deck'; vuoto non è assente ('title': '' = nessuna nota). Letto e scritto dal SOLO deck, che valida per voce: un id fuori catalogo o un campo su una cella fissa cade con un avviso e il resto del blocco vive. cfg_validate non lo controlla.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Template della nota nel titolo della tab, coi buchi {TASK} {slug} {file} {path}. Ridotto dal deck all'alfabeto di _sane_note."
+          },
+          "model": {
+            "type": "string",
+            "enum": ["fable", "opus", "sonnet", "haiku"],
+            "description": "Modello con cui parte la sessione dell'azione."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Prompt iniziale della sessione, stesso vocabolario di buchi del titolo. Vuoto = nessun prompt."
+          }
+        }
+      }
+    },
+    "taskFields": {
+      "type": "array",
+      "description": "Campi di PROGETTO nell'header del task file, in aggiunta ai campi fissi del template del plugin. Opzionali tutti: create-task li chiede e accetta il vuoto, si riempiono anche dopo. Nel task file diventano righe '- **<key>**: <valore>' fra Folder e Progress, nell'ordine di dichiarazione, anche vuote. Il progetto dichiara le chiavi, mai il template. Validato da cfg_validate e dal lettore scripts/config/project-config.sh.",
+      "items": {
+        "type": "object",
+        "required": ["key"],
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[^*:|\\s]([^*:|\\r\\n]*[^*:|\\s])?$",
+            "description": "Nome del campo, così come compare nell'header. Niente '*', ':', '|', a capo né spazi in testa o in coda. Non può coincidere (senza distinguere maiuscole) con un campo fisso del template — ID, Size, Folder, Parent Task, Progress… — né con un'altra voce: il parser dell'header tiene la prima occorrenza di una chiave, e un omonimo oscurerebbe l'altro. Le chiavi riservate si ricavano dal template, quindi non sono elencate qui."
+          },
+          "ask": {
+            "type": "string",
+            "description": "Domanda che create-task pone in interattivo. Assente → si chiede col nome del campo."
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regex che un valore non vuoto deve soddisfare, nel dialetto di jq (test(), motore Oniguruma: \\d funziona, in ERE POSIX no). Il vuoto passa sempre. In interattivo una risposta che non combacia si richiede una volta; in YOLO un valore che non combacia non si scrive."
+          },
+          "inherit": {
+            "type": "boolean",
+            "description": "true → alla nascita di una task con Parent Task, il valore dello stesso campo nel task file del parent è il default (qualunque Size abbia il parent; scritto anche in YOLO). Campo del parent vuoto → nessun default. Vale solo alla nascita."
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Skill di PROGETTO invocate dalle skill loom a eventi del ciclo di vita, in ordine di dichiarazione, col tool Skill nel turno della skill che solleva l'evento. Skill e non script, perché l'azione tipica passa da un tool MCP che solo il modello chiama; nel file di progetto e non in userConfig, perché vale per un progetto solo. L'esistenza delle skill non si controlla qui: una skill assente o che fallisce vale un avviso, e il resto della lista gira. Contratto della skill hook: loom-works-plugin/docs/.",
+      "additionalProperties": false,
+      "properties": {
+        "deliverableDone": {
+          "allOf": [{ "$ref": "#/definitions/skillList" }],
+          "description": "Un DLV è chiuso, committato e pushato (run-task; checkpoint-task per i DLV che spunta da sé). Argomenti: <taskId> <n> <sha> <task_file> -- <testo del DLV>."
+        },
+        "taskDone": {
+          "allOf": [{ "$ref": "#/definitions/skillList" }],
+          "description": "La task è chiusa (checkpoint-task, giro che porta Progress a ✔️ Done, dopo il commit finale). Argomenti: <taskId> <sha> <task_file>."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "skillList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\S+$",
+        "description": "Nome della skill come la si invoca (es. jira-sync, o plugin:skill)."
+      }
     }
   }
 }
