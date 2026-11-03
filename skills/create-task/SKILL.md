@@ -55,6 +55,7 @@ Quando attiva, deduce automaticamente:
 - **Dipendenze**: nessuna
 - **Acceptance criteria**: "- [ ] Implementare quanto descritto"
 - **Deliverables**: "- [ ] Codice funzionante"
+- **Campi di progetto**: solo i valori nominati dal contesto o ereditati dal parent, gli altri vuoti (§2d)
 
 Esempio: `/loom-works:create-task yolo migliorare logging dei servizi`
 → Nome: `migliorare-logging-servizi`, Desc: "Migliorare logging dei servizi"
@@ -137,8 +138,40 @@ Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emer
 
 **YOLO**: anche in modalità YOLO questa cattura è sempre attiva. Si salta la domanda all'utente ma si legge lo stesso il contesto conversazionale.
 
+### 2d. Campi di progetto (sempre, sia interattivo che YOLO)
+
+Un progetto può dichiarare in `.claude/loom-works.json` campi propri dell'header del task file (blocco `taskFields`, es. la user story Jira di riferimento). Il progetto dichiara le chiavi, non il template: i valori li raccogli tu, qui.
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" fields
+```
+
+- **Nessuna riga, exit 0** → il progetto non dichiara campi: niente da chiedere, e allo step 3 la riga del segnaposto sparisce.
+- **Exit non-zero** → il blocco è invalido, o `jq` manca e il file lo dichiara: riporta all'utente il messaggio dello script, crea la task **senza** campi di progetto e dillo nel feedback finale. Non inventare i campi leggendo il JSON a mano.
+- **Righe `FIELD|<key>|<inherit|->|<ask>`** → un campo per riga, nell'ordine di dichiarazione; `<ask>` è la domanda da porre (vuota → chiedi col nome del campo). Una riga `PATTERN|<key>|<regex>` dice che il campo ha un formato.
+
+**Tutti i campi sono opzionali**: il vuoto è sempre una risposta valida, e un campo si riempie anche dopo, a mano. Per ogni campo il valore si decide così, in quest'ordine:
+
+1. **Default ereditato.** Se la task ha un parent — il `**Parent Task**` che scrivi quando il contesto nomina il padre — leggi i default dei campi ereditabili:
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" inherit <parentId>
+   ```
+   Ogni riga `INHERIT|<key>|<valore>` è il default di quel campo, letto dal task file del parent, qualunque Size abbia. Nessuna riga per un campo = nessun default. L'eredità vale solo qui, alla nascita: un `Parent Task` aggiunto dopo non propaga niente.
+2. **Interattiva.** Chiedi tutti i campi insieme con una domanda scritta **in chat**, non col tool — sono testo libero, e `AskUserQuestion` non ha una forma per raccoglierli. Per ogni campo: la key, la domanda `<ask>`, il default se c'è («invio = AA-1, dal parent T16»), e che il vuoto va bene. Ping pre-domanda come per le altre (§Convenzione TTS). La risposta dell'utente vince sul default; su un campo che non nomina vale il default, o il vuoto.
+3. **YOLO.** Nessuna domanda. Un campo prende un valore solo se il contesto lo attribuisce a quel campo («sub-task AA-1240»): un valore che il contesto non lega a un campo preciso non si scrive in nessuno, e un valore non si deduce mai. Il valore nominato dal contesto vince sul default ereditato; senza nessuno dei due il campo resta vuoto. Il default ereditato si scrive anche in YOLO: è un dato del repo, non un'invenzione. Vale anche quando ti invoca il triage da un altro progetto.
+
+**Formato.** Ogni valore non vuoto che non arriva dal parent si controlla prima di scriverlo — lo script valuta la regex nel dialetto dichiarato dal progetto, tu non la valuti a occhio:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" match "<key>" "<valore>"
+```
+
+`MATCH=1` → si scrive. `MATCH=0` → in interattiva richiedi quel campo una volta, dicendo il formato atteso; se anche la seconda risposta non combacia il campo resta vuoto, e lo dici nel feedback. In YOLO un valore che non combacia non si scrive. I default di `inherit` arrivano già controllati.
+
 ### 3. Creazione file task
 Crea `{docs_root}/tasks/${TASK_ID}-${taskName}.md` usando il template `${CLAUDE_PLUGIN_ROOT}/templates/task-template.md`.
+
+Il segnaposto `{{campi_progetto}}` dell'header diventa una riga per campo dello step 2d, nell'ordine di dichiarazione, **anche vuota**: `- **<key>**: <valore>`, oppure `- **<key>**:` senza valore. Progetto senza campi → la riga del segnaposto sparisce del tutto, senza lasciare una riga vuota: l'header resta quello di sempre, con `Progress` come ultima riga.
 
 ### 3b. Task folder (condizionale)
 
@@ -162,6 +195,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh ${TASK_ID} ${task-name} "${des
 ### 5. Feedback finale
 - Path file creato
 - ID assegnato
+- Campi di progetto (se il progetto ne dichiara): i valori scritti con la loro fonte (risposta, contesto, parent), quelli rimasti vuoti, e l'errore del lettore se la task è nata senza campi
 - Suggerisci review del file
 - Ping TTS fine creazione (la pre-analisi per fillare la task può durare >1min → l'utente va avvisato che è pronta):
   ```bash

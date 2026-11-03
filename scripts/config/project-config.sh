@@ -6,6 +6,7 @@
 # Usage: project-config.sh fields
 #        project-config.sh hooks <deliverableDone|taskDone>
 #        project-config.sh match <key> <valore>
+#        project-config.sh inherit <parentTaskId>
 # =============================================================================
 #
 # Gemello di scripts/utils/docs-root.sh: serve al markdown delle skill, che può
@@ -28,6 +29,16 @@
 #            regex si valuta con test() di jq, cioè nel dialetto dichiarato
 #            dallo schema (Oniguruma, dove `\d` funziona): il chiamante non la
 #            valuta da sé, o la valuterebbe in un dialetto diverso.
+#   inherit  il default ereditato di ogni campo con `inherit: true`, letto
+#            dall'header del task file del parent:
+#              INHERIT|<key>|<valore>
+#            Solo i valori non vuoti che soddisfano il pattern del campo: un
+#            valore del parent che non combacia non diventa un default, e lo si
+#            dice su stderr. Il parent vale qualunque Size abbia: l'eredità non è
+#            riservata alle epiche. Task file del parent non trovato → nessuna
+#            riga e un avviso su stderr, exit 0: un id sbagliato nel contesto non
+#            deve impedire di creare la task. Nell'header del parent vince la
+#            prima occorrenza di una chiave, come nel parser del deck.
 #
 # Blocco assente (o file assente) → nessuna riga, exit 0: un progetto che non
 # dichiara niente ha l'header e il ciclo di vita di sempre.
@@ -59,7 +70,7 @@
 set -uo pipefail
 
 usage() {
-    echo "Usage: project-config.sh fields | hooks <deliverableDone|taskDone> | match <key> <valore>" >&2
+    echo "Usage: project-config.sh fields | hooks <deliverableDone|taskDone> | match <key> <valore> | inherit <parentTaskId>" >&2
     exit 2
 }
 
@@ -75,6 +86,7 @@ case "$CMD" in
         esac
         ;;
     match) [[ $# -eq 2 ]] || usage ;;
+    inherit) [[ $# -eq 1 ]] || usage ;;
     *) usage ;;
 esac
 
@@ -141,5 +153,40 @@ case "$CMD" in
         RES="${RES%$'\r'}"
         [[ "$RES" == UNDECLARED ]] && undeclared "$1"
         echo "$RES"
+        ;;
+    inherit)
+        # <key>|<pattern> dei soli campi ereditabili; la key non contiene `|`.
+        mapfile -t INHERITABLE < <(jq -r '(.taskFields // [])[] | select(.inherit == true) | "\(.key)|\(.pattern // "")"' "$CFG" | lf)
+        [[ ${#INHERITABLE[@]} -eq 0 ]] && exit 0
+        if ! RESOLVED="$(lw_resolve_task "$1" 2>/dev/null)"; then
+            echo "WARN: task file del parent $1 non trovato: nessun default ereditato" >&2
+            exit 0
+        fi
+        eval "$RESOLVED"
+        # Header del parent: le righe `- **<k>**: <v>` prima del primo `## `.
+        declare -A PARENT=()
+        RE_FIELD='^-[[:space:]]*\*\*([^*]+)\*\*:[[:space:]]*(.*)$'
+        while IFS= read -r LINE || [[ -n "$LINE" ]]; do
+            LINE="${LINE%$'\r'}"
+            [[ "$LINE" == '## '* ]] && break
+            if [[ "$LINE" =~ $RE_FIELD ]]; then
+                K="${BASH_REMATCH[1]}"; V="${BASH_REMATCH[2]}"
+                V="${V%"${V##*[![:space:]]}"}"
+                [[ -v "PARENT[$K]" ]] || PARENT["$K"]="$V"
+            fi
+        done < "$TASK_FILE"
+        for ENTRY in "${INHERITABLE[@]}"; do
+            K="${ENTRY%%|*}"; P="${ENTRY#*|}"
+            V="${PARENT[$K]:-}"
+            [[ -z "$V" ]] && continue
+            if [[ -n "$P" ]]; then
+                OK="$(jq -rn --arg v "$V" --arg p "$P" '$v | test($p)')"
+                if [[ "${OK%$'\r'}" != true ]]; then
+                    echo "WARN: ${K}='${V}' nel parent $1 non combacia col pattern del campo: nessun default" >&2
+                    continue
+                fi
+            fi
+            printf 'INHERIT|%s|%s\n' "$K" "$V"
+        done
         ;;
 esac

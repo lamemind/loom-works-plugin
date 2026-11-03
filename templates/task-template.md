@@ -9,6 +9,7 @@
 - **Parent Task**:
 - **Branch**:
 - **Folder**:
+{{campi_progetto}}
 - **Progress**: 🔵 Todo
 
 ## Description
