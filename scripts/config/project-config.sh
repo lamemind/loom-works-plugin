@@ -5,6 +5,7 @@
 #                     .claude/loom-works.json: taskFields e hooks
 # Usage: project-config.sh fields
 #        project-config.sh hooks <deliverableDone|taskDone>
+#                                [--task <id> --sha <sha> [--dlv <n>]]
 #        project-config.sh match <key> <valore>
 #        project-config.sh inherit <parentTaskId>
 # =============================================================================
@@ -24,6 +25,22 @@
 #            `ask` diventano spazi.
 #   hooks    una riga per skill, nell'ordine di dichiarazione:
 #              HOOK|<n>|<skill>
+#            Con --task (e --sha, e --dlv per deliverableDone) segue una riga
+#            sola con gli argomenti da passare a ogni skill della lista:
+#              ARGS=<taskId> <n> <sha> <task_file> -- <testo del DLV>   (deliverableDone)
+#              ARGS=<taskId> <sha> <task_file>                          (taskDone)
+#            <task_file> è relativo alla project root; <sha> è quello passato,
+#            verificato come commit e accorciato; il testo del DLV lo legge
+#            task-deliverables.sh --show, il parser che numera e spunta, e il DLV
+#            dev'essere già [x]: l'evento vale per un DLV chiuso, e un numero
+#            sbagliato si ferma qui invece di arrivare alla skill. La skill hook
+#            riceve path e testo perché non vede ${CLAUDE_PLUGIN_ROOT} e non può
+#            rifarsi da sé docs-root e numerazione.
+#            Lista vuota → nessuna riga, nemmeno ARGS, e la task non si risolve:
+#            un progetto senza hook non paga niente e non può fallire qui.
+#            Gli argomenti si compongono prima di stampare: o tutte le righe, o
+#            nessuna ed exit 1 — una lista di HOOK senza ARGS farebbe invocare
+#            le skill senza argomenti.
 #   match    MATCH=1 se il valore soddisfa il pattern del campo, MATCH=0 se no.
 #            Il vuoto passa sempre, e un campo senza pattern accetta tutto. La
 #            regex si valuta con test() di jq, cioè nel dialetto dichiarato
@@ -64,26 +81,51 @@
 # se li nomina.
 #
 # Exit: 0 ok · 1 config illeggibile, invalida, o jq assente con blocchi
-#       dichiarati · 2 uso sbagliato, o `match` su una key non dichiarata
+#       dichiarati; argomenti di un hook non componibili (task, sha o DLV) ·
+#       2 uso sbagliato, o `match` su una key non dichiarata
 # =============================================================================
 
 set -uo pipefail
 
 usage() {
-    echo "Usage: project-config.sh fields | hooks <deliverableDone|taskDone> | match <key> <valore> | inherit <parentTaskId>" >&2
+    echo "Usage: project-config.sh fields | hooks <deliverableDone|taskDone> [--task <id> --sha <sha> [--dlv <n>]] | match <key> <valore> | inherit <parentTaskId>" >&2
     exit 2
 }
 
 CMD="${1:-}"
 [[ $# -gt 0 ]] && shift
+HOOK_TASK="" HOOK_SHA="" HOOK_DLV=""
 case "$CMD" in
     fields) [[ $# -eq 0 ]] || usage ;;
     hooks)
-        [[ $# -eq 1 ]] || usage
+        [[ $# -ge 1 ]] || usage
         case "$1" in
             deliverableDone|taskDone) ;;
             *) echo "ERROR: evento sconosciuto: $1 (ammessi: deliverableDone, taskDone)" >&2; exit 2 ;;
         esac
+        EVENT="$1"; shift
+        while [[ $# -gt 0 ]]; do
+            [[ $# -ge 2 ]] || usage
+            case "$1" in
+                --task) HOOK_TASK="$2" ;;
+                --sha) HOOK_SHA="$2" ;;
+                --dlv) HOOK_DLV="$2" ;;
+                *) usage ;;
+            esac
+            shift 2
+        done
+        # Gli argomenti dell'hook vanno chiesti interi o per niente: --sha o --dlv
+        # senza --task non hanno una task a cui riferirsi.
+        if [[ -n "$HOOK_TASK" ]]; then
+            [[ -n "$HOOK_SHA" ]] || { echo "ERROR: --task senza --sha: l'hook riceve il commit che porta l'evento" >&2; exit 2; }
+            if [[ "$EVENT" == deliverableDone ]]; then
+                [[ "$HOOK_DLV" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: deliverableDone vuole --dlv <n> (intero da 1): '${HOOK_DLV}'" >&2; exit 2; }
+            elif [[ -n "$HOOK_DLV" ]]; then
+                echo "ERROR: --dlv non vale per taskDone: l'evento riguarda la task, non un DLV" >&2; exit 2
+            fi
+        elif [[ -n "$HOOK_SHA" || -n "$HOOK_DLV" ]]; then
+            echo "ERROR: --sha e --dlv valgono solo con --task" >&2; exit 2
+        fi
         ;;
     match) [[ $# -eq 2 ]] || usage ;;
     inherit) [[ $# -eq 1 ]] || usage ;;
@@ -140,7 +182,45 @@ case "$CMD" in
         ' "$CFG" | lf
         ;;
     hooks)
-        jq -r --arg ev "$1" '(.hooks[$ev] // []) | to_entries[] | "HOOK|\(.key + 1)|\(.value)"' "$CFG" | lf
+        mapfile -t HOOK_LINES < <(jq -r --arg ev "$EVENT" '(.hooks[$ev] // []) | to_entries[] | "HOOK|\(.key + 1)|\(.value)"' "$CFG" | lf)
+        [[ ${#HOOK_LINES[@]} -eq 0 ]] && exit 0
+        if [[ -n "$HOOK_TASK" ]]; then
+            if ! RESOLVED="$(lw_resolve_task "$HOOK_TASK" 2>/dev/null)"; then
+                echo "ERROR: task ${HOOK_TASK} non risolvibile: argomenti dell'hook ${EVENT} non componibili" >&2
+                exit 1
+            fi
+            eval "$RESOLVED"
+            # Verifica e accorcia in un colpo: uno sha che non è un commit di questo
+            # repo arriverebbe alla skill come un riferimento a niente.
+            if ! SHORT="$(git -C "$ROOT" rev-parse --short --verify --quiet "${HOOK_SHA}^{commit}")"; then
+                echo "ERROR: ${HOOK_SHA} non è un commit di ${ROOT}: argomenti dell'hook ${EVENT} non componibili" >&2
+                exit 1
+            fi
+            SHORT="${SHORT%$'\r'}"
+            REL="${TASK_FILE#"$ROOT"/}"
+            [[ "$REL" == /* ]] && REL="$(realpath -m --relative-to="$ROOT" "$TASK_FILE")"
+            if [[ "$EVENT" == deliverableDone ]]; then
+                if ! SHOWN="$(PROJECT_ROOT="$ROOT" "${SCRIPT_DIR}/../task/task-deliverables.sh" "$TASK_ID" --show "$HOOK_DLV" 2>&1)"; then
+                    echo "ERROR: ${SHOWN#ERROR: }" >&2
+                    exit 1
+                fi
+                SHOWN="${SHOWN%$'\r'}"
+                # DLV|<n>|<stato>|<testo>: il testo è tutto ciò che segue il terzo `|`.
+                STATE="${SHOWN#DLV|*|}"; STATE="${STATE%%|*}"
+                TEXT="${SHOWN#DLV|*|*|}"
+                if [[ "$STATE" != done ]]; then
+                    echo "ERROR: DLV${HOOK_DLV} di ${TASK_ID} non è spuntato: deliverableDone vale per un DLV chiuso" >&2
+                    exit 1
+                fi
+                HOOK_ARGS="${TASK_ID} ${HOOK_DLV} ${SHORT} ${REL} -- ${TEXT}"
+            else
+                HOOK_ARGS="${TASK_ID} ${SHORT} ${REL}"
+            fi
+        fi
+        printf '%s\n' "${HOOK_LINES[@]}"
+        if [[ -n "$HOOK_TASK" ]]; then
+            printf 'ARGS=%s\n' "$HOOK_ARGS"
+        fi
         ;;
     match)
         RES="$(jq -r --arg k "$1" --arg v "$2" '

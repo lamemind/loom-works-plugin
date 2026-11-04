@@ -1,7 +1,7 @@
 ---
 name: run-task
 description: Esegue i deliverable di una task — perimetro dichiarabile sui DLV, un commit per DLV chiuso, rito di validazione scelto da Size.
-allowed-tools: Bash(*), Task, Read, Edit, Write, Glob, Grep, TodoWrite
+allowed-tools: Bash(*), Task, Read, Edit, Write, Glob, Grep, TodoWrite, Skill
 ---
 
 **Docs root** — primo passo, prima di ogni altra cosa:
@@ -119,14 +119,32 @@ Per ogni DLV del perimetro, **in ordine**:
    ```bash
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
      && lw_git_add_n_commit "run(${taskId}): DLV<n> <maniglia>" <path>... "${TASK_FILE}" \
-     && lw_git_push "$(lw_current_branch)"
+     && lw_git_push "$(lw_current_branch)" \
+     && git log -1 --format='DLV_SHA=%h' -- "${TASK_FILE}"
    ```
 
    La pathspec è **obbligatoria** e la componi tu, elencando i file che hai toccato per quel deliverable: l'indice è una zona comune del worktree e un commit senza path rastrella anche ciò che altre sessioni hanno in stage. Vale in entrambi i regimi — in linked è comunque ciò che tiene un DLV separato dal successivo.
 
+   `DLV_SHA` è il commit del DLV, letto come l'ultimo commit che tocca il task file e non come `HEAD`: in detached un'altra sessione può committare fra il tuo commit e la riga dopo. Compare solo se commit e push sono riusciti.
+4. **Hook di progetto** — l'evento `deliverableDone`, solo se il passo 3 ha stampato `DLV_SHA`:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" hooks deliverableDone --task ${taskId} --dlv <n> --sha <DLV_SHA>
+   ```
+
+   Senza `DLV_SHA` commit o push non sono riusciti: l'evento non parte, perché la skill hook riceverebbe un commit che le altre sessioni non vedono, e il guasto va in §8.
+
+   - **Nessuna riga, exit 0** → il progetto non dichiara hook su questo evento: passa al DLV successivo.
+   - **Righe `HOOK|<i>|<skill>` e una riga `ARGS=<argomenti>`** → per ogni `HOOK`, nell'ordine di `<i>`, invoca il tool `Skill` con `skill` = `<skill>` e `args` = il valore di `ARGS` copiato tale e quale. Una skill alla volta: la successiva parte quando la precedente ha dichiarato il suo esito.
+   - **Exit non-zero** → nessuna skill per questo DLV. Il messaggio dello script nomina il guasto: blocco `hooks` invalido, jq assente, task, DLV o sha non risolvibili.
+
+   **Un hook non ferma mai il ciclo.** Il DLV è già committato e pushato, e l'hook non lo riapre. Una skill che non esiste, che dà errore o che dichiara un esito di fallimento produce un avviso in linea — `⚠ hook <skill> fallito su DLV<n>: <motivo>` — e una riga in §8; le skill successive della lista e i DLV successivi girano comunque. Nessun secondo tentativo: un hook fallito a metà ha già potuto scrivere fuori dal repo (un commento sulla issue), e lo scriverebbe due volte. Un exit non-zero dello script vale uguale: `⚠ hook deliverableDone non invocati su DLV<n>: <messaggio>`, e una riga sola in §8 anche se si ripete a ogni DLV.
+
+   Il body di una skill hook entra nel contesto a ogni invocazione e vale per quell'hook soltanto. Quando la skill ha dichiarato l'esito riprendono le regole di questo ciclo: prossimo DLV del perimetro, commit leggero, nessuna fase doc. Ciò che la skill hook fa resta suo: non si spunta e non entra nel commit di nessun DLV.
+
 Il commit è **leggero**: codice + spunta, niente `Prog`, niente Progress Log, niente inbox. Il tracking e la doc restano di `checkpoint-task`, che è l'unico a chiudere la task (✔️, `Done at`, trasloco delle nozioni). Non fare qui il suo mestiere.
 
-Un DLV che non riesci a chiudere: **non spuntarlo e non committarlo come fatto**. Fermati, dichiara quale è e perché, e lascia intatti quelli dopo.
+Un DLV che non riesci a chiudere: **non spuntarlo e non committarlo come fatto**. Fermati, dichiara quale è e perché, e lascia intatti quelli dopo. Un DLV non chiuso non solleva `deliverableDone`.
 
 ## 7. Chiusura
 
@@ -136,7 +154,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "$(say_id ${task
 
 In caso di blocco reale: `say_auto "$(say_id ${taskId}) blocked"`.
 
-Poi riporta quali DLV sono chiusi e quali restano aperti nel task file, e suggerisci `/loom-works:checkpoint-task` per il checkpoint (Prog, Progress Log, fase doc). Il report chiude con la sezione `🚦 Segnalazioni` (§8), sempre.
+Poi riporta quali DLV sono chiusi e quali restano aperti nel task file, per ogni DLV chiuso gli hook invocati col loro esito (quando il progetto ne dichiara), e suggerisci `/loom-works:checkpoint-task` per il checkpoint (Prog, Progress Log, fase doc). Il report chiude con la sezione `🚦 Segnalazioni` (§8), sempre.
 
 ## 8. 🚦 Segnalazioni — la sezione fissa del report
 
@@ -159,6 +177,7 @@ A zero segnalazioni, una riga sola: `**🚦 Segnalazioni** — nessuna`.
 
 - **`S{N}` numera da 1 dentro questo report**, e la riga porta l'id e la segnalazione, nient'altro: il testo dopo `— ` è quello che lo scenario cita byte per byte.
 - **Prima di stampare, interroga il registro ADR** su ogni segnalazione (`adr.sh cerca`, regola in contesto): exit `0` vuol dire già scartata con un motivo, e non la riporti.
+- **Un hook di progetto fallito è sempre una segnalazione** (§6, passo 4): `S{N} — hook <skill> fallito su DLV<n>: <motivo>`, oppure `S{N} — hook deliverableDone non invocati: <messaggio dello script>`. L'avviso in linea si perde nel transcript; la riga qui è ciò che l'umano decide.
 - **Ciò che hai corretto di tua iniziativa sta dentro la sezione, con «subito» già marcato e chi = agente — mai in un inciso del report.** «Ho corretto un difetto pre-esistente» è una decisione che hai già preso: resta ribaltabile solo se l'umano la vede fra le segnalazioni. Prima di stampare la sezione ne scrivi lo scenario:
 
   ```bash

@@ -56,7 +56,7 @@ Esegue i **deliverable** di una task, uno alla volta. Può essere lanciato più 
 3. **Gate preflight** — nessun dubbio architetturale aperto: `L` pretende `## Decisions`, `S`/`M` lo pretendono quando il dubbio emerge. Nessuna domanda inline. Un blocco `### Preflight` con l'heading `— premessa decaduta` non vale come preflight fatto, a nessun Size: il preflight si è fermato davanti a una premessa smentita dalla misura senza porre domande, e i DLV poggiano su un meccanismo che la misura ha già smentito
 4. **Rito** — `Size` decide quanta validazione e pianificazione precedono il codice (`S` nessuna · `M` leggera · `L` profonda + piano top-down)
 5. **Promozione 🟡** — `promote-wip.sh`, tre posti insieme e commit dedicato, solo da 🔵 o 🟢
-6. **Ciclo per-DLV** — lavora, spunta `[x]`, committa `run(Txx): DLVn <maniglia>` con pathspec esplicita, pusha
+6. **Ciclo per-DLV** — lavora, spunta `[x]`, committa `run(Txx): DLVn <maniglia>` con pathspec esplicita, pusha, poi invoca in ordine le skill di `hooks.deliverableDone` del progetto (`project-config.sh hooks deliverableDone --task --dlv --sha` compone gli argomenti); un hook fallito è un avviso e una segnalazione, mai una fermata
 
 **Definition of Done** (per deliverable, non per task):
 

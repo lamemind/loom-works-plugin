@@ -5,11 +5,19 @@
 #
 # Usage: task-deliverables.sh [--docs-root D] <task-id> [--scope <spec>]
 #        task-deliverables.sh [--docs-root D] <task-id> --check <n>
+#        task-deliverables.sh [--docs-root D] <task-id> --show <n>
 # Env:   PROJECT_ROOT (default: $PWD)
 #
-# Due verbi sullo stesso oggetto, un parser solo: risolvere il perimetro e
-# spuntare una voce contano i DLV nello stesso identico modo, e due copie del
-# conteggio divergerebbero al primo task file con una forma inattesa.
+# Tre verbi sullo stesso oggetto, un parser solo: risolvere il perimetro,
+# spuntare una voce e leggerla contano i DLV nello stesso identico modo, e due
+# copie del conteggio divergerebbero al primo task file con una forma inattesa.
+#
+# --show <n> legge una voce in qualunque stato, senza toccare il file:
+#   DLV|<n>|open|done|<testo>
+# Serve a chi deve citare un DLV gia' chiuso — il perimetro rifiuta un DLV
+# [x], e --check su un DLV [x] non ne stampa il testo. Lo usa il lettore degli
+# hook di progetto (scripts/config/project-config.sh) per comporre gli argomenti
+# di deliverableDone. Indice fuori range -> exit 1.
 #
 # NUMERAZIONE — posizionale 1-based sulle sole checkbox a COLONNA ZERO dentro
 # `## Deliverables Checklist`. Le righe indentate sono prosa di una voce, non
@@ -47,6 +55,7 @@
 
 SCOPE_SPEC=""
 CHECK_N=""
+SHOW_N=""
 TASK_ID_ARG=""
 
 while [[ $# -gt 0 ]]; do
@@ -54,13 +63,16 @@ while [[ $# -gt 0 ]]; do
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
         --scope) SCOPE_SPEC="$2"; shift 2 ;;
         --check) CHECK_N="$2"; shift 2 ;;
+        --show) SHOW_N="$2"; shift 2 ;;
         -*) echo "ERROR: opzione sconosciuta: $1" >&2; exit 1 ;;
         *) TASK_ID_ARG="$1"; shift ;;
     esac
 done
 
-if [[ -n "$SCOPE_SPEC" && -n "$CHECK_N" ]]; then
-    echo "ERROR: --scope e --check sono modi diversi, non si combinano" >&2
+MODES=0
+for m in "$SCOPE_SPEC" "$CHECK_N" "$SHOW_N"; do [[ -n "$m" ]] && MODES=$((MODES + 1)); done
+if (( MODES > 1 )); then
+    echo "ERROR: --scope, --check e --show sono modi diversi, non si combinano" >&2
     exit 1
 fi
 
@@ -101,6 +113,16 @@ dlv_field() {  # <indice 1-based> <1=lineno|2=state|3=text>
         3) row="${row#*|}"; printf '%s' "${row#*|}" ;;
     esac
 }
+
+# --- Modo --show: legge una voce, qualunque stato ----------------------------
+if [[ -n "$SHOW_N" ]]; then
+    if [[ ! "$SHOW_N" =~ ^[0-9]+$ ]] || (( SHOW_N < 1 || SHOW_N > TOTAL )); then
+        echo "ERROR: --show ${SHOW_N} fuori range: ${TASK_ID} ha ${TOTAL} deliverable (1-${TOTAL})" >&2
+        exit 1
+    fi
+    printf 'DLV|%d|%s|%s\n' "$SHOW_N" "$(dlv_field "$SHOW_N" 2)" "$(dlv_field "$SHOW_N" 3)"
+    exit 0
+fi
 
 # --- Modo --check: spunta una voce -------------------------------------------
 if [[ -n "$CHECK_N" ]]; then
