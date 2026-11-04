@@ -92,6 +92,19 @@ The folder holding `tasks.md`, `tasks/`, `reference/` and `current-task.md` is *
 
 Read it with `scripts/utils/docs-root.sh` (`--abs` for an absolute path); scripts resolve it themselves via `lw_docs_root` in `scripts/utils/lib.sh`.
 
+### Task fields and lifecycle hooks — per project
+
+The same file can declare two optional blocks: `taskFields`, extra fields that `create-task` asks for and writes into the task file header, and `hooks`, project skills invoked by `run-task` and `checkpoint-task` when a deliverable closes (`deliverableDone`) and when the task closes (`taskDone`).
+
+```json
+{
+  "taskFields": [{ "key": "User Story", "pattern": "^[A-Z]+-\\d+$", "inherit": true }],
+  "hooks": { "deliverableDone": ["jira-sync"], "taskDone": ["jira-sync"] }
+}
+```
+
+Skills read the blocks with `scripts/config/project-config.sh`. Contract — reserved keys, hook arguments, how a hook skill must behave unattended: `docs/taskfields-hooks-format.md`.
+
 ## Runtime dependencies
 
 Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception.

@@ -110,7 +110,7 @@
     },
     "taskFields": {
       "type": "array",
-      "description": "Campi di PROGETTO nell'header del task file, in aggiunta ai campi fissi del template del plugin. Opzionali tutti: create-task li chiede e accetta il vuoto, si riempiono anche dopo. Nel task file diventano righe '- **<key>**: <valore>' fra Folder e Progress, nell'ordine di dichiarazione, anche vuote. Il progetto dichiara le chiavi, mai il template. Validato da cfg_validate e dal lettore scripts/config/project-config.sh.",
+      "description": "Campi di PROGETTO nell'header del task file, in aggiunta ai campi fissi del template del plugin. Opzionali tutti: create-task li chiede e accetta il vuoto, si riempiono anche dopo. Nel task file diventano righe '- **<key>**: <valore>' fra Folder e Progress, nell'ordine di dichiarazione, anche vuote. Il progetto dichiara le chiavi, mai il template. Validato da cfg_validate e dal lettore scripts/config/project-config.sh. Contratto: docs/taskfields-hooks-format.md del plugin.",
       "items": {
         "type": "object",
         "required": ["key"],
@@ -138,7 +138,7 @@
     },
     "hooks": {
       "type": "object",
-      "description": "Skill di PROGETTO invocate dalle skill loom a eventi del ciclo di vita, in ordine di dichiarazione, col tool Skill nel turno della skill che solleva l'evento. Skill e non script, perché l'azione tipica passa da un tool MCP che solo il modello chiama; nel file di progetto e non in userConfig, perché vale per un progetto solo. L'esistenza delle skill non si controlla qui: una skill assente o che fallisce vale un avviso, e il resto della lista gira. Contratto della skill hook: loom-works-plugin/docs/.",
+      "description": "Skill di PROGETTO invocate dalle skill loom a eventi del ciclo di vita, in ordine di dichiarazione, col tool Skill nel turno della skill che solleva l'evento. Skill e non script, perché l'azione tipica passa da un tool MCP che solo il modello chiama; nel file di progetto e non in userConfig, perché vale per un progetto solo. L'esistenza delle skill non si controlla qui: una skill assente o che fallisce vale un avviso, e il resto della lista gira. Contratto della skill hook (argomenti, esito, fallimento): docs/taskfields-hooks-format.md del plugin.",
       "additionalProperties": false,
       "properties": {
         "deliverableDone": {
