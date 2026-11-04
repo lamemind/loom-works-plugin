@@ -74,6 +74,8 @@ Salvataggio del progresso. Commit delle modifiche.
 - A fine giornata (checkpoint intermedio)
 - Prima di passare ad altra task
 
+**Hook di progetto**: dopo il push della fase codice invoca le skill di `hooks.deliverableDone` per ogni DLV che il checkpoint spunta da sé; nel giro che chiude la task, dopo il push finale, quelle di `hooks.taskDone`. Un hook fallito è un avviso e una segnalazione, mai una fermata.
+
 **Doc Impact**: le voci restano vive nella sede che il task file dichiara e ogni checkpoint le **riesamina** coi soli criteri indipendenti — riscrive o elimina, nessun marker. Il primo trasloco le porta nell'inbox della task, lasciando al loro posto `→ inbox <file> · storia: <sha>`; da lì la sede è quel file, finché la chiusura non lo congela con `drainable`. Nessuna scelta utente, nessuno spawn. Dettagli: [Task Management §Doc Impact](./task-management.md).
 
 ### Pattern di Iterazione

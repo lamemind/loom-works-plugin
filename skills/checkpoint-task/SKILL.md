@@ -1,7 +1,7 @@
 ---
 name: checkpoint-task
 description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nella loro sede e toglie quelle che il codice ha smentito), trasloco nell'inbox della task e accensione di drainable alla chiusura.
-allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion
+allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion, Skill
 ---
 
 **Docs root** — primo passo, prima di ogni altra cosa:
@@ -64,7 +64,7 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    **IMPORTANTE**: Ignora la sezione `## Prod Validation` — item non checkati lì NON bloccano il completamento.
 
 3. **Aggiornamento task documentation**
-   1. Aggiorna checklist con [x] items completati
+   1. Spunta ogni DLV completato con `${CLAUDE_PLUGIN_ROOT}/scripts/task/task-deliverables.sh ${taskId} --check <n>`, non a mano: la numerazione è posizionale, la stessa di `run-task`, e il numero serve all'evento `deliverableDone` (step 5). `task-deliverables.sh ${taskId}` elenca ogni DLV col suo numero. Annota i DLV che spunti in questo giro: uno già `[x]` l'ha chiuso `run-task`, che ha già sollevato l'evento.
    2. Aggiorna Progress % se cambiato
    3. Aggiungi sezione "## Progress Log" se non esiste
    4. Aggiungi entry nel Progress Log:
@@ -100,6 +100,14 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} "checkpoint(${taskId}): ${descrizione}" -- <file1> <file2> ...
    ```
    `--task` fissa il task file all'ID risolto; lo script lo aggiunge da sé alla pathspec. Con `TASK_SRC=env` e nessuna pathspec lo script esce in errore.
+
+   **Hook `deliverableDone`** — dopo il push riuscito, per ogni DLV spuntato allo step 3.1 di questo giro, in ordine di numero:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" hooks deliverableDone --task ${taskId} --dlv <n> --sha <sha>
+   ```
+
+   `<sha>` è quello che lo script di commit stampa in `-> commit 1 (codice+tracking, …): <sha>`, cioè il commit che porta le spunte. Le skill si invocano come dice §Hook di progetto. Nessuna invocazione se in questo giro non hai spuntato DLV, o se il push è fallito (nessuna riga `-> commit`): la skill hook riceverebbe un commit che le altre sessioni non vedono.
 
 6. **Fase doc — riesame e trasloco**
 
@@ -203,12 +211,32 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
    - **la pathspec dopo `--`** è obbligatoria: il push della fase codice è già avvenuto e altre sessioni possono aver ripreso a lavorare — un `git add -A` qui rastrellerebbe lavoro non tuo.
    - **`--task`** è obbligatorio anche in linked: se la task si è chiusa allo step 4 il symlink non c'è più.
 
+   **Hook `taskDone`** — solo se lo step 4 di questo giro ha portato Progress a `✔️ Done`, dopo il push riuscito dello step 8:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" hooks taskDone --task ${taskId} --sha <sha>
+   ```
+
+   `<sha>` è l'ultimo commit che lo step 8 stampa — `-> commit 2 (doc-nozione, …)` se c'è, altrimenti `-> commit 1 (…)` — cioè lo stato finale della chiusura; con lo step 8 saltato, l'ultimo dello step 5. Le skill si invocano come dice §Hook di progetto. Un checkpoint che non chiude non solleva `taskDone`.
+
 9. **Feedback finale**
-   Riporta: avanzamento registrato, su quale sede è girato il riesame e cosa ha riscritto o eliminato, se il trasloco ha creato l'inbox e con quali marker, e — se la task si è chiusa — quali inbox sono diventati drainable e quali sono stati saltati (già drenati, o congelati da `branch:`). Il feedback chiude con la sezione `🚦 Segnalazioni` (§🚦 Segnalazioni, sotto), sempre. Poi il ping TTS:
+   Riporta: avanzamento registrato, su quale sede è girato il riesame e cosa ha riscritto o eliminato, se il trasloco ha creato l'inbox e con quali marker, e — se la task si è chiusa — quali inbox sono diventati drainable e quali sono stati saltati (già drenati, o congelati da `branch:`). Se il progetto dichiara hook, riporta anche quelli invocati in questo giro, evento per evento, col loro esito. Il feedback chiude con la sezione `🚦 Segnalazioni` (§🚦 Segnalazioni, sotto), sempre. Poi il ping TTS:
    ```bash
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "checkpoint $(say_id ${taskId}) done"
    ```
    In caso di errore nel commit/push: `say_auto "checkpoint $(say_id ${taskId}) failed"`.
+
+## Hook di progetto — come si invocano
+
+Gli step 5 e 8 sollevano due eventi che il progetto può legare a skill proprie in `.claude/loom-works.json` (`hooks.deliverableDone`, `hooks.taskDone`). Lo script dello step stampa:
+
+- **nessuna riga, exit 0** → il progetto non dichiara hook su quell'evento: niente da fare.
+- **righe `HOOK|<i>|<skill>` e una riga `ARGS=<argomenti>`** → per ogni `HOOK`, nell'ordine di `<i>`, invoca il tool `Skill` con `skill` = `<skill>` e `args` = il valore di `ARGS` copiato tale e quale. Una skill alla volta: la successiva parte quando la precedente ha dichiarato il suo esito.
+- **exit non-zero** → nessuna skill per quell'evento. Il messaggio nomina il guasto: blocco `hooks` invalido, jq assente, task, DLV o sha non risolvibili.
+
+**Un hook non ferma mai il checkpoint.** Commit e push sono già avvenuti, e l'hook non li riapre. Una skill che non esiste, che dà errore o che dichiara un esito di fallimento produce un avviso in linea — `⚠ hook <skill> fallito su DLV<n>: <motivo>`, o `su taskDone` — e una riga nelle Segnalazioni; le skill successive della lista e il resto del flusso girano comunque. Nessun secondo tentativo: un hook fallito a metà ha già potuto scrivere fuori dal repo (un commento sulla issue), e lo scriverebbe due volte. Un exit non-zero dello script vale uguale: `⚠ hook <evento> non invocati: <messaggio>`.
+
+Il body di una skill hook entra nel contesto a ogni invocazione e vale per quell'hook soltanto: quando la skill ha dichiarato l'esito, riprendi dallo step che segue. Ciò che la skill hook fa resta suo, e nessun suo file entra nelle pathspec del checkpoint.
 
 ## 🚦 Segnalazioni — la sezione fissa del report
 
@@ -231,6 +259,7 @@ A zero segnalazioni, una riga sola: `**🚦 Segnalazioni** — nessuna`.
 
 - **`S{N}` numera da 1 dentro questo report**, e la riga porta l'id e la segnalazione, nient'altro: il testo dopo `— ` è quello che lo scenario cita byte per byte.
 - **Prima di stampare, interroga il registro ADR** su ogni segnalazione (`adr.sh cerca`, regola in contesto): exit `0` vuol dire già scartata con un motivo, e non la riporti.
+- **Un hook di progetto fallito è sempre una segnalazione** (§Hook di progetto): `S{N} — hook <skill> fallito su DLV<n>: <motivo>` (o `su taskDone`), oppure `S{N} — hook <evento> non invocati: <messaggio dello script>`. L'avviso in linea si perde nel transcript; la riga qui è ciò che l'umano decide.
 - **Ciò che hai corretto di tua iniziativa sta dentro la sezione, con «subito» già marcato e chi = agente — mai in un inciso del report.** «Ho corretto un difetto pre-esistente» è una decisione che hai già preso: resta ribaltabile solo se l'umano la vede fra le segnalazioni. Prima di stampare la sezione ne scrivi lo scenario:
 
   ```bash
@@ -307,6 +336,7 @@ Topic = argomento concreto della domanda. NO generici.
 
 - **Due script**: analyze per raccogliere info (solo linked), commit per eseguire.
 - **Due fasi di commit**: la fase codice (step 5) chiude e pusha il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e l'eventuale trasloco con pathspec esplicita. Un fallimento della fase doc non porta con sé il codice.
+- **Due eventi, ognuno dopo il proprio push**: `deliverableDone` dopo lo step 5, solo per i DLV spuntati in questo giro; `taskDone` dopo lo step 8, solo nel giro che chiude. Un checkpoint che non spunta e non chiude non invoca niente.
 - **Riesame ≠ archivio**: il riesame (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta — ed è il grosso del lavoro dopo il primo, perché da lì in avanti c'è solo lui. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola. Sull'inbox vale di più che sul task file: rigiudica un file già pubblicato e indicizzato, letto da chi non ha la task in mano.
 - **Il file inbox è WIP finché la task è aperta**: l'owner è la task, e il corpo si appende, si riscrive e si pota a ogni checkpoint — le tre operazioni e la regola degli id stanno in `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`. Il congelamento arriva con `drainable` (6.4), quando la proprietà passa al sistema documentale: da lì le uniche scritture ammesse sono la riga marker (lo sblocco di `pull-repos`) e il registro del drain.
 - **Baseline del diff**: derivato, mai storato — dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD`.
