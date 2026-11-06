@@ -38,7 +38,7 @@
     },
     "launch": {
       "type": "array",
-      "description": "Surface LAUNCH custom: voci fire-once che lanciano un comando arbitrario con cwd = project root. Fanno da bottone 'apri app nel contesto del progetto', niente match finestra né stato. Ogni voce ha emoji propria, label leggibile (opzionale, fallback = command) e un command shell.",
+      "description": "Voci LAUNCH custom: comandi shell arbitrari eseguiti con cwd = project root. Senza attributi una voce è un launcher fire-and-forget (apri l'app nel contesto del progetto, niente match finestra né stato); gli attributi opzionali la rendono una voce con esito (capture), lanciata all'avvio del deck (startup) o a scadenza (every), pinnata a una cifra (key), fuori dalla riga launch (header) o spenta (enabled). Un tipo solo per entrambe: la differenza fra launcher e script sta in cosa il consumer fa dopo lo spawn, non nella voce. Compass legge solo emoji, label e command dal registry e tratta ogni voce come launcher. Ogni voce ha emoji propria, label leggibile (opzionale, fallback = command) e un command shell.",
       "items": {
         "type": "object",
         "required": ["emoji", "command"],
@@ -56,7 +56,33 @@
           "command": {
             "type": "string",
             "minLength": 1,
-            "description": "Comando shell eseguito con cwd = project root (via bash -c). Es. 'codium .', 'idea ud-maven-parent'."
+            "description": "Comando shell eseguito con cwd = project root. Il deck lo lancia con `bash -lic` (login + interattiva: risolve alias e funzioni di ~/.bashrc), compass con `bash -ic`. Es. 'codium .', 'idea ud-maven-parent', \"git pull --ff-only && git submodule foreach 'git pull --ff-only'\"."
+          },
+          "capture": {
+            "type": "boolean",
+            "description": "Il deck cattura exit code e output della voce: stdout e stderr su .claude/loom/launch/<slug>.log, exit code e ora dell'ultimo giro in <slug>.json (macchina-locali, non gittati). Esito in testata (🔄 in corso, 🚨 ultimo exit non-zero), nella pagina launch (^L) e in una notifica desktop. Default false: fire-and-forget come oggi. Letto dal SOLO deck."
+          },
+          "startup": {
+            "type": "boolean",
+            "description": "La voce corre al mount del deck, a ogni apertura, senza guardare la scadenza di every. Default false. Letto dal SOLO deck."
+          },
+          "every": {
+            "type": "string",
+            "pattern": "^[0-9]+(m|h|d)$",
+            "description": "Scadenza: la voce corre quando l'ultimo giro registrato su disco è più vecchio di questa durata (30m, 6h, 1d), al primo tick utile a deck aperto — anche subito dopo il mount, se la soglia è già passata. Misurata dal file di esito e non dall'avvio del deck, così un deck sospeso o riaperto non perde né raddoppia i giri. Vale anche senza capture. Letto dal SOLO deck."
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[0-9]$",
+            "description": "La cifra che lancia la voce nel deck, pinnata qualunque sia la posizione nell'array. Le voci senza key prendono le cifre libere in ordine 1-9 poi 0. Due voci con la stessa key: la seconda la perde con un avviso. Letto dal SOLO deck."
+          },
+          "header": {
+            "type": "boolean",
+            "description": "La voce compare nella riga launch del deck con la sua cifra. Default true. Con false resta lanciabile dalla pagina launch (^L) e dalla scadenza: è «solo dalla pagina», non spenta. Letto dal SOLO deck."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Default true. Con false la voce è spenta: fuori dalla riga launch, nessun startup, nessuna scadenza, senza perdere il valore di every. Compass non lo vede e la mostra comunque. Letto dal SOLO deck."
           }
         }
       }
