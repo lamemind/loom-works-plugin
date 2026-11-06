@@ -176,8 +176,6 @@ Vale la stessa economia del recap senza freni di volume (§2b): un minuto di let
 - dentro un sottosistema, le sue domande aprono con un **heading di livello 3** (`Domande`), le sue proposte con un altro (`Proposte`);
 - ogni sottosistema chiude con un separatore `---`.
 
-Sono i livelli **logici**. In chat si scrivono secondo la convenzione del terminale dell'output style, che vuole un `#` in più (`# ## Sottosistema`, `# ### Domande`), non con `##`/`###` letterali che il terminale renderebbe piatti.
-
 Un solo ping TTS, prima di scrivere il turno:
 
 ```bash

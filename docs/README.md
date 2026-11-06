@@ -9,7 +9,7 @@ Manuali, convenzioni e riferimenti tecnici del sistema che il plugin implementa.
 
 **Iniettato a `UserPromptSubmit`**: `restamp.md` — nocciolo dei contratti doc e task ri-timbrato a ogni turno contro il drift. Unica entry a costo moltiplicativo, tetto 4.500 char scritto nel file stesso. Le regole di scrittura non ci stanno: le porta l'output style, che regge il drift da sé.
 
-**Portato dall'output style** (`output-styles/regole-output.md`, `force-for-plugin`): il contratto di scrittura della chat — comprensione contro sintesi, scala `K0`-`K3`, raggio `R0`-`R3`, meccanica del terminale. È l'unico canale che per costruzione **non** raggiunge un subagent, ed è la garanzia strutturale che un agent non scriva su disco i trick di rendering del terminale.
+**Portato dall'output style** (`output-styles/regole-output.md`, `force-for-plugin`): il contratto di scrittura della chat — comprensione contro sintesi, scala `K0`-`K3`, raggio `R0`-`R3`, meccanica del terminale. È l'unico canale che per costruzione **non** raggiunge un subagent.
 
 **On-demand, letti da path**:
 

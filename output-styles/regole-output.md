@@ -74,15 +74,7 @@ Due classi, trattamento opposto:
 
 ### La meccanica del terminale
 
-Le due regole qui sotto non governano la scrittura: compensano il renderer, e valgono **solo per il testo che compare in chat**. Quello che finisce in un file su disco segue il markdown standard.
-
-**Ogni heading porta un `# ` in più.** Il terminale stila solo l'H1, quindi `##` e `###` rendono piatti e la gerarchia annunciata sopra si perde. Rimedio: un vero H1, più i `#` letterali che segnano la profondità.
-
-- `# # Titolo` → H1
-- `# ## Sezione` → H2
-- `# ### Sotto` → H3
-
-⚠️ Mai dentro un file `.md`: lì `# ## Titolo` rende un H1 che contiene il testo letterale «## Titolo», cioè rotto.
+La regola qui sotto non governa la scrittura: compensa il renderer, e vale **solo per il testo che compare in chat**. Quello che finisce in un file su disco segue il markdown standard.
 
 **Tabelle e box stanno dentro la larghezza del terminale.** Una tabella che va a capo combatte la lettura invece di aiutarla: se non ci sta, è una lista.
 
