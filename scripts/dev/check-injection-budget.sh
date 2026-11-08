@@ -66,6 +66,9 @@ check() { # $1=event $2=label $3=chars
   printf '%-18s %-52s %8s  %s\n' "$1" "$2" "$3" "$status"
 }
 
+# Ogni comando misurato gira con lo stdin da /dev/null: dentro questo `while read` lo
+# stdin e' la lista delle entry, e un comando che lo legge la consumerebbe. Le entry
+# successive resterebbero non misurate, con exit 0 e nessun errore.
 while IFS=$'\t' read -r ev cmd; do
   rcmd="${cmd//\$\{CLAUDE_PLUGIN_ROOT\}/$ROOT}"
   label="${cmd##*/}"; label="${label%\"}"
@@ -77,7 +80,7 @@ while IFS=$'\t' read -r ev cmd; do
       [ -f "$tf" ] || continue
       found=$((found+1))
       tid="$(basename "$tf")"; tid="${tid%%-*}"
-      n=$(LOOM_TASK="$tid" CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd" 2>/dev/null | count_chars)
+      n=$(LOOM_TASK="$tid" CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd" 2>/dev/null </dev/null | count_chars)
       if [ "$n" -gt "$max" ]; then max=$n; maxid=$tid; fi
     done
     if [ "$found" -eq 0 ]; then
@@ -86,7 +89,7 @@ while IFS=$'\t' read -r ev cmd; do
       check "$ev" "$label (max su $found task: $maxid)" "$max"
     fi
   else
-    n=$( (unset LOOM_TASK; CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd") 2>/dev/null | count_chars )
+    n=$( (unset LOOM_TASK; CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd") 2>/dev/null </dev/null | count_chars )
     check "$ev" "$label" "$n"
   fi
 done < <(jq -r '.hooks | to_entries[] | .key as $ev | .value[].hooks[].command | $ev + "\t" + .' "$HOOKS")
