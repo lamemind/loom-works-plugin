@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/docs/restamp.md\""
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context/restamp.sh\""
           },
           {
             "type": "command",
