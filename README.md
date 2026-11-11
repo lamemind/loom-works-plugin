@@ -12,7 +12,10 @@ loom-works organizes work into **tasks** and **lanes**:
 
 ## Install
 
+The plugin is published in the `lamemind` marketplace ([`lamemind/claude-marketplace`](https://github.com/lamemind/claude-marketplace)):
+
 ```
+/plugin marketplace add lamemind/claude-marketplace
 /plugin install loom-works@lamemind
 ```
 

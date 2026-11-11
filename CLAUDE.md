@@ -11,4 +11,4 @@ Plugin source repository. Install via `/plugin install loom-works@lamemind`.
 - `docs/` — Methodology documentation (injected at SessionStart)
 - `output-styles/` — Output style imposto ai client (`force-for-plugin`), auto-caricata
 - `templates/` — Task and doc templates
-- `.claude-plugin/` — Plugin manifest (plugin.json, marketplace.json)
+- `.claude-plugin/` — Plugin manifest (plugin.json). The marketplace catalog lives in [`lamemind/claude-marketplace`](https://github.com/lamemind/claude-marketplace)
