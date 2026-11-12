@@ -418,10 +418,10 @@ _chiave() {
 
 # Quanti caratteri chiede una categoria per rendere TUTTE le sue voci: e' la
 # domanda su cui il water-filling decide chi servire per primo. Legge l'array
-# `scelte` del chiamante (scoping dinamico di bash), che qui e' sempre componi.
+# `lung` del chiamante (scoping dinamico di bash), che qui e' sempre componi.
 _domanda() {
     local d=0 j
-    for j in $1; do d=$(( d + ${#scelte[$j]} + 3 )); done
+    for j in $1; do d=$(( d + lung[$j] + 3 )); done
     printf '%s' "$d"
 }
 
@@ -511,8 +511,18 @@ componi() {
     # alla precedente. La prima voce della riga il separatore non ce l'ha, quindi
     # il conto qui sovrastima di tre caratteri: la riga esce appena sotto il cap
     # invece che a filo, ed e' l'errore nella direzione innocua.
+    #
+    # Le lunghezze sono code point, calcolate una volta qui in `lung` e lette da
+    # tutto il riempimento: `${#voce}` dipende dal locale della shell, e in Git
+    # Bash conta byte, cosi' una voce con accenti o frecce costerebbe piu' di
+    # quanto build-index.sh le conta poi contro lo stesso cap (lib-doc.sh
+    # §Conteggio dei caratteri). Il separatore vale 3 code point, 4 byte.
     local SEPW=3
     local i j c v riga
+    local -a lung=()
+    for (( i=0; i<${#scelte[@]}; i++ )); do
+        doc_chars_var "lung[$i]" "${scelte[$i]}"
+    done
 
     # Indici per categoria, nell'ordine di merito in cui il potatore ha reso.
     local L_NOME="" L_ERRORE="" L_SEZIONE=""
@@ -559,7 +569,7 @@ componi() {
             lista="L_$best"
             local costo
             for j in ${!lista}; do
-                costo=$(( ${#scelte[$j]} + SEPW ))
+                costo=$(( lung[$j] + SEPW ))
                 # Ci si ferma alla prima voce che non entra invece di saltarla:
                 # l'ordine dentro la categoria e' merito, e scavalcare una voce
                 # cara per prenderne una economica piu' in basso e' una decisione
@@ -639,7 +649,7 @@ componi() {
         if (( contenuto )); then
             echo "[tldr] RIDONDANTE scartata ${etichette[$idx]}: ${scelte[$idx]}" >&2
             unset 'preso[$idx]'
-            usato=$(( usato - ${#scelte[$idx]} - SEPW ))
+            usato=$(( usato - lung[$idx] - SEPW ))
             ridondanti=$((ridondanti+1))
         else
             tenuti+=("$idx")
@@ -654,7 +664,7 @@ componi() {
         local scelto=-1 costo_scelto=0
         for (( i=0; i<${#scelte[@]}; i++ )); do
             [[ -n "${preso[$i]:-}" ]] && continue
-            local costo=$(( ${#scelte[$i]} + SEPW ))
+            local costo=$(( lung[$i] + SEPW ))
             (( usato + costo <= LW_DOC_TLDR_CAP )) || continue
             # Il dedup vale anche qui, o la passata finale riammette proprio le
             # voci che ha appena tolto — o ne ammette di nuove ridondanti con le
@@ -717,7 +727,9 @@ componi() {
         printf '%s\n' "$riga"
     fi
 
-    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${#riga} char, cap ${LW_DOC_TLDR_CAP}) — sez=${#sez_r[@]} err=${#err_r[@]} nomi=${#nome_r[@]}; scarti: ${non_verbatim} non-verbatim, ${fuori_vocabolario} fuori-vocabolario, ${ridondanti} ridondanti, ${tagliate} oltre-cap" >&2
+    local riga_len
+    doc_chars_var riga_len "$riga"
+    echo "[tldr] componi: ${rese} voci rese, ${#ordinate[@]} nella riga (${riga_len} char, cap ${LW_DOC_TLDR_CAP}) — sez=${#sez_r[@]} err=${#err_r[@]} nomi=${#nome_r[@]}; scarti: ${non_verbatim} non-verbatim, ${fuori_vocabolario} fuori-vocabolario, ${ridondanti} ridondanti, ${tagliate} oltre-cap" >&2
 }
 
 # --- set ----------------------------------------------------------------------
@@ -760,7 +772,9 @@ set_tldr() {
     } > "$tmp"
     mv "$tmp" "$FILE"
 
-    echo "[tldr] set ${FILE}: ${#TESTO} char" >&2
+    local testo_len
+    doc_chars_var testo_len "$TESTO"
+    echo "[tldr] set ${FILE}: ${testo_len} char" >&2
 }
 
 case "$VERB" in

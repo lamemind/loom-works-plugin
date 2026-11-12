@@ -112,18 +112,14 @@ DOCS_ROOT="$(lw_docs_root)"
 
 [[ -d "$DIR" ]] || usage_err "dir not found: $DIR"
 
-# I due cicli sui file non aprono processi oltre quelli che misurano: `wc -m`,
-# `git log` e `inbox.sh parse`. Gli helper qui sotto assegnano alla variabile che
-# il chiamante nomina invece di stampare, come le letture di lib-doc.sh: in Git
-# Bash su Windows ogni `$(…)` e' un fork emulato, e moltiplicato per i file e per
-# le ancore era quasi tutto il tempo dello script (lib-doc.sh §Lettura senza
-# sottoprocessi).
-
-char_count() {  # <var> <file> → <var> = caratteri del file secondo `wc -m`
-    local _cc_n
-    _cc_n="$(wc -m < "$2")"
-    printf -v "$1" '%s' "${_cc_n//[[:space:]]/}"
-}
+# I due cicli sui file non aprono processi oltre `git log` e `inbox.sh parse`.
+# I caratteri di un file li conta doc_file_chars_var di lib-doc.sh, in code
+# point e senza processi: `wc -m` costava un processo per file e in Git Bash
+# contava byte (lib-doc.sh §Conteggio dei caratteri). Gli helper qui sotto
+# assegnano alla variabile che il chiamante nomina invece di stampare, come le
+# letture di lib-doc.sh: in Git Bash su Windows ogni `$(…)` e' un fork emulato, e
+# moltiplicato per i file e per le ancore era quasi tutto il tempo dello script
+# (lib-doc.sh §Lettura senza sottoprocessi).
 
 cappello_of() {  # <var> <basename> → <var> = ID dal nome, vuoto se il nome non ne porta uno
     local _co_id=""
@@ -206,7 +202,7 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
                 [[ "$drainable" == "si" && -z "$branch" ]] || continue
             fi
 
-            char_count chars "$file"
+            doc_file_chars_var chars "$file"
             cappello_of cappello "${file##*/}"
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                 "$created" "$rel" "$natura" "$indexed" "$drainable" "$branch" \
@@ -262,7 +258,7 @@ while IFS= read -r -d '' file; do
     rel="${file#"$PROJECT_ROOT"/}"
     doc_excluded "$rel" && continue
 
-    char_count chars "$file"
+    doc_file_chars_var chars "$file"
     doc_layer_var layer "$rel"
     base="${file##*/}"
 
@@ -271,7 +267,7 @@ while IFS= read -r -d '' file; do
         # il TLDR dei file inbox sta in riga 4 e lo possiede inbox.sh: qui non
         # si legge (nessuna regex propria sul formato inbox)
         doc_tldr_var tldr "$file" 3
-        tldr_len=${#tldr}
+        doc_chars_var tldr_len "$tldr"
     fi
 
     flags=""
@@ -420,7 +416,7 @@ if [[ "$ONLINE" -eq 1 ]]; then
     if [[ -n "$LW_DOC_ONLINE_LIST" ]]; then
         while IFS= read -r rel; do
             [[ -f "${PROJECT_ROOT}/${rel}" ]] || continue
-            char_count c "${PROJECT_ROOT}/${rel}"
+            doc_file_chars_var c "${PROJECT_ROOT}/${rel}"
             online_total=$((online_total + c))
             printf '  @-import  %-52s %8s\n' "$rel" "$c"
         done <<< "$LW_DOC_ONLINE_LIST"

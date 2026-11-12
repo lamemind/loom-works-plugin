@@ -121,8 +121,11 @@ while IFS= read -r -d '' file; do
         continue
     fi
 
-    if (( ${#tldr} > LW_DOC_TLDR_CAP )); then
-        echo "[build-index] OVER-CAP TLDR ${#tldr} char (cap ${LW_DOC_TLDR_CAP}): ${file#"$PROJECT_ROOT"/}" >&2
+    # Caratteri come code point, non `${#tldr}`: quello dipende dal locale della
+    # shell e in Git Bash conta byte (lib-doc.sh §Conteggio dei caratteri).
+    doc_chars_var tldr_len "$tldr"
+    if (( tldr_len > LW_DOC_TLDR_CAP )); then
+        echo "[build-index] OVER-CAP TLDR ${tldr_len} char (cap ${LW_DOC_TLDR_CAP}): ${file#"$PROJECT_ROOT"/}" >&2
         OVERCAP=$((OVERCAP+1))
     fi
 
@@ -179,6 +182,7 @@ if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
         [[ "$natura" == "nozioni" && "$indexed" == "indexed" ]] || continue
 
         if [[ -n "$tldr" ]]; then
+            # tldr_len e' il conteggio di inbox.sh parse, gia' in code point.
             if (( tldr_len > LW_DOC_TLDR_CAP )); then
                 echo "[build-index] OVER-CAP TLDR ${tldr_len} char (cap ${LW_DOC_TLDR_CAP}): ${file#"$PROJECT_ROOT"/}" >&2
                 OVERCAP=$((OVERCAP+1))

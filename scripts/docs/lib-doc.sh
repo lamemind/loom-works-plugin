@@ -11,6 +11,8 @@
 #   - il parser dell'override di test LOOM_DOC_THRESHOLDS_OVERRIDE
 #   - la regex del TLDR (doc_tldr, doc_tldr_var), condivisa fra i layer: riga 3 per reference/,
 #     riga 4 per l'inbox — la riga e' un PARAMETRO, cosi' l'implementazione resta una
+#   - il conteggio dei caratteri contro cui si misurano le soglie (doc_chars_var,
+#     doc_file_chars_var): code point, indipendente dal locale della shell
 #   - la precedenza di layer (doc_layer): inbox → online → offline → altro
 #   - le regex del formato inbox (usate SOLO da inbox.sh)
 #   - il perimetro escluso condiviso (doc_excluded): il runtime che non e' doc
@@ -137,6 +139,46 @@ doc_line() {  # <var> <file> <riga> → <var> = riga N del file, vuota se assent
         fi
     fi
     printf -v "$1" '%s' "$_dl_line"
+}
+
+# ---- Conteggio dei caratteri -------------------------------------------------
+#
+# Ogni soglia del sistema doc e' in caratteri, e un carattere qui e' un code
+# point: il numero che `wc -m` da' su Linux con glibc in locale UTF-8. Ne' `${#v}`
+# di bash ne' `wc -m` lo danno ovunque, perche' dipendono dal locale della shell
+# che li esegue. In Git Bash su Windows con LANG, LC_CTYPE e LC_ALL vuote contano
+# byte: una lettera accentata o una freccia vale 2-3, un'emoji 4, e un TLDR
+# italiano di 494 caratteri ne misura 523. Con un locale UTF-8 contano unita'
+# UTF-16, perche' in MSYS `wchar_t` e' a 16 bit: un'emoji fuori dal piano base
+# vale 2. Nessun locale da' code point, quindi impostarlo negli script non basta.
+#
+# Il conteggio qui non chiede niente al locale: dentro la funzione LC_ALL=C fa
+# vedere a bash i byte, si tolgono i byte di continuazione UTF-8 (0x80-0xBF) e si
+# contano quelli che restano, perche' ogni carattere ha uno e un solo byte di
+# testa. `local` restituisce al chiamante il suo locale all'uscita. Su testo
+# UTF-8 valido il numero coincide con `wc -m` su Linux, anche sui `\r` di un file
+# CRLF, che entrambi contano.
+#
+# Due forme, nessun processo (§Lettura senza sottoprocessi): `doc_chars_var` per
+# una stringa, `doc_file_chars_var` per un file intero, letto con `read -d ''`,
+# che a differenza di `$(…)` non perde i newline finali. Un file con un byte NUL
+# si misura fino al NUL: la doc e' testo, e il NUL non ci compare.
+
+_LW_DOC_UTF8_CONT=$'[\x80-\xbf]'
+readonly _LW_DOC_UTF8_CONT
+
+doc_chars_var() {  # <var> <stringa> → <var> = caratteri (code point UTF-8) della stringa
+    local LC_ALL=C
+    local _dc_s="${2//$_LW_DOC_UTF8_CONT/}"
+    printf -v "$1" '%s' "${#_dc_s}"
+}
+
+doc_file_chars_var() {  # <var> <file> → <var> = caratteri (code point UTF-8) del file, 0 se illeggibile
+    local LC_ALL=C
+    local _dfc_t=""
+    [[ -r "$2" ]] && { IFS= read -r -d '' _dfc_t < "$2" || true; }
+    _dfc_t="${_dfc_t//$_LW_DOC_UTF8_CONT/}"
+    printf -v "$1" '%s' "${#_dfc_t}"
 }
 
 # ---- Layer -------------------------------------------------------------------

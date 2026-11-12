@@ -281,9 +281,13 @@ cmd_parse() {
         exit 2
     fi
 
-    local titolo tldr=""
+    local titolo tldr="" tldr_len=0
     doc_line titolo "$file" 1; titolo="${titolo#\# }"
     doc_tldr_var tldr "$file" 4
+    # La lunghezza che entrambi i formati stampano, e che build-index.sh confronta
+    # col cap: code point, non `${#tldr}`, che in Git Bash conta byte (lib-doc.sh
+    # §Conteggio dei caratteri).
+    doc_chars_var tldr_len "$tldr"
 
     # Prima passata: valida i sub-bullet (un malformato non emette NESSUNA riga
     # di dato), poi seconda passata per l'output.
@@ -353,7 +357,7 @@ cmd_parse() {
         (( MK_DRAINABLE )) && col_drainable="drainable"
         printf 'TITOLO\t%s\n' "$titolo"
         printf 'MARKER\t%s\t%s\t%s\t%s\n' "$MK_NATURA" "$col_indexed" "$col_drainable" "$MK_BRANCH"
-        [[ -n "$tldr" ]] && printf 'TLDR\t%s\t%s\n' "$tldr" "${#tldr}"
+        [[ -n "$tldr" ]] && printf 'TLDR\t%s\t%s\n' "$tldr" "$tldr_len"
         for i in "${!noz_id[@]}"; do
             printf 'NOZIONE\t%s\t%s\t%s\t%s\t%s\n' \
                 "${noz_id[$i]}" "${noz_stato[$i]}" "${noz_attore[$i]}" "${noz_verdetto[$i]}" "${noz_target[$i]}"
@@ -367,7 +371,7 @@ cmd_parse() {
         (( MK_DRAINABLE )) && hdr+=" · drainable"
         [[ -n "$MK_BRANCH" ]] && hdr+=" · branch:${MK_BRANCH}"
         printf '%s  —  %s\n' "$hdr" "$titolo"
-        [[ -n "$tldr" ]] && printf 'TLDR (%s char): %s\n' "${#tldr}" "$tldr"
+        [[ -n "$tldr" ]] && printf 'TLDR (%s char): %s\n' "$tldr_len" "$tldr"
         for i in "${!noz_id[@]}"; do
             printf '%-4s %-7s %s\n' "${noz_id[$i]}" "${noz_stato[$i]}" "${noz_resa[$i]:-—}"
         done
