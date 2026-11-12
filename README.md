@@ -45,6 +45,7 @@ Then bootstrap the project structure:
 | `/loom-works:run-task` | Execute a task's deliverables — scoped per DLV, one commit each |
 | `/loom-works:checkpoint-task` | Checkpoint progress: analyze changes, commit, update tasks.md |
 | `/loom-works:preflight-task` | Freeze design decisions before execution |
+| `/loom-works:spawn-task` | Ask the project's running deck to open a task conversation (preflight, run with scope, recap, checkpoint) — one spawn per call, no questions |
 | `/loom-works:spawn-lane` | Create a persistent git worktree lane |
 | `/loom-works:merge-lane` | Merge lane into main, keep worktree |
 | `/loom-works:drop-lane` | Destroy a lane without merging |
