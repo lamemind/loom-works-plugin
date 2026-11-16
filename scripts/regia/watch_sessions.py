@@ -3,7 +3,8 @@ watch_sessions — segue le sessioni Claude Code vive di un progetto loom-works.
 
 Ogni riga su stdout è un evento per il tool Monitor di Claude Code:
   - dal registro vivo (~/.claude/sessions/<pid>.json): sessione nuova, sessione
-    chiusa, transcript nuovo dopo un /clear
+    chiusa, transcript nuovo dopo un /clear, legame con la task cambiato,
+    richiesta di permesso (`waiting`), sessione `busy` ferma da --stall-minutes
   - dai transcript delle altre sessioni: turno finito, domanda all'utente,
     skill lanciata, prompt dell'utente
   - dai task file: sezione cambiata, cifre di DLV e AC, campo Progress
@@ -52,6 +53,8 @@ def parse_arguments():
     parser.add_argument("--repo", action="append", default=[],
                         help="nome=path relativo alla radice; ripetibile")
     parser.add_argument("--poll-seconds", type=int, default=15)
+    parser.add_argument("--stall-minutes", type=float, default=10,
+                        help="una sessione busy col transcript fermo da più tempo produce un evento")
     parser.add_argument("--once", action="store_true",
                         help="un giro solo: legge, salva lo stato ed esce")
     return parser.parse_args()
@@ -163,6 +166,67 @@ def start_offset(path, since):
     return size
 
 
+def last_activity(process):
+    """L'ultimo momento in cui la sessione ha scritto qualcosa: il transcript o
+    i file dei suoi subagent (`<sessionId>/subagents/`), che lavorano mentre
+    il transcript principale tace. `None` se non ha ancora scritto niente."""
+    transcript = process["transcript"]
+    subagents_dir = os.path.join(os.path.dirname(transcript), process["session_id"], "subagents")
+    moments = []
+    for path in [transcript] + glob.glob(os.path.join(glob.escape(subagents_dir), "*")):
+        try:
+            moments.append(os.path.getmtime(path))
+        except OSError:
+            continue
+    return max(moments) if moments else None
+
+
+def check_status(process, session, settings, initialized, now):
+    """Gli eventi dal campo `status` del registro.
+
+    `waiting` è una richiesta di permesso: non chiude il turno, quindi il
+    transcript non la annuncia. Una domanda con AskUserQuestion ha già il suo
+    evento, e non ne riceve un secondo.
+
+    Lo stallo è una sessione `busy` col transcript e i subagent fermi da
+    --stall-minutes. Un evento per episodio: riparte solo se la sessione si
+    muove e si ferma di nuovo. Dice «ferma», non «bloccata»: un comando lungo è
+    indistinguibile da una richiesta API appesa.
+    """
+    label = process["label"]
+    if (initialized and session.status == "waiting" and process.get("status") != "waiting"
+            and process.get("last_tool") != "AskUserQuestion"):
+        tool = process.get("last_tool")
+        emit(f"{label} ⏳ aspetta un permesso" + (f": {tool}" if tool else ""))
+    process["status"] = session.status
+    process["status_since"] = session.status_since
+    moved = last_activity(process)
+    if moved != process.get("last_move") or session.status != "busy":
+        process["last_move"] = moved
+        process["stall_reported"] = False
+    if (initialized and session.status == "busy" and not process.get("stall_reported")
+            and moved is not None and now - moved >= settings.stall_minutes * 60):
+        details = "busy"
+        if process.get("last_tool"):
+            details += f", ultimo tool {process['last_tool']}"
+        if session.alive is None:
+            details += ", o processo morto"
+        emit(f"{label} 🧊 ferma da {int((now - moved) / 60)} min ({details})")
+        process["stall_reported"] = True
+
+
+def describe_status(process, now):
+    """`T31 waiting 4 min [loom-deck]` per la riga di armo: lo stato del
+    registro e la sua età (`ora − statusUpdatedAt`), dal minuto in su."""
+    text = process["label"]
+    if process.get("status"):
+        text += f" {process['status']}"
+        since = process.get("status_since")
+        if since is not None and now - since >= 60:
+            text += f" {int((now - since) / 60)} min"
+    return text + process.get("where", "")
+
+
 def short_id(session_id):
     return session_id[:8]
 
@@ -204,7 +268,7 @@ def new_process(session, transcript, offset):
         "sidecar_task": None,
         "label": "",
         "last_text": "",
-        "status": session.status,
+        "status": None,
     }
 
 
@@ -221,6 +285,7 @@ def is_own(session, state, settings):
 
 
 def scan_sessions(state, settings):
+    now = time.time()
     initialized = state.get("initialized")
     since = state.get("last_scan") if initialized else None
     registry = regia_common.read_registry(settings.project_root)
@@ -239,11 +304,11 @@ def scan_sessions(state, settings):
         if process is None:
             process = new_process(session, transcript, start_offset(transcript, since))
             process["sidecar_task"] = bindings.get(session.session_id)
+            process["where"] = relative_cwd(session.cwd, settings)
             refresh_label(process)
             state["processes"][session.key] = process
             if initialized:
-                where = relative_cwd(session.cwd, settings)
-                emit(f"{process['label']} 🆕 nuova sessione {short_id(session.session_id)}{where}")
+                emit(f"{process['label']} 🆕 nuova sessione {short_id(session.session_id)}{process['where']}")
         elif process["session_id"] != session.session_id:
             process.update(session_id=session.session_id, transcript=transcript,
                            offset=start_offset(transcript, since),
@@ -261,7 +326,7 @@ def scan_sessions(state, settings):
         read_new_records(process)
         if initialized and old_label is not None:
             announce_label_change(process, old_label)
-        process["status"] = session.status
+        check_status(process, session, settings, initialized, now)
     for key in list(state["processes"]):
         if key in seen:
             continue
@@ -432,6 +497,7 @@ def main():
     settings = build_settings(parse_arguments())
     state = load_state(settings.state)
     scanners = (scan_sessions, scan_task_files, scan_progress_table, scan_git)
+    first_scan = True
     while True:
         scan_started = time.time()
         for scanner in scanners:
@@ -439,10 +505,12 @@ def main():
                 scanner(state, settings)
             except Exception as error:  # una fonte che si rompe non deve fermare il monitor
                 emit(f"monitor ⚠ {scanner.__name__}: {type(error).__name__}: {error}")
-        if not state.get("initialized"):
+        if first_scan:
+            word = "riarmato" if state.get("initialized") else "armato"
             state["initialized"] = True
-            labels = sorted(process["label"] for process in state["processes"].values())
-            emit(f"monitor ✅ armato: {', '.join(labels) or 'nessuna sessione viva'}")
+            sessions = sorted(describe_status(process, time.time()) for process in state["processes"].values())
+            emit(f"monitor ✅ {word}: {', '.join(sessions) or 'nessuna sessione viva'}")
+            first_scan = False
         state["last_scan"] = scan_started
         save_state(settings.state, state)
         if settings.once:
