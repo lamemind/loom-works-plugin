@@ -9,7 +9,8 @@ Ogni riga su stdout è un evento per il tool Monitor di Claude Code:
     skill lanciata, prompt dell'utente
   - dai task file: sezione cambiata, cifre di DLV e AC, campo Progress
   - da tasks.md: colonna Prog della tabella Tasks Overview
-  - da git: commit locali nuovi e push su origin, per ogni repo guardato
+  - da git: commit locali nuovi e push su origin, per ogni repo guardato: la
+    radice, ogni submodule di .gitmodules e i --repo in più
 
 Le sessioni sono quelle del registro vivo con `cwd` dentro la radice del
 progetto, comprese quelle nate in un submodule: il transcript di ognuna si
@@ -51,7 +52,7 @@ def parse_arguments():
     parser.add_argument("--own-session", default="", help="session id da saltare: quello che lancia il monitor")
     parser.add_argument("--state", required=True, help="file JSON di stato; tenerlo fuori dal repo")
     parser.add_argument("--repo", action="append", default=[],
-                        help="nome=path relativo alla radice; ripetibile")
+                        help="nome=path relativo alla radice, oltre a radice e submodule; ripetibile")
     parser.add_argument("--poll-seconds", type=int, default=15)
     parser.add_argument("--stall-minutes", type=float, default=10,
                         help="una sessione busy col transcript fermo da più tempo produce un evento")
@@ -480,11 +481,28 @@ def scan_git(state, settings):
                 emit(f"git {repo_name} ● {short_ref}: {commit_line[:160]}")
 
 
+def submodule_paths(project_root):
+    """I path dei submodule dichiarati in `.gitmodules`, relativi alla radice.
+
+    Il registro dei submodule è il file, non una lista a mano: un submodule
+    aggiunto entra nel monitor senza toccare il comando della regia. Stessa
+    fonte di `pull-repos`.
+    """
+    try:
+        with open(os.path.join(project_root, ".gitmodules"), encoding="utf-8") as modules_handle:
+            text = modules_handle.read()
+    except OSError:
+        return []
+    return [match.strip() for match in re.findall(r"^\s*path\s*=\s*(.+?)\s*$", text, re.M)]
+
+
 def build_settings(arguments):
     arguments.project_root = os.path.abspath(
         arguments.project_root or regia_common.find_project_root(os.getcwd()))
     arguments.docs_path = os.path.join(arguments.project_root, regia_common.docs_root(arguments.project_root))
     repos = {"root": arguments.project_root}
+    for relative_path in submodule_paths(arguments.project_root):
+        repos[relative_path] = os.path.join(arguments.project_root, relative_path)
     for repo_argument in arguments.repo:
         name, _, relative_path = repo_argument.partition("=")
         repos[name] = os.path.join(arguments.project_root, relative_path)
