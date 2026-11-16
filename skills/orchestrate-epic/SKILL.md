@@ -270,3 +270,28 @@ Per le segnalazioni la prima riga è `Risposte alle segnalazioni di T<id> — ap
 La firma è vera solo dopo il via dato in questa chat: il classificatore di auto mode blocca un messaggio che dichiara un'approvazione mai data, ed è giusto così. Mai la firma su un testo che l'utente non ha visto.
 
 Dopo l'invio togli la proposta dallo stato. Se erano le segnalazioni di un run, il ciclo prosegue col checkpoint (§2).
+
+## 4. Scalare all'utente
+
+Una regia che aspetta l'utente chiude il turno, e compass la mostra `done`, non `ask`: il badge non avvisa nessuno. Quando la regia ha bisogno dell'utente lo avvisa da sé, su **tre canali insieme**:
+
+1. **una riga in chat** in testa al riporto: chi aspetta, per cosa, con la maniglia di ogni task;
+2. **`PushNotification`**: una riga sotto i 200 caratteri, in testa ciò su cui agire («T32 (campione Naviga) aspetta il via su 3 risposte di preflight»);
+3. **`say.sh`**:
+
+   ```bash
+   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "regia $(say_id T<epica>) <argomento in 3-7 parole>"
+   ```
+
+**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); un'anomalia; un mandato che non ha più niente da lanciare.
+
+**Non si scala** per gli eventi di routine — commit, push, un DLV spuntato, un checkpoint andato liscio: bastano le righe del riporto. Una notifica che non serviva si somma alle altre e insegna a ignorarle.
+
+### Le anomalie: ramo fermo, nessun ritento
+
+- `spawn-task` esce con un codice diverso da `0`;
+- una conversazione in ciclo si chiude a metà (`✖ sessione chiusa` prima del checkpoint);
+- un run chiude il turno senza aver chiuso nessun DLV del suo perimetro;
+- un evento `🧊 ferma da N min` su una conversazione in ciclo.
+
+La regia ferma la task e le sue dipendenti, scrive il motivo in `## Rami fermi`, scala all'utente e **non rilancia**: un secondo tentativo su una causa non capita ripete il guasto, e può ripetere anche quello che il primo ha già scritto. I rami indipendenti continuano. Il ramo riparte quando l'utente lo dice.
