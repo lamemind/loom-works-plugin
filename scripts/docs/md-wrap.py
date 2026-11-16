@@ -18,8 +18,8 @@ Una continuazione candidata diventa una rottura di wrap confermata solo se la
 prima parola della riga successiva NON sarebbe entrata nella colonna rilevata:
 e' cio' che distingue un a-capo automatico da un a-capo voluto.
 
-Dipendenza runtime: python3. E' l'unico artefatto Python del plugin — tutto il
-resto di scripts/ e' bash. Un consumer che lo invoca su una macchina senza
+Dipendenza runtime: python3. Insieme agli script della regia (scripts/regia/)
+e' l'unico Python del plugin — tutto il resto di scripts/ e' bash. Un consumer che lo invoca su una macchina senza
 interprete non riceve un errore di questo script ma un fallimento di spawn, e
 deve restare muto invece di rompersi.
 """
