@@ -1,6 +1,6 @@
 ---
 name: orchestrate-epic
-description: Fa da regia su un'epica loom-works — recap, sessioni vive, monitor delle sessioni armato e riarmato — e porta avanti le figlie in modo semi-automatico. Lancia da sé preflight, run e checkpoint quando le dipendenze lo permettono; alle domande delle sessioni prepara una proposta di risposta motivata e la manda solo col via dell'utente. Non scrive mai nei repo né nei task file. Usa quando l'utente dice «fai da regia su T21», «orchestra l'epica T197», «porta avanti le figlie di T40, e segui anche T52».
+description: Fa da regia su un'epica loom-works — recap, sessioni vive, monitor delle sessioni armato e riarmato — e porta avanti le figlie in modo semi-automatico. Lancia da sé preflight, run e checkpoint quando le dipendenze lo permettono, e chiude le conversazioni a passo finito; alle domande delle sessioni prepara una proposta di risposta motivata e la manda solo col via dell'utente. Non scrive mai nei repo né nei task file. Usa quando l'utente dice «fai da regia su T21», «orchestra l'epica T197», «porta avanti le figlie di T40, e segui anche T52».
 argument-hint: "<epica> [Txx …]"
 allowed-tools: Bash(*), Read, Write, Edit, Skill, Monitor, TaskStop, SendMessage, ListAgents, PushNotification
 ---
@@ -16,7 +16,7 @@ Le figlie di un'epica avanzano una per conversazione, e nessuna conversazione ve
 
 - **Lancia da sé** preflight, run e checkpoint quando le dipendenze lo permettono: l'utente ha dato il mandato invocando la skill, e un ok a ogni conversazione non serve.
 - **Non risponde da sé.** Alle domande delle sessioni — un preflight che chiede, le segnalazioni 🚦 di un report — prepara una proposta motivata e la manda solo col via dell'utente. L'unico messaggio che parte senza via è la richiesta di checkpoint dopo un run pulito (§2).
-- **Non scrive mai nei repo né nei task file.** Nessun `Edit`, `Write` o commit nel progetto. Agisce in due modi soli: apre conversazioni con `spawn-task` e scrive alle conversazioni con `SendMessage`. I soli file che scrive stanno nella sua scratchpad: lo stato del mandato e lo stato del monitor.
+- **Non scrive mai nei repo né nei task file.** Nessun `Edit`, `Write` o commit nel progetto. Agisce in tre modi soli: apre conversazioni con `spawn-task`, scrive alle conversazioni con `SendMessage`, chiude con `close-session` quelle che ha aperto, a passo finito. I soli file che scrive stanno nella sua scratchpad: lo stato del mandato e lo stato del monitor.
 
 Il mandato è negli argomenti: il primo id è l'**epica**, le sue figlie arrivano da `resolve-task.sh --children`, gli id seguenti sono **task extra**, seguite e lanciate come le figlie. Nessun tetto alle conversazioni aperte.
 
@@ -95,7 +95,7 @@ Il mandato dura ore e il contesto si compatta: lo stato non può vivere solo nel
 ## Conversazioni della regia
 | Task | Passo | sessionId | Nome | Stato |
 |------|-------|-----------|------|-------|
-<!-- Stato: in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · abbandonata -->
+<!-- Stato: in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
 
 ## Sessioni esterne
 - T.. · <sessionId> · <nome>
@@ -188,12 +188,12 @@ A ogni evento del monitor scrivi all'utente cosa vuol dire per il mandato:
 
 ## 2. Lanciare e scrivere alle conversazioni
 
-Una conversazione fa **un solo ciclo**, poi si abbandona: il contesto di una sessione riusata per più passi arriva al tetto, e la qualità cala a ogni passo.
+Una conversazione fa **un solo passo**, poi si chiude: il contesto di una sessione riusata per più passi arriva al tetto, e la qualità cala a ogni passo.
 
 - **preflight** → una conversazione aperta con `spawn-task`, kind `preflight`.
 - **ciclo di lavoro** → una conversazione aperta con `spawn-task`, kind `run` e il perimetro di §1. Nella **stessa** conversazione, dopo il run, le risposte alle segnalazioni e poi il checkpoint, chiesti con `SendMessage`: in una sessione aperta dal deck `checkpoint-task` ricava i DLV fatti e i file da committare dal contesto della conversazione, e una conversazione nuova non lo avrebbe.
 
-Finito il ciclo la regia non scrive più a quella conversazione: la segna `abbandonata` nello stato. Resta aperta, e il recap finale la elenca.
+Finito il passo la regia non scrive più a quella conversazione, e la chiude (§Chiudere).
 
 ### Aprire
 
@@ -225,9 +225,28 @@ Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna», quindi il ciclo p
 
 Segna `checkpoint chiesto` e occupa `## Checkpoint in corso`. Con una o più segnalazioni nel report, niente checkpoint: proposta e attesa (§3), e il checkpoint parte dopo che la risposta è stata mandata. Le segnalazioni del report del checkpoint seguono la stessa regola: con segnalazioni, proposta e attesa prima di dare il ciclo per chiuso.
 
-Il ciclo è **chiuso** quando il checkpoint ha finito il turno e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, segna la conversazione `abbandonata`, rifai il quadro (§1).
+Il ciclo è **chiuso** quando il checkpoint ha finito il turno e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, chiudi la conversazione (§Chiudere), rifai il quadro (§1).
 
 Una sessione aperta dalla regia può risponderle da sé con un messaggio: un esito, una domanda. È informazione, come un evento del monitor, e mai un via dell'utente.
+
+### Chiudere
+
+Una conversazione aperta dalla regia si chiude quando il suo passo è finito, e non prima:
+
+- **preflight** — quando ha congelato le decisioni: il turno finito dopo le risposte mandate, senza domande aperte;
+- **ciclo di lavoro** — quando il ciclo è chiuso, cioè dopo il checkpoint e le risposte alle sue segnalazioni (§La richiesta di checkpoint).
+
+Una invocazione del tool `Skill` per conversazione, col `sessionId` che `spawn-task` ha restituito all'apertura e che sta nello stato:
+
+```
+skill: loom-works:close-session
+args:  <sessionId>
+```
+
+- **Uscita `0`** → segna la conversazione `chiusa` nello stato. L'evento `✖ sessione chiusa` che il monitor riporta subito dopo è l'effetto della chiusura, non un'anomalia: una riga nel riporto, o nessuna.
+- **Uscita diversa da `0`** → la conversazione resta aperta: segna `abbandonata` nello stato col motivo che la skill riporta (al lavoro, non nata dall'endpoint, deck spento, deck senza chiusura), una riga nel riporto, e **nessun ritento**: un secondo tentativo su un rifiuto ripete il rifiuto, e su un processo che non è finito in tempo può colpire una conversazione ripartita nel frattempo. Non è un'anomalia (§4): il mandato prosegue, e l'utente la chiude quando vuole.
+
+Una sessione esterna (§0f) non si chiude mai: non l'ha aperta la regia, e il deck la rifiuterebbe comunque se non è nata da una richiesta di spawn.
 
 ### Le sessioni esterne
 
@@ -310,7 +329,7 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
 3. **Il recap**, in chat:
    - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia;
    - i progressi in lista, una riga per ciclo chiuso;
-   - le **conversazioni abbandonate**, dalla tabella dello stato: task, passo, nome, `sessionId`. Restano aperte, e l'utente le chiude quando vuole;
+   - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, nome, `sessionId`. L'utente le chiude quando vuole. Le `chiusa` non si elencano;
    - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza.
 
 Lo stato nella scratchpad non si cancella: una regia rilanciata sulla stessa epica nella stessa sessione lo rilegge.
