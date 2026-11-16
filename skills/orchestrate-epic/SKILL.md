@@ -123,3 +123,66 @@ Aggiungi `--repo nome=path-relativo` solo per un repo dove lavorano le figlie ch
 **Riarmo.** Il tool `Monitor` uccide il processo dopo 30 minuti al massimo e ti manda un avviso di scadenza. A ogni avviso rilancia **lo stesso comando, con lo stesso `--state`**: il monitor riparte dal punto in cui era, senza ripetere gli eventi già detti e senza perdere quelli capitati nel cambio. La riga di armo diventa `monitor ✅ riarmato: …`. Un evento consegnato dopo un `TaskStop` era già in coda: è in ritardo, ignoralo.
 
 Gli eventi del monitor arrivano come notifiche e non sono risposte dell'utente, anche quando arrivano mentre aspetti il suo via. Il fine turno di una sessione arriva come evento `⏸ turno finito`: è il segnale su cui la regia ragiona, perché la notifica di `SendMessage` con `notify_when_idle` non arriva mentre la regia sta lavorando.
+
+## 1. Il quadro e la scelta del passo
+
+Il passo successivo si decide sul quadro dei file, mai a memoria. Rifai il quadro dopo l'armo e dopo ogni evento che cambia lo stato di una task — un fine turno, un checkpoint finito, una risposta dell'utente:
+
+```bash
+"PY" -B -I "R/mandate.py" tree <epica> --children <figlie> --extra <extra>
+```
+
+Le righe che legge la regia:
+
+| Riga | Cosa dice |
+|---|---|
+| `TASK\|<id>\|prog=…\|size=…\|where=…\|preflight=…\|dlv=a/b\|ac=a/b\|next=…\|blocked=…\|title=…` | stato della task e prossimo passo del suo ciclo |
+| `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo |
+| `MATERIALE\|<id>\|<path> · …` | i path di `## Materiale`, `📁/` sciolto nella task folder |
+| `CONFLICT\|<id>\|<id>\|dipendenza` · `…\|materiale: <path>` | due task aperte che non possono girare insieme |
+
+Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **mai dai glifi del grafo**: fra la promozione e il checkpoint i glifi del grafo restano indietro. Il grafo dà solo le frecce.
+
+`next` vale:
+
+- `preflight` — nessun preflight valido: manca il blocco datato in `## Decisions`, o l'ultimo è una «premessa decaduta». Il primo caso lo lanci; il secondo no: la ricostruzione delle premesse è dell'utente, e la task diventa un ramo fermo (§4).
+- `run` — preflight fatto e DLV aperti.
+- `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è interrotto prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2): scala all'utente.
+- `chiusa` — Prog ✔️, niente da fare.
+- `non-spot` — la task ha `Lane` o `Branch`: la segui e la riporti, ma non la lanci. `spawn-task` apre la tab nella radice del progetto e non sa aprirla nel worktree di una lane.
+- `epica` — un'epica dentro il mandato non si esegue: si orchestra a parte.
+- `assente` — nessun task file: scartala con una riga all'utente.
+
+### Le regole di partenza
+
+Una conversazione nuova parte solo se valgono tutte:
+
+1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua o esterna (§0f).
+2. **Dipendenze soddisfatte**, per ogni passo, preflight compreso: le decisioni di una task poggiano su ciò che la dipendenza ha fatto davvero. Una dipendenza è soddisfatta quando è ✔️, oppure quando la sua voce in `## Dependencies` nomina dei DLV precisi («serve il DLV2 di T21») e quei DLV sono **chiusi a ciclo finito**. Le voci le leggi tu nel task file: `blocked=` conta solo le task, non i DLV.
+3. **Un DLV conta come chiuso solo a ciclo finito.** `run-task` spunta e committa ogni DLV appena chiuso, prima del checkpoint e prima delle risposte alle segnalazioni del suo report. Per la regia il DLV diventa una base solo dopo il checkpoint del suo ciclo e le risposte alle segnalazioni. Una task con segnalazioni in sospeso non fa da base a nessuna: si fermano le sue dipendenti, i rami indipendenti continuano.
+4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia: né una dipendenza fra loro, né un path in comune nei loro `## Materiale`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
+5. **Un checkpoint alla volta in tutto il mandato.** Il checkpoint riscrive il task file e `tasks.md`, e due `checkpoint-task` insieme fanno race su `tasks.md` e su git. Prima di chiederne uno guarda `## Checkpoint in corso` nello stato: se è occupato, il ciclo aspetta in coda, e lo dici in una riga.
+
+Fra le task pronte, parte prima quella che sblocca più task del mandato: conta le righe `DEPS` che la nominano.
+
+### Il perimetro del run
+
+Un ciclo di lavoro è una sola chiamata `run`. Prima del lancio guarda le voci `## Dependencies` delle altre task del mandato: se una nomina un DLV preciso di questa task, il primo ciclo fa **solo quei DLV** (perimetro `2`, `1,3`), e il resto va in un ciclo successivo, in un'altra conversazione. Le dipendenze vivono spesso al livello del singolo DLV, e un run su tutti i DLV terrebbe ferma la dipendente fino alla fine. Senza DLV nominati, il perimetro è tutti i DLV aperti: `run` senza perimetro.
+
+### Il riporto
+
+A ogni evento del monitor scrivi all'utente cosa vuol dire per il mandato:
+
+| Evento | Riporto |
+|---|---|
+| ciclo chiuso che sblocca un'altra task | cosa si sblocca e cosa lanci adesso |
+| sessione ferma su domande o segnalazioni | chi aspetta, per cosa, e la proposta (§3) |
+| commit, push, fase doc di un checkpoint | una riga: cosa registra, «per il parallelo non cambia niente» |
+| sessione nuova | quale task segue; se la task ha già una conversazione in ciclo, l'avviso di non farle lavorare insieme |
+| risposta dell'utente in una tab che rischia un danno | cosa sparisce e cosa resta, per esteso |
+
+- Ogni id di task porta la sua maniglia, sempre: `T32 (campione Naviga su dev)`.
+- Un evento minore prende una riga; non riempire il silenzio.
+- L'evento è un fatto, la deduzione si dice come tale («molto probabilmente è il DLV3»).
+- Quando la notifica non basta, apri il transcript prima di scrivere: `"PY" -B -I "R/sessions.py" tail <prefisso del sessionId> --chars 6000`.
+- Il monitor etichetta una sessione con la sua task: due conversazioni sulla stessa task portano la stessa etichetta. Quale delle due ha parlato lo dice `sessions.py list`, con stato ed età di ognuna.
