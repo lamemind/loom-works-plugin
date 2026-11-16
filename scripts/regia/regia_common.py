@@ -427,15 +427,19 @@ def first_meaningful_line(text):
     return ""
 
 
-# Messaggi che Claude Code consegna come prompt ma che non ha scritto nessuno:
-# la fine di un comando o di un subagent in background, il messaggio di un
-# subagent o di un'altra sessione, i promemoria e i comandi locali.
+# Messaggi che Claude Code registra come `type: user` ma che non ha scritto
+# nessuno: la fine di un comando o di un subagent in background, il messaggio di
+# un subagent o di un'altra sessione, i promemoria, i comandi locali, e
+# l'interruzione di un turno (esc, o un permesso negato), che ha anche la
+# variante `[Request interrupted by user for tool use]`: si confronta per
+# prefisso.
 MACHINE_PROMPT_PREFIXES = (
     "<task-notification>",
     "<agent-message",
     "<cross-session-message",
     "<system-reminder>",
     "<local-command",
+    "[Request interrupted by user",
 )
 
 

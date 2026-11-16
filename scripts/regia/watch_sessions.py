@@ -340,6 +340,10 @@ def scan_sessions(state, settings):
             continue  # entry a metà scrittura: il giro dopo la rilegge
         del state["processes"][key]
         if initialized:
+            # I record scritti fra l'ultimo giro e la chiusura (l'ultima
+            # risposta prima di un /exit) si leggono ora: dopo non c'è più un
+            # processo da cui risalire al transcript.
+            read_new_records(process)
             emit(f"{process['label']} ✖ sessione chiusa {short_id(process['session_id'])}")
 
 
