@@ -233,3 +233,40 @@ Una sessione aperta dalla regia può risponderle da sé con un messaggio: un esi
 ### Le sessioni esterne
 
 A una sessione che la regia non ha aperto (§0f) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia.
+
+## 3. Proposte di risposta
+
+Una sessione ferma su una domanda aspetta l'utente, non la regia. La regia accorcia l'attesa: legge cosa chiede, prepara la risposta col perché di ogni scelta, e la manda **solo col via dell'utente**.
+
+**Quando.** Un evento `⏸ turno finito` di una sessione che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}` — oppure un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Leggi la sessione per intero prima di proporre: `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000`.
+
+**Cosa proponi.**
+
+- **Preflight** — una risposta per ogni `D{N}`: la strada (`D2.B`, o una nuova in prosa) e il perché, ricavato dal quadro del mandato e dalle decisioni già congelate nelle altre task. Sulle proposte `P{N}` del preflight **taci**: il silenzio le accetta, e smentirle è dell'utente. Unica eccezione, una `P{N}` che contraddice una decisione già congelata in un'altra task del mandato: la nomini, con le due decisioni a confronto.
+- **Segnalazioni** — per ogni `S{N}` un'uscita, `subito` · `task` · `scarto` · `ignora`, col perché; per `scarto` anche il motivo che finirà nel registro ADR.
+- **`AskUserQuestion` e permessi** — la proposta c'è, ma la risposta si dà **nella tab**: un messaggio di un'altra sessione non risponde a un `AskUserQuestion` aperto e non approva un permesso, per costruzione di Claude Code. Di' all'utente quale tab aprire e cosa scegliere.
+
+**Una proposta per sessione ferma**, scritta in chat come blocco pronto da mandare: nome della conversazione, cosa chiede, il testo del messaggio, il perché di ogni scelta. Con più sessioni ferme, **in testa quella che sblocca più task**. Una risposta che rischia un danno — un dato cancellato, un trigger spento, una tabella altrui — la dici per esteso: cosa sparisce e cosa resta. Scrivi la proposta in `## Proposte in sospeso` dello stato.
+
+**Il via.** L'utente risponde in prosa, nel turno dopo:
+
+- «mandale» → manda ogni proposta in sospeso così com'è;
+- «manda T32 con D2.B» → cambia la proposta come dice, poi la mandi;
+- risponde da sé nella tab → la proposta si ritira: lo vedi dall'evento `✍ prompt utente` di quella sessione. Toglila dallo stato e non mandarla.
+
+Una proposta senza via resta in sospeso: non la mandi, non la ricordi a ogni evento.
+
+**Il messaggio.** Prima riga con la firma, poi le risposte:
+
+```
+Risposte al preflight di T<id> — approvate dall'utente, inviate dalla regia di T<epica>.
+
+D1 → D1.A: <testo>
+D3 → <strada nuova, in prosa>
+```
+
+Per le segnalazioni la prima riga è `Risposte alle segnalazioni di T<id> — approvate dall'utente, inviate dalla regia di T<epica>.`, poi una riga per `S{N}` con l'uscita e le parole dell'utente, che la sessione scriverà come approfondimento dello scenario. La firma tiene la decisione all'utente anche quando la porta la regia, e la sessione la scrive come una risposta normale.
+
+La firma è vera solo dopo il via dato in questa chat: il classificatore di auto mode blocca un messaggio che dichiara un'approvazione mai data, ed è giusto così. Mai la firma su un testo che l'utente non ha visto.
+
+Dopo l'invio togli la proposta dallo stato. Se erano le segnalazioni di un run, il ciclo prosegue col checkpoint (§2).
