@@ -110,6 +110,22 @@ def is_within(path, root, windows=IS_WINDOWS):
     return candidate.startswith(base if base.endswith(separator) else base + separator)
 
 
+def relative_location(cwd, project_root):
+    """La sottocartella in cui è nata una sessione, relativa alla radice;
+    stringa vuota per la radice stessa.
+
+    Su Windows `os.path.relpath` solleva `ValueError` su due path di drive
+    diversi, e la grafia MSYS (`/c/…`) che a volte compare nel `cwd` è per lui
+    un altro drive: lì vale l'ultimo segmento del path.
+    """
+    if comparable_path(cwd) == comparable_path(project_root):
+        return ""
+    try:
+        return os.path.relpath(cwd, project_root)
+    except ValueError:
+        return os.path.basename(cwd.rstrip("/\\")) or cwd
+
+
 # ---------------------------------------------------------------------------
 # Registro vivo: ~/.claude/sessions/<pid>.json
 # ---------------------------------------------------------------------------

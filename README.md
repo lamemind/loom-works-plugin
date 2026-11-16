@@ -111,11 +111,12 @@ Skills read the blocks with `scripts/config/project-config.sh`. Contract — res
 
 ## Runtime dependencies
 
-Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception.
+Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with two exceptions, both Python with the standard library only.
 
 | Dependency | Required by | Without it |
 |---|---|---|
-| `python3` | `scripts/docs/md-wrap.py` (the only non-bash script) | The script cannot be spawned at all. A consumer that invokes it must stay silent instead of breaking: the absence of an interpreter is an unavailable measurement, not an error to report. |
+| `python3` | `scripts/docs/md-wrap.py` | The script cannot be spawned at all. A consumer that invokes it must stay silent instead of breaking: the absence of an interpreter is an unavailable measurement, not an error to report. |
+| `python3` (or `python` on Windows) | `scripts/regia/watch_sessions.py`, `scripts/regia/sessions.py` — the monitor that follows the live sessions of a project, and `list`/`tail` on them | No monitor for the regia of an epic. Whoever launches it reports the missing interpreter. |
 
 ## TTS support
 

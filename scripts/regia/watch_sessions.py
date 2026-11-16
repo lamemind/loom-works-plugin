@@ -38,6 +38,10 @@ import subprocess
 import sys
 import time
 
+# Il modulo comune si carica dal path esplicito della cartella dello script:
+# con `python -I` la cartella non entra da sola in sys.path. Nessun __pycache__:
+# la cartella è la cache del plugin, che non si scrive.
+sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
@@ -342,9 +346,8 @@ def scan_sessions(state, settings):
 def relative_cwd(cwd, settings):
     """` [loom-deck]` per una sessione nata in una sottocartella, niente per
     una nata nella radice."""
-    if regia_common.comparable_path(cwd) == regia_common.comparable_path(settings.project_root):
-        return ""
-    return f" [{os.path.relpath(cwd, settings.project_root)}]"
+    location = regia_common.relative_location(cwd, settings.project_root)
+    return f" [{location}]" if location else ""
 
 
 def split_sections(text):

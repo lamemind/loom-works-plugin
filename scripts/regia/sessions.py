@@ -22,6 +22,10 @@ import os
 import sys
 import time
 
+# Il modulo comune si carica dal path esplicito della cartella dello script:
+# con `python -I` la cartella non entra da sola in sys.path. Nessun __pycache__:
+# la cartella è la cache del plugin, che non si scrive.
+sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
@@ -57,9 +61,8 @@ def command_list(project_root):
         path = regia_common.transcript_path(session.cwd, session.session_id)
         label = regia_common.session_label(
             session.session_id, bindings.get(session.session_id), regia_common.task_of_transcript(path))
-        where = ""
-        if regia_common.comparable_path(session.cwd) != regia_common.comparable_path(project_root):
-            where = f"[{os.path.relpath(session.cwd, project_root)}]  "
+        location = regia_common.relative_location(session.cwd, project_root)
+        where = f"[{location}]  " if location else ""
         unverified = " (pid non verificato)" if session.alive is None else ""
         print(f"{session.session_id[:8]}  {label:7}  {status_with_age(session, now):14}  "
               f"{where}{first_prompt(path)[:100]}{unverified}")
