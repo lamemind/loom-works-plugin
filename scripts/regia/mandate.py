@@ -242,7 +242,7 @@ def materiale_paths(lines, folder):
 def read_task(project_root, docs, task_id, overview):
     progress, title = overview.get(task_id, ("?", ""))
     task = {"id": task_id, "prog": normalize_glyph(progress) or "?", "title": title,
-            "file": None, "size": "?", "where": "spot", "preflight": "none",
+            "file": None, "size": "?", "preflight": "none",
             "dlv": [0, 0], "ac": [0, 0], "deps": [], "materiale": []}
     path = find_task_file(project_root, docs, task_id)
     if path is None:
@@ -253,12 +253,6 @@ def read_task(project_root, docs, task_id, overview):
     if not task["title"] and lines and lines[0].startswith("# Task:"):
         task["title"] = lines[0][len("# Task:"):].strip()
     task["size"] = header_field(lines, "Size") or "?"
-    lane = header_field(lines, "Lane")
-    branch = header_field(lines, "Branch")
-    if branch:
-        task["where"] = f"branch {branch}"
-    elif lane and not lane.lower().startswith("nessuna"):
-        task["where"] = f"lane {lane}"
     task["preflight"] = preflight_state(lines)
     task["dlv"] = list(count_checkboxes(section_lines(lines, "Deliverables Checklist")))
     task["ac"] = list(count_checkboxes(section_lines(lines, "Acceptance Criteria")))
@@ -269,16 +263,15 @@ def read_task(project_root, docs, task_id, overview):
 
 def next_step(task):
     """Il prossimo passo del ciclo di una task, dai soli file: preflight se
-    manca, poi run finché c'è un DLV aperto, poi checkpoint. Le task che la
-    regia non lancia lo dicono al posto del passo."""
+    manca, poi run finché c'è un DLV aperto, poi checkpoint. Lane e branch
+    non entrano: dove e quando lanciare lo decide la regia, non un campo
+    dell'header."""
     if task["file"] is None:
         return "assente"
     if task["prog"] == normalize_glyph("✔️"):
         return "chiusa"
     if task["size"].lower().startswith("epic"):
         return "epica"
-    if task["where"] != "spot":
-        return "non-spot"
     if task["preflight"] != "ok":
         return "preflight"
     done, total = task["dlv"]
@@ -307,12 +300,16 @@ def snapshot(project_root, epic, children, extra):
         if task_id not in mandate and task_id != epic:
             mandate.append(task_id)
     tasks = {task_id: read_task(project_root, docs, task_id, overview) for task_id in [epic] + mandate}
+    # Una figlia che nomina la propria epica fra le dipendenze non aspetta
+    # niente: l'epica si chiude dopo le figlie, e contarla terrebbe la figlia
+    # ferma per sempre.
     dependencies = {task_id: [] for task_id in mandate}
     for task_id in mandate:
         for dependency in tasks[task_id]["deps"]:
-            dependencies[task_id].append((dependency, "deps"))
+            if dependency != epic:
+                dependencies[task_id].append((dependency, "deps"))
     for task_id, dependency, source in graph_edges(tasks_md_lines):
-        if task_id in dependencies and dependency != task_id:
+        if task_id in dependencies and dependency not in (task_id, epic):
             dependencies[task_id].append((dependency, source))
     closed = normalize_glyph("✔️")
     for task_id in mandate:
@@ -353,7 +350,7 @@ def print_tree(state):
     print(f"EPIC|{epic['id']}|prog={epic['prog']}|size={epic['size']}|{figures(epic)}|title={epic['title']}")
     for task_id in state["mandate"]:
         task = state["tasks"][task_id]
-        print(f"TASK|{task_id}|prog={task['prog']}|size={task['size']}|where={task['where']}"
+        print(f"TASK|{task_id}|prog={task['prog']}|size={task['size']}"
               f"|preflight={task['preflight']}|{figures(task)}|next={task['next']}"
               f"|blocked={','.join(task['open_dependencies']) or '-'}|title={task['title']}")
         if task["dependencies"]:

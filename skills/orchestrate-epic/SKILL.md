@@ -136,8 +136,8 @@ Le righe che legge la regia:
 
 | Riga | Cosa dice |
 |---|---|
-| `TASK\|<id>\|prog=…\|size=…\|where=…\|preflight=…\|dlv=a/b\|ac=a/b\|next=…\|blocked=…\|title=…` | stato della task e prossimo passo del suo ciclo |
-| `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo |
+| `TASK\|<id>\|prog=…\|size=…\|preflight=…\|dlv=a/b\|ac=a/b\|next=…\|blocked=…\|title=…` | stato della task e prossimo passo del suo ciclo |
+| `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo. L'epica del mandato non compare: si chiude dopo le figlie, e una figlia che la nomina non la aspetta |
 | `MATERIALE\|<id>\|<path> · …` | i path di `## Materiale`, `📁/` sciolto nella task folder |
 | `CONFLICT\|<id>\|<id>\|dipendenza` · `…\|materiale: <path>` | due task aperte che non possono girare insieme |
 
@@ -149,7 +149,6 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 - `run` — preflight fatto e DLV aperti.
 - `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è interrotto prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2): scala all'utente.
 - `chiusa` — Prog ✔️, niente da fare.
-- `non-spot` — la task ha `Lane` o `Branch`: la segui e la riporti, ma non la lanci. `spawn-task` apre la tab nella radice del progetto e non sa aprirla nel worktree di una lane.
 - `epica` — un'epica dentro il mandato non si esegue: si orchestra a parte.
 - `assente` — nessun task file: scartala con una riga all'utente.
 
