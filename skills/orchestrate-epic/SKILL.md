@@ -295,3 +295,23 @@ Una regia che aspetta l'utente chiude il turno, e compass la mostra `done`, non 
 - un evento `🧊 ferma da N min` su una conversazione in ciclo.
 
 La regia ferma la task e le sue dipendenti, scrive il motivo in `## Rami fermi`, scala all'utente e **non rilancia**: un secondo tentativo su una causa non capita ripete il guasto, e può ripetere anche quello che il primo ha già scritto. I rami indipendenti continuano. Il ramo riparte quando l'utente lo dice.
+
+## 5. Stop
+
+La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta di checkpoint è in corso, dillo: il checkpoint finisce da sé, ma nessuno lo seguirà più.
+
+1. **`TaskStop` sul monitor.** Un evento che arriva dopo è in ritardo: ignoralo.
+2. **Le cifre finali**, accanto a quelle salvate all'avvio:
+
+   ```bash
+   "PY" -B -I "R/mandate.py" recap --before "SP/regia-<epica>-prima.json"
+   ```
+
+   Una riga `RECAP|<id>|prog=prima→dopo|dlv=a/b→c/d|ac=a/b→c/d|title=…` per l'epica e per ogni task del mandato.
+3. **Il recap**, in chat:
+   - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia;
+   - i progressi in lista, una riga per ciclo chiuso;
+   - le **conversazioni abbandonate**, dalla tabella dello stato: task, passo, nome, `sessionId`. Restano aperte, e l'utente le chiude quando vuole;
+   - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza.
+
+Lo stato nella scratchpad non si cancella: una regia rilanciata sulla stessa epica nella stessa sessione lo rilegge.
