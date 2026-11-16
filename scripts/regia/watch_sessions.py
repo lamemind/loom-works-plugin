@@ -2,11 +2,18 @@
 watch_sessions — segue le sessioni Claude Code vive di un progetto loom-works.
 
 Ogni riga su stdout è un evento per il tool Monitor di Claude Code:
+  - dal registro vivo (~/.claude/sessions/<pid>.json): sessione nuova, sessione
+    chiusa, transcript nuovo dopo un /clear
   - dai transcript delle altre sessioni: turno finito, domanda all'utente,
-    skill lanciata, prompt dell'utente, sessione nuova
+    skill lanciata, prompt dell'utente
   - dai task file: sezione cambiata, cifre di DLV e AC, campo Progress
   - da tasks.md: colonna Prog della tabella Tasks Overview
   - da git: commit locali nuovi e push su origin, per ogni repo guardato
+
+Le sessioni sono quelle del registro vivo con `cwd` dentro la radice del
+progetto, comprese quelle nate in un submodule: il transcript di ognuna si
+ricava dal suo `cwd`. La chiave di una sessione è il processo (pid +
+`procStart`), non il `sessionId`, che cambia a ogni /clear.
 
 Lo stato sta in un file JSON (--state): un monitor riarmato con lo stesso file
 non ripete gli eventi già detti e non perde quelli capitati nel cambio. Il primo
@@ -43,20 +50,12 @@ def parse_arguments():
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     parser.add_argument("--own-session", default="", help="session id da saltare: quello che lancia il monitor")
     parser.add_argument("--state", required=True, help="file JSON di stato; tenerlo fuori dal repo")
-    parser.add_argument("--transcript-dir", default="", help="default: ~/.claude/projects/<radice codificata>")
     parser.add_argument("--repo", action="append", default=[],
                         help="nome=path relativo alla radice; ripetibile")
     parser.add_argument("--poll-seconds", type=int, default=15)
-    parser.add_argument("--live-window-minutes", type=int, default=20,
-                        help="un transcript fermo da più tempo resta fuori finché non si muove")
     parser.add_argument("--once", action="store_true",
                         help="un giro solo: legge, salva lo stato ed esce")
     return parser.parse_args()
-
-
-def default_transcript_dir(project_root):
-    encoded = re.sub(r"[^A-Za-z0-9]", "-", project_root)
-    return os.path.join(os.path.expanduser("~"), ".claude", "projects", encoded)
 
 
 def emit(line):
@@ -64,10 +63,14 @@ def emit(line):
 
 
 def load_state(state_path):
+    state = {}
     if os.path.exists(state_path):
         with open(state_path, encoding="utf-8") as state_handle:
-            return json.load(state_handle)
-    return {"transcripts": {}, "task_files": {}, "progress": {}, "git_refs": {}}
+            state = json.load(state_handle)
+    for section in ("processes", "task_files", "progress", "git_refs"):
+        state.setdefault(section, {})
+    state.setdefault("own_processes", [])
+    return state
 
 
 def save_state(state_path, state):
@@ -77,56 +80,49 @@ def save_state(state_path, state):
     os.replace(temporary_path, state_path)
 
 
-def first_meaningful_line(text):
-    for raw_line in text.splitlines():
-        cleaned = raw_line.strip().lstrip("#").strip().strip("*").strip()
-        if cleaned:
-            return cleaned
-    return ""
+def task_id_in_text(text):
+    match = TASK_ID_PATTERN.search(text)
+    return match.group(1) if match else None
 
 
 def task_id_of_transcript(path):
-    with open(path, encoding="utf-8", errors="replace") as transcript_handle:
-        for index, line in enumerate(transcript_handle):
-            match = TASK_ID_PATTERN.search(line)
-            if match:
-                return match.group(1)
-            if index > 400:
-                break
-    return "?" + os.path.basename(path)[:6]
+    """La task scritta dall'hook SessionStart di loom-works nei primi record."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as transcript_handle:
+            for index, line in enumerate(transcript_handle):
+                task_id = task_id_in_text(line)
+                if task_id:
+                    return task_id
+                if index > 400:
+                    break
+    except OSError:
+        pass
+    return None
 
 
-def describe_user_prompt(content):
-    command_match = re.search(r"<command-name>(.*?)</command-name>", content)
-    if command_match:
-        args_match = re.search(r"<command-args>(.*?)</command-args>", content, re.S)
-        args = args_match.group(1).strip() if args_match else ""
-        return f"{command_match.group(1)} {args}".strip()
-    return first_meaningful_line(content)
-
-
-def handle_transcript_record(record, session, label):
+def handle_transcript_record(record, process, label):
     record_type = record.get("type")
     if record_type == "system" and record.get("subtype") == "turn_duration":
-        summary = first_meaningful_line(session.get("last_text", ""))
+        summary = regia_common.first_meaningful_line(process.get("last_text", ""))
         emit(f"{label} ⏸ turno finito, aspetta l'utente: {summary[:160]}")
         return
-    message = record.get("message") or {}
-    content = message.get("content")
-    if record_type == "user" and isinstance(content, str):
-        if "<system-reminder>" in content[:40] or "<local-command" in content:
-            return
-        emit(f"{label} ✍ prompt utente: {describe_user_prompt(content)[:140]}")
+    prompt = regia_common.user_prompt_text(record)
+    if prompt is not None:
+        emit(f"{label} ✍ prompt utente: {regia_common.describe_prompt(prompt)[:140]}")
         return
-    if record_type != "assistant" or not isinstance(content, list):
+    content = (record.get("message") or {}).get("content")
+    if record_type != "assistant" or record.get("isSidechain") or not isinstance(content, list):
         return
     for block in content:
+        if not isinstance(block, dict):
+            continue
         block_type = block.get("type")
         if block_type == "text" and block.get("text", "").strip():
-            session["last_text"] = block["text"]
+            process["last_text"] = block["text"]
         elif block_type == "tool_use":
             tool_name = block.get("name")
             tool_input = block.get("input") or {}
+            process["last_tool"] = tool_name
             if tool_name == "Skill":
                 emit(f"{label} ▶ skill {tool_input.get('skill')} {str(tool_input.get('args') or '')[:80]}")
             elif tool_name == "AskUserQuestion":
@@ -134,43 +130,147 @@ def handle_transcript_record(record, session, label):
                 emit(f"{label} ❓ domanda all'utente: {questions[0].get('question', '')[:160]}")
 
 
-def scan_transcripts(state, settings):
-    now = time.time()
-    for path in glob.glob(os.path.join(settings.transcript_dir, "*.jsonl")):
-        session_id = os.path.basename(path)[:-6]
-        if session_id == settings.own_session:
-            continue
+def read_new_records(process):
+    """Legge i record completi aggiunti al transcript dall'ultimo giro."""
+    path = process["transcript"]
+    try:
         size = os.path.getsize(path)
-        session = state["transcripts"].get(session_id)
-        if session is None:
-            if now - os.path.getmtime(path) > settings.live_window_minutes * 60:
-                continue
-            label = task_id_of_transcript(path)
-            session = {"offset": size, "label": label, "last_text": ""}
-            state["transcripts"][session_id] = session
-            if state.get("initialized"):
-                emit(f"{label} 🆕 nuova sessione {session_id[:8]}")
+    except OSError:
+        return  # la sessione non ha ancora scritto il primo record
+    if size < process["offset"]:
+        process["offset"] = 0  # file riscritto da capo: si rilegge
+    if size == process["offset"]:
+        return
+    with open(path, "rb") as transcript_handle:
+        transcript_handle.seek(process["offset"])
+        chunk = transcript_handle.read(size - process["offset"])
+    last_newline = chunk.rfind(b"\n")
+    if last_newline < 0:
+        return  # record a metà: si legge al giro dopo
+    process["offset"] += last_newline + 1
+    for raw_line in chunk[: last_newline + 1].splitlines():
+        decoded_line = raw_line.decode("utf-8", errors="replace")
+        try:
+            record = json.loads(decoded_line)
+        except ValueError:
             continue
-        if size <= session["offset"]:
+        if not isinstance(record, dict):
             continue
-        with open(path, "rb") as transcript_handle:
-            transcript_handle.seek(session["offset"])
-            chunk = transcript_handle.read(size - session["offset"])
-        last_newline = chunk.rfind(b"\n")
-        if last_newline < 0:
+        if not process.get("transcript_task"):
+            process["transcript_task"] = task_id_in_text(decoded_line)
+            refresh_label(process)
+        handle_transcript_record(record, process, process["label"])
+
+
+def start_offset(path, since):
+    """Da dove leggere un transcript che il monitor non ha ancora letto.
+
+    Al primo giro (`since` assente) dalla fine: niente eventi sul passato.
+    Dopo, dall'inizio se il transcript è nato dopo il giro precedente (una
+    sessione nuova, un /clear), dalla fine se è più vecchio (un --resume di una
+    conversazione già lunga, che ripeterebbe tutta la sua storia).
+    """
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return 0  # nessun record ancora: quando arriva si legge tutto
+    if since is None:
+        return size
+    born = regia_common.first_record_time(path)
+    if born is None or born >= since - 5:
+        return 0
+    return size
+
+
+def short_id(session_id):
+    return session_id[:8]
+
+
+def refresh_label(process):
+    """L'etichetta della sessione: la task dal transcript, poi quella già nota
+    del processo, poi `?` più l'inizio del sessionId."""
+    process["label"] = (process.get("transcript_task") or process.get("label_task")
+                        or "?" + process["session_id"][:6])
+    if not process["label"].startswith("?"):
+        process["label_task"] = process["label"]
+
+
+def new_process(session, transcript, offset):
+    return {
+        "pid": session.pid,
+        "session_id": session.session_id,
+        "cwd": session.cwd,
+        "transcript": transcript,
+        "offset": offset,
+        "transcript_task": task_id_of_transcript(transcript),
+        "label": "",
+        "last_text": "",
+        "status": session.status,
+    }
+
+
+def is_own(session, state, settings):
+    """La sessione che lancia il monitor non si segue: riporterebbe i propri
+    turni. Il processo si ricorda, così un /clear della regia, che cambia il
+    suo sessionId, non la fa ricomparire."""
+    if session.key in state["own_processes"]:
+        return True
+    if settings.own_session and session.session_id.startswith(settings.own_session):
+        state["own_processes"].append(session.key)
+        return True
+    return False
+
+
+def scan_sessions(state, settings):
+    initialized = state.get("initialized")
+    since = state.get("last_scan") if initialized else None
+    registry = regia_common.read_registry(settings.project_root)
+    if not registry.readable:
+        emit("monitor ⚠ registro delle sessioni illeggibile: ~/.claude/sessions")
+        return
+    seen = set()
+    for session in registry.sessions:
+        if is_own(session, state, settings):
             continue
-        session["offset"] += last_newline + 1
-        for raw_line in chunk[: last_newline + 1].splitlines():
-            decoded_line = raw_line.decode("utf-8", errors="replace")
-            try:
-                record = json.loads(decoded_line)
-            except json.JSONDecodeError:
-                continue
-            if session["label"].startswith("?"):
-                match = TASK_ID_PATTERN.search(decoded_line)
-                if match:
-                    session["label"] = match.group(1)
-            handle_transcript_record(record, session, session["label"])
+        seen.add(session.key)
+        process = state["processes"].get(session.key)
+        transcript = regia_common.transcript_path(session.cwd, session.session_id)
+        if process is None:
+            process = new_process(session, transcript, start_offset(transcript, since))
+            refresh_label(process)
+            state["processes"][session.key] = process
+            if initialized:
+                where = relative_cwd(session.cwd, settings)
+                emit(f"{process['label']} 🆕 nuova sessione {short_id(session.session_id)}{where}")
+        elif process["session_id"] != session.session_id:
+            process.update(session_id=session.session_id, transcript=transcript,
+                           offset=start_offset(transcript, since),
+                           transcript_task=task_id_of_transcript(transcript))
+            refresh_label(process)
+            if initialized:
+                emit(f"{process['label']} 🔄 transcript nuovo {short_id(session.session_id)} "
+                     f"(/clear o compattazione)")
+        else:
+            process["transcript"] = transcript
+        read_new_records(process)
+        process["status"] = session.status
+    for key in list(state["processes"]):
+        if key in seen:
+            continue
+        process = state["processes"][key]
+        if process["pid"] in registry.unreadable:
+            continue  # entry a metà scrittura: il giro dopo la rilegge
+        del state["processes"][key]
+        if initialized:
+            emit(f"{process['label']} ✖ sessione chiusa {short_id(process['session_id'])}")
+
+
+def relative_cwd(cwd, settings):
+    """` [loom-deck]` per una sessione nata in una sottocartella, niente per
+    una nata nella radice."""
+    if regia_common.comparable_path(cwd) == regia_common.comparable_path(settings.project_root):
+        return ""
+    return f" [{os.path.relpath(cwd, settings.project_root)}]"
 
 
 def split_sections(text):
@@ -311,7 +411,6 @@ def build_settings(arguments):
     arguments.project_root = os.path.abspath(
         arguments.project_root or regia_common.find_project_root(os.getcwd()))
     arguments.docs_path = os.path.join(arguments.project_root, regia_common.docs_root(arguments.project_root))
-    arguments.transcript_dir = arguments.transcript_dir or default_transcript_dir(arguments.project_root)
     repos = {"root": arguments.project_root}
     for repo_argument in arguments.repo:
         name, _, relative_path = repo_argument.partition("=")
@@ -323,12 +422,10 @@ def build_settings(arguments):
 def main():
     regia_common.setup_stdout()
     settings = build_settings(parse_arguments())
-    if not os.path.isdir(settings.transcript_dir):
-        emit(f"monitor ⚠ cartella dei transcript assente: {settings.transcript_dir}")
-        sys.exit(1)
     state = load_state(settings.state)
-    scanners = (scan_transcripts, scan_task_files, scan_progress_table, scan_git)
+    scanners = (scan_sessions, scan_task_files, scan_progress_table, scan_git)
     while True:
+        scan_started = time.time()
         for scanner in scanners:
             try:
                 scanner(state, settings)
@@ -336,8 +433,9 @@ def main():
                 emit(f"monitor ⚠ {scanner.__name__}: {type(error).__name__}: {error}")
         if not state.get("initialized"):
             state["initialized"] = True
-            labels = sorted(session["label"] for session in state["transcripts"].values())
+            labels = sorted(process["label"] for process in state["processes"].values())
             emit(f"monitor ✅ armato: {', '.join(labels) or 'nessuna sessione viva'}")
+        state["last_scan"] = scan_started
         save_state(settings.state, state)
         if settings.once:
             return
