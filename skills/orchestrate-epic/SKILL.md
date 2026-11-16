@@ -15,7 +15,7 @@ $ARGUMENTS
 Le figlie di un'epica avanzano una per conversazione, e nessuna conversazione vede le altre. La **regia** è la conversazione in più che le vede tutte: un monitor in background le segue, e a ogni evento la regia decide il passo successivo del mandato e lo dice all'utente.
 
 - **Lancia da sé** preflight, run e checkpoint quando le dipendenze lo permettono: l'utente ha dato il mandato invocando la skill, e un ok a ogni conversazione non serve.
-- **Non risponde da sé.** Alle domande delle sessioni — un preflight che chiede, le segnalazioni 🚦 di un report — prepara una proposta motivata e la manda solo col via dell'utente. L'unico messaggio che parte senza via è la richiesta di checkpoint dopo un run pulito (§3).
+- **Non risponde da sé.** Alle domande delle sessioni — un preflight che chiede, le segnalazioni 🚦 di un report — prepara una proposta motivata e la manda solo col via dell'utente. L'unico messaggio che parte senza via è la richiesta di checkpoint dopo un run pulito (§2).
 - **Non scrive mai nei repo né nei task file.** Nessun `Edit`, `Write` o commit nel progetto. Agisce in due modi soli: apre conversazioni con `spawn-task` e scrive alle conversazioni con `SendMessage`. I soli file che scrive stanno nella sua scratchpad: lo stato del mandato e lo stato del monitor.
 
 Il mandato è negli argomenti: il primo id è l'**epica**, le sue figlie arrivano da `resolve-task.sh --children`, gli id seguenti sono **task extra**, seguite e lanciate come le figlie. Nessun tetto alle conversazioni aperte.
@@ -186,3 +186,50 @@ A ogni evento del monitor scrivi all'utente cosa vuol dire per il mandato:
 - L'evento è un fatto, la deduzione si dice come tale («molto probabilmente è il DLV3»).
 - Quando la notifica non basta, apri il transcript prima di scrivere: `"PY" -B -I "R/sessions.py" tail <prefisso del sessionId> --chars 6000`.
 - Il monitor etichetta una sessione con la sua task: due conversazioni sulla stessa task portano la stessa etichetta. Quale delle due ha parlato lo dice `sessions.py list`, con stato ed età di ognuna.
+
+## 2. Lanciare e scrivere alle conversazioni
+
+Una conversazione fa **un solo ciclo**, poi si abbandona: il contesto di una sessione riusata per più passi arriva al tetto, e la qualità cala a ogni passo.
+
+- **preflight** → una conversazione aperta con `spawn-task`, kind `preflight`.
+- **ciclo di lavoro** → una conversazione aperta con `spawn-task`, kind `run` e il perimetro di §1. Nella **stessa** conversazione, dopo il run, le risposte alle segnalazioni e poi il checkpoint, chiesti con `SendMessage`: in una sessione aperta dal deck `checkpoint-task` ricava i DLV fatti e i file da committare dal contesto della conversazione, e una conversazione nuova non lo avrebbe.
+
+Finito il ciclo la regia non scrive più a quella conversazione: la segna `abbandonata` nello stato. Resta aperta, e il recap finale la elenca.
+
+### Aprire
+
+Una invocazione del tool `Skill` per conversazione:
+
+```
+skill: loom-works:spawn-task
+args:  <TaskID> preflight
+args:  <TaskID> run [perimetro]
+```
+
+Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare.
+
+### Scrivere
+
+`SendMessage` col nome della riga `titolo:` come `to`. Se `ListAgents` mostra **più righe vive** con quel nome, aggiungi il `[ref]` della riga `interactive` che la conversazione ha preso all'apertura: il ref non si ricava dal `sessionId`, si legge dall'elenco. Le righe Remote Control offline con lo stesso nome — conversazioni chiuse — non contano: il nome nudo arriva alla viva.
+
+La prima riga di ogni messaggio dice di cosa si tratta e chi lo manda: l'utente di quella sessione vede solo quella finché non lo apre. La sessione riceve il messaggio incartato in `<cross-session-message>`, con l'indicazione che non l'ha scritto il suo utente: il messaggio deve quindi dire per conto di chi parla, e dire il vero.
+
+### La richiesta di checkpoint — l'unico messaggio senza via
+
+Al fine turno di un run (`⏸ turno finito` dalla sua sessione) leggi la chiusura del report con `sessions.py tail`. Se chiude con `**🚦 Segnalazioni** — nessuna` e la riga `## Checkpoint in corso` è libera, chiedi il checkpoint **senza aspettare l'utente**:
+
+```
+Checkpoint del ciclo: lancia /loom-works:checkpoint-task <TaskID> — richiesta della regia di T<epica>.
+
+Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna», quindi il ciclo passa al checkpoint in questa conversazione, che ha il contesto del run.
+```
+
+Segna `checkpoint chiesto` e occupa `## Checkpoint in corso`. Con una o più segnalazioni nel report, niente checkpoint: proposta e attesa (§3), e il checkpoint parte dopo che la risposta è stata mandata. Le segnalazioni del report del checkpoint seguono la stessa regola: con segnalazioni, proposta e attesa prima di dare il ciclo per chiuso.
+
+Il ciclo è **chiuso** quando il checkpoint ha finito il turno e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, segna la conversazione `abbandonata`, rifai il quadro (§1).
+
+Una sessione aperta dalla regia può risponderle da sé con un messaggio: un esito, una domanda. È informazione, come un evento del monitor, e mai un via dell'utente.
+
+### Le sessioni esterne
+
+A una sessione che la regia non ha aperto (§0f) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia.
