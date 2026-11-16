@@ -46,6 +46,7 @@ Then bootstrap the project structure:
 | `/loom-works:checkpoint-task` | Checkpoint progress: analyze changes, commit, update tasks.md |
 | `/loom-works:preflight-task` | Freeze design decisions before execution |
 | `/loom-works:spawn-task` | Ask the project's running deck to open a task conversation (preflight, run with scope, recap, checkpoint) — one spawn per call, no questions |
+| `/loom-works:orchestrate-epic` | Direct an epic semi-automatically: recap, live sessions, session monitor; launches preflight, run and checkpoint of the children through the deck, proposes answers and sends them only on the user's go-ahead — never writes to the repos |
 | `/loom-works:spawn-lane` | Create a persistent git worktree lane |
 | `/loom-works:merge-lane` | Merge lane into main, keep worktree |
 | `/loom-works:drop-lane` | Destroy a lane without merging |
