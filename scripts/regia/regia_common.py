@@ -456,3 +456,71 @@ def describe_prompt(content):
         args = args_match.group(1).strip() if args_match else ""
         return f"{command_match.group(1)} {args}".replace("\n", " ").strip()
     return first_meaningful_line(content)
+
+
+# ---------------------------------------------------------------------------
+# Legame sessione → task
+# ---------------------------------------------------------------------------
+
+# La frase che l'hook SessionStart di loom-works (`inject-task.sh`) scrive nel
+# primo messaggio di una sessione legata a una task via `$LOOM_TASK`.
+TASK_PHRASE_PATTERN = re.compile(r"risolta via \$LOOM_TASK=(T\d+)")
+
+
+def sidecar_path(project_root):
+    return os.path.join(project_root, ".claude", "loom", "session-tasks.jsonl")
+
+
+def load_task_bindings(project_root):
+    """sessionId → taskId dal sidecar del deck, `.claude/loom/session-tasks.jsonl`.
+
+    JSONL append-only, last-wins per campo: un record con un `taskId` diverso
+    riassegna la conversazione, `taskId` vuoto la stacca (torna senza task), un
+    record senza il campo non tocca il legame. È il canale che segue le
+    riassegnazioni fatte nel deck, quindi viene prima della frase nel
+    transcript, che resta quella scritta all'apertura. Stessa lettura di
+    `loadSessionIndex` in `loom-deck/src/task-index.ts`.
+    """
+    bindings = {}
+    try:
+        with open(sidecar_path(project_root), encoding="utf-8", errors="replace") as sidecar_handle:
+            lines = sidecar_handle.readlines()
+    except OSError:
+        return bindings
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(record, dict) or not isinstance(record.get("sessionId"), str):
+            continue
+        task_id = record.get("taskId")
+        if not isinstance(task_id, str):
+            continue
+        if task_id:
+            bindings[record["sessionId"]] = task_id
+        else:
+            bindings.pop(record["sessionId"], None)
+    return bindings
+
+
+def task_of_transcript(path, max_lines=400):
+    """La task della frase `risolta via $LOOM_TASK=<id>` nei primi record del
+    transcript, `None` se non c'è."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as transcript_handle:
+            for index, line in enumerate(transcript_handle):
+                match = TASK_PHRASE_PATTERN.search(line)
+                if match:
+                    return match.group(1)
+                if index >= max_lines:
+                    break
+    except OSError:
+        pass
+    return None
+
+
+def session_label(session_id, sidecar_task, transcript_task):
+    """L'etichetta di una sessione: la task del sidecar, poi quella della frase
+    nel transcript, poi `?` più l'inizio del sessionId."""
+    return sidecar_task or transcript_task or "?" + session_id[:6]

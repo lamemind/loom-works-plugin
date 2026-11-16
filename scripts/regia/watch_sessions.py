@@ -40,7 +40,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
 
-TASK_ID_PATTERN = re.compile(r"LOOM_TASK=(T\d+)")
 CHECKBOX_PATTERN = re.compile(r"^- \[([ x])\]")
 
 
@@ -78,26 +77,6 @@ def save_state(state_path, state):
     with open(temporary_path, "w", encoding="utf-8") as state_handle:
         json.dump(state, state_handle)
     os.replace(temporary_path, state_path)
-
-
-def task_id_in_text(text):
-    match = TASK_ID_PATTERN.search(text)
-    return match.group(1) if match else None
-
-
-def task_id_of_transcript(path):
-    """La task scritta dall'hook SessionStart di loom-works nei primi record."""
-    try:
-        with open(path, encoding="utf-8", errors="replace") as transcript_handle:
-            for index, line in enumerate(transcript_handle):
-                task_id = task_id_in_text(line)
-                if task_id:
-                    return task_id
-                if index > 400:
-                    break
-    except OSError:
-        pass
-    return None
 
 
 def handle_transcript_record(record, process, label):
@@ -157,8 +136,10 @@ def read_new_records(process):
         if not isinstance(record, dict):
             continue
         if not process.get("transcript_task"):
-            process["transcript_task"] = task_id_in_text(decoded_line)
-            refresh_label(process)
+            match = regia_common.TASK_PHRASE_PATTERN.search(decoded_line)
+            if match:
+                process["transcript_task"] = match.group(1)
+                refresh_label(process)
         handle_transcript_record(record, process, process["label"])
 
 
@@ -187,12 +168,29 @@ def short_id(session_id):
 
 
 def refresh_label(process):
-    """L'etichetta della sessione: la task dal transcript, poi quella già nota
-    del processo, poi `?` più l'inizio del sessionId."""
-    process["label"] = (process.get("transcript_task") or process.get("label_task")
-                        or "?" + process["session_id"][:6])
-    if not process["label"].startswith("?"):
-        process["label_task"] = process["label"]
+    """L'etichetta della sessione, a cascata: il sidecar del deck (segue le
+    riassegnazioni), la frase dell'hook SessionStart nel transcript, `?`."""
+    process["label"] = regia_common.session_label(
+        process["session_id"], process.get("sidecar_task"), process.get("transcript_task"))
+
+
+def announce_label_change(process, old_label):
+    """Un evento quando l'etichetta di una sessione già seguita cambia.
+
+    Da `?` a una task è un legame che arriva (la frase dell'hook compare nel
+    transcript, o il deck assegna la conversazione); da una task a `?` un
+    legame tolto nel deck; fra due task una riassegnazione.
+    """
+    new_label = process["label"]
+    if new_label == old_label:
+        return
+    session = short_id(process["session_id"])
+    if old_label.startswith("?"):
+        emit(f"{new_label} 🏷 sessione {session} legata a {new_label}")
+    elif new_label.startswith("?"):
+        emit(f"{new_label} 🔀 sessione {session} staccata da {old_label}")
+    else:
+        emit(f"{new_label} 🔀 sessione {session} riassegnata: {old_label} → {new_label}")
 
 
 def new_process(session, transcript, offset):
@@ -202,7 +200,8 @@ def new_process(session, transcript, offset):
         "cwd": session.cwd,
         "transcript": transcript,
         "offset": offset,
-        "transcript_task": task_id_of_transcript(transcript),
+        "transcript_task": regia_common.task_of_transcript(transcript),
+        "sidecar_task": None,
         "label": "",
         "last_text": "",
         "status": session.status,
@@ -228,6 +227,7 @@ def scan_sessions(state, settings):
     if not registry.readable:
         emit("monitor ⚠ registro delle sessioni illeggibile: ~/.claude/sessions")
         return
+    bindings = regia_common.load_task_bindings(settings.project_root)
     seen = set()
     for session in registry.sessions:
         if is_own(session, state, settings):
@@ -235,8 +235,10 @@ def scan_sessions(state, settings):
         seen.add(session.key)
         process = state["processes"].get(session.key)
         transcript = regia_common.transcript_path(session.cwd, session.session_id)
+        old_label = None
         if process is None:
             process = new_process(session, transcript, start_offset(transcript, since))
+            process["sidecar_task"] = bindings.get(session.session_id)
             refresh_label(process)
             state["processes"][session.key] = process
             if initialized:
@@ -245,14 +247,20 @@ def scan_sessions(state, settings):
         elif process["session_id"] != session.session_id:
             process.update(session_id=session.session_id, transcript=transcript,
                            offset=start_offset(transcript, since),
-                           transcript_task=task_id_of_transcript(transcript))
+                           transcript_task=regia_common.task_of_transcript(transcript),
+                           sidecar_task=bindings.get(session.session_id))
             refresh_label(process)
             if initialized:
                 emit(f"{process['label']} 🔄 transcript nuovo {short_id(session.session_id)} "
                      f"(/clear o compattazione)")
         else:
+            old_label = process["label"]
             process["transcript"] = transcript
+            process["sidecar_task"] = bindings.get(session.session_id)
+            refresh_label(process)
         read_new_records(process)
+        if initialized and old_label is not None:
+            announce_label_change(process, old_label)
         process["status"] = session.status
     for key in list(state["processes"]):
         if key in seen:
