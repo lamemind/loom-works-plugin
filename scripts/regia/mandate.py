@@ -270,7 +270,10 @@ def next_step(task):
         return "assente"
     if task["prog"] == normalize_glyph("✔️"):
         return "chiusa"
-    if task["size"].lower().startswith("epic"):
+    # Un'epica o un mandato fra i membri è un perimetro a sé: non si lancia,
+    # si orchestra a parte (docs/mandate-format.md), e i suoi membri non
+    # entrano in questo albero.
+    if task["size"].lower().startswith(("epic", "mandate")):
         return "epica"
     if task["preflight"] != "ok":
         return "preflight"

@@ -25,7 +25,7 @@ Normalmente ci arrivi da `recap-status` quando nessuna task è attiva. Invocata 
 
 Chi chiede un recap dichiara, con l'atto stesso, di non avere la bussola della situazione. Scrivi quindi a **`K1`** su un perimetro dichiarato:
 
-- **cosa** — il progetto intero: le sue task, le sue epiche, il suo stato
+- **cosa** — il progetto intero: le sue task, le sue epiche e i suoi mandati, il suo stato
 - **dove** — tutto il dominio del progetto (qui *cosa* e *dove* coincidono, perché lo zoom è già il più largo)
 
 `K1` significa: termini comuni nudi, termini specialistici glossati alla prima occorrenza, implicazioni sempre esplicitate, nessuna ancora al mondo di tutti i giorni. La scala `K0`-`K3` non la ridefinisci — vive nell'output style; qui dichiari solo a che grado leggerla dentro il perimetro.
@@ -73,7 +73,7 @@ Blocchi disponibili — **seleziona e adatta** in base al progetto reale. Non tu
 | **Stato git** | sempre — branch, HEAD commit, worktree/lane, lavorazioni uncommitted |
 | **Task attiva** | se symlink presente — focus sullo stato REALE (confronto AC/deliverable vs git) |
 | **Tabella task** | sempre —  ID / Stato / Titolo / preflight. Aggiungi Pri / Size dove aggiungono valore |
-| **Epiche aperte** | se ci sono task `Size: Epic` non chiuse — cappello + figlie aperte, raggruppate |
+| **Epiche aperte** | se ci sono task `Size: Epic` o `Size: Mandate` non chiuse — cappello o mandato + membri aperti, raggruppati. I membri vengono da `${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh <id> --members`: le figlie di un'epica, la lista `## Membri` di un mandato. Una task può comparire sotto più mandati e sotto la sua epica: va ripetuta in ogni gruppo, perché ogni gruppo è un perimetro intero |
 | **Fondamenta consolidate** | su progetti maturi (≥5 task done) — cosa è già a terra, raggruppato per area |
 | **⚠️ Incongruenze** | se ce ne sono — sezione separata, evidenziata |
 | **Gap / residui** | se una task ha lavoro non chiuso — checklist prima di completare |

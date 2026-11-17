@@ -151,7 +151,7 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 - `run` — preflight fatto e DLV aperti.
 - `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è interrotto prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2): scala all'utente.
 - `chiusa` — Prog ✔️, niente da fare.
-- `epica` — un'epica dentro il mandato non si esegue: si orchestra a parte.
+- `epica` — un'epica o un mandato (`Size: Mandate`) dentro il mandato non si esegue: si orchestra a parte.
 - `assente` — nessun task file: scartala con una riga all'utente.
 
 ### Le regole di partenza
