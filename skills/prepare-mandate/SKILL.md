@@ -27,7 +27,7 @@ Questa skill costruisce il perimetro **prima** che la regia parta, e ne scrive l
 | Modo | Cosa scrive | Chi committa |
 |---|---|---|
 | creazione (§2) | un task file nuovo `Size: Mandate`, e la sua riga in `tasks.md` | `create-task.sh` |
-| modifica (§4) | `## Membri`, `## Preferenze d'ordine` e `## Analisi del perimetro` di un mandato che esiste | la skill, il solo file del mandato |
+| modifica (§4) | `## Membri`, `## Preferenze d'ordine` e `## Analisi del perimetro` di un mandato che esiste, la Description se chiesta | la skill, il solo file del mandato |
 | epica (§5) | la sola `## Analisi del perimetro` di un'epica | la skill, il solo file dell'epica |
 
 Confini, in ogni modo:
@@ -194,6 +194,63 @@ Poi la fermata: `AskUserQuestion` con la domanda «Scrivo il mandato <id>?» e t
 - **Annulla** → cancella il file: `git status --short -- <file>` deve stampare `??`, cioè un file mai committato, che è il tuo. L'id torna libero.
 
 Chiudi con il path del file, l'id, il numero di membri e le righe dell'analisi per fonte.
+
+## 4. Modifica di un mandato
+
+Un mandato che esiste si rilancia per aggiungere o togliere membri, cambiare descrizione o preferenze d'ordine, o solo per rifare l'analisi. L'analisi si rifà **intera** a ogni rilancio, anche quando la lista non cambia.
+
+### 4a. Il file è pulito
+
+```bash
+git status --short -- <file del mandato>
+```
+
+Output vuoto → avanti. Altrimenti fermati e dillo: il file ha modifiche non committate, e il commit di questa skill le porterebbe con sé. Chi le ha scritte le committa o le scarta, poi si rilancia.
+
+### 4b. La lista nuova
+
+I membri di oggi si leggono col lettore unico, mai a mano:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <mandato> --members
+```
+
+Poi si applicano le parole dell'utente:
+
+- **«aggiungi T64»** → una riga nuova in fondo a `## Membri`, o nel punto che l'utente dice, con le regole del §2a: task file assente → fuori, ✔️ → avviso, epica o mandato → riga sola. Il mandato non aggiunge sé stesso, e un id già in lista non si ripete.
+- **«togli T52»** → la riga di T52 sparisce. Un id che non è in lista si dice alla conferma, senza toccare niente.
+- **«le figlie di T40»** → come al §2a, le aperte una per una.
+- **descrizione, preferenze d'ordine, una maniglia** → si riscrive quello che le parole dicono, e nient'altro.
+- **nessun verbo** → la lista resta com'è, e si rifà la sola analisi.
+
+Un `TASK_MEMBER_MISSING=<id>` — un membro senza task file, per esempio una task chiusa e purgata — resta in lista finché l'utente non dice di toglierlo: lo mostri alla conferma come tale.
+
+### 4c. La rianalisi
+
+Col metodo del §6, §La rianalisi: `tree` con l'id del mandato in testa e la **lista nuova** dopo `--children`, le righe `dichiarata` e `materiale` ricalcolate, ogni riga `modello` vecchia confermata, riscritta o tolta con la ragione, le coppie dei membri aggiunti analizzate da zero. Il file su disco non cambia ancora: `tree` riceve i membri dagli argomenti, e la sezione `## Membri` del file non la legge.
+
+### 4d. La conferma e il commit
+
+In chat, prima della domanda:
+
+- la differenza di `## Membri`: `+ T64 (maniglia)`, `− T52 (maniglia)`;
+- le preferenze d'ordine e la descrizione nuove, se cambiano;
+- la differenza dell'analisi riga per riga (`=` `+` `-` `~`, §6);
+- le note del §3: avvisi sui membri, dipendenze aperte fuori dal perimetro, dipendenze non dichiarate, punti ciechi.
+
+Poi la fermata: `AskUserQuestion` con la domanda «Aggiorno il mandato <id>?» e tre opzioni — aggiorna · correggo · annulla.
+
+- **Aggiorna** → scrivi col tool `Edit` le sole sezioni che cambiano: `## Membri`, `## Preferenze d'ordine` (creata se prima non c'era, tolta se l'utente la svuota), `## Analisi del perimetro` sostituita intera, e la Description se l'utente l'ha chiesto. Poi il commit del **solo** file del mandato:
+
+  ```bash
+  source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
+    && lw_git_add_n_commit "task(<id>): mandato — <+T64 −T52 | analisi rifatta>" "<file del mandato>" \
+    && lw_git_push "$(lw_current_branch)"
+  ```
+
+  `tasks.md` non si tocca: la riga del mandato non cambia.
+- **Correggo** → applica, rifai la rianalisi se cambia la lista, mostra e richiedi.
+- **Annulla** → niente da cancellare: il file non è cambiato.
 
 ## 6. L'analisi del perimetro
 
