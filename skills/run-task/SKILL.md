@@ -33,15 +33,15 @@ Fai **sempre** `Read` di `TASK_FILE`: in contesto può non esserci affatto (invo
 
 `TASK_SRC` decide il regime di commit e nient'altro: `symlink` → linked · `env`/`arg` → **detached**, e in detached ogni commit porta la propria pathspec (§6).
 
-## 1. Gate `Size: Epic` — dichiara e fermati
+## 1. Gate `Size: Epic` e `Size: Mandate` — dichiara e fermati
 
-Prima di ogni altra cosa, e prima del fallback su Size assente, o un cappello verrebbe eseguito come una task media. Un perimetro dichiarato nelle Note utente **non** apre il gate.
+Prima di ogni altra cosa, e prima del fallback su Size assente, o un'epica o un mandato verrebbe eseguito come una task media. Un perimetro di DLV dichiarato nelle Note utente **non** apre il gate.
 
-Una task `Size: Epic` è un cappello, e un cappello non ha lavoro eseguibile proprio: sta tutto nelle figlie. Non aprire nessun deliverable, non scrivere codice. Stampa invece:
+Una task `Size: Epic` è un cappello: il suo lavoro sta tutto nelle figlie. Una task `Size: Mandate` è il perimetro di una regia: elenca nel proprio file task di epiche diverse e orfane, e il lavoro sta tutto nei membri (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). Nessuna delle due ha lavoro eseguibile proprio. Non aprire nessun deliverable, non scrivere codice. Stampa invece:
 
-- che `${taskId}` è un'epica e che `run-task` non la esegue
-- l'elenco delle figlie con la loro Prog, da `${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --children`
-- l'invito a eseguire una figlia (`/loom-works:run-task T{N}`) o a chiedere il quadro con `/loom-works:recap-status-epic ${taskId}`
+- che `${taskId}` è un'epica, o un mandato, e che `run-task` non la esegue
+- l'elenco dei membri con la loro Prog, da `${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --members` — le figlie per un'epica, la lista `## Membri` per un mandato; un `TASK_MEMBER_MISSING=<id>` è un membro dichiarato senza task file, e va nell'elenco come tale
+- l'invito a eseguire un membro (`/loom-works:run-task T{N}`) o a chiedere il quadro con `/loom-works:recap-status-epic ${taskId}`
 
 Poi termina. Nessuna promozione, nessun ping TTS, nessuna fase Doc Impact: non è stato fatto lavoro.
 

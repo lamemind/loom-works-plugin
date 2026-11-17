@@ -51,7 +51,7 @@ Esegue i **deliverable** di una task, uno alla volta. Può essere lanciato più 
 
 **Fasi**:
 
-1. **Gate `Epic`** — un cappello non si esegue: dichiara le figlie e ferma
+1. **Gate `Epic` / `Mandate`** — un cappello o un mandato non si esegue: dichiara i membri (`resolve-task.sh --members`) e ferma
 2. **Perimetro** — `task-deliverables.sh` numera i DLV 1-based e risolve `--scope "1,3-5"`; nudo = tutti gli aperti. Errore secco su indice fuori range, spec malformata, perimetro vuoto, DLV già `[x]` nominato
 3. **Gate preflight** — nessun dubbio architetturale aperto: `L` pretende `## Decisions`, `S`/`M` lo pretendono quando il dubbio emerge. Nessuna domanda inline. Un blocco `### Preflight` con l'heading `— premessa decaduta` non vale come preflight fatto, a nessun Size: il preflight si è fermato davanti a una premessa smentita dalla misura senza porre domande, e i DLV poggiano su un meccanismo che la misura ha già smentito
 4. **Rito** — `Size` decide quanta validazione e pianificazione precedono il codice (`S` nessuna · `M` leggera · `L` profonda + piano top-down)
