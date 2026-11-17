@@ -77,7 +77,7 @@ Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-la
 
 **Parentela fra task**: il campo `**Parent Task**: T{N}` si scrive a mano nella figlia, e il parent porta `- [ ] T{N} (<maniglia>) chiusa` in Acceptance. Alla chiusura della figlia il suo `checkpoint-task` flagga indietro quella checkbox — matchando l'id, non la frase.
 
-**Epiche (task cappello)**: `Size: Epic` marca il cappello. Serve un marker suo perché la parentela la scrive la **figlia** — il padre non sa di averne senza scandagliare gli altri task file. Nel cappello: visione, perimetro, ordine delle fasi, una checkbox per figlia in Acceptance. Nelle figlie: il lavoro eseguibile, coi propri DLV e AC. `run-task` **non esegue** un'epica, lo dichiara e si ferma. Figlie: `resolve-task.sh <id> --children` (word boundary sull'id, `T7` non matcha `T74`).
+**Epiche (task cappello)**: `Size: Epic` marca il cappello. Serve un marker: la parentela la scrive la **figlia**, il padre non sa di averne. Nel cappello: visione, ordine delle fasi, una checkbox per figlia in Acceptance; nelle figlie il lavoro eseguibile. Un **mandato** (`Size: Mandate`) elenca nel suo file membri anche di epiche diverse. Nessuno dei due copia stato o cifre dei membri, e `run-task` non li esegue. Membri: `resolve-task.sh <id> --members`; formato: `mandate-format.md`.
 
 **Materiale della task**: la sezione `## Materiale` dichiara i file di **alto rilievo**, non l'inventario della folder. Voce = glifo + path + maniglia verbo+oggetto. 📖 fonte · 🔬 analisi · 📤 prodotto · `📁/` = radice della task folder (campo `Folder`).
 
