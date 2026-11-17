@@ -80,6 +80,8 @@ Il primo id deve essere un'epica, `Size: Epic` nel suo task file. Se non lo è, 
 
 più `ListAgents`. `list` dà ogni sessione viva del progetto con la sua task e il suo stato; `ListAgents` dà il nome con cui le scrivi. Una sessione già viva su una task del mandato, aperta da qualcun altro, è **esterna**: la regia la segue e le prepara proposte di risposta col via dell'utente, ma non le manda nessun messaggio di sua iniziativa, nemmeno il checkpoint. Finché è viva, la regia non apre un'altra conversazione sulla stessa task.
 
+Una sessione viva su una task fuori dal mandato, o senza task, non è esterna: è fuori dal mandato, e la regia la ignora (§1, Il riporto).
+
 ### 0g. Lo stato del mandato
 
 Il mandato dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `SP/regia-<epica>.md` col tool `Write`, riscrivilo a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo.
@@ -170,7 +172,16 @@ Un ciclo di lavoro è una sola chiamata `run`. Prima del lancio guarda le voci `
 
 ### Il riporto
 
-A ogni evento del monitor scrivi all'utente cosa vuol dire per il mandato:
+Il monitor segue tutte le sessioni vive del progetto, non solo quelle del mandato. Il **mandato** è l'epica, le sue figlie e le extra (§0d), e l'etichetta in testa a un evento dice a quale task appartiene. Prima di riportare, guarda l'etichetta:
+
+- **Task del mandato** → l'evento si riporta, come nella tabella sotto.
+- **Task fuori dal mandato** — una sessione legata a un'altra task, il task file di un'altra task, la sua cella Prog in `tasks.md` → la regia ignora l'evento del tutto: nessuna riga in chat, nessuna proposta (§3), nessun messaggio, nessuna chiusura, nessuna scalata (§4), niente nello stato. Vale anche per gli eventi che dentro il mandato chiedono una mossa: una domanda, un permesso in attesa, `🧊 ferma da N min`. Quella sessione risponde al suo utente, non al mandato: una proposta o un messaggio della regia sarebbero un'azione che l'utente non le ha chiesto.
+- **Sessione senza task** — etichetta `?` più l'inizio del sessionId → fuori dal mandato, finché un evento non la lega a una task del mandato.
+- **Cambio di legame** — `🏷 legata a`, `🔀 staccata da`, `🔀 riassegnata` → conta se la task vecchia o la nuova è del mandato: una riga, e da lì la sessione è dentro o fuori secondo la nuova. Una conversazione della regia in ciclo che esce dal mandato ha il ciclo interrotto: è un'anomalia (§4).
+- **Eventi `git`** → non portano un'etichetta di task, la riga del commit di norma sì (`run(T23): …`, `checkpoint(T23): …`): un commit che nomina solo task fuori dal mandato si ignora.
+- **Eventi `monitor`** → si guardano sempre: parlano del monitor, non di una task.
+
+A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
 
 | Evento | Riporto |
 |---|---|
@@ -256,7 +267,7 @@ A una sessione che la regia non ha aperto (§0f) non parte nessun messaggio di i
 
 Una sessione ferma su una domanda aspetta l'utente, non la regia. La regia accorcia l'attesa: legge cosa chiede, prepara la risposta col perché di ogni scelta, e la manda **solo col via dell'utente**.
 
-**Quando.** Un evento `⏸ turno finito` di una sessione che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}` — oppure un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Leggi la sessione per intero prima di proporre: `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000`.
+**Quando.** Un evento `⏸ turno finito` di una sessione del mandato (§1, Il riporto) che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}` — oppure un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Leggi la sessione per intero prima di proporre: `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000`.
 
 **Cosa proponi.**
 
