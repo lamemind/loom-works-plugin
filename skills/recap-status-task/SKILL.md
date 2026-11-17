@@ -46,7 +46,7 @@ Cascata di famiglia `arg → $LOOM_TASK → symlink {docs_root}/current-task.md`
 
 Fai **sempre** `Read` di `TASK_FILE`, per intero. Non lavorare su ciò che l'iniezione ha portato in contesto: il fill del budget si ferma alla prima sezione che non entra, quindi una sezione può mancare dal contesto senza mancare dal file.
 
-**Se la task ha `Size: Epic`** sei sul caso sbagliato — è un cappello, e il suo stato vero sta nelle figlie. Dichiaralo in una riga, indica `/loom-works:recap-status-epic ${TASK_ID}`, e **procedi comunque** col recap del solo cappello: fermarsi sarebbe peggio che consegnare un quadro parziale dichiarato tale.
+**Se la task ha `Size: Epic` o `Size: Mandate`** sei sul caso sbagliato — è un cappello o un mandato, e il suo stato vero sta nei membri. Dichiaralo in una riga, indica `/loom-works:recap-status-epic ${TASK_ID}`, e **procedi comunque** col recap del solo cappello: fermarsi sarebbe peggio che consegnare un quadro parziale dichiarato tale.
 
 ## 2. Raccogli il contesto reale
 

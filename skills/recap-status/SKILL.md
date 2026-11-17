@@ -35,7 +35,10 @@ Cascata di famiglia `arg → $LOOM_TASK → symlink {docs_root}/current-task.md`
 |---|---|
 | exit non-zero — nessuna task risolta | `loom-works:recap-status-project` |
 | task risolta con `Size: Epic` | `loom-works:recap-status-epic` |
+| task risolta con `Size: Mandate` | `loom-works:recap-status-epic` |
 | task risolta con qualunque altro `Size` | `loom-works:recap-status-task` |
+
+Un mandato va a `recap-status-epic` come un'epica: i due perimetri differiscono solo nel punto da cui si leggono i membri, e la sotto-skill li legge col lettore unico (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`).
 
 Il `Size` si legge facendo `Read` di `TASK_FILE`, non da ciò che l'iniezione ha portato in contesto: il fill del budget può averlo troncato.
 
