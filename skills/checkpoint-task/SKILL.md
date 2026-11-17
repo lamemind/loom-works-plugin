@@ -1,6 +1,6 @@
 ---
 name: checkpoint-task
-description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nella loro sede e toglie quelle che il codice ha smentito), trasloco nell'inbox della task e accensione di drainable alla chiusura.
+description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nella loro sede e toglie quelle che il codice ha smentito), trasloco nell'inbox della task e accensione di drainable alla chiusura. Su un'epica o un mandato passa a checkpoint-mandate.
 allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion, Skill
 ---
 
@@ -43,6 +43,14 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 
 - `**Folder**:` — se popolato, mostralo in output prefixato con 📁 (solo informativo).
 - `**Branch**:` — il branch su cui la task sviluppa; **assente o vuoto = `main`**. Governa i marker del trasloco (step 6).
+
+## Epica e mandato — passa a `checkpoint-mandate`
+
+Prima di ogni step del flusso, leggi `Size` dall'header di `TASK_FILE`. Su `Size: Epic` o `Size: Mandate` la task è un **perimetro**: non ha codice né DLV propri, e il lavoro sta nei membri. Il checkpoint di un perimetro è un altro flusso — riallinea la prosa del perimetro a ciò che i membri hanno scritto, senza analisi del diff, senza DLV e senza fase doc — e lo fa `checkpoint-mandate`.
+
+Stampa una riga sola, `→ checkpoint-mandate ${taskId}`, poi invoca il tool `Skill` con `skill` = `loom-works:checkpoint-mandate` e `args` = le Note utente **verbatim**: la parola «chiudi», se c'è, decide la chiusura del perimetro, e un riassunto la perderebbe. Senza un id nelle Note utente passa `${taskId}` davanti, perché la sotto-skill risolva lo stesso perimetro. Poi fermati: nessuno degli step sotto gira, nessun commit, nessun ping TTS — il report, il commit e le Segnalazioni li fa la sotto-skill.
+
+Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre un perimetro, quindi un'epica non produce mai codice da committare qui.
 
 ## Flusso checkpoint
 
