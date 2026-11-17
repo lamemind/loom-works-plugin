@@ -49,17 +49,19 @@ Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scri
 
 ## 1. Il modo
 
-Dalle Note utente leggi gli id (`T<numero>`) e il resto, che è una descrizione oppure dei verbi («aggiungi T64», «togli T52»). Di ogni id leggi il task file con `resolve-task.sh <id>` (`Size` nell'header) e la Prog dalla tabella Tasks Overview di `{docs_root}/tasks.md`.
+Dalle Note utente leggi gli id (`T<numero>`) e il resto, che è una descrizione oppure dei **verbi sulla lista** («aggiungi T64», «togli T52»). Di ogni id leggi il task file con `resolve-task.sh <id>` (`Size` nell'header) e la Prog dalla tabella Tasks Overview di `{docs_root}/tasks.md`.
+
+Il modo lo decidono il primo id e quello che lo segue:
 
 | Note utente | Modo |
 |---|---|
-| un solo id, `Size: Mandate`, con o senza verbi | modifica (§4) |
+| il primo id è `Size: Mandate`, da solo o seguito da verbi sulla lista — gli id dopo il primo sono gli oggetti dei verbi | modifica (§4) |
 | un solo id, `Size: Epic`, e nient'altro | epica (§5) |
-| due o più id, oppure una descrizione, con o senza id | creazione (§2) |
+| due o più id senza verbi, oppure una descrizione, con o senza id | creazione (§2) |
 | un solo id di una task normale, e nient'altro | errore |
 | niente | errore |
 
-È il dispatch per marcatore di `recap-status` e `run-task`: il `Size` dell'unico id nominato decide.
+È il dispatch per marcatore di `recap-status` e `run-task`: il `Size` del primo id decide.
 
 **Errore** → stampa l'uso e fermati, senza scrivere niente:
 
@@ -70,7 +72,7 @@ Dalle Note utente leggi gli id (`T<numero>`) e il resto, che è una descrizione 
 /loom-works:prepare-mandate T40                      scrive l'analisi del perimetro nell'epica T40
 ```
 
-**Lettura dubbia** → dichiara il modo che hai letto e chiedilo con `AskUserQuestion` prima di scrivere qualunque file. Due casi tipici: «le figlie di T40» da solo (l'analisi nell'epica T40, oppure un mandato nuovo con le sue figlie aperte?), e un mandato seguito da parole che non sono verbi sulla lista.
+**Lettura dubbia** → dichiara il modo che hai letto e chiedilo con `AskUserQuestion` prima di scrivere qualunque file. Tre casi tipici: «le figlie di T40» da solo (l'analisi nell'epica T40, oppure un mandato nuovo con le sue figlie aperte?); un mandato seguito da altri id senza verbi (aggiungerli al mandato, oppure un mandato nuovo che lo contiene come riga sola?); un mandato seguito da parole che non sono verbi sulla lista.
 
 Prima di proseguire dichiara il modo in una riga: `🧭 Modo: creazione da lista — 3 id`.
 
@@ -162,7 +164,7 @@ Il task file del mandato si scrive **prima** dell'analisi e **non si committa** 
 
 Le regole del file:
 
-- **Titolo** «Mandato: <tema>», col tema dalle parole dell'utente; da soli id, il tema che i membri hanno in comune. **Slug**: il tema in kebab-case, con il prefisso `mandato-`.
+- **Titolo** «Mandato: <tema>», col tema dalle parole dell'utente; da soli id, il tema che i membri hanno in comune. **Slug**: il tema in kebab-case, senza accenti, con il prefisso `mandato-`.
 - **Priority** Med se l'utente non la dice (High, Med, Low).
 - **Estimated Time** vuoto: la stima di un mandato sarebbe la somma dei membri, cioè una copia.
 - **Description**: dalle parole dell'utente. Da soli id, un paragrafo corto sul tema comune, che l'utente corregge alla conferma. Niente sullo stato dei membri.
@@ -191,7 +193,7 @@ Poi la fermata: `AskUserQuestion` con la domanda «Scrivo il mandato <id>?» e t
 
   Lo script aggiunge la riga a `tasks.md`, committa il task file e `tasks.md` con una pathspec esplicita, e pusha.
 - **Correggo** → applica la correzione. Se cambia la lista dei membri, rifai l'analisi (§2d). Mostra di nuovo bozza e note, e richiedi.
-- **Annulla** → cancella il file: `git status --short -- <file>` deve stampare `??`, cioè un file mai committato, che è il tuo. L'id torna libero.
+- **Annulla** → cancella il file: `git status --short -- <file>` deve stampare `??`, cioè un file mai committato, che è il tuo. L'id torna libero. Se stampa altro, il file non è più solo tuo: non cancellarlo, e dillo.
 
 Chiudi con il path del file, l'id, il numero di membri e le righe dell'analisi per fonte.
 
