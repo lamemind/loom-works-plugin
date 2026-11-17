@@ -44,6 +44,7 @@ Then bootstrap the project structure:
 | `/loom-works:start-task` | Activate a task for checkpoint tracking |
 | `/loom-works:run-task` | Execute a task's deliverables — scoped per DLV, one commit each |
 | `/loom-works:checkpoint-task` | Checkpoint progress: analyze changes, commit, update tasks.md |
+| `/loom-works:checkpoint-mandate` | Checkpoint of a scope (epic or mandate): realign its task file to what the members did and found since the last progress entry — blockers, linked tasks, open decisions, scope analysis re-checked, status copies removed; commits only the scope file and tasks.md, no doc phase, no questions. `checkpoint-task` hands epics and mandates over to it |
 | `/loom-works:preflight-task` | Freeze design decisions before execution |
 | `/loom-works:spawn-task` | Ask the project's running deck to open a task conversation (preflight, run with scope, recap, checkpoint) — one spawn per call, no questions |
 | `/loom-works:close-session` | Ask the project's running deck to close a live conversation that `spawn-task` opened — the `claude` process ends, the tab closes, the transcript stays resumable; one session per call, no questions |

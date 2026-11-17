@@ -11,7 +11,7 @@ Un perimetro di lavoro vive sempre in un task file, in una di due forme:
 
 Le due forme differiscono solo nel punto da cui si leggono i membri, e il lettore è uno solo (§Il lettore dei membri).
 
-Un mandato non ha lavoro eseguibile proprio, come un'epica: `run-task` dichiara che è un mandato e si ferma, e il recap lo fa `recap-status-epic`.
+Un mandato non ha lavoro eseguibile proprio, come un'epica: `run-task` dichiara che è un mandato e si ferma, il recap lo fa `recap-status-epic`, e il checkpoint `checkpoint-mandate`, che riallinea il file del perimetro a ciò che i membri hanno scritto.
 
 ## Struttura del task file
 
