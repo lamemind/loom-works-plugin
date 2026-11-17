@@ -155,6 +155,40 @@ Una riga `[x]` su una figlia che non è ✔️ — una figlia riaperta — resta
 
 **In un mandato nessuna checkbox si tocca**: il formato non ne vuole, perché il checkpoint di un membro spunta solo la checkbox del proprio `Parent Task` e nessuno terrebbe le altre allineate. Se il mandato ne porta, sono copie fuori dal §3: Segnalazioni.
 
+## 7. La Prog e la chiusura
+
+**Il perimetro si chiude** — Prog ✔️ — in casi diversi per le due forme:
+
+| Forma | Si chiude quando |
+|---|---|
+| epica | tutta `## Acceptance Criteria` è `[x]` dopo il §6, oppure le Note utente portano «chiudi» |
+| mandato | solo quando le Note utente portano «chiudi», anche con tutti i membri ✔️ |
+
+`## Prod Validation` non conta. Un mandato non si chiude da sé perché la sua chiusura non deriva dai membri: dice che il giro per cui è nato è finito, e lo decide chi l'ha aperto. La regia non passa parole al checkpoint, quindi non chiude mai un perimetro.
+
+La cella Prog si legge e si scrive con le primitive di `lib.sh`, che trovano la colonna dall'header della Tasks Overview e non toccano le tabelle sotto:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" && lw_tasks_md_prog_get "{docs_root}/tasks.md" <id>
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" && lw_tasks_md_prog_set "{docs_root}/tasks.md" <id> <glifo>
+```
+
+`lw_tasks_md_prog_get` vuoto → la riga del perimetro non c'è: `tasks.md` non si tocca, e il report lo dice.
+
+**Alla chiusura**, in quest'ordine:
+
+1. Header del file: `- **Progress**: ✔️ Done`. La data la aggiunge lo script del commit (§9), che riscrive la riga in `✔️ Done at <data>`.
+2. Prog ✔️ in `tasks.md`; se il perimetro compare nel grafo dell'Execution Plan, allinea l'emoji davanti al suo id.
+3. Se il symlink `{docs_root}/current-task.md` risolve a questo file, eliminalo (`rm`). Se punta altrove, o non esiste, non toccarlo: è il binding di un'altra task.
+4. Se l'header porta `**Parent Task**: T<n>`, nel file del padre la checkbox della riga che porta l'id del perimetro passa a `[x]` — matcha sull'id, riscrivi solo il box — e il file del padre entra nella pathspec del §9. È la stessa regola di `checkpoint-task`: alla chiusura di una task il suo checkpoint spunta la riga del padre. Nessuna riga con l'id → un avviso nel report, nessun blocco.
+
+**Senza chiusura**, la Prog dice se il lavoro del perimetro è cominciato:
+
+- Prog 🔵 o 🟢 e almeno un membro 🟡 o ✔️ → 🟡 in `tasks.md` e nel grafo, `- **Progress**: 🟡 In Progress` nell'header.
+- Prog 🔵 o 🟢 e nessun membro avviato → resta com'è.
+- Prog 🟡 → resta.
+- Prog ✔️ → resta. Un perimetro chiuso non si riapre dal checkpoint: se la condizione di chiusura non vale più — un'epica con una figlia nuova e la sua checkbox `[ ]` — il report lo dice, e la riapertura la decide l'umano.
+
 ## 8. L'avanzamento
 
 Se il giro ha cambiato il file del perimetro, **o** la finestra del §2 non era vuota, appendi al Progress Log del perimetro (crea `## Progress Log` in coda al file se non c'è):
@@ -169,6 +203,37 @@ Se il giro ha cambiato il file del perimetro, **o** la finestra del §2 non era 
 L'avanzamento si scrive anche quando la finestra non porta fatti del perimetro: sposta la partenza in avanti, così il giro dopo non rilegge lo stesso diff.
 
 **Finestra vuota e file intatto → nessun avanzamento e nessun commit.** Il giro non ha letto niente di nuovo e non ha cambiato niente: è il secondo giro sullo stesso perimetro senza lavoro dei membri in mezzo, e deve restare un no-op, chiunque lo lanci.
+
+## 9. Commit e push
+
+Gira se il giro ha cambiato il file del perimetro. La pathspec la componi tu, e nomina **sempre** il file del perimetro:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh" --task <id> "checkpoint(<id>): <sintesi del giro>" \
+  -- "<TASK_FILE>" ["{docs_root}/tasks.md"] [<file del padre>]
+```
+
+- **Il file del perimetro va scritto dopo `--` anche se `--task` lo aggiunge da sé.** Con una pathspec vuota lo script cade nel regime linked e fa `git add -A`, che porterebbe nel commit tutto il worktree (in detached esce in errore).
+- **`tasks.md` entra solo se il giro ne ha riscritto la cella** (§7). È un file condiviso: nominato senza averlo toccato, porterebbe nel commit le modifiche non committate di un'altra sessione.
+- **Il file del padre** entra solo alla chiusura di un perimetro con `Parent Task` (§7).
+- **`--task`** è obbligatorio anche in linked: alla chiusura il symlink può essere sparito.
+- Nessun `--doc-message`: il giro non scrive file doc, e lo script fa un commit solo.
+
+Lo script committa e pusha, e stampa `-> commit 1 (codice+tracking, …): <sha>`. Exit non-zero → commit o push falliti: niente hook, ping `failed`, e il report lo dice.
+
+**Hook `taskDone`** — solo se il §7 ha chiuso il perimetro in questo giro, dopo il push riuscito:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" hooks taskDone --task <id> --sha <sha>
+```
+
+Un progetto che lega una skill alla chiusura di una task la riceve anche per un perimetro. `deliverableDone` non parte mai: un perimetro non ha DLV.
+
+- **Nessuna riga, exit 0** → il progetto non dichiara hook su `taskDone`.
+- **Righe `HOOK|<i>|<skill>` e una riga `ARGS=<argomenti>`** → per ogni `HOOK`, nell'ordine di `<i>`, invoca il tool `Skill` con `skill` = `<skill>` e `args` = il valore di `ARGS` copiato tale e quale, una skill alla volta.
+- **Exit non-zero** → nessuna skill: il messaggio nomina il guasto (blocco `hooks` invalido, jq assente, task o sha non risolvibili).
+
+Un hook non riapre niente: commit e push sono già avvenuti. Una skill che non esiste, che dà errore o che dichiara un fallimento produce un avviso in linea — `⚠ hook <skill> fallito su taskDone: <motivo>` — e una segnalazione (`hook <skill> fallito su taskDone: <motivo>`, o `hook taskDone non invocati: <messaggio dello script>`); le skill successive girano comunque, e nessuna si ritenta: un hook fallito a metà può aver già scritto fuori dal repo. Ciò che la skill hook fa resta suo, e nessun suo file entra nel commit del giro.
 
 ## Il report
 
