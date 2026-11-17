@@ -52,7 +52,8 @@ Perché questo perimetro esiste e cosa vuole ottenere.
 ### `## Membri`
 
 - **Una riga per membro**, a colonna zero, che comincia con `- `. Vale il **primo `T<numero>`** della riga, il resto è la maniglia: `- T52 (maniglia)`, `- **T52** — maniglia` e ``- `T52` maniglia`` leggono tutte `T52`. È la stessa tolleranza del campo `**Parent Task**`.
-- Righe indentate, righe senza id e testo fuori dalla lista non contano: sono prosa.
+- Righe indentate, righe senza id, righe dentro un blocco ```` ``` ```` e testo fuori dalla lista non contano: sono prosa.
+- La sezione finisce al prossimo heading `#` o `##`. Un `###` la divide in gruppi senza chiuderla.
 - L'ordine è quello del file. Un id ripetuto conta una volta, alla prima riga; il mandato che elenca sé stesso non conta.
 - **Niente checkbox e niente stato.** Il `checkpoint-task` di un membro spunta solo la checkbox del suo `Parent Task`: una checkbox per membro nel mandato non ha custode e resta indietro alla prima chiusura. La checkbox per figlia nell'Acceptance di un'epica resta, perché lì il custode c'è.
 - **Un'epica o un mandato fra i membri resta una riga sola.** Il lettore non lo sostituisce coi suoi membri: chi consuma lo tratta come un perimetro da orchestrare a parte. Così nessun ciclo fra mandati può nascere dal lettore. Il prezzo: «tutte le figlie di T40 più due orfane» si scrive elencando le figlie una per una, e una figlia nata dopo non entra da sola.

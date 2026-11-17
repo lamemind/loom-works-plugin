@@ -264,6 +264,121 @@ lw_task_children() {   # <task-id>
     done
 }
 
+# ---- Membri di un perimetro: epica o mandato ---------------------------------
+#
+# Un perimetro di lavoro vive in un task file in due forme, e le due differiscono
+# solo nel punto da cui si leggono i membri (contratto: docs/mandate-format.md):
+#
+#   - `Size: Mandate` nell'header -> la lista `## Membri` del file, nell'ordine
+#     del file: una riga a colonna zero che comincia con `- `, vale il primo
+#     `T<numero>` della riga (stessa tolleranza di `**Parent Task**`)
+#   - ogni altra task             -> le figlie, da lw_task_children
+#
+# Un lettore solo perche' regia, checkpoint e recap contano gli stessi membri:
+# due letture scritte a mano divergerebbero al primo task file con una forma
+# inattesa, come il grep di `Parent Task` senza ancora di fine-token.
+#
+# Un membro epica o mandato resta una riga sola, mai espanso nei suoi membri:
+# chi consuma lo orchestra a parte, e un ciclo fra mandati non puo' nascere qui.
+# Un id ripetuto conta alla prima riga; il mandato che elenca se' stesso no.
+#
+# Stampa:
+#
+#   TASK_MEMBERS_SRC=list|parent
+#   TASK_MEMBERS_COUNT=2
+#   TASK_MEMBER=T52 /abs/path/runtime/tasks/T52-slug.md
+#   TASK_MEMBER_MISSING=T58
+#   TASK_MEMBER=T61 /abs/path/runtime/tasks/T61-slug.md
+#
+# TASK_MEMBER_MISSING e' un membro dichiarato senza task file: fuori dal
+# conteggio, e non ferma il lettore — una task purgata da clean-tasks e' un caso
+# normale, chi consuma decide. Un mandato senza `## Membri` da' zero membri: non
+# ripiega sulle figlie, i membri di un mandato sono la sua lista.
+#
+# Nessun sottoprocesso per riga o per membro: su Git Bash ognuno costa ~150 ms.
+# Exit: 0 = ok · 1 = id malformato · 2 = task file assente
+lw_task_members() {   # <task-id>
+    local id="${1:-}" root docs dir file="" candidate line size=""
+    local in_section=0 in_fence=0 member path seen=" " rows="" count=0
+
+    if [[ ! "$id" =~ ^T[0-9]+$ ]]; then
+        echo "ERROR: id task malformato: '${id}' (atteso T<numero>)" >&2
+        return 1
+    fi
+
+    root="$(lw_find_project_root)"
+    docs="$(lw_docs_root)"
+    dir="${root}/${docs}/tasks"
+
+    for candidate in "${dir}/${id}"-*.md; do
+        [[ -f "$candidate" ]] && { file="$candidate"; break; }
+    done
+    if [[ -z "$file" ]]; then
+        echo "ERROR: task file non trovato per ${id} in ${dir}" >&2
+        return 2
+    fi
+
+    # Size si legge solo nell'header, prima del primo `## `: la prosa di una
+    # Description puo' nominare `Size: Mandate` senza esserlo.
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        [[ "$line" == "## "* ]] && break
+        if [[ "$line" =~ ^-[[:space:]]*\*\*Size\*\*:[[:space:]]*([A-Za-z]+) ]]; then
+            size="${BASH_REMATCH[1],,}"
+            break
+        fi
+    done < "$file"
+
+    if [[ "$size" != "mandate" ]]; then
+        local children
+        children="$(lw_task_children "$id")" || return 1
+        echo "TASK_MEMBERS_SRC=parent"
+        if [[ -z "$children" ]]; then
+            echo "TASK_MEMBERS_COUNT=0"
+        else
+            count=0
+            while IFS= read -r line; do count=$((count + 1)); done <<< "$children"
+            echo "TASK_MEMBERS_COUNT=${count}"
+            printf '%s\n' "${children//TASK_CHILD=/TASK_MEMBER=}"
+        fi
+        return 0
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        if [[ "$line" =~ ^##[[:space:]]+Membri[[:space:]]*$ ]]; then
+            in_section=1; in_fence=0; continue
+        fi
+        [[ "$in_section" -eq 1 ]] || continue
+        # chiude al prossimo heading di livello 1 o 2: un `###` dentro la
+        # sezione raggruppa i membri, non la termina
+        [[ "$in_fence" -eq 0 && "$line" =~ ^#{1,2}[[:space:]] ]] && break
+        if [[ "$line" == '```'* ]]; then
+            in_fence=$((1 - in_fence)); continue
+        fi
+        [[ "$in_fence" -eq 0 ]] || continue
+        [[ "$line" =~ ^-[[:space:]] ]] || continue
+        [[ "$line" =~ (^|[^A-Za-z0-9_])(T[0-9]+)([^0-9]|$) ]] || continue
+        member="${BASH_REMATCH[2]}"
+        [[ "$member" == "$id" || "$seen" == *" ${member} "* ]] && continue
+        seen+="${member} "
+        path=""
+        for candidate in "${dir}/${member}"-*.md; do
+            [[ -f "$candidate" ]] && { path="$candidate"; break; }
+        done
+        if [[ -n "$path" ]]; then
+            rows+="TASK_MEMBER=${member} ${path}"$'\n'
+            count=$((count + 1))
+        else
+            rows+="TASK_MEMBER_MISSING=${member}"$'\n'
+        fi
+    done < "$file"
+
+    echo "TASK_MEMBERS_SRC=list"
+    echo "TASK_MEMBERS_COUNT=${count}"
+    printf '%s' "$rows"
+}
+
 # ---- Cella Prog della Tasks Overview -----------------------------------------
 #
 # Lettura e riscrittura della cella Prog di una riga `| T<n> | … |` in tasks.md,
