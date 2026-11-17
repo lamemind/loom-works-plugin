@@ -252,6 +252,29 @@ Poi la fermata: `AskUserQuestion` con la domanda «Aggiorno il mandato <id>?» e
 - **Correggo** → applica, rifai la rianalisi se cambia la lista, mostra e richiedi.
 - **Annulla** → niente da cancellare: il file non è cambiato.
 
+## 5. L'analisi in un'epica
+
+Un'epica ha già i suoi membri — le figlie, che dichiarano `**Parent Task**` — e non ha una lista da costruire. Le manca, finché nessuno la scrive, l'analisi: la stessa sezione di un mandato, con lo stesso nome e la stessa forma, così chi la cerca la cerca con un nome solo. In questo modo la skill scrive **solo** quella sezione: le figlie, la loro checkbox nell'Acceptance dell'epica, la Prog e `tasks.md` non si toccano.
+
+1. **Il file è pulito** — la guardia del §4a, sul file dell'epica.
+2. **Le figlie** — dal lettore unico:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <epica> --members
+   ```
+
+   `TASK_MEMBERS_COUNT=0` → dillo e fermati: un'epica senza figlie non ha coppie da analizzare.
+3. **L'analisi** — col metodo del §6, con l'epica in testa e le figlie dopo `--children`, nell'ordine del lettore. Se `## Analisi del perimetro` esiste già, è una rianalisi, con la tabella vecchia in ingresso; altrimenti si parte da zero.
+4. **La conferma** — in chat la sezione nuova, o la differenza riga per riga se c'era, e le note del §3. Una dipendenza aperta verso una task che non è figlia non si può aggiungere ai membri da qui, perché le figlie le decide il `Parent Task` della figlia: la nota dice che per seguirla insieme all'epica serve un mandato. Poi `AskUserQuestion` con la domanda «Scrivo l'analisi del perimetro nell'epica <id>?» e tre opzioni — scrivi · correggo · annulla.
+5. **La scrittura** — col tool `Edit`. Se la sezione esiste, si sostituisce intera dove sta. Se non esiste, entra subito dopo `## Description`, prima del primo heading `## ` che la segue: nel mandato la sezione sta nello stesso punto, dopo la Description e le sezioni proprie.
+6. **Il commit** — il solo file dell'epica:
+
+   ```bash
+   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
+     && lw_git_add_n_commit "task(<epica>): analisi del perimetro" "<file dell'epica>" \
+     && lw_git_push "$(lw_current_branch)"
+   ```
+
 ## 6. L'analisi del perimetro
 
 Il metodo è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md`: leggilo per intero prima della prima analisi della conversazione. Vale per i tre modi, ed è lo stesso che usa chi riscrive un'analisi smentita da un membro.
