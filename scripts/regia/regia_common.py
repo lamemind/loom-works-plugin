@@ -255,7 +255,7 @@ def process_is_alive(pid, proc_start):
 class LiveSession:
     """Una entry viva del registro, ridotta a ciò che la regia legge."""
 
-    def __init__(self, pid, entry, alive):
+    def __init__(self, pid, entry, alive, headless=False):
         self.pid = pid
         self.proc_start = entry["procStart"]
         self.session_id = entry["sessionId"]
@@ -266,6 +266,10 @@ class LiveSession:
         self.name = entry.get("name") if isinstance(entry.get("name"), str) else ""
         # True = verificata, None = processo non verificabile su questa piattaforma
         self.alive = alive
+        # Un turno `claude -p` in corso (`entrypoint: sdk-cli`): un processo che
+        # scrive sul transcript senza una tab. Il processo vive un turno solo,
+        # quindi la sua nascita e la sua fine sono l'inizio e la fine del turno.
+        self.headless = headless
 
     @property
     def key(self):
@@ -275,19 +279,34 @@ class LiveSession:
         return f"{self.pid}:{self.proc_start}"
 
 
-def parse_live_entry(content):
-    """Il dict di una entry utilizzabile, o `None`.
+def process_class(entry):
+    """Che cosa è il processo di una entry del registro: `tab`, `headless` o `None`.
+
+    `tab` è una conversazione in una tab dell'utente (`entrypoint: cli`,
+    `kind: interactive`); `headless` un turno `claude -p` in corso
+    (`entrypoint: sdk-cli`, `kind: interactive`). Tutto il resto è `None`, e
+    il job in background per primo: scrive `entrypoint: cli` come una tab e si
+    distingue solo per `kind: bg`, quindi le due classi si riconoscono in
+    positivo, campo per campo. Campi assenti valgono come tab: una versione del
+    CLI che non li scrivesse non deve svuotare la lista. Stessa regola di
+    `processClass` nel deck e di `loadLiveSessions` in compass.
+    """
+    entrypoint = entry.get("entrypoint") if isinstance(entry.get("entrypoint"), str) else "cli"
+    kind = entry.get("kind") if isinstance(entry.get("kind"), str) else "interactive"
+    if kind != "interactive":
+        return None
+    if entrypoint == "cli":
+        return "tab"
+    if entrypoint == "sdk-cli":
+        return "headless"
+    return None
+
+
+def parse_registry_entry(content):
+    """Il dict di una entry utilizzabile, di qualunque classe, o `None`.
 
     Senza `sessionId`, `procStart` o `cwd` l'entry non serve: il primo porta al
     transcript, il secondo è la guardia sul pid, il terzo il filtro di progetto.
-
-    Restano fuori i processi che non sono una tab dell'utente: `entrypoint`
-    diverso da `cli` (un `claude -p`, che scrive `sdk-cli`) e `kind` diverso da
-    `interactive` (un job in background, che scrive `entrypoint: cli` e si
-    distingue solo per `kind: bg`). Campi assenti valgono come sessione
-    interattiva: una versione del CLI che non li scrivesse non deve svuotare la
-    lista. Stesso filtro di `parseLiveEntry` nel deck e di `loadLiveSessions`
-    in compass.
     """
     try:
         entry = json.loads(content)
@@ -298,15 +317,20 @@ def parse_live_entry(content):
     for field in ("sessionId", "procStart", "cwd"):
         if not isinstance(entry.get(field), str) or not entry[field]:
             return None
-    entrypoint = entry.get("entrypoint") if isinstance(entry.get("entrypoint"), str) else "cli"
-    kind = entry.get("kind") if isinstance(entry.get("kind"), str) else "interactive"
-    if entrypoint != "cli" or kind != "interactive":
+    return entry
+
+
+def parse_live_entry(content):
+    """Il dict di una entry che è una tab dell'utente, o `None` (`process_class`)."""
+    entry = parse_registry_entry(content)
+    if entry is None or process_class(entry) != "tab":
         return None
     return entry
 
 
 class Registry:
-    """Una lettura del registro: le sessioni vive del progetto, più i pid la
+    """Una lettura del registro: le sessioni vive del progetto — tab e turni
+    headless, `LiveSession.headless` le distingue —, più i pid la
     cui entry esiste ma non si è potuta leggere.
 
     `readable` è falso quando la cartella stessa non si legge: chi confronta
@@ -341,19 +365,20 @@ def read_registry(project_root):
                 content = entry_handle.read()
         except OSError:
             continue  # il processo è finito fra listdir e open
-        entry = parse_live_entry(content)
+        entry = parse_registry_entry(content)
         if entry is None:
             try:
                 json.loads(content)
             except ValueError:
                 registry.unreadable.add(pid)  # scrittura a metà: si rilegge al giro dopo
             continue
-        if not is_within(entry["cwd"], project_root):
+        kind = process_class(entry)
+        if kind is None or not is_within(entry["cwd"], project_root):
             continue
         alive = process_is_alive(pid, entry["procStart"])
         if alive is False:
             continue
-        registry.sessions.append(LiveSession(pid, entry, alive))
+        registry.sessions.append(LiveSession(pid, entry, alive, headless=kind == "headless"))
     return registry
 
 

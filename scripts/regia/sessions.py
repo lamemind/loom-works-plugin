@@ -2,7 +2,8 @@
 sessions — legge le altre sessioni Claude Code di un progetto loom-works.
 
   list   le sessioni vive del progetto, dal registro ~/.claude/sessions/: id,
-         task legata, stato e sua età, sottocartella di nascita, primo prompt
+         task legata, stato e sua età, sottocartella di nascita, primo prompt.
+         Un turno headless in corso (`claude -p`) porta `headless` nello stato
   tail   l'ultimo testo di una sessione e i suoi ultimi prompt dell'utente: cosa
          la sessione sta chiedendo, per decidere cosa risponderle. Cerca il
          prefisso fra le vive, poi fra i transcript del progetto: una sessione
@@ -43,7 +44,11 @@ def first_prompt(path):
 
 
 def status_with_age(session, now):
+    """`busy 4 min`; un turno headless in corso porta `headless` davanti: un
+    processo che lavora senza una tab a cui tornare."""
     text = session.status or "?"
+    if session.headless:
+        text = f"headless {text}"
     if session.status_since is not None and now - session.status_since >= 60:
         text += f" {int((now - session.status_since) / 60)} min"
     return text

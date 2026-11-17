@@ -4,7 +4,8 @@ watch_sessions — segue le sessioni Claude Code vive di un progetto loom-works.
 Ogni riga su stdout è un evento per il tool Monitor di Claude Code:
   - dal registro vivo (~/.claude/sessions/<pid>.json): sessione nuova, sessione
     chiusa, transcript nuovo dopo un /clear, legame con la task cambiato,
-    richiesta di permesso (`waiting`), sessione `busy` ferma da --stall-minutes
+    richiesta di permesso (`waiting`), sessione `busy` ferma da --stall-minutes;
+    turno headless partito e finito, per un `claude -p` (`entrypoint: sdk-cli`)
   - dai transcript delle altre sessioni: turno finito, domanda all'utente,
     skill lanciata, prompt dell'utente
   - dai task file: sezione cambiata, cifre di DLV e AC, campo Progress
@@ -90,6 +91,11 @@ def save_state(state_path, state):
 def handle_transcript_record(record, process, label):
     record_type = record.get("type")
     if record_type == "system" and record.get("subtype") == "turn_duration":
+        # Un turno headless lo chiude la fine del processo (`⏹`): nessuno
+        # aspetta davanti a una tab, e due eventi per una fine sola si
+        # leggerebbero come due turni.
+        if process.get("headless"):
+            return
         summary = regia_common.first_meaningful_line(process.get("last_text", ""))
         emit(f"{label} ⏸ turno finito, aspetta l'utente: {summary[:160]}")
         return
@@ -222,8 +228,11 @@ def check_status(process, session, settings, initialized, now):
 
 def describe_status(process, now):
     """`T31 waiting 4 min [loom-deck]` per la riga di armo: lo stato del
-    registro e la sua età (`ora − statusUpdatedAt`), dal minuto in su."""
+    registro e la sua età (`ora − statusUpdatedAt`), dal minuto in su. Un turno
+    headless porta la parola `headless` dopo l'etichetta."""
     text = process["label"]
+    if process.get("headless"):
+        text += " headless"
     if process.get("status"):
         text += f" {process['status']}"
         since = process.get("status_since")
@@ -274,7 +283,36 @@ def new_process(session, transcript, offset):
         "label": "",
         "last_text": "",
         "status": None,
+        "headless": session.headless,
     }
+
+
+def announce_start(process):
+    """L'evento di un processo che il monitor vede per la prima volta.
+
+    Un turno headless è un processo che vive un turno solo: la sua nascita è
+    l'inizio del turno, e un `--resume` headless della stessa conversazione è un
+    processo nuovo, quindi un evento nuovo. Un turno che parte e finisce fra due
+    giri del monitor non produce né l'uno né l'altro evento.
+    """
+    session = short_id(process["session_id"])
+    if process.get("headless"):
+        emit(f"{process['label']} ▶ turno headless partito {session}{process['where']}")
+    else:
+        emit(f"{process['label']} 🆕 nuova sessione {session}{process['where']}")
+
+
+def announce_end(process):
+    """L'evento di un processo sparito dal registro. Per un turno headless è
+    la fine del turno, con la prima riga dell'ultimo testo: se il turno finisce
+    su una domanda lo legge la regia dal testo, non un riconoscimento a pattern
+    qui."""
+    session = short_id(process["session_id"])
+    if process.get("headless"):
+        summary = regia_common.first_meaningful_line(process.get("last_text", ""))
+        emit(f"{process['label']} ⏹ turno headless finito {session}" + (f": {summary[:160]}" if summary else ""))
+    else:
+        emit(f"{process['label']} ✖ sessione chiusa {session}")
 
 
 def is_own(session, state, settings):
@@ -313,7 +351,7 @@ def scan_sessions(state, settings):
             refresh_label(process)
             state["processes"][session.key] = process
             if initialized:
-                emit(f"{process['label']} 🆕 nuova sessione {short_id(session.session_id)}{process['where']}")
+                announce_start(process)
         elif process["session_id"] != session.session_id:
             process.update(session_id=session.session_id, transcript=transcript,
                            offset=start_offset(transcript, since),
@@ -344,7 +382,7 @@ def scan_sessions(state, settings):
             # risposta prima di un /exit) si leggono ora: dopo non c'è più un
             # processo da cui risalire al transcript.
             read_new_records(process)
-            emit(f"{process['label']} ✖ sessione chiusa {short_id(process['session_id'])}")
+            announce_end(process)
 
 
 def relative_cwd(cwd, settings):
