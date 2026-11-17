@@ -1,0 +1,210 @@
+---
+name: prepare-mandate
+description: Prepara il perimetro di una regia prima che parta — crea un mandato (task `Size: Mandate`) da una lista di id o da una descrizione, lo modifica aggiungendo o togliendo membri, oppure scrive l'analisi del perimetro dentro un'epica. L'analisi delle dipendenze e delle collisioni fra i membri ha una metà meccanica (`mandate.py tree`) e una del modello, che legge i task file dei membri. Presidiata — lista e analisi le conferma l'utente prima del commit — e non tocca mai i task file dei membri. Usa quando l'utente dice «prepara un mandato con T52, T61 e T64», «fammi un mandato con tutte le task di front-end», «aggiungi T70 al mandato T230, togli T52», «scrivi l'analisi del perimetro di T40».
+argument-hint: "<Txx Tyy …> | <descrizione> | <mandato> [aggiungi Txx] [togli Tyy] | <epica>"
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, AskUserQuestion
+---
+
+**Docs root** — primo passo, prima di ogni altra cosa:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+```
+
+Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
+
+## Note utente
+~~~human
+$ARGUMENTS
+~~~
+
+## Il ruolo
+
+Un **perimetro** è l'insieme di task che una regia porta avanti insieme: le figlie di un'epica, oppure i membri di un **mandato**, cioè una task `Size: Mandate` che elenca nel proprio file task di epiche diverse e orfane. Il formato del task file è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`: leggilo per intero prima di scrivere qualunque file.
+
+Questa skill costruisce il perimetro **prima** che la regia parta, e ne scrive l'analisi: quali coppie di membri non possono girare insieme, e su cosa. Tre modi:
+
+| Modo | Cosa scrive | Chi committa |
+|---|---|---|
+| creazione (§2) | un task file nuovo `Size: Mandate`, e la sua riga in `tasks.md` | `create-task.sh` |
+| modifica (§4) | `## Membri`, `## Preferenze d'ordine` e `## Analisi del perimetro` di un mandato che esiste | la skill, il solo file del mandato |
+| epica (§5) | la sola `## Analisi del perimetro` di un'epica | la skill, il solo file dell'epica |
+
+Confini, in ogni modo:
+
+- **I task file dei membri non si toccano mai**, nemmeno per correggere un difetto che l'analisi trova — una dipendenza non dichiarata, un `## Materiale` incompleto. Il difetto si dice all'utente alla conferma, e lo corregge chi lavora su quel membro.
+- **Nessun commit senza la conferma dell'utente**, chiesta con `AskUserQuestion` (§3). Una conferma chiesta in chat è testo: niente fermerebbe il commit prima della risposta, mentre il tool sospende l'esecuzione finché l'utente non sceglie.
+- **Nessuna copia di stato o di cifre** nel file del perimetro (`mandate-format.md` §Nessuna copia): niente Prog dei membri, niente DLV contati, niente stime sommate. Tutto questo vive altrove e resterebbe indietro alla prima modifica.
+
+## 0. Avvio
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/utils/docs-root.sh"
+for candidate in python3 python; do "$candidate" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && { command -v "$candidate"; break; }; done
+```
+
+L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo all'utente e fermati: senza Python la metà meccanica dell'analisi non si calcola.
+
+Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (lo chiamiamo `PY`) e la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/regia`. Ogni script si lancia con `"PY" -B -I "R/<script>"`: `-I` lo isola dalla cartella corrente, `-B` non scrive bytecode nella cache del plugin.
+
+## 1. Il modo
+
+Dalle Note utente leggi gli id (`T<numero>`) e il resto, che è una descrizione oppure dei verbi («aggiungi T64», «togli T52»). Di ogni id leggi il task file con `resolve-task.sh <id>` (`Size` nell'header) e la Prog dalla tabella Tasks Overview di `{docs_root}/tasks.md`.
+
+| Note utente | Modo |
+|---|---|
+| un solo id, `Size: Mandate`, con o senza verbi | modifica (§4) |
+| un solo id, `Size: Epic`, e nient'altro | epica (§5) |
+| due o più id, oppure una descrizione, con o senza id | creazione (§2) |
+| un solo id di una task normale, e nient'altro | errore |
+| niente | errore |
+
+È il dispatch per marcatore di `recap-status` e `run-task`: il `Size` dell'unico id nominato decide.
+
+**Errore** → stampa l'uso e fermati, senza scrivere niente:
+
+```
+/loom-works:prepare-mandate T52 T61 T64              crea un mandato da una lista di id
+/loom-works:prepare-mandate le task di front-end     crea un mandato da una descrizione
+/loom-works:prepare-mandate T230 aggiungi T70        modifica il mandato T230 (anche: togli T52)
+/loom-works:prepare-mandate T40                      scrive l'analisi del perimetro nell'epica T40
+```
+
+**Lettura dubbia** → dichiara il modo che hai letto e chiedilo con `AskUserQuestion` prima di scrivere qualunque file. Due casi tipici: «le figlie di T40» da solo (l'analisi nell'epica T40, oppure un mandato nuovo con le sue figlie aperte?), e un mandato seguito da parole che non sono verbi sulla lista.
+
+Prima di proseguire dichiara il modo in una riga: `🧭 Modo: creazione da lista — 3 id`.
+
+## 2. Creazione
+
+### 2a. La lista — da id
+
+Per ogni id nominato, nell'ordine in cui l'utente lo nomina:
+
+- **Nessun task file** (`resolve-task.sh` esce non-zero) → resta fuori dalla lista. Lo dici alla conferma: un id sbagliato non deve diventare un membro senza file.
+- **Prog ✔️** → entra, con un avviso alla conferma: una task chiusa non dà lavoro alla regia.
+- **`Size: Epic` o `Size: Mandate`** → entra come riga sola (`mandate-format.md` §Membri: il lettore non la espande). La conferma dice che la regia non lancerà i suoi membri: la tratterà come un perimetro da orchestrare a parte.
+- **«le figlie di T40»** → le leggi da `resolve-task.sh T40 --members` e scrivi le aperte (Prog diversa da ✔️) una per una, nell'ordine del lettore. Una figlia nata dopo non entra da sola: lo dici alla conferma.
+
+Da una lista di id non c'è una fermata qui: la lista la conferma l'utente insieme alla bozza e all'analisi, in una fermata sola (§3).
+
+### 2b. La lista — da una descrizione
+
+La proposta si costruisce in due passi:
+
+1. **I titoli delle aperte.** Le righe della tabella Tasks Overview di `{docs_root}/tasks.md` con Prog 🔵, 🟢 o 🟡 — solo quella tabella: le tabelle che la seguono (lane attive, cross-deps) hanno righe della stessa forma. Dai titoli scegli i candidati e i dubbi.
+2. **I task file dei candidati e dei dubbi**, letti per Description, Deliverables e `## Materiale`. Il titolo da solo non basta: è troncato a 100 caratteri, e dà falsi positivi.
+
+Le task ✔️ non entrano nella proposta. Un id nominato dall'utente accanto alla descrizione entra con le regole del §2a.
+
+La proposta in chat porta una ragione per membro e l'elenco corto dei vicini esclusi — le task che un lettore si aspetterebbe di trovare, con il perché non ci sono:
+
+```
+📋 Proposta — «tutte le task di front-end»
+   T52 (lettore delle convention del deck) — riscrive il parser della tabella task
+   T61 (gate del deck sulle convention) — legge il formato di T52 nel deck
+   esclusi:
+   T58 (doc delle convention) — tocca solo reference/, nessun file del deck
+```
+
+Poi la **prima fermata**: `AskUserQuestion` con la domanda «Confermi i membri del mandato?» e tre opzioni — confermo · correggo (scrivi cosa aggiungere o togliere) · annulla. Una correzione rifà la proposta e la richiede; annulla chiude la skill senza scrivere niente.
+
+### 2c. Il file su disco, prima dell'analisi
+
+Il task file del mandato si scrive **prima** dell'analisi e **non si committa** fino alla conferma. Due ragioni: `mandate.py tree` vuole in testa un id il cui task file esiste su disco, e senza esce 1; e `get-next-task-id.sh` conta i file oltre alle righe di `tasks.md`, quindi il file non committato riserva l'id contro una sessione parallela che crea una task durante l'attesa della conferma.
+
+1. L'id:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/utils/get-next-task-id.sh"
+   ```
+
+2. I campi di progetto:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/config/project-config.sh" fields
+   ```
+
+   Ogni riga `FIELD|<key>|…` diventa una riga vuota `- **<key>**:` dopo `Folder`, nell'ordine dichiarato, senza domande: un mandato non ha lavoro proprio, e il campo si riempie a mano se serve. Nessuna riga → nessuna riga nell'header. Exit non-zero → header senza campi, e lo dici alla conferma.
+
+3. Il file, col tool `Write`, in `{docs_root}/tasks/<id>-mandato-<slug>.md`:
+
+   ```markdown
+   # Task: Mandato: <tema>
+
+   - **ID**: <id>
+   - **Created on**: <YYYY-MM-DD HH:mm>
+   - **Priority**: Med
+   - **Estimated Time**:
+   - **Size**: Mandate
+   - **Lane**: nessuna (task spot)
+   - **Parent Task**:
+   - **Branch**:
+   - **Folder**:
+   - **Progress**: 🔵 Todo
+
+   ## Description
+
+   <perché questo perimetro esiste e cosa vuole ottenere>
+
+   ## Membri
+
+   - T52 (lettore delle convention del deck)
+   - T61 (gate del deck sulle convention)
+
+   ## Preferenze d'ordine
+
+   - In questo giro prima le convention: T52 prima di T61.
+
+   ## Analisi del perimetro
+
+   <scritta al §2d>
+   ```
+
+Le regole del file:
+
+- **Titolo** «Mandato: <tema>», col tema dalle parole dell'utente; da soli id, il tema che i membri hanno in comune. **Slug**: il tema in kebab-case, con il prefisso `mandato-`.
+- **Priority** Med se l'utente non la dice (High, Med, Low).
+- **Estimated Time** vuoto: la stima di un mandato sarebbe la somma dei membri, cioè una copia.
+- **Description**: dalle parole dell'utente. Da soli id, un paragrafo corto sul tema comune, che l'utente corregge alla conferma. Niente sullo stato dei membri.
+- **Membri**: `- T<id> (maniglia)`, con la maniglia verbo+oggetto ricavata dal titolo del membro. Niente Prog, niente checkbox, niente epica di provenienza: la parentela vive nel `Parent Task` del membro.
+- **Preferenze d'ordine**: solo se l'utente ha detto un ordine per questo giro; altrimenti la sezione non c'è. Una dipendenza vera non è una preferenza: se l'utente dice «T61 ha bisogno del formato di T52», quella va in `## Dependencies` di T61, che questa skill non scrive — lo dici alla conferma.
+- Niente `## Acceptance Criteria` e niente `## Deliverables Checklist`: un mandato non ha lavoro proprio (`mandate-format.md` §Acceptance e Deliverables).
+
+### 2d. L'analisi
+
+Scrivi `## Analisi del perimetro` nel file su disco col metodo del §6, con l'id del mandato in testa e i membri della lista. Poi la conferma (§3).
+
+## 3. La conferma e il commit della creazione
+
+In chat, prima della domanda:
+
+- la **bozza** del file intero;
+- le **note** che l'utente deve leggere prima di dire sì: gli id rimasti fuori senza task file, i membri ✔️, i membri epica o mandato, le dipendenze aperte verso task fuori dal perimetro con l'offerta di aggiungerle (§6), i punti ciechi dell'analisi (§6), le dipendenze non dichiarate che l'analisi ha trovato.
+
+Poi la fermata: `AskUserQuestion` con la domanda «Scrivo il mandato <id>?» e tre opzioni — scrivi · correggo (lista, descrizione, preferenze) · annulla. Le preferenze d'ordine l'utente le aggiunge qui, nella risposta.
+
+- **Scrivi** → se la risposta porta delle preferenze, scrivile in `## Preferenze d'ordine`. Poi:
+
+  ```bash
+  "${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh" <id> mandato-<slug> "Mandato: <tema>" <Priority>
+  ```
+
+  Lo script aggiunge la riga a `tasks.md`, committa il task file e `tasks.md` con una pathspec esplicita, e pusha.
+- **Correggo** → applica la correzione. Se cambia la lista dei membri, rifai l'analisi (§2d). Mostra di nuovo bozza e note, e richiedi.
+- **Annulla** → cancella il file: `git status --short -- <file>` deve stampare `??`, cioè un file mai committato, che è il tuo. L'id torna libero.
+
+Chiudi con il path del file, l'id, il numero di membri e le righe dell'analisi per fonte.
+
+## Convenzione TTS
+
+Prima di ogni `AskUserQuestion`:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic 3-7 parole specifiche>"
+```
+
+A lavoro finito, dopo il commit:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "$(say_id <id>) ready"
+```

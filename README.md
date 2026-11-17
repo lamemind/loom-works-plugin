@@ -48,6 +48,7 @@ Then bootstrap the project structure:
 | `/loom-works:spawn-task` | Ask the project's running deck to open a task conversation (preflight, run with scope, recap, checkpoint) — one spawn per call, no questions |
 | `/loom-works:close-session` | Ask the project's running deck to close a live conversation that `spawn-task` opened — the `claude` process ends, the tab closes, the transcript stays resumable; one session per call, no questions |
 | `/loom-works:orchestrate-epic` | Direct an epic semi-automatically: recap, live sessions, session monitor; launches preflight, run and checkpoint of the children through the deck, proposes answers and sends them only on the user's go-ahead — never writes to the repos |
+| `/loom-works:prepare-mandate` | Build a direction scope before it starts: create a mandate (`Size: Mandate`) from task ids or a description, add or remove its members, or write the scope analysis into an epic — dependencies and collisions between members, mechanical half from `mandate.py tree` plus a model half; the user confirms before every commit, member task files are never touched |
 | `/loom-works:spawn-lane` | Create a persistent git worktree lane |
 | `/loom-works:merge-lane` | Merge lane into main, keep worktree |
 | `/loom-works:drop-lane` | Destroy a lane without merging |
