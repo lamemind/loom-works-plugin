@@ -195,6 +195,23 @@ Poi la fermata: `AskUserQuestion` con la domanda «Scrivo il mandato <id>?» e t
 
 Chiudi con il path del file, l'id, il numero di membri e le righe dell'analisi per fonte.
 
+## 6. L'analisi del perimetro
+
+Il metodo è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md`: leggilo per intero prima della prima analisi della conversazione. Vale per i tre modi, ed è lo stesso che usa chi riscrive un'analisi smentita da un membro.
+
+In breve, le due metà:
+
+1. **Meccanica** — `tree` con la testa e i membri, e la trascrizione delle sue righe `CONFLICT`:
+
+   ```bash
+   "PY" -B -I "R/mandate.py" tree <testa> --children <membri…>
+   ```
+
+   La testa è il mandato o l'epica: il suo task file deve esistere su disco, ed è per questo che la creazione lo scrive prima (§2c). I membri si passano nell'ordine della lista: è l'ordine delle coppie in tabella. `tree` legge e basta, nessun file del repo cambia.
+2. **Del modello** — il task file intero di ogni membro aperto, e `git grep` sui soli path e simboli che due membri nominano, per sapere se cadono sullo stesso file.
+
+Le note che l'analisi produce oltre alla tabella vanno alla conferma, mai nel file: le dipendenze aperte verso task fuori dal perimetro, le dipendenze non dichiarate, i punti ciechi.
+
 ## Convenzione TTS
 
 Prima di ogni `AskUserQuestion`:

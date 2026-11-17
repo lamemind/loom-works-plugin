@@ -81,6 +81,8 @@ Le relazioni fra coppie di membri sull'intero perimetro. Ha **lo stesso nome e l
 
 Le righe `dichiarata` e `materiale` si ricalcolano dai file, quindi un confronto meccanico le verifica contro lo stato attuale. Le righe `modello` vengono da una lettura, e si riesaminano quando un membro cambia. La sezione non porta sha né data.
 
+Il metodo con cui la sezione si scrive e si riscrive — trascrizione delle righe di `tree`, lettura dei membri, rianalisi — è `mandate-analysis.md`.
+
 ### Acceptance e Deliverables
 
 Facoltativi: il formato non prescrive né `## Acceptance Criteria` né `## Deliverables Checklist`. Un mandato non ha lavoro proprio, e la sua chiusura è la sua Prog in `tasks.md`, non una derivazione dai membri.
