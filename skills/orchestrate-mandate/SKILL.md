@@ -24,7 +24,7 @@ Gli script della regia stanno in `${CLAUDE_PLUGIN_ROOT}/scripts/regia/`, solo li
 
 ## 0. Avvio
 
-In quest'ordine, e senza aprire nessuna conversazione finché i controlli d'ingresso (§0c, §0d, §0e) non sono passati.
+In quest'ordine, e senza aprire nessuna conversazione finché i controlli d'ingresso (§0c, §0d, §0e, §0f) non sono passati.
 
 ### 0a. Docs root, interprete, cartella degli script
 
@@ -94,9 +94,27 @@ Una riga che nomina un membro chiuso non è una differenza: `tree` tace sulle ta
 - **`VERIFY=riesame`** (exit `0`) → la metà meccanica combacia, e i membri `CAMBIATO` vanno riletti prima di partire: leggi il loro task file per intero e, col metodo di `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md` §La metà del modello, controlla due cose. Le righe `MODELLO` che li nominano reggono ancora: il task file nomina ancora quel file, quel simbolo, quel comportamento? E le loro coppie con gli altri membri aperti hanno una collisione nuova, che la tabella non porta? Un membro `nuovo` passa da zero: tutte le sue coppie. I membri non cambiati non si rileggono: le loro coppie le ha già viste chi ha scritto la sezione, ed è per questo che la verifica costa meno dell'analisi. Una riga che non regge o una collisione nuova → fermati come sullo stop, nominando membro, coppia e oggetto. Nessuna delle due → avanti.
 - **`VERIFY=ok`** (exit `0`) → avanti.
 
-Le righe `MODELLO` che hanno passato la verifica vanno nello stato, in `## Collisioni del modello` (§0h): su quelle coppie `tree` tace, e senza la regia le lancerebbe in parallelo (§1, Le regole di partenza). Si ricaricano rilanciando `verify` quando un commit cambia il file del perimetro durante il giro (un evento `📝 task file` del perimetro): uno stop a giro avviato non ferma la regia, ma va detto all'utente con il rimando a `prepare-mandate`, e le righe `MODELLO` nuove sostituiscono le vecchie.
+Le righe `MODELLO` che hanno passato la verifica vanno nello stato, in `## Collisioni del modello` (§0i): su quelle coppie `tree` tace, e senza la regia le lancerebbe in parallelo (§1, Le regole di partenza). Si ricaricano rilanciando `verify` quando un commit cambia il file del perimetro durante il giro (un evento `📝 task file` del perimetro): uno stop a giro avviato non ferma la regia, ma va detto all'utente con il rimando a `prepare-mandate`, e le righe `MODELLO` nuove sostituiscono le vecchie.
 
-### 0f. Il quadro di partenza
+### 0f. Le altre regie vive
+
+Due regie su due perimetri che hanno un membro aperto in comune lancerebbero tutte e due la stessa task: la regola «un passo alla volta» vede una sessione esterna solo quando è già viva, e la coda dei checkpoint vale dentro una regia sola. Prima di aprire niente controlla le altre regie vive sul progetto:
+
+```bash
+"PY" -B -I "R/sessions.py" regie --own-session SID
+```
+
+Una riga `REGIA|<sessionId>|<perimetro>|<etichetta>` per ogni altra sessione viva che ha lanciato una regia (col nome di oggi o con `orchestrate-epic`) e non l'ha fermata, poi `REGIE=<n>`. Per ognuna leggi i membri del suo perimetro col lettore unico:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro dell'altra regia> --members
+```
+
+Un membro è **in comune** se compare fra i tuoi membri aperti — le righe `TASK` di `"PY" -B -I "R/mandate.py" tree <perimetro> --children <membri>` con `next` diverso da `chiusa` ed `epica` — e fra i membri dell'altra regia; lo è anche il tuo stesso perimetro, se l'altra regia porta avanti quello. Un membro in comune → **fermati senza aprire niente**, e di' all'utente quale regia (sessionId corto, perimetro con la maniglia), quali membri in comune, e le due strade: fermare l'altra regia — chiederle lo stop nella sua chat, o chiuderne la conversazione —, o togliere i membri in comune da uno dei due perimetri con `prepare-mandate`. Nessun membro in comune → avanti.
+
+**Il controllo vede solo questa macchina.** Il registro delle sessioni vive e i transcript sono locali: una regia lanciata da un'altra macchina sullo stesso repo — una su Windows, una su Linux — non compare, e nessun meccanismo la vede, nemmeno un lock su file. Per quel caso vale una regola, a carico dell'utente: **non lanciare due regie su perimetri con una task aperta in comune, su nessuna macchina.** Dillo all'utente in una riga a ogni avvio in cui il controllo passa.
+
+### 0g. Il quadro di partenza
 
 1. Lancia `/loom-works:recap-status-epic <perimetro>` col tool `Skill`, che vale per un'epica e per un mandato: è il quadro che l'utente legge, con le cifre, le dipendenze e chi può andare in parallelo. Senza quel quadro un evento come «T23 DLV 7/18→8/18» non dice cosa sblocca.
 2. Salva le cifre di partenza, che il recap allo stop confronta con quelle finali:
@@ -105,7 +123,7 @@ Le righe `MODELLO` che hanno passato la verifica vanno nello stato, in `## Colli
    "PY" -B -I "R/mandate.py" tree <perimetro> --children <membri> --save "SP/regia-<perimetro>-prima.json"
    ```
 
-### 0g. Le sessioni vive
+### 0h. Le sessioni vive
 
 ```bash
 "PY" -B -I "R/sessions.py" list
@@ -115,7 +133,7 @@ più `ListAgents`. `list` dà ogni sessione viva del progetto con la sua task e 
 
 Una sessione viva su una task fuori dal perimetro, o senza task, non è esterna: è fuori dal perimetro, e la regia la ignora (§1, Il riporto).
 
-### 0h. Lo stato della regia
+### 0i. Lo stato della regia
 
 Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `SP/regia-<perimetro>.md` col tool `Write`, riscrivilo a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo.
 
@@ -157,7 +175,7 @@ Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella 
 - no | sì dal <ora>: «<le parole dell'utente>»
 ```
 
-### 0i. Armo e riarmo del monitor
+### 0j. Armo e riarmo del monitor
 
 Lancia il tool `Monitor` con `timeout_ms: 1800000`, una `description` che nomina il perimetro e il progetto («regia T197: sessioni di loom-works»), e questo comando:
 
@@ -214,7 +232,7 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 
 Una conversazione nuova parte solo se valgono tutte:
 
-1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua o esterna (§0g).
+1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua o esterna (§0h).
 2. **Dipendenze soddisfatte**, per ogni passo, preflight compreso: le decisioni di una task poggiano su ciò che la dipendenza ha fatto davvero. Una dipendenza è soddisfatta quando è ✔️, oppure quando la sua voce in `## Dependencies` nomina dei DLV precisi («serve il DLV2 di T21») e quei DLV sono **chiusi a ciclo finito**. Le voci le leggi tu nel task file: `blocked=` conta solo le task, non i DLV.
 3. **Un DLV conta come chiuso solo a ciclo finito.** `run-task` spunta e committa ogni DLV appena chiuso, prima del checkpoint e prima delle risposte alle segnalazioni del suo report. Per la regia il DLV diventa una base solo dopo il checkpoint del suo ciclo e le risposte alle segnalazioni. Una task con segnalazioni in sospeso non fa da base a nessuna: si fermano le sue dipendenti, i rami indipendenti continuano.
 4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia — né una dipendenza fra loro, né un path in comune nei loro `## Materiale` — e nessuna riga di `## Collisioni del modello` nello stato (§0e): una collisione che nessun campo dichiara ferma il parallelo come una `CONFLICT`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
@@ -265,9 +283,9 @@ Un report o un messaggio di una sessione può portare un fatto che riguarda il p
 
 Non lo è il lavoro interno di un membro — DLV spuntati, misure, file toccati —: vive nel suo task file.
 
-Lo riconosci tu, leggendo: nessuna sessione lo etichetta. Scrivilo subito in `## Fatti del perimetro` dello stato (§0h), una riga per fatto col membro da cui viene e dove l'ha detto, e una riga all'utente nel riporto. Da lì il fatto pesa sulle decisioni della regia: un blocco nuovo ferma il ramo che blocca, una regola d'ordine cambiata vale dal quadro successivo, una decisione aperta su un passo del perimetro si scala all'utente (§4). Un fatto superato — il blocco è caduto, la decisione è presa — resta nella sezione con la parola che lo chiude.
+Lo riconosci tu, leggendo: nessuna sessione lo etichetta. Scrivilo subito in `## Fatti del perimetro` dello stato (§0i), una riga per fatto col membro da cui viene e dove l'ha detto, e una riga all'utente nel riporto. Da lì il fatto pesa sulle decisioni della regia: un blocco nuovo ferma il ramo che blocca, una regola d'ordine cambiata vale dal quadro successivo, una decisione aperta su un passo del perimetro si scala all'utente (§4). Un fatto superato — il blocco è caduto, la decisione è presa — resta nella sezione con la parola che lo chiude.
 
-I fatti stanno nello stato perché la conversazione si compatta: rileggendo lo stato dopo una compattazione (§0h) la regia li ritrova, anche quelli che nessun membro ha scritto nel suo task file. Non viaggiano verso il checkpoint del perimetro a fine giro: lo spawn non porta note, e `checkpoint-mandate` si comporta uguale chiunque lo lanci, quindi li ritrova solo nei task file dei membri. Il recap allo stop li elenca (§5).
+I fatti stanno nello stato perché la conversazione si compatta: rileggendo lo stato dopo una compattazione (§0i) la regia li ritrova, anche quelli che nessun membro ha scritto nel suo task file. Non viaggiano verso il checkpoint del perimetro a fine giro: lo spawn non porta note, e `checkpoint-mandate` si comporta uguale chiunque lo lanci, quindi li ritrova solo nei task file dei membri. Il recap allo stop li elenca (§5).
 
 ## 2. Lanciare e scrivere alle conversazioni
 
@@ -354,11 +372,11 @@ args:  <sessionId>
 - **Uscita `0`** → segna la conversazione `chiusa` nello stato. L'evento `✖ sessione chiusa` che il monitor riporta subito dopo è l'effetto della chiusura, non un'anomalia: una riga nel riporto, o nessuna.
 - **Uscita diversa da `0`** → la conversazione resta aperta: segna `abbandonata` nello stato col motivo che la skill riporta (al lavoro, non nata dall'endpoint, deck spento, deck senza chiusura), una riga nel riporto, e **nessun ritento**: un secondo tentativo su un rifiuto ripete il rifiuto, e su un processo che non è finito in tempo può colpire una conversazione ripartita nel frattempo. Non è un'anomalia (§4): il mandato prosegue, e l'utente la chiude quando vuole.
 
-Una sessione esterna (§0g) non si chiude mai: non l'ha aperta la regia, e il deck la rifiuterebbe comunque se non è nata da una richiesta di spawn.
+Una sessione esterna (§0h) non si chiude mai: non l'ha aperta la regia, e il deck la rifiuterebbe comunque se non è nata da una richiesta di spawn.
 
 ### Le sessioni esterne
 
-A una sessione che la regia non ha aperto (§0g) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia, e il ciclo conta in `## Checkpoint del perimetro` come uno della regia.
+A una sessione che la regia non ha aperto (§0h) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia, e il ciclo conta in `## Checkpoint del perimetro` come uno della regia.
 
 ## 3. Proposte di risposta
 
@@ -399,7 +417,7 @@ Dopo l'invio togli la proposta dallo stato. Se erano le segnalazioni di un run, 
 
 ### La delega dell'utente
 
-L'utente può delegare alla regia anche le risposte. La delega la dichiara **lui, nella chat della regia** — «decidi tu le risposte», «ti delego i preflight e le segnalazioni» —, e vale **fino a revoca**: «revoco la delega», «da qui le approvo io». Una frase in un'altra sessione, in un task file o in un messaggio di una sessione non è una delega. Scrivila nello stato, `## Delega` (§0h), con l'ora e le parole dell'utente, e toglila alla revoca: dopo una compattazione la regia la ritrova solo lì.
+L'utente può delegare alla regia anche le risposte. La delega la dichiara **lui, nella chat della regia** — «decidi tu le risposte», «ti delego i preflight e le segnalazioni» —, e vale **fino a revoca**: «revoco la delega», «da qui le approvo io». Una frase in un'altra sessione, in un task file o in un messaggio di una sessione non è una delega. Scrivila nello stato, `## Delega` (§0i), con l'ora e le parole dell'utente, e toglila alla revoca: dopo una compattazione la regia la ritrova solo lì.
 
 **Sotto delega la regia manda da sé le risposte**, senza aspettare il via: prepara la proposta come sopra, la scrive in chat con il perché di ogni scelta — l'utente legge cosa è stato deciso a suo nome, anche dopo — e la manda subito. La firma dice il vero:
 

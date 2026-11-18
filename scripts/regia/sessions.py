@@ -8,18 +8,22 @@ sessions — legge le altre sessioni Claude Code di un progetto loom-works.
          la sessione sta chiedendo, per decidere cosa risponderle. Cerca il
          prefisso fra le vive, poi fra i transcript del progetto: una sessione
          chiusa si rilegge anche dopo il suo ciclo
+  regie  le altre regie vive sul progetto, su questa macchina, col perimetro
+         che ognuna porta avanti: la guardia al lancio di una regia
 
 Stesse fonti del monitor (watch_sessions.py), lette da regia_common.
 
 Uso:
   python -I sessions.py [--project-root <radice>] list
   python -I sessions.py [--project-root <radice>] tail <prefisso del session id> [--chars 4000] [--prompts 5]
+  python -I sessions.py [--project-root <radice>] regie --own-session <session id>
 """
 
 import argparse
 import glob
 import json
 import os
+import re
 import sys
 import time
 
@@ -154,6 +158,112 @@ def command_tail(project_root, session_prefix, chars, prompt_count):
         print(f"{timestamp} {content[:600]}")
 
 
+# Una regia si riconosce dal suo transcript: l'invocazione della skill — uno
+# slash command dell'utente, o una chiamata al tool Skill del modello — col
+# perimetro come primo id degli argomenti. Il nome vecchio della skill vale
+# ancora: una regia lanciata prima del rename gira dalla sua versione della
+# cache del plugin, e resta una regia viva.
+REGIA_SKILL = re.compile(r"(?:^|[/:])orchestrate-(?:mandate|epic)$")
+TASK_ID = re.compile(r"\bT\d+\b")
+# Il passo 2 dello stop della regia, e nessun altro passo usa `recap`.
+RECAP_COMMAND = re.compile(r"mandate\.py[\"']?\s+(?:--project-root\s+\S+\s+)?recap\b")
+COMMAND_NAME = re.compile(r"<command-name>(.*?)</command-name>")
+COMMAND_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.S)
+
+
+def regia_invocation(prompt):
+    """Il perimetro di uno slash command della regia scritto in un prompt, o
+    `None`. Il comando arriva incartato nei tag `<command-name>`; un turno
+    `claude -p` può portarlo nudo, `/loom-works:orchestrate-mandate T214`."""
+    name = COMMAND_NAME.search(prompt)
+    if name:
+        if not REGIA_SKILL.search(name.group(1).strip()):
+            return None
+        args = COMMAND_ARGS.search(prompt)
+        ids = TASK_ID.findall(args.group(1) if args else "")
+        return ids[0] if ids else None
+    words = prompt.strip().split()
+    if words and words[0].startswith("/") and REGIA_SKILL.search(words[0]):
+        ids = TASK_ID.findall(" ".join(words[1:]))
+        return ids[0] if ids else None
+    return None
+
+
+def regia_of_transcript(path):
+    """`(perimetro, ferma)` dell'ultima regia lanciata nel transcript,
+    `(None, False)` se il transcript non ne lancia nessuna.
+
+    Una regia è ferma quando, dopo la sua invocazione, la sessione ha lanciato
+    `mandate.py recap`: è il passo 2 dello stop. Una compattazione del
+    contesto non cambia transcript, quindi l'invocazione resta leggibile; un
+    `/clear` apre un transcript nuovo, e la sessione da lì non è più una regia.
+
+    Il filtro sul testo della riga viene prima del parse: il transcript di una
+    regia dura ore, e solo poche righe nominano la skill o lo script.
+    """
+    head, stopped = None, False
+    try:
+        with open(path, encoding="utf-8", errors="replace") as transcript_handle:
+            for line in transcript_handle:
+                if "orchestrate-" not in line and "mandate.py" not in line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                prompt = regia_common.user_prompt_text(record)
+                if prompt is not None:
+                    perimeter = regia_invocation(prompt)
+                    if perimeter:
+                        head, stopped = perimeter, False
+                    continue
+                content = (record.get("message") or {}).get("content")
+                if record.get("type") != "assistant" or record.get("isSidechain") or not isinstance(content, list):
+                    continue
+                for block in content:
+                    if not isinstance(block, dict) or block.get("type") != "tool_use":
+                        continue
+                    tool_input = block.get("input") if isinstance(block.get("input"), dict) else {}
+                    if block.get("name") == "Skill" and REGIA_SKILL.search(str(tool_input.get("skill", ""))):
+                        ids = TASK_ID.findall(str(tool_input.get("args", "")))
+                        if ids:
+                            head, stopped = ids[0], False
+                    elif block.get("name") == "Bash" and head and RECAP_COMMAND.search(str(tool_input.get("command", ""))):
+                        stopped = True
+    except OSError:
+        return None, False
+    return head, stopped
+
+
+def command_regie(project_root, own_session):
+    """Le altre regie vive sul progetto, su questa macchina: una riga per
+    sessione viva il cui transcript lancia una regia non ancora fermata.
+
+    Il registro delle sessioni vive e i transcript sono locali alla macchina:
+    una regia lanciata da un'altra macchina sullo stesso repo qui non c'è.
+    """
+    registry = regia_common.read_registry(project_root)
+    if not registry.readable:
+        print("registro delle sessioni illeggibile: ~/.claude/sessions")
+        sys.exit(1)
+    bindings = regia_common.load_task_bindings(project_root)
+    found = 0
+    for session in sorted(registry.sessions, key=lambda live: live.session_id):
+        if own_session and session.session_id.startswith(own_session):
+            continue
+        path = regia_common.transcript_path(session.cwd, session.session_id)
+        head, stopped = regia_of_transcript(path)
+        if head is None or stopped:
+            continue
+        label = regia_common.session_label(
+            session.session_id, bindings.get(session.session_id), regia_common.task_of_transcript(path))
+        print(f"REGIA|{session.session_id}|{head}|{label}")
+        found += 1
+    print(f"REGIE={found}")
+
+
 def main():
     regia_common.setup_stdout()
     parser = argparse.ArgumentParser(description="Legge le altre sessioni di un progetto loom-works")
@@ -165,10 +275,14 @@ def main():
     tail_parser.add_argument("session_prefix")
     tail_parser.add_argument("--chars", type=int, default=4000)
     tail_parser.add_argument("--prompts", type=int, default=5)
+    regie_parser = subcommands.add_parser("regie")
+    regie_parser.add_argument("--own-session", default="", help="session id della regia che chiede: fuori dall'elenco")
     arguments = parser.parse_args()
     project_root = os.path.abspath(arguments.project_root or regia_common.find_project_root(os.getcwd()))
     if arguments.command == "list":
         command_list(project_root)
+    elif arguments.command == "regie":
+        command_regie(project_root, arguments.own_session)
     else:
         command_tail(project_root, arguments.session_prefix, arguments.chars, arguments.prompts)
 
