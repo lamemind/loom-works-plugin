@@ -1,7 +1,7 @@
 ---
-name: orchestrate-epic
-description: Fa da regia su un'epica loom-works — recap, sessioni vive, monitor delle sessioni armato e riarmato — e porta avanti le figlie in modo semi-automatico. Lancia da sé preflight, run e checkpoint quando le dipendenze lo permettono, e chiude le conversazioni a passo finito; alle domande delle sessioni prepara una proposta di risposta motivata e la manda solo col via dell'utente. Non scrive mai nei repo né nei task file. Usa quando l'utente dice «fai da regia su T21», «orchestra l'epica T197», «porta avanti le figlie di T40, e segui anche T52».
-argument-hint: "<epica> [Txx …]"
+name: orchestrate-mandate
+description: Fa da regia su un perimetro loom-works — un id solo, un'epica (le sue figlie) o un mandato (`Size: Mandate`, la sua lista di membri) — e porta avanti i membri in modo semi-automatico. Al lancio verifica l'analisi del perimetro scritta nel task file e si ferma se non combacia; poi recap, sessioni vive, monitor delle sessioni armato e riarmato. Lancia da sé preflight, run e checkpoint quando le dipendenze lo permettono, chiude le conversazioni a passo finito, e a fine giro lancia il checkpoint del perimetro; alle domande delle sessioni prepara una proposta di risposta motivata e la manda solo col via dell'utente, o da sé sotto una delega che l'utente dichiara. Non scrive mai nei repo né nei task file. Usa quando l'utente dice «fai da regia su T21», «orchestra l'epica T197», «orchestra il mandato T214».
+argument-hint: "<epica|mandato>"
 allowed-tools: Bash(*), Read, Write, Edit, Skill, Monitor, TaskStop, SendMessage, ListAgents, PushNotification
 ---
 
