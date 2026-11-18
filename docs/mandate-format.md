@@ -79,7 +79,7 @@ Le relazioni fra coppie di membri sull'intero perimetro. Ha **lo stesso nome e l
 - **`materiale`** — due membri aperti che nominano path sovrapposti in `## Materiale`: le righe `CONFLICT` di `mandate.py tree`.
 - **`modello`** — una collisione che nessun campo dichiara, trovata leggendo i DLV dei membri.
 
-Le righe `dichiarata` e `materiale` si ricalcolano dai file, quindi un confronto meccanico le verifica contro lo stato attuale. Le righe `modello` vengono da una lettura, e si riesaminano quando un membro cambia. La sezione non porta sha né data.
+Le righe `dichiarata` e `materiale` si ricalcolano dai file, quindi un confronto meccanico le verifica contro lo stato attuale: `scripts/regia/mandate.py verify`. Le righe `modello` vengono da una lettura, e si riesaminano quando un membro cambia. La sezione non porta sha né data: il commit da cui l'analisi vale si ricava dalla storia, ed è il più recente fra l'ultimo che ha cambiato le righe della sezione e l'ultimo `### Avanzamento` del perimetro.
 
 Il metodo con cui la sezione si scrive e si riscrive — trascrizione delle righe di `tree`, lettura dei membri, rianalisi — è `mandate-analysis.md`.
 

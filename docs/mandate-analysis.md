@@ -32,7 +32,7 @@ L'analisi ha due metà, e servono entrambe:
 
 **Regole di trascrizione:**
 
-- **Ogni riga `CONFLICT` diventa una riga della tabella, e nessuna riga `dichiarata` o `materiale` esiste senza la sua `CONFLICT`.** È la proprietà che rende la metà meccanica verificabile con un confronto, alla partenza della regia: le stesse righe si ricalcolano dai file.
+- **Ogni riga `CONFLICT` diventa una riga della tabella, e nessuna riga `dichiarata` o `materiale` esiste senza la sua `CONFLICT`.** È la proprietà che rende la metà meccanica verificabile con un confronto, alla partenza della regia: le stesse righe si ricalcolano dai file, e `mandate.py verify <testa> --children <membri…>` stampa ogni differenza (`DIFF`), le righe `modello` (`MODELLO`) e i membri aperti cambiati dopo il commit dell'analisi (`CAMBIATO`).
 - **`dipendenza`** → il verso viene da `DEPS`: `A → B` se le `DEPS` di A nominano B. Se si nominano a vicenda, due righe. `Su cosa` è la prosa della voce di `## Dependencies` di A che nomina B, accorciata; per una freccia che viene solo dal grafo, «grafo di `tasks.md`».
 - **`materiale: <path>`** → `A · B`, coi membri nell'ordine della lista. `Su cosa` porta i path fra backtick. Se uno dei due dichiara il path come 📖 fonte, cioè lo legge e basta, `Su cosa` lo dice — la riga resta, perché `tree` la calcola e il confronto la conta.
 - **Una dipendenza verso una task chiusa** non entra in tabella.

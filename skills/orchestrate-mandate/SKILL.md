@@ -24,7 +24,7 @@ Gli script della regia stanno in `${CLAUDE_PLUGIN_ROOT}/scripts/regia/`, solo li
 
 ## 0. Avvio
 
-In quest'ordine, e senza aprire nessuna conversazione finché i controlli d'ingresso (§0c, §0d) non sono passati.
+In quest'ordine, e senza aprire nessuna conversazione finché i controlli d'ingresso (§0c, §0d, §0e) non sono passati.
 
 ### 0a. Docs root, interprete, cartella degli script
 
@@ -69,7 +69,34 @@ Le righe `TASK_MEMBER=<id> <file>` sono i membri, nell'ordine del lettore: le fi
 
 I membri si leggono **solo** dal lettore, mai a mano dal task file, e si rileggono a ogni quadro (§1).
 
-### 0e. Il quadro di partenza
+### 0e. La verifica al lancio
+
+Il perimetro porta nel suo task file la sezione `## Analisi del perimetro`: quali coppie di membri non possono girare insieme, e su cosa (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). Prima della prima conversazione la regia controlla che l'analisi scritta valga ancora:
+
+```bash
+"PY" -B -I "R/mandate.py" verify <perimetro> --children <membri>
+```
+
+Le righe:
+
+| Riga | Cosa dice |
+|---|---|
+| `PERIMETRO=<id>\|epica\|mandato` · `ANALYSIS=presente\|assente` · `ROWS=<n>` | il perimetro, e se la sezione c'è |
+| `ANALYSIS_COMMIT=<sha>` · `ANALYSIS_FROM=sezione\|avanzamento` | il commit da cui l'analisi vale: il più recente fra l'ultimo che ha cambiato le righe della sezione e l'ultimo `### Avanzamento` del perimetro, cioè l'ultimo giro di `checkpoint-mandate`, che riverifica l'analisi. `ANALYSIS_COMMIT=? (<motivo>)`: file o sezione non committati |
+| `DIFF\|<tipo>\|<coppia>\|<dettaglio>` | una differenza della metà meccanica: `manca` (una riga `CONFLICT` di `tree` senza la sua riga, o un path che la riga non cita), `in più` (una riga `dichiarata` o `materiale` che `tree` non calcola), `fuori` (una riga su una task che non è un membro aperto), `forma` (una riga fuori dal formato), `membri` (la lista di un mandato cambiata dopo l'analisi) |
+| `MODELLO\|<a>\|<b>\|<su cosa>` | una collisione della metà del modello fra due membri aperti |
+| `CAMBIATO\|<id>\|modificato\|nuovo` | un membro aperto il cui task file è cambiato dopo il commit dell'analisi, o è nato dopo |
+| `VERIFY=ok\|riesame\|stop` | il verdetto |
+
+Una riga che nomina un membro chiuso non è una differenza: `tree` tace sulle task chiuse, e la riga resta scritta.
+
+- **`VERIFY=stop`** (exit `2`) → **fermati senza aprire niente**. Di' all'utente perché, riga per riga — analisi assente, non committata, ogni `DIFF` —, e il rimedio: `/loom-works:prepare-mandate <perimetro>`, che riscrive l'analisi di un'epica o di un mandato. La regia non scrive nei task file e non può correggere da sé. Un'epica che non ha mai avuto l'analisi si ferma allo stesso modo.
+- **`VERIFY=riesame`** (exit `0`) → la metà meccanica combacia, e i membri `CAMBIATO` vanno riletti prima di partire: leggi il loro task file per intero e, col metodo di `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md` §La metà del modello, controlla due cose. Le righe `MODELLO` che li nominano reggono ancora: il task file nomina ancora quel file, quel simbolo, quel comportamento? E le loro coppie con gli altri membri aperti hanno una collisione nuova, che la tabella non porta? Un membro `nuovo` passa da zero: tutte le sue coppie. I membri non cambiati non si rileggono: le loro coppie le ha già viste chi ha scritto la sezione, ed è per questo che la verifica costa meno dell'analisi. Una riga che non regge o una collisione nuova → fermati come sullo stop, nominando membro, coppia e oggetto. Nessuna delle due → avanti.
+- **`VERIFY=ok`** (exit `0`) → avanti.
+
+Le righe `MODELLO` che hanno passato la verifica vanno nello stato, in `## Collisioni del modello` (§0h): su quelle coppie `tree` tace, e senza la regia le lancerebbe in parallelo (§1, Le regole di partenza). Si ricaricano rilanciando `verify` quando un commit cambia il file del perimetro durante il giro (un evento `📝 task file` del perimetro): uno stop a giro avviato non ferma la regia, ma va detto all'utente con il rimando a `prepare-mandate`, e le righe `MODELLO` nuove sostituiscono le vecchie.
+
+### 0f. Il quadro di partenza
 
 1. Lancia `/loom-works:recap-status-epic <perimetro>` col tool `Skill`, che vale per un'epica e per un mandato: è il quadro che l'utente legge, con le cifre, le dipendenze e chi può andare in parallelo. Senza quel quadro un evento come «T23 DLV 7/18→8/18» non dice cosa sblocca.
 2. Salva le cifre di partenza, che il recap allo stop confronta con quelle finali:
@@ -78,7 +105,7 @@ I membri si leggono **solo** dal lettore, mai a mano dal task file, e si rileggo
    "PY" -B -I "R/mandate.py" tree <perimetro> --children <membri> --save "SP/regia-<perimetro>-prima.json"
    ```
 
-### 0f. Le sessioni vive
+### 0g. Le sessioni vive
 
 ```bash
 "PY" -B -I "R/sessions.py" list
@@ -88,7 +115,7 @@ più `ListAgents`. `list` dà ogni sessione viva del progetto con la sua task e 
 
 Una sessione viva su una task fuori dal perimetro, o senza task, non è esterna: è fuori dal perimetro, e la regia la ignora (§1, Il riporto).
 
-### 0g. Lo stato della regia
+### 0h. Lo stato della regia
 
 Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `SP/regia-<perimetro>.md` col tool `Write`, riscrivilo a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo.
 
@@ -105,6 +132,9 @@ Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella 
 |------|-------|-----------|------|-------|
 <!-- Stato: in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
 
+## Collisioni del modello
+- T.. · T.. · <su cosa>   (righe MODELLO di verify, ricaricate a ogni commit del file del perimetro)
+
 ## Sessioni esterne
 - T.. · <sessionId> · <nome>
 
@@ -118,7 +148,7 @@ Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella 
 - T.. · <motivo> · task che aspettano: T..
 ```
 
-### 0h. Armo e riarmo del monitor
+### 0i. Armo e riarmo del monitor
 
 Lancia il tool `Monitor` con `timeout_ms: 1800000`, una `description` che nomina il perimetro e il progetto («regia T197: sessioni di loom-works»), e questo comando:
 
@@ -175,10 +205,10 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 
 Una conversazione nuova parte solo se valgono tutte:
 
-1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua o esterna (§0f).
+1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua o esterna (§0g).
 2. **Dipendenze soddisfatte**, per ogni passo, preflight compreso: le decisioni di una task poggiano su ciò che la dipendenza ha fatto davvero. Una dipendenza è soddisfatta quando è ✔️, oppure quando la sua voce in `## Dependencies` nomina dei DLV precisi («serve il DLV2 di T21») e quei DLV sono **chiusi a ciclo finito**. Le voci le leggi tu nel task file: `blocked=` conta solo le task, non i DLV.
 3. **Un DLV conta come chiuso solo a ciclo finito.** `run-task` spunta e committa ogni DLV appena chiuso, prima del checkpoint e prima delle risposte alle segnalazioni del suo report. Per la regia il DLV diventa una base solo dopo il checkpoint del suo ciclo e le risposte alle segnalazioni. Una task con segnalazioni in sospeso non fa da base a nessuna: si fermano le sue dipendenti, i rami indipendenti continuano.
-4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia: né una dipendenza fra loro, né un path in comune nei loro `## Materiale`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
+4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia — né una dipendenza fra loro, né un path in comune nei loro `## Materiale` — e nessuna riga di `## Collisioni del modello` nello stato (§0e): una collisione che nessun campo dichiara ferma il parallelo come una `CONFLICT`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
 5. **Un checkpoint alla volta in tutto il mandato.** Il checkpoint riscrive il task file e `tasks.md`, e due `checkpoint-task` insieme fanno race su `tasks.md` e su git. Prima di chiederne uno guarda `## Checkpoint in corso` nello stato: se è occupato, il ciclo aspetta in coda, e lo dici in una riga.
 
 Fra i membri pronti, parte prima quello che sblocca più membri: conta le righe `DEPS` che lo nominano.
@@ -274,11 +304,11 @@ args:  <sessionId>
 - **Uscita `0`** → segna la conversazione `chiusa` nello stato. L'evento `✖ sessione chiusa` che il monitor riporta subito dopo è l'effetto della chiusura, non un'anomalia: una riga nel riporto, o nessuna.
 - **Uscita diversa da `0`** → la conversazione resta aperta: segna `abbandonata` nello stato col motivo che la skill riporta (al lavoro, non nata dall'endpoint, deck spento, deck senza chiusura), una riga nel riporto, e **nessun ritento**: un secondo tentativo su un rifiuto ripete il rifiuto, e su un processo che non è finito in tempo può colpire una conversazione ripartita nel frattempo. Non è un'anomalia (§4): il mandato prosegue, e l'utente la chiude quando vuole.
 
-Una sessione esterna (§0f) non si chiude mai: non l'ha aperta la regia, e il deck la rifiuterebbe comunque se non è nata da una richiesta di spawn.
+Una sessione esterna (§0g) non si chiude mai: non l'ha aperta la regia, e il deck la rifiuterebbe comunque se non è nata da una richiesta di spawn.
 
 ### Le sessioni esterne
 
-A una sessione che la regia non ha aperto (§0f) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia.
+A una sessione che la regia non ha aperto (§0g) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia.
 
 ## 3. Proposte di risposta
 
