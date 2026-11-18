@@ -194,14 +194,14 @@ Le righe che legge la regia:
 | `TASK\|<id>\|prog=…\|size=…\|preflight=…\|dlv=a/b\|ac=a/b\|next=…\|blocked=…\|title=…` | stato della task e prossimo passo del suo ciclo |
 | `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo. Il perimetro non compare: si chiude dopo i membri, e un membro che lo nomina non lo aspetta |
 | `MATERIALE\|<id>\|<path> · …` | i path di `## Materiale`, `📁/` sciolto nella task folder |
-| `CONFLICT\|<id>\|<id>\|dipendenza` · `…\|materiale: <path>` | due task aperte che non possono girare insieme |
+| `CONFLICT\|<id>\|<id>\|dipendenza` · `…\|materiale: <path>` | due task aperte che non possono girare insieme: una dipendenza fra loro, o un path in comune che almeno una delle due non dichiara come 📖 fonte (due letture non si scontrano) |
 
 Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **mai dai glifi del grafo**: fra la promozione e il checkpoint i glifi del grafo restano indietro. Il grafo dà solo le frecce.
 
 `next` vale:
 
-- `preflight` — nessun preflight valido: manca il blocco datato in `## Decisions`, o l'ultimo è una «premessa decaduta». Il primo caso lo lanci; il secondo no: la ricostruzione delle premesse è dell'utente, e la task diventa un ramo fermo (§4).
-- `run` — preflight fatto e DLV aperti.
+- `preflight` — nessun preflight valido su una task 🔵: manca il blocco datato in `## Decisions`; oppure, a ogni Prog, l'ultimo blocco è una «premessa decaduta». Una task 🟢 o 🟡 senza blocco è già partita senza preflight, che per una S o una M non è obbligatorio: va a `run` o a `checkpoint`. Il primo caso lo lanci; il secondo no: la ricostruzione delle premesse è dell'utente, e la task diventa un ramo fermo (§4).
+- `run` — preflight fatto, o task già partita, e DLV aperti.
 - `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è interrotto prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2): scala all'utente.
 - `chiusa` — Prog ✔️, niente da fare.
 - `epica` — un'epica o un mandato fra i membri non si esegue: è un perimetro a sé, e si orchestra con una regia a parte.

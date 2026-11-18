@@ -4,7 +4,7 @@ Metodo per chi **scrive** la sezione `## Analisi del perimetro` di un mandato o 
 
 L'analisi ha due metà, e servono entrambe:
 
-- la **metà meccanica** viene da `mandate.py tree`, che legge i campi dichiarati dei membri: le dipendenze di `## Dependencies` e del grafo di `tasks.md`, e i path in comune nei `## Materiale`;
+- la **metà meccanica** viene da `mandate.py tree`, che legge i campi dichiarati dei membri: le dipendenze di `## Dependencies` e del grafo di `tasks.md`, e i path in comune nei `## Materiale`. Di `## Dependencies` conta il primo id di ogni voce a colonna zero, e una voce che comincia con «Nessuna» non dichiara niente anche se poi nomina una task («Nessuna. Non parte insieme a T211»): un vincolo «non insieme» è una collisione, e lo trova la metà del modello;
 - la **metà del modello** trova le collisioni che nessun campo dichiara, per esempio due task spot che toccano lo stesso codice senza scriverlo nel `## Materiale`. Su quelle `tree` tace, e una regia lancerebbe le due task in parallelo.
 
 ## L'ingresso
@@ -34,7 +34,7 @@ L'analisi ha due metà, e servono entrambe:
 
 - **Ogni riga `CONFLICT` diventa una riga della tabella, e nessuna riga `dichiarata` o `materiale` esiste senza la sua `CONFLICT`.** È la proprietà che rende la metà meccanica verificabile con un confronto, alla partenza della regia: le stesse righe si ricalcolano dai file, e `mandate.py verify <testa> --children <membri…>` stampa ogni differenza (`DIFF`), le righe `modello` (`MODELLO`) e i membri aperti cambiati dopo il commit dell'analisi (`CAMBIATO`).
 - **`dipendenza`** → il verso viene da `DEPS`: `A → B` se le `DEPS` di A nominano B. Se si nominano a vicenda, due righe. `Su cosa` è la prosa della voce di `## Dependencies` di A che nomina B, accorciata; per una freccia che viene solo dal grafo, «grafo di `tasks.md`».
-- **`materiale: <path>`** → `A · B`, coi membri nell'ordine della lista. `Su cosa` porta i path fra backtick. Se uno dei due dichiara il path come 📖 fonte, cioè lo legge e basta, `Su cosa` lo dice — la riga resta, perché `tree` la calcola e il confronto la conta.
+- **`materiale: <path>`** → `A · B`, coi membri nell'ordine della lista. `Su cosa` porta i path fra backtick. Se tutti e due dichiarano il path come 📖 fonte, cioè lo leggono e basta, `tree` non stampa la riga: due letture non si scontrano. Se lo dichiara 📖 uno solo, `Su cosa` lo dice — la riga resta, perché `tree` la calcola e il confronto la conta.
 - **Una dipendenza verso una task chiusa** non entra in tabella.
 - **Una dipendenza aperta verso una task fuori dal perimetro** — un id in `blocked=` che non è fra i membri — non entra in tabella: si mostra alla conferma, con l'offerta di aggiungere la task ai membri. In un'epica l'offerta non c'è, perché le figlie le decide il `Parent Task` della figlia: alla conferma si dice che per seguirla insieme serve un mandato.
 

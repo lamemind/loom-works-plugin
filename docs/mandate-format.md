@@ -76,7 +76,7 @@ Le relazioni fra coppie di membri sull'intero perimetro. Ha **lo stesso nome e l
 | `Fonte` | `dichiarata` · `materiale` · `modello` |
 
 - **`dichiarata`** — una dipendenza che un membro dichiara in `## Dependencies` o che il grafo di `tasks.md` porta: le righe `DEPS` di `scripts/regia/mandate.py tree`.
-- **`materiale`** — due membri aperti che nominano path sovrapposti in `## Materiale`: le righe `CONFLICT` di `mandate.py tree`.
+- **`materiale`** — due membri aperti che nominano path sovrapposti in `## Materiale`, e almeno uno dei due non come 📖 fonte: le righe `CONFLICT` di `mandate.py tree`. Due letture dello stesso file non si scontrano.
 - **`modello`** — una collisione che nessun campo dichiara, trovata leggendo i DLV dei membri.
 
 Le righe `dichiarata` e `materiale` si ricalcolano dai file, quindi un confronto meccanico le verifica contro lo stato attuale: `scripts/regia/mandate.py verify`. Le righe `modello` vengono da una lettura, e si riesaminano quando un membro cambia. La sezione non porta sha né data: il commit da cui l'analisi vale si ricava dalla storia, ed è il più recente fra l'ultimo che ha cambiato le righe della sezione e l'ultimo `### Avanzamento` del perimetro.

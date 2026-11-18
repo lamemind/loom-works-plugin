@@ -205,12 +205,26 @@ def preflight_state(lines):
     return "decaduta" if "premessa decaduta" in headings[-1] else "ok"
 
 
+# Una voce di `## Dependencies` che comincia con «Nessuna» (o «Nessuno»), anche
+# in grassetto o in corsivo, non dichiara dipendenze.
+NO_DEPENDENCY = re.compile(r"^-\s+[*_`]*\s*nessun", re.IGNORECASE)
+
+
 def declared_dependencies(lines):
-    """Le task nominate in `## Dependencies`: il primo id di ogni voce. Il resto
-    della voce è prosa, e può citare altre task per spiegare."""
+    """Le task nominate in `## Dependencies`: il primo id di ogni voce a
+    colonna zero, la stessa regola del lettore dei membri e di `Parent Task`.
+
+    Il resto della voce è prosa, e può citare altre task per spiegare. Una riga
+    indentata è prosa della voce sopra. Una voce che comincia con «Nessuna» non
+    dichiara niente anche quando poi nomina una task («Nessuna. Non parte
+    insieme a T211»): un vincolo «non insieme» è una collisione, e sta
+    nell'analisi del perimetro. Le voci con prosa prima dell'id restano lette:
+    una dipendenza vera scritta in prosa e non letta farebbe partire una task
+    prima della sua base, l'errore che costa di più.
+    """
     dependencies = []
     for line in section_lines(lines, "Dependencies"):
-        if not line.lstrip().startswith("-"):
+        if not line.startswith("-") or NO_DEPENDENCY.match(line):
             continue
         numbers = TASK_REFERENCE.findall(line)
         if numbers:
@@ -221,19 +235,26 @@ def declared_dependencies(lines):
 def materiale_paths(lines, folder):
     """I path di `## Materiale`, nella forma su cui si confrontano: relativi
     alla radice, `📁/` sciolto nella task folder, nessun `./` davanti. Un path
-    che finisce con `/` è una cartella."""
+    che finisce con `/` è una cartella.
+
+    Restituisce la lista dei path e l'insieme di quelli che la task dichiara
+    solo come 📖 fonte, cioè legge e basta: un path nominato anche con un altro
+    glifo non ci entra."""
     # Solo il prefisso `./`: la folder stessa comincia con un punto
     # (`./.26-11-16-slug`), e uno strip dei caratteri lo mangerebbe.
     folder = (folder or "").strip()
     while folder.startswith("./"):
         folder = folder[2:]
     paths = []
+    read_only = set()
+    written = set()
     for line in section_lines(lines, "Materiale"):
         if not line.lstrip().startswith("-"):
             continue
         match = BACKTICKED.search(line)
         if not match:
             continue
+        source_only = "📖" in line[:match.start()]
         path = match.group(1).strip()
         if path.startswith("📁/"):
             if not folder:
@@ -244,14 +265,15 @@ def materiale_paths(lines, folder):
                 path = path[len(prefix):]
         if path:
             paths.append(path)
-    return paths
+            (read_only if source_only else written).add(path)
+    return paths, read_only - written
 
 
 def read_task(project_root, docs, task_id, overview):
     progress, title = overview.get(task_id, ("?", ""))
     task = {"id": task_id, "prog": normalize_glyph(progress) or "?", "title": title,
             "file": None, "size": "?", "preflight": "none",
-            "dlv": [0, 0], "ac": [0, 0], "deps": [], "materiale": []}
+            "dlv": [0, 0], "ac": [0, 0], "deps": [], "materiale": [], "read_only": set()}
     path = find_task_file(project_root, docs, task_id)
     if path is None:
         return task
@@ -265,7 +287,7 @@ def read_task(project_root, docs, task_id, overview):
     task["dlv"] = list(count_checkboxes(section_lines(lines, "Deliverables Checklist")))
     task["ac"] = list(count_checkboxes(section_lines(lines, "Acceptance Criteria")))
     task["deps"] = declared_dependencies(lines)
-    task["materiale"] = materiale_paths(lines, header_field(lines, "Folder"))
+    task["materiale"], task["read_only"] = materiale_paths(lines, header_field(lines, "Folder"))
     return task
 
 
@@ -273,7 +295,13 @@ def next_step(task):
     """Il prossimo passo del ciclo di una task, dai soli file: preflight se
     manca, poi run finché c'è un DLV aperto, poi checkpoint. Lane e branch
     non entrano: dove e quando lanciare lo decide la regia, non un campo
-    dell'header."""
+    dell'header.
+
+    Un preflight mancante manda a `preflight` solo una task 🔵 (o senza riga
+    in `tasks.md`): una task 🟢 o 🟡 è già partita senza preflight, che per
+    una S o una M non è obbligatorio, e il suo passo è il run o il checkpoint.
+    Un preflight decaduto manda sempre a `preflight`: `run-task` lo rifiuta a
+    ogni Size."""
     if task["file"] is None:
         return "assente"
     if task["prog"] == normalize_glyph("✔️"):
@@ -283,12 +311,18 @@ def next_step(task):
     # entrano in questo albero.
     if task["size"].lower().startswith(("epic", "mandate")):
         return "epica"
-    if task["preflight"] != "ok":
+    if task["preflight"] == "decaduta":
+        return "preflight"
+    if task["preflight"] == "none" and task["prog"] not in STARTED:
         return "preflight"
     done, total = task["dlv"]
     if done < total:
         return "run"
     return "checkpoint"
+
+
+# Le Prog di una task già partita: preflight fatto (🟢) o lavoro in corso (🟡).
+STARTED = (normalize_glyph("🟢"), normalize_glyph("🟡"))
 
 
 def paths_overlap(first, second):
@@ -345,8 +379,12 @@ def snapshot(project_root, head, members):
                 any(item["id"] == first for item in tasks[second]["dependencies"])
             if linked:
                 conflicts.append({"tasks": [first, second], "reason": "dipendenza"})
+            # Due letture non si scontrano: un path in comune conta solo se
+            # almeno una delle due task non lo dichiara come 📖 fonte.
             shared = sorted({path for path in tasks[first]["materiale"]
-                             for other in tasks[second]["materiale"] if paths_overlap(path, other)})
+                             for other in tasks[second]["materiale"]
+                             if paths_overlap(path, other)
+                             and not (path in tasks[first]["read_only"] and other in tasks[second]["read_only"])})
             if shared:
                 conflicts.append({"tasks": [first, second], "reason": "materiale: " + ", ".join(shared)})
     return {"head": head, "mandate": mandate, "tasks": tasks, "conflicts": conflicts, "overview": overview}
