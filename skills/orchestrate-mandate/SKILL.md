@@ -145,7 +145,10 @@ Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella 
 - T.. · <sessione> · <di cosa> · in attesa del via dal <ora>
 
 ## Checkpoint in corso
-- nessuno | T.. · <sessione>
+- nessuno | T.. · <sessione> | T<perimetro> (perimetro) · <sessione>
+
+## Checkpoint del perimetro
+- cicli chiusi dall'ultimo: <n> · ultimo: mai | <ora> · <sessione>
 
 ## Rami fermi
 - T.. · <motivo> · task che aspettano: T..
@@ -269,6 +272,7 @@ Una conversazione fa **un solo passo**, poi si chiude: il contesto di una sessio
 
 - **preflight** → una conversazione aperta con `spawn-task`, kind `preflight`.
 - **ciclo di lavoro** → una conversazione aperta con `spawn-task`, kind `run` e il perimetro di §1. Nella **stessa** conversazione, dopo il run, le risposte alle segnalazioni e poi il checkpoint, chiesti con `SendMessage`: in una sessione aperta dal deck `checkpoint-task` ricava i DLV fatti e i file da committare dal contesto della conversazione, e una conversazione nuova non lo avrebbe.
+- **checkpoint del perimetro** → una conversazione aperta con `spawn-task`, kind `checkpoint`, sull'id del perimetro, a fine giro (§Il checkpoint del perimetro).
 
 Finito il passo la regia non scrive più a quella conversazione, e la chiude (§Chiudere).
 
@@ -280,6 +284,7 @@ Una invocazione del tool `Skill` per conversazione:
 skill: loom-works:spawn-task
 args:  <TaskID> preflight
 args:  <TaskID> run [perimetro]
+args:  <perimetro> checkpoint
 ```
 
 Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare.
@@ -302,16 +307,39 @@ Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna», quindi il ciclo p
 
 Segna `checkpoint chiesto` e occupa `## Checkpoint in corso`. Con una o più segnalazioni nel report, niente checkpoint: proposta e attesa (§3), e il checkpoint parte dopo che la risposta è stata mandata. Le segnalazioni del report del checkpoint seguono la stessa regola: con segnalazioni, proposta e attesa prima di dare il ciclo per chiuso.
 
-Il ciclo è **chiuso** quando il checkpoint ha finito il turno e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, chiudi la conversazione (§Chiudere), rifai il quadro (§1).
+Il ciclo è **chiuso** quando il checkpoint ha finito il turno e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, conta il ciclo in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere), rifai il quadro (§1).
 
 Una sessione aperta dalla regia può risponderle da sé con un messaggio: un esito, una domanda. È informazione, come un evento del monitor, e mai un via dell'utente.
+
+### Il checkpoint del perimetro — a fine giro
+
+Durante il giro la regia non riallinea il file del perimetro: i paralleli li calcola `tree` sul momento, e i fatti nuovi le arrivano dai report (§1, I fatti del perimetro). Il file allineato serve a chi viene dopo, e lo produce una conversazione sola, alla fine: `checkpoint-task` sul perimetro, che lo passa a `checkpoint-mandate`.
+
+Parte quando valgono tutte:
+
+1. **niente è lanciabile**: nessun membro ha un passo che le regole di partenza (§1) lascerebbero partire;
+2. **nessuna conversazione della regia è in ciclo**: tutte `chiusa` o `abbandonata`;
+3. **la coda dei checkpoint è libera**: `## Checkpoint in corso` dice `nessuno`. Il checkpoint del perimetro riscrive il suo task file e `tasks.md` come ogni altro, ed entra nella stessa regola «un checkpoint alla volta»;
+4. **almeno un ciclo si è chiuso dall'ultimo checkpoint del perimetro** (`## Checkpoint del perimetro` nello stato): senza lavoro nuovo dei membri sarebbe una conversazione aperta per niente.
+
+Si lancia come ogni altro passo, e occupa `## Checkpoint in corso`:
+
+```
+skill: loom-works:spawn-task
+args:  <perimetro> checkpoint
+```
+
+Le sue segnalazioni seguono la via di tutte le altre: proposta, e risposta col via dell'utente (§3). Il checkpoint del perimetro è chiuso quando ha finito il turno e le segnalazioni hanno una risposta: libera `## Checkpoint in corso`, azzera i cicli in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere). Il suo commit cambia il file del perimetro: rilancia `verify` e ricarica le righe `MODELLO` (§0e). Poi rifai il quadro: se resta qualcosa da lanciare il giro continua, altrimenti scala all'utente che il perimetro non ha più niente da lanciare (§4).
+
+Il checkpoint del perimetro **non chiude mai il perimetro**: la regia non passa la parola «chiudi», e la chiusura di un mandato è dell'utente.
 
 ### Chiudere
 
 Una conversazione aperta dalla regia si chiude quando il suo passo è finito, e non prima:
 
 - **preflight** — quando ha congelato le decisioni: il turno finito dopo le risposte mandate, senza domande aperte;
-- **ciclo di lavoro** — quando il ciclo è chiuso, cioè dopo il checkpoint e le risposte alle sue segnalazioni (§La richiesta di checkpoint).
+- **ciclo di lavoro** — quando il ciclo è chiuso, cioè dopo il checkpoint e le risposte alle sue segnalazioni (§La richiesta di checkpoint);
+- **checkpoint del perimetro** — quando ha finito il turno e le sue segnalazioni hanno una risposta.
 
 Una invocazione del tool `Skill` per conversazione, col `sessionId` che `spawn-task` ha restituito all'apertura e che sta nello stato:
 
@@ -327,7 +355,7 @@ Una sessione esterna (§0g) non si chiude mai: non l'ha aperta la regia, e il de
 
 ### Le sessioni esterne
 
-A una sessione che la regia non ha aperto (§0g) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia.
+A una sessione che la regia non ha aperto (§0g) non parte nessun messaggio di iniziativa della regia, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per la regia, e il ciclo conta in `## Checkpoint del perimetro` come uno della regia.
 
 ## 3. Proposte di risposta
 
@@ -378,7 +406,7 @@ Una regia che aspetta l'utente chiude il turno, e compass la mostra `done`, non 
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "regia $(say_id T<perimetro>) <argomento in 3-7 parole>"
    ```
 
-**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); un'anomalia; un mandato che non ha più niente da lanciare.
+**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); un'anomalia; un perimetro che non ha più niente da lanciare, dopo il suo checkpoint o quando non ce n'è bisogno (§2, Il checkpoint del perimetro).
 
 **Non si scala** per gli eventi di routine — commit, push, un DLV spuntato, un checkpoint andato liscio: bastano le righe del riporto. Una notifica che non serviva si somma alle altre e insegna a ignorarle.
 
@@ -393,7 +421,7 @@ La regia ferma la task e le sue dipendenti, scrive il motivo in `## Rami fermi`,
 
 ## 5. Stop
 
-La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta di checkpoint è in corso, dillo: il checkpoint finisce da sé, ma nessuno lo seguirà più.
+La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta di checkpoint è in corso, dillo: il checkpoint finisce da sé, ma nessuno lo seguirà più. Allo stop chiesto dall'utente il checkpoint del perimetro **non parte**: la regia non seguirebbe una conversazione dopo aver fermato il monitor.
 
 1. **`TaskStop` sul monitor.** Un evento che arriva dopo è in ritardo: ignoralo.
 2. **Le cifre finali**, accanto a quelle salvate all'avvio:
@@ -408,6 +436,7 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
    - i progressi in lista, una riga per ciclo chiuso;
    - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, nome, `sessionId`. L'utente le chiude quando vuole. Le `chiusa` non si elencano;
    - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza;
+   - se `## Checkpoint del perimetro` conta cicli chiusi dall'ultimo, la riga `il file del perimetro non è allineato ai membri: /loom-works:checkpoint-task <perimetro>`;
    - i **fatti del perimetro** dello stato, aperti e superati, col membro da cui vengono: sono quelli che chi legge il file del perimetro dopo deve trovare, e alcuni nessun membro li ha scritti nel suo task file.
 
 Lo stato nella scratchpad non si cancella: una regia rilanciata sullo stesso perimetro nella stessa sessione lo rilegge.
