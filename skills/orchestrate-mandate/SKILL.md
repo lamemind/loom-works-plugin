@@ -221,7 +221,7 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 
 `next` vale:
 
-- `preflight` — nessun preflight valido su una task 🔵: manca il blocco datato in `## Decisions`; oppure, a ogni Prog, l'ultimo blocco è una «premessa decaduta». Una task 🟢 o 🟡 senza blocco è già partita senza preflight, che per una S o una M non è obbligatorio: va a `run` o a `checkpoint`. Il primo caso lo lanci; il secondo no: la ricostruzione delle premesse è dell'utente, e la task diventa un ramo fermo (§4).
+- `preflight` — nessun preflight valido su una task 🔵: manca il blocco datato in `## Decisions`; oppure, a ogni Prog, l'ultimo blocco è una «premessa decaduta». Una task 🟢 o 🟡 senza blocco è già partita senza preflight, che per una S o una M non è obbligatorio: va a `run` o a `checkpoint`. Una Size L senza blocco va a `preflight` a ogni Prog: `run-task` su una L senza preflight si rifiuta di partire. Il primo caso lo lanci; il secondo no: la ricostruzione delle premesse è dell'utente, e la task diventa un ramo fermo (§4).
 - `run` — preflight fatto, o task già partita, e DLV aperti.
 - `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è interrotto prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2): scala all'utente.
 - `chiusa` — Prog ✔️, niente da fare.

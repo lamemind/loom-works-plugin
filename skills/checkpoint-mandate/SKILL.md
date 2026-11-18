@@ -126,7 +126,13 @@ Il perimetro si riallinea in queste sezioni, e solo in queste:
 
 **La sezione c'è** → la riverifichi, in due metà:
 
-1. **Meccanica.** Le righe `CONFLICT` di `tree` (§1) contro le righe `dichiarata` e `materiale` della tabella. È una divergenza una `CONFLICT` senza la sua riga, o una riga `dichiarata` o `materiale` fra due membri aperti che `tree` non stampa più. Una riga con un membro chiuso non è una divergenza: `tree` tace sulle task chiuse, e la riga resta scritta.
+1. **Meccanica.** Il confronto fra le righe `dichiarata` e `materiale` della tabella e il calcolo di `tree` lo fa lo script, coi membri del §1:
+
+   ```bash
+   "PY" -B -I "R/mandate.py" verify <id> --children <membri, nell'ordine del lettore>
+   ```
+
+   Ogni riga `DIFF|<tipo>|<coppia>|<dettaglio>` è una divergenza: `manca` (una `CONFLICT` di `tree` senza la sua riga, o un path calcolato che la riga non cita), `in più` (una riga `dichiarata` o `materiale` che `tree` non calcola più), `fuori` (una riga su una task che non è un membro aperto), `forma` (una riga fuori dal formato), `membri` (la `## Membri` di un mandato cambiata dopo il commit dell'analisi). Nessuna riga `DIFF` → la metà meccanica combacia. Una riga con un membro chiuso non è una divergenza: lo script la salta, perché `tree` tace sulle task chiuse e la riga resta scritta. Le righe `CAMBIATO` qui non servono: i membri da rileggere li dà la finestra del §2.
 2. **Del modello.** Per ogni membro cambiato nella finestra: le righe `modello` che lo nominano reggono ancora — il suo task file nomina ancora quel file, quel simbolo, quel comportamento? E le sue coppie con gli altri membri aperti hanno una collisione nuova? Il metodo è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md` §La metà del modello. I membri non cambiati nella finestra non si rileggono: le loro coppie le ha già viste chi ha scritto la sezione.
 
 Nessuna divergenza → la sezione resta intatta, e il report dice `analisi confermata`.

@@ -297,11 +297,12 @@ def next_step(task):
     non entrano: dove e quando lanciare lo decide la regia, non un campo
     dell'header.
 
-    Un preflight mancante manda a `preflight` solo una task 🔵 (o senza riga
-    in `tasks.md`): una task 🟢 o 🟡 è già partita senza preflight, che per
-    una S o una M non è obbligatorio, e il suo passo è il run o il checkpoint.
-    Un preflight decaduto manda sempre a `preflight`: `run-task` lo rifiuta a
-    ogni Size."""
+    Un preflight mancante manda a `preflight` una task 🔵 (o senza riga in
+    `tasks.md`): una task 🟢 o 🟡 è già partita senza preflight, che per una
+    S o una M non è obbligatorio, e il suo passo è il run o il checkpoint.
+    Una task Size L senza preflight va a `preflight` a ogni Prog: `run-task`
+    su una L senza preflight si rifiuta di partire. Un preflight decaduto
+    manda sempre a `preflight`: `run-task` lo rifiuta a ogni Size."""
     if task["file"] is None:
         return "assente"
     if task["prog"] == normalize_glyph("✔️"):
@@ -313,7 +314,7 @@ def next_step(task):
         return "epica"
     if task["preflight"] == "decaduta":
         return "preflight"
-    if task["preflight"] == "none" and task["prog"] not in STARTED:
+    if task["preflight"] == "none" and (task["prog"] not in STARTED or is_size_large(task["size"])):
         return "preflight"
     done, total = task["dlv"]
     if done < total:
@@ -323,6 +324,13 @@ def next_step(task):
 
 # Le Prog di una task già partita: preflight fatto (🟢) o lavoro in corso (🟡).
 STARTED = (normalize_glyph("🟢"), normalize_glyph("🟡"))
+
+
+def is_size_large(size):
+    """Vero per `Size: L`, la sola Size su cui `run-task` pretende il preflight.
+    Un'epica e un mandato non arrivano qui: `next_step` li ferma prima."""
+    words = size.split()
+    return bool(words) and words[0].upper() == "L"
 
 
 def paths_overlap(first, second):
