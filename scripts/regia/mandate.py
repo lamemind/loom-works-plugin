@@ -4,9 +4,9 @@ mandate — le letture della regia sul mandato: gate, albero, cifre prima → do
   gate    se la regia può partire: il permission mode della sessione che la
           lancia, letto dal suo transcript, e quello del progetto, letto da
           `.claude/loom-works.json`. Parte solo se sono entrambi `auto`
-  tree    lo stato del mandato dai file: per ogni task Prog, Size, dove gira,
+  tree    lo stato del perimetro dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
-          `## Materiale`; poi le coppie di task che non possono girare insieme
+          `## Materiale`; poi le coppie di membri che non possono girare insieme
   recap   le cifre di oggi accanto a quelle salvate da `tree --save` all'armo
 
 Solo letture: nessuno di questi comandi scrive nei repo. `tree --save` scrive il
@@ -17,12 +17,14 @@ dal task file, mai dai glifi del grafo: fra la promozione e il checkpoint i
 glifi del grafo restano indietro. Il grafo dà solo le frecce, cioè chi dipende
 da chi.
 
-Le figlie dell'epica non le cerca questo script: le passa la skill, che le
-legge da `resolve-task.sh --children`. Una regola sola per contare le figlie.
+Il perimetro è un id solo, un'epica o un mandato (`Size: Mandate`). I suoi
+membri non li cerca questo script: le figlie di un'epica e la lista di un
+mandato le legge il lettore unico, `resolve-task.sh <id> --members`, e la skill
+le passa dopo `--children`. Una regola sola per contare i membri.
 
 Uso:
   python -I mandate.py [--project-root <radice>] gate --own-session <session id>
-  python -I mandate.py [--project-root <radice>] tree <epica> [--children T1 T2 …] [--extra T3 …] [--save <file.json>]
+  python -I mandate.py [--project-root <radice>] tree <perimetro> [--children T1 T2 …] [--save <file.json>]
   python -I mandate.py [--project-root <radice>] recap --before <file.json>
 
 Exit: 0 ok · 1 errore d'uso o file mancante · 2 gate chiuso.
@@ -289,7 +291,7 @@ def paths_overlap(first, second):
     return (first.endswith("/") and second.startswith(first)) or (second.endswith("/") and first.startswith(second))
 
 
-def snapshot(project_root, epic, children, extra):
+def snapshot(project_root, head, members):
     docs = regia_common.docs_root(project_root)
     tasks_md = os.path.join(project_root, docs, "tasks.md")
     try:
@@ -299,20 +301,20 @@ def snapshot(project_root, epic, children, extra):
         tasks_md_lines = []
     overview = overview_rows(tasks_md_lines)
     mandate = []
-    for task_id in list(children) + list(extra):
-        if task_id not in mandate and task_id != epic:
+    for task_id in members:
+        if task_id not in mandate and task_id != head:
             mandate.append(task_id)
-    tasks = {task_id: read_task(project_root, docs, task_id, overview) for task_id in [epic] + mandate}
-    # Una figlia che nomina la propria epica fra le dipendenze non aspetta
-    # niente: l'epica si chiude dopo le figlie, e contarla terrebbe la figlia
-    # ferma per sempre.
+    tasks = {task_id: read_task(project_root, docs, task_id, overview) for task_id in [head] + mandate}
+    # Un membro che nomina il proprio perimetro fra le dipendenze non aspetta
+    # niente: il perimetro si chiude dopo i membri, e contarlo terrebbe il
+    # membro fermo per sempre. Vale per la figlia che nomina la sua epica.
     dependencies = {task_id: [] for task_id in mandate}
     for task_id in mandate:
         for dependency in tasks[task_id]["deps"]:
-            if dependency != epic:
+            if dependency != head:
                 dependencies[task_id].append((dependency, "deps"))
     for task_id, dependency, source in graph_edges(tasks_md_lines):
-        if task_id in dependencies and dependency not in (task_id, epic):
+        if task_id in dependencies and dependency not in (task_id, head):
             dependencies[task_id].append((dependency, source))
     closed = normalize_glyph("✔️")
     for task_id in mandate:
@@ -341,7 +343,7 @@ def snapshot(project_root, epic, children, extra):
                              for other in tasks[second]["materiale"] if paths_overlap(path, other)})
             if shared:
                 conflicts.append({"tasks": [first, second], "reason": "materiale: " + ", ".join(shared)})
-    return {"epic": epic, "mandate": mandate, "tasks": tasks, "conflicts": conflicts}
+    return {"head": head, "mandate": mandate, "tasks": tasks, "conflicts": conflicts}
 
 
 def figures(task):
@@ -349,8 +351,8 @@ def figures(task):
 
 
 def print_tree(state):
-    epic = state["tasks"][state["epic"]]
-    print(f"EPIC|{epic['id']}|prog={epic['prog']}|size={epic['size']}|{figures(epic)}|title={epic['title']}")
+    head = state["tasks"][state["head"]]
+    print(f"PERIMETRO|{head['id']}|prog={head['prog']}|size={head['size']}|{figures(head)}|title={head['title']}")
     for task_id in state["mandate"]:
         task = state["tasks"][task_id]
         print(f"TASK|{task_id}|prog={task['prog']}|size={task['size']}"
@@ -366,21 +368,21 @@ def print_tree(state):
 
 
 def command_tree(project_root, arguments):
-    for task_id in [arguments.epic] + arguments.children + arguments.extra:
+    for task_id in [arguments.head] + arguments.children:
         if not TASK_ID_PATTERN.match(task_id):
             print(f"ERROR: id task malformato: '{task_id}' (atteso T<numero>)", file=sys.stderr)
             return 1
-    state = snapshot(project_root, arguments.epic, arguments.children, arguments.extra)
-    if state["tasks"][arguments.epic]["file"] is None:
-        print(f"ERROR: task file di {arguments.epic} non trovato", file=sys.stderr)
+    state = snapshot(project_root, arguments.head, arguments.children)
+    if state["tasks"][arguments.head]["file"] is None:
+        print(f"ERROR: task file di {arguments.head} non trovato", file=sys.stderr)
         return 1
     print_tree(state)
     if arguments.save:
         temporary_path = arguments.save + ".tmp"
         with open(temporary_path, "w", encoding="utf-8") as save_handle:
-            json.dump({"epic": state["epic"], "mandate": state["mandate"],
+            json.dump({"head": state["head"], "mandate": state["mandate"],
                        "figures": {task_id: {key: state["tasks"][task_id][key] for key in ("prog", "dlv", "ac", "title")}
-                                   for task_id in [state["epic"]] + state["mandate"]}},
+                                   for task_id in [state["head"]] + state["mandate"]}},
                       save_handle, ensure_ascii=False)
         os.replace(temporary_path, arguments.save)
     return 0
@@ -393,8 +395,11 @@ def command_recap(project_root, before_path):
     except (OSError, ValueError) as error:
         print(f"ERROR: cifre di partenza illeggibili: {before_path}: {error}", file=sys.stderr)
         return 1
-    state = snapshot(project_root, before["epic"], before["mandate"], [])
-    for task_id in [before["epic"]] + before["mandate"]:
+    # `epic` è la chiave delle cifre salvate prima del rename della skill: una
+    # regia rilanciata nella stessa sessione rilegge il file che aveva scritto.
+    head = before.get("head") or before.get("epic")
+    state = snapshot(project_root, head, before["mandate"])
+    for task_id in [head] + before["mandate"]:
         then = before["figures"].get(task_id, {"prog": "?", "dlv": [0, 0], "ac": [0, 0], "title": ""})
         now = state["tasks"][task_id]
         print(f"RECAP|{task_id}|prog={then['prog']}→{now['prog']}"
@@ -412,9 +417,9 @@ def parse_arguments():
     gate_parser = subcommands.add_parser("gate")
     gate_parser.add_argument("--own-session", required=True, help="session id della sessione della regia")
     tree_parser = subcommands.add_parser("tree")
-    tree_parser.add_argument("epic")
-    tree_parser.add_argument("--children", nargs="*", default=[])
-    tree_parser.add_argument("--extra", nargs="*", default=[])
+    tree_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
+    tree_parser.add_argument("--children", nargs="*", default=[],
+                             help="i membri, dal lettore unico resolve-task.sh --members")
     tree_parser.add_argument("--save", default="", help="file JSON delle cifre di partenza, fuori dai repo")
     recap_parser = subcommands.add_parser("recap")
     recap_parser.add_argument("--before", required=True)

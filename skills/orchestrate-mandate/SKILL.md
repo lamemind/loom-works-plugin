@@ -12,19 +12,19 @@ $ARGUMENTS
 
 ## Il ruolo
 
-Le figlie di un'epica avanzano una per conversazione, e nessuna conversazione vede le altre. La **regia** è la conversazione in più che le vede tutte: un monitor in background le segue, e a ogni evento la regia decide il passo successivo del mandato e lo dice all'utente.
+I membri di un perimetro avanzano uno per conversazione, e nessuna conversazione vede le altre. La **regia** è la conversazione in più che le vede tutte: un monitor in background le segue, e a ogni evento la regia decide il passo successivo del perimetro e lo dice all'utente.
 
 - **Lancia da sé** preflight, run e checkpoint quando le dipendenze lo permettono: l'utente ha dato il mandato invocando la skill, e un ok a ogni conversazione non serve.
 - **Non risponde da sé.** Alle domande delle sessioni — un preflight che chiede, le segnalazioni 🚦 di un report — prepara una proposta motivata e la manda solo col via dell'utente. L'unico messaggio che parte senza via è la richiesta di checkpoint dopo un run pulito (§2).
-- **Non scrive mai nei repo né nei task file.** Nessun `Edit`, `Write` o commit nel progetto. Agisce in tre modi soli: apre conversazioni con `spawn-task`, scrive alle conversazioni con `SendMessage`, chiude con `close-session` quelle che ha aperto, a passo finito. I soli file che scrive stanno nella sua scratchpad: lo stato del mandato e lo stato del monitor.
+- **Non scrive mai nei repo né nei task file.** Nessun `Edit`, `Write` o commit nel progetto. Agisce in tre modi soli: apre conversazioni con `spawn-task`, scrive alle conversazioni con `SendMessage`, chiude con `close-session` quelle che ha aperto, a passo finito. I soli file che scrive stanno nella sua scratchpad: lo stato della regia e lo stato del monitor.
 
-Il mandato è negli argomenti: il primo id è l'**epica**, le sue figlie arrivano da `resolve-task.sh --children`, gli id seguenti sono **task extra**, seguite e lanciate come le figlie. Nessun tetto alle conversazioni aperte.
+Il **perimetro** è un id solo negli argomenti: un'**epica** (`Size: Epic`), i cui membri sono le figlie, o un **mandato** (`Size: Mandate`), che elenca i membri nel proprio file (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). La regia li tratta allo stesso modo: i membri arrivano dal lettore unico, `resolve-task.sh <id> --members`, e il perimetro con tutti i suoi membri è ciò che la regia porta avanti. Un perimetro più largo — un'epica e qualche task in più, task di epiche diverse — si costruisce prima del lancio con `/loom-works:prepare-mandate`, mai negli argomenti. Nessun tetto alle conversazioni aperte.
 
 Gli script della regia stanno in `${CLAUDE_PLUGIN_ROOT}/scripts/regia/`, solo libreria standard di Python, Linux e Windows: `watch_sessions.py` (il monitor), `sessions.py` (`list` delle vive, `tail` di una sessione), `mandate.py` (`gate`, `tree`, `recap`). Leggono e basta: nessuno scrive nei repo.
 
 ## 0. Avvio
 
-In quest'ordine, e senza aprire nessuna conversazione finché il §0c non è passato.
+In quest'ordine, e senza aprire nessuna conversazione finché i controlli d'ingresso (§0c, §0d) non sono passati.
 
 ### 0a. Docs root, interprete, cartella degli script
 
@@ -54,22 +54,28 @@ Exit `0` (`GATE=ok`) → avanti. Exit `2` → **fermati senza aprire niente** e 
 
 Il modo della regia si legge dal suo transcript, perché il registro delle sessioni vive non lo porta.
 
-### 0d. Il mandato
+### 0d. Il perimetro e i membri
+
+Gli argomenti portano **un id solo**. Con un id dopo il primo fermati prima di aprire qualsiasi cosa, e di' all'utente che il perimetro è un id solo, un'epica o un mandato, e che per seguire insieme task in più si prepara un mandato con `/loom-works:prepare-mandate <id…>`. Non proseguire sul primo id: le conversazioni partirebbero su un perimetro diverso da quello che l'utente ha scritto.
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <epica>
-"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <epica> --children
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro>
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro> --members
 ```
 
-Il primo id deve essere un'epica, `Size: Epic` nel suo task file. Se non lo è, dillo e fermati: senza epica non c'è un mandato da derivare, e un elenco di task sciolte si segue con `run-task`, una alla volta. Le righe `TASK_CHILD=<id> <file>` sono le figlie; gli id successivi negli argomenti sono le extra, e un id che non risolve un task file si scarta con una riga all'utente.
+Il `Size` del task file del perimetro deve essere `Epic` o `Mandate`. Se non lo è, dillo e fermati: una task normale si esegue con `run-task`, e un elenco di task sciolte diventa un perimetro con `prepare-mandate`.
+
+Le righe `TASK_MEMBER=<id> <file>` sono i membri, nell'ordine del lettore: le figlie per un'epica (`TASK_MEMBERS_SRC=parent`), la lista `## Membri` per un mandato (`TASK_MEMBERS_SRC=list`). Una riga `TASK_MEMBER_MISSING=<id>` è un membro dichiarato senza task file: una riga all'utente, e resta fuori. `TASK_MEMBERS_COUNT=0` → dillo e fermati: non c'è niente da portare avanti.
+
+I membri si leggono **solo** dal lettore, mai a mano dal task file, e si rileggono a ogni quadro (§1).
 
 ### 0e. Il quadro di partenza
 
-1. Lancia `/loom-works:recap-status-epic <epica>` col tool `Skill`: è il quadro che l'utente legge, con le cifre, le dipendenze e chi può andare in parallelo. Senza quel quadro un evento come «T23 DLV 7/18→8/18» non dice cosa sblocca.
+1. Lancia `/loom-works:recap-status-epic <perimetro>` col tool `Skill`, che vale per un'epica e per un mandato: è il quadro che l'utente legge, con le cifre, le dipendenze e chi può andare in parallelo. Senza quel quadro un evento come «T23 DLV 7/18→8/18» non dice cosa sblocca.
 2. Salva le cifre di partenza, che il recap allo stop confronta con quelle finali:
 
    ```bash
-   "PY" -B -I "R/mandate.py" tree <epica> --children <figlie> --extra <extra> --save "SP/regia-<epica>-prima.json"
+   "PY" -B -I "R/mandate.py" tree <perimetro> --children <membri> --save "SP/regia-<perimetro>-prima.json"
    ```
 
 ### 0f. Le sessioni vive
@@ -78,21 +84,21 @@ Il primo id deve essere un'epica, `Size: Epic` nel suo task file. Se non lo è, 
 "PY" -B -I "R/sessions.py" list
 ```
 
-più `ListAgents`. `list` dà ogni sessione viva del progetto con la sua task e il suo stato; `ListAgents` dà il nome con cui le scrivi. Una sessione già viva su una task del mandato, aperta da qualcun altro, è **esterna**: la regia la segue e le prepara proposte di risposta col via dell'utente, ma non le manda nessun messaggio di sua iniziativa, nemmeno il checkpoint. Finché è viva, la regia non apre un'altra conversazione sulla stessa task.
+più `ListAgents`. `list` dà ogni sessione viva del progetto con la sua task e il suo stato; `ListAgents` dà il nome con cui le scrivi. Una sessione già viva su un membro del perimetro, aperta da qualcun altro, è **esterna**: la regia la segue e le prepara proposte di risposta col via dell'utente, ma non le manda nessun messaggio di sua iniziativa, nemmeno il checkpoint. Finché è viva, la regia non apre un'altra conversazione sulla stessa task.
 
-Una sessione viva su una task fuori dal mandato, o senza task, non è esterna: è fuori dal mandato, e la regia la ignora (§1, Il riporto).
+Una sessione viva su una task fuori dal perimetro, o senza task, non è esterna: è fuori dal perimetro, e la regia la ignora (§1, Il riporto).
 
-### 0g. Lo stato del mandato
+### 0g. Lo stato della regia
 
-Il mandato dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `SP/regia-<epica>.md` col tool `Write`, riscrivilo a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo.
+Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `SP/regia-<perimetro>.md` col tool `Write`, riscrivilo a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo.
 
 ```markdown
-# Regia di T<epica> — stato del mandato
+# Regia di T<perimetro> — stato
 
-## Mandato
-- figlie: T.. T..
-- extra: T..
-- cifre di partenza: SP/regia-<epica>-prima.json
+## Perimetro
+- T<perimetro> · epica | mandato
+- membri: T.. T..
+- cifre di partenza: SP/regia-<perimetro>-prima.json
 
 ## Conversazioni della regia
 | Task | Passo | sessionId | Nome | Stato |
@@ -114,13 +120,13 @@ Il mandato dura ore e il contesto si compatta: lo stato non può vivere solo nel
 
 ### 0h. Armo e riarmo del monitor
 
-Lancia il tool `Monitor` con `timeout_ms: 1800000`, una `description` che nomina l'epica e il progetto («regia T197: sessioni di loom-works»), e questo comando:
+Lancia il tool `Monitor` con `timeout_ms: 1800000`, una `description` che nomina il perimetro e il progetto («regia T197: sessioni di loom-works»), e questo comando:
 
 ```bash
 "PY" -u -B -I "R/watch_sessions.py" --project-root "<radice del progetto>" --own-session SID --state "SP/watch_state.json" 2>&1
 ```
 
-Aggiungi `--repo nome=path-relativo` solo per un repo dove lavorano le figlie che non sia la radice né un submodule di `.gitmodules`: quelli il monitor li guarda da sé. Aspetta la riga `monitor ✅ armato: …`: deve elencare ogni sessione viva che ti aspetti, con stato ed età. Una sessione attesa che manca va cercata con `sessions.py list` prima di fidarti del silenzio.
+Aggiungi `--repo nome=path-relativo` solo per un repo dove lavorano i membri che non sia la radice né un submodule di `.gitmodules`: quelli il monitor li guarda da sé. Aspetta la riga `monitor ✅ armato: …`: deve elencare ogni sessione viva che ti aspetti, con stato ed età. Una sessione attesa che manca va cercata con `sessions.py list` prima di fidarti del silenzio.
 
 **Riarmo.** Il tool `Monitor` uccide il processo dopo 30 minuti al massimo e ti manda un avviso di scadenza. A ogni avviso rilancia **lo stesso comando, con lo stesso `--state`**: il monitor riparte dal punto in cui era, senza ripetere gli eventi già detti e senza perdere quelli capitati nel cambio. La riga di armo diventa `monitor ✅ riarmato: …`. Un evento consegnato dopo un `TaskStop` era già in coda: è in ritardo, ignoralo.
 
@@ -131,7 +137,7 @@ Gli eventi del monitor arrivano come notifiche e non sono risposte dell'utente, 
 Il passo successivo si decide sul quadro dei file, mai a memoria. Rifai il quadro dopo l'armo e dopo ogni evento che cambia lo stato di una task — un fine turno, un checkpoint finito, una risposta dell'utente:
 
 ```bash
-"PY" -B -I "R/mandate.py" tree <epica> --children <figlie> --extra <extra>
+"PY" -B -I "R/mandate.py" tree <perimetro> --children <membri>
 ```
 
 Le righe che legge la regia:
@@ -139,7 +145,7 @@ Le righe che legge la regia:
 | Riga | Cosa dice |
 |---|---|
 | `TASK\|<id>\|prog=…\|size=…\|preflight=…\|dlv=a/b\|ac=a/b\|next=…\|blocked=…\|title=…` | stato della task e prossimo passo del suo ciclo |
-| `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo. L'epica del mandato non compare: si chiude dopo le figlie, e una figlia che la nomina non la aspetta |
+| `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo. Il perimetro non compare: si chiude dopo i membri, e un membro che lo nomina non lo aspetta |
 | `MATERIALE\|<id>\|<path> · …` | i path di `## Materiale`, `📁/` sciolto nella task folder |
 | `CONFLICT\|<id>\|<id>\|dipendenza` · `…\|materiale: <path>` | due task aperte che non possono girare insieme |
 
@@ -151,7 +157,7 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 - `run` — preflight fatto e DLV aperti.
 - `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è interrotto prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2): scala all'utente.
 - `chiusa` — Prog ✔️, niente da fare.
-- `epica` — un'epica o un mandato (`Size: Mandate`) dentro il mandato non si esegue: si orchestra a parte.
+- `epica` — un'epica o un mandato fra i membri non si esegue: è un perimetro a sé, e si orchestra con una regia a parte.
 - `assente` — nessun task file: scartala con una riga all'utente.
 
 ### Le regole di partenza
@@ -164,15 +170,15 @@ Una conversazione nuova parte solo se valgono tutte:
 4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia: né una dipendenza fra loro, né un path in comune nei loro `## Materiale`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
 5. **Un checkpoint alla volta in tutto il mandato.** Il checkpoint riscrive il task file e `tasks.md`, e due `checkpoint-task` insieme fanno race su `tasks.md` e su git. Prima di chiederne uno guarda `## Checkpoint in corso` nello stato: se è occupato, il ciclo aspetta in coda, e lo dici in una riga.
 
-Fra le task pronte, parte prima quella che sblocca più task del mandato: conta le righe `DEPS` che la nominano.
+Fra i membri pronti, parte prima quello che sblocca più membri: conta le righe `DEPS` che lo nominano.
 
 ### Il perimetro del run
 
-Un ciclo di lavoro è una sola chiamata `run`. Prima del lancio guarda le voci `## Dependencies` delle altre task del mandato: se una nomina un DLV preciso di questa task, il primo ciclo fa **solo quei DLV** (perimetro `2`, `1,3`), e il resto va in un ciclo successivo, in un'altra conversazione. Le dipendenze vivono spesso al livello del singolo DLV, e un run su tutti i DLV terrebbe ferma la dipendente fino alla fine. Senza DLV nominati, il perimetro è tutti i DLV aperti: `run` senza perimetro.
+Un ciclo di lavoro è una sola chiamata `run`. Prima del lancio guarda le voci `## Dependencies` degli altri membri: se una nomina un DLV preciso di questa task, il primo ciclo fa **solo quei DLV** (perimetro `2`, `1,3`), e il resto va in un ciclo successivo, in un'altra conversazione. Le dipendenze vivono spesso al livello del singolo DLV, e un run su tutti i DLV terrebbe ferma la dipendente fino alla fine. Senza DLV nominati, il perimetro è tutti i DLV aperti: `run` senza perimetro.
 
 ### Il riporto
 
-Il monitor segue tutte le sessioni vive del progetto, non solo quelle del mandato. Il **mandato** è l'epica, le sue figlie e le extra (§0d), e l'etichetta in testa a un evento dice a quale task appartiene. Prima di riportare, guarda l'etichetta:
+Il monitor segue tutte le sessioni vive del progetto, non solo quelle del perimetro. Il **mandato** della regia è il perimetro e i suoi membri (§0d), e l'etichetta in testa a un evento dice a quale task appartiene. Prima di riportare, guarda l'etichetta:
 
 - **Task del mandato** → l'evento si riporta, come nella tabella sotto.
 - **Task fuori dal mandato** — una sessione legata a un'altra task, il task file di un'altra task, la sua cella Prog in `tasks.md` → la regia ignora l'evento del tutto: nessuna riga in chat, nessuna proposta (§3), nessun messaggio, nessuna chiusura, nessuna scalata (§4), niente nello stato. Vale anche per gli eventi che dentro il mandato chiedono una mossa: una domanda, un permesso in attesa, `🧊 ferma da N min`. Quella sessione risponde al suo utente, non al mandato: una proposta o un messaggio della regia sarebbero un'azione che l'utente non le ha chiesto.
@@ -229,7 +235,7 @@ La prima riga di ogni messaggio dice di cosa si tratta e chi lo manda: l'utente 
 Al fine turno di un run (`⏸ turno finito` dalla sua sessione) leggi la chiusura del report con `sessions.py tail`. Se chiude con `**🚦 Segnalazioni** — nessuna` e la riga `## Checkpoint in corso` è libera, chiedi il checkpoint **senza aspettare l'utente**:
 
 ```
-Checkpoint del ciclo: lancia /loom-works:checkpoint-task <TaskID> — richiesta della regia di T<epica>.
+Checkpoint del ciclo: lancia /loom-works:checkpoint-task <TaskID> — richiesta della regia di T<perimetro>.
 
 Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna», quindi il ciclo passa al checkpoint in questa conversazione, che ha il contesto del run.
 ```
@@ -288,13 +294,13 @@ Una proposta senza via resta in sospeso: non la mandi, non la ricordi a ogni eve
 **Il messaggio.** Prima riga con la firma, poi le risposte:
 
 ```
-Risposte al preflight di T<id> — approvate dall'utente, inviate dalla regia di T<epica>.
+Risposte al preflight di T<id> — approvate dall'utente, inviate dalla regia di T<perimetro>.
 
 D1 → D1.A: <testo>
 D3 → <strada nuova, in prosa>
 ```
 
-Per le segnalazioni la prima riga è `Risposte alle segnalazioni di T<id> — approvate dall'utente, inviate dalla regia di T<epica>.`, poi una riga per `S{N}` con l'uscita e le parole dell'utente, che la sessione scriverà come approfondimento dello scenario. La firma tiene la decisione all'utente anche quando la porta la regia, e la sessione la scrive come una risposta normale.
+Per le segnalazioni la prima riga è `Risposte alle segnalazioni di T<id> — approvate dall'utente, inviate dalla regia di T<perimetro>.`, poi una riga per `S{N}` con l'uscita e le parole dell'utente, che la sessione scriverà come approfondimento dello scenario. La firma tiene la decisione all'utente anche quando la porta la regia, e la sessione la scrive come una risposta normale.
 
 La firma è vera solo dopo il via dato in questa chat: il classificatore di auto mode blocca un messaggio che dichiara un'approvazione mai data, ed è giusto così. Mai la firma su un testo che l'utente non ha visto.
 
@@ -309,7 +315,7 @@ Una regia che aspetta l'utente chiude il turno, e compass la mostra `done`, non 
 3. **`say.sh`**:
 
    ```bash
-   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "regia $(say_id T<epica>) <argomento in 3-7 parole>"
+   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "regia $(say_id T<perimetro>) <argomento in 3-7 parole>"
    ```
 
 **Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); un'anomalia; un mandato che non ha più niente da lanciare.
@@ -333,14 +339,14 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
 2. **Le cifre finali**, accanto a quelle salvate all'avvio:
 
    ```bash
-   "PY" -B -I "R/mandate.py" recap --before "SP/regia-<epica>-prima.json"
+   "PY" -B -I "R/mandate.py" recap --before "SP/regia-<perimetro>-prima.json"
    ```
 
-   Una riga `RECAP|<id>|prog=prima→dopo|dlv=a/b→c/d|ac=a/b→c/d|title=…` per l'epica e per ogni task del mandato.
+   Una riga `RECAP|<id>|prog=prima→dopo|dlv=a/b→c/d|ac=a/b→c/d|title=…` per il perimetro e per ogni membro letto all'avvio.
 3. **Il recap**, in chat:
    - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia;
    - i progressi in lista, una riga per ciclo chiuso;
    - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, nome, `sessionId`. L'utente le chiude quando vuole. Le `chiusa` non si elencano;
    - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza.
 
-Lo stato nella scratchpad non si cancella: una regia rilanciata sulla stessa epica nella stessa sessione lo rilegge.
+Lo stato nella scratchpad non si cancella: una regia rilanciata sullo stesso perimetro nella stessa sessione lo rilegge.
