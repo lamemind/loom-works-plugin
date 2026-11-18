@@ -43,12 +43,16 @@ Secondo l'uscita del comando, senza ritentare:
 
 | Uscita | Esito | Cosa scrivi |
 |---|---|---|
-| `0` | tab aperta | le righe di stdout così come sono: `sessionId`, task, kind e modello, prompt, titolo, comando in-tab |
-| `1` | il deck ha rifiutato o non ha risposto | il motivo da stderr (task assente, DLV chiusi o fuori range, spawn spento sulla piattaforma) |
+| `0` | tab aperta | le righe di stdout così come sono: `sessionId`, task, kind e modello, prompt, titolo, comando in-tab, e la riga `⚠ finestra non verificata` quando c'è |
+| `1` | il deck ha rifiutato o non ha risposto | il motivo da stderr così com'è (task assente, DLV chiusi o fuori range, spawn spento sulla piattaforma, finestra del progetto non in focus) |
 | `2` | errore d'uso | il messaggio da stderr: la riga composta al passo 1 era sbagliata |
 | `3` | nessun deck in ascolto sul progetto | che serve il deck acceso sul progetto, o aggiornato: l'endpoint c'è da `loom-deck` 0.87.0 |
 | `127` | `loom-deck-spawn` non trovato | che il deck installato è più vecchio dell'endpoint: `npm install -g @lamemind/loom-deck@latest` |
 
 Una riga `⚠ spawn inerte` in testa allo stdout vuol dire che il deck gira col freno dei test (`LOOM_DECK_NO_SPAWN`): il binding è scritto, la tab no. Riportalo com'è.
 
-La tab nasce nella finestra di terminale attiva (Ptyxis) o usata per ultima (Windows Terminal), come col tasto del deck: di norma quella da cui l'utente scrive alla conversazione.
+**Finestra del progetto non in focus** (Linux). Ptyxis apre la tab nella sua finestra attiva, e il deck non sposta il focus per conto proprio: prima di aprire chiede a compass se la finestra in focus è del progetto, e se non lo è rifiuta. Il motivo porta già l'istruzione per l'utente — portare davanti una finestra del progetto e richiedere lo spawn —: riportalo e non ritentare, perché solo l'utente può cambiare la finestra in focus.
+
+**`⚠ finestra non verificata`** in stdout vuol dire che il deck non ha potuto chiedere — compass assente, più vecchio del controllo, o che non conosce il progetto — e ha aperto comunque: la tab è nata nella finestra di terminale attiva, che può essere di un altro progetto. Riportalo com'è.
+
+Su Windows il controllo non c'è: la tab nasce nella finestra di Windows Terminal usata per ultima.
