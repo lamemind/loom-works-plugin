@@ -132,6 +132,9 @@ Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella 
 |------|-------|-----------|------|-------|
 <!-- Stato: in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
 
+## Fatti del perimetro
+- T.. · <il fatto> · <dove l'ha detto: report del run, messaggio, preflight> [· superato: <cosa lo chiude>]
+
 ## Collisioni del modello
 - T.. · T.. · <su cosa>   (righe MODELLO di verify, ricaricate a ogni commit del file del perimetro)
 
@@ -243,6 +246,22 @@ A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
 - L'evento è un fatto, la deduzione si dice come tale («molto probabilmente è il DLV3»).
 - Quando la notifica non basta, apri il transcript prima di scrivere: `"PY" -B -I "R/sessions.py" tail <prefisso del sessionId> --chars 6000`.
 - Il monitor etichetta una sessione con la sua task: due conversazioni sulla stessa task portano la stessa etichetta. Quale delle due ha parlato lo dice `sessions.py list`, con stato ed età di ognuna.
+
+### I fatti del perimetro
+
+Un report o un messaggio di una sessione può portare un fatto che riguarda il perimetro intero o un altro membro, non il lavoro interno della task che lo scrive. La definizione è quella di `checkpoint-mandate` (`${CLAUDE_PLUGIN_ROOT}/skills/checkpoint-mandate/SKILL.md` §2, «Un fatto del perimetro»):
+
+- un **blocco** — il membro non può proseguire finché una task, dentro o fuori dal perimetro, non chiude;
+- una **collegata** — una task fuori dal perimetro da cui i membri dipendono, o che dipende da loro;
+- una **decisione aperta** che tocca più membri, o da prendere prima di un passo del perimetro; e la decisione presa che ne chiude una già scritta;
+- una **regola cambiata** — chi può girare in parallelo, in che ordine;
+- un **cambio di un membro** che smentisce ciò che la regia sa di lui: un DLV tolto, una dipendenza nuova, uno scopo spostato.
+
+Non lo è il lavoro interno di un membro — DLV spuntati, misure, file toccati —: vive nel suo task file.
+
+Lo riconosci tu, leggendo: nessuna sessione lo etichetta. Scrivilo subito in `## Fatti del perimetro` dello stato (§0h), una riga per fatto col membro da cui viene e dove l'ha detto, e una riga all'utente nel riporto. Da lì il fatto pesa sulle decisioni della regia: un blocco nuovo ferma il ramo che blocca, una regola d'ordine cambiata vale dal quadro successivo, una decisione aperta su un passo del perimetro si scala all'utente (§4). Un fatto superato — il blocco è caduto, la decisione è presa — resta nella sezione con la parola che lo chiude.
+
+I fatti stanno nello stato perché la conversazione si compatta: rileggendo lo stato dopo una compattazione (§0h) la regia li ritrova, anche quelli che nessun membro ha scritto nel suo task file. Non viaggiano verso il checkpoint del perimetro a fine giro: lo spawn non porta note, e `checkpoint-mandate` si comporta uguale chiunque lo lanci, quindi li ritrova solo nei task file dei membri. Il recap allo stop li elenca (§5).
 
 ## 2. Lanciare e scrivere alle conversazioni
 
@@ -388,6 +407,7 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
    - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia; i membri entrati o usciti durante il giro, con una parola che lo dice;
    - i progressi in lista, una riga per ciclo chiuso;
    - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, nome, `sessionId`. L'utente le chiude quando vuole. Le `chiusa` non si elencano;
-   - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza.
+   - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza;
+   - i **fatti del perimetro** dello stato, aperti e superati, col membro da cui vengono: sono quelli che chi legge il file del perimetro dopo deve trovare, e alcuni nessun membro li ha scritti nel suo task file.
 
 Lo stato nella scratchpad non si cancella: una regia rilanciata sullo stesso perimetro nella stessa sessione lo rilegge.
