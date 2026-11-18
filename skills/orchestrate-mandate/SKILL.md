@@ -134,11 +134,22 @@ Gli eventi del monitor arrivano come notifiche e non sono risposte dell'utente, 
 
 ## 1. Il quadro e la scelta del passo
 
-Il passo successivo si decide sul quadro dei file, mai a memoria. Rifai il quadro dopo l'armo e dopo ogni evento che cambia lo stato di una task — un fine turno, un checkpoint finito, una risposta dell'utente:
+Il passo successivo si decide sul quadro dei file, mai a memoria. Rifai il quadro dopo l'armo e dopo ogni evento che cambia lo stato di una task — un fine turno, un checkpoint finito, una risposta dell'utente. Il quadro sono due letture, sempre insieme e in quest'ordine:
 
 ```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro> --members
 "PY" -B -I "R/mandate.py" tree <perimetro> --children <membri>
 ```
+
+### I membri, a ogni quadro
+
+I membri si rileggono dal lettore unico a ogni quadro, e i `<membri>` di `tree` sono quelli di **questa** lettura, non quelli dell'avvio: un perimetro cambia durante il giro. In un'epica nasce una figlia nuova, che dichiara il `Parent Task`; in un mandato `prepare-mandate` aggiunge o toglie una riga di `## Membri`. Confronta la lettura con la riga `membri:` dello stato:
+
+- **Un membro nuovo** entra nel mandato della regia da questo quadro, e parte con le sole regole del quadro: le dipendenze e i path in comune che `tree` calcola. Una riga all'utente: `T70 (maniglia) entra nel perimetro: l'analisi scritta non lo copre, e le collisioni che nessun campo dichiara non le vedo — per coprirlo /loom-works:prepare-mandate <perimetro>`. La regia non si ferma: l'analisi non la può scrivere, e un ramo fermo in attesa di un'analisi resterebbe appeso all'utente.
+- **Un membro tolto** esce dal mandato della regia: nessuna conversazione nuova su di lui. Un suo ciclo già aperto da questa regia arriva al checkpoint come gli altri, poi la task si lascia andare. Una riga all'utente.
+- **Un `TASK_MEMBER_MISSING` nuovo** — un membro purgato da `clean-tasks` durante il giro — esce come un membro tolto.
+
+Riscrivi la riga `membri:` dello stato a ogni cambio. Le cifre di partenza del recap (§5) restano quelle salvate all'avvio: un membro entrato dopo non ha un «prima», e il recap lo dice.
 
 Le righe che legge la regia:
 
@@ -178,13 +189,13 @@ Un ciclo di lavoro è una sola chiamata `run`. Prima del lancio guarda le voci `
 
 ### Il riporto
 
-Il monitor segue tutte le sessioni vive del progetto, non solo quelle del perimetro. Il **mandato** della regia è il perimetro e i suoi membri (§0d), e l'etichetta in testa a un evento dice a quale task appartiene. Prima di riportare, guarda l'etichetta:
+Il monitor segue tutte le sessioni vive del progetto, non solo quelle del perimetro. Il **mandato** della regia è il perimetro e i suoi membri dell'ultima lettura (§I membri, a ogni quadro), e l'etichetta in testa a un evento dice a quale task appartiene. Prima di riportare, guarda l'etichetta:
 
 - **Task del mandato** → l'evento si riporta, come nella tabella sotto.
 - **Task fuori dal mandato** — una sessione legata a un'altra task, il task file di un'altra task, la sua cella Prog in `tasks.md` → la regia ignora l'evento del tutto: nessuna riga in chat, nessuna proposta (§3), nessun messaggio, nessuna chiusura, nessuna scalata (§4), niente nello stato. Vale anche per gli eventi che dentro il mandato chiedono una mossa: una domanda, un permesso in attesa, `🧊 ferma da N min`. Quella sessione risponde al suo utente, non al mandato: una proposta o un messaggio della regia sarebbero un'azione che l'utente non le ha chiesto.
 - **Sessione senza task** — etichetta `?` più l'inizio del sessionId → fuori dal mandato, finché un evento non la lega a una task del mandato.
 - **Cambio di legame** — `🏷 legata a`, `🔀 staccata da`, `🔀 riassegnata` → conta se la task vecchia o la nuova è del mandato: una riga, e da lì la sessione è dentro o fuori secondo la nuova. Una conversazione della regia in ciclo che esce dal mandato ha il ciclo interrotto: è un'anomalia (§4).
-- **Eventi `git`** → non portano un'etichetta di task, la riga del commit di norma sì (`run(T23): …`, `checkpoint(T23): …`): un commit che nomina solo task fuori dal mandato si ignora.
+- **Eventi `git`** → non portano un'etichetta di task, la riga del commit di norma sì (`run(T23): …`, `checkpoint(T23): …`): un commit che nomina solo task fuori dal mandato si ignora. Unica eccezione, il commit di creazione di una task, `task(T<n>): create …`: rifai il quadro prima di ignorarlo, perché è così che si presenta una figlia nuova dell'epica — il monitor non riporta un task file appena nato, e la sua etichetta è fuori dal mandato finché il lettore non la conta. Se il quadro non la porta fra i membri, l'evento resta ignorato.
 - **Eventi `monitor`** → si guardano sempre: parlano del monitor, non di una task.
 
 A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
@@ -342,9 +353,9 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
    "PY" -B -I "R/mandate.py" recap --before "SP/regia-<perimetro>-prima.json"
    ```
 
-   Una riga `RECAP|<id>|prog=prima→dopo|dlv=a/b→c/d|ac=a/b→c/d|title=…` per il perimetro e per ogni membro letto all'avvio.
+   Una riga `RECAP|<id>|prog=prima→dopo|dlv=a/b→c/d|ac=a/b→c/d|title=…` per il perimetro e per ogni membro letto all'avvio. Un membro entrato durante il giro non ha una riga: le sue cifre di oggi stanno nell'ultimo quadro.
 3. **Il recap**, in chat:
-   - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia;
+   - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia; i membri entrati o usciti durante il giro, con una parola che lo dice;
    - i progressi in lista, una riga per ciclo chiuso;
    - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, nome, `sessionId`. L'utente le chiude quando vuole. Le `chiusa` non si elencano;
    - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza.
