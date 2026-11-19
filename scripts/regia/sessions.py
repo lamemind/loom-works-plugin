@@ -160,10 +160,8 @@ def command_tail(project_root, session_prefix, chars, prompt_count):
 
 # Una regia si riconosce dal suo transcript: l'invocazione della skill — uno
 # slash command dell'utente, o una chiamata al tool Skill del modello — col
-# perimetro come primo id degli argomenti. Il nome vecchio della skill vale
-# ancora: una regia lanciata prima del rename gira dalla sua versione della
-# cache del plugin, e resta una regia viva.
-REGIA_SKILL = re.compile(r"(?:^|[/:])orchestrate-(?:mandate|epic)$")
+# perimetro come primo id degli argomenti.
+REGIA_SKILL = re.compile(r"(?:^|[/:])orchestrate-mandate$")
 TASK_ID = re.compile(r"\bT\d+\b")
 # Il passo 2 dello stop della regia, e nessun altro passo usa `recap`.
 RECAP_COMMAND = re.compile(r"mandate\.py[\"']?\s+(?:--project-root\s+\S+\s+)?recap\b")

@@ -104,7 +104,7 @@ Due regie su due perimetri che hanno un membro aperto in comune lancerebbero tut
 "PY" -B -I "R/sessions.py" regie --own-session SID
 ```
 
-Una riga `REGIA|<sessionId>|<perimetro>|<etichetta>` per ogni altra sessione viva che ha lanciato una regia (col nome di oggi o con `orchestrate-epic`) e non l'ha fermata, poi `REGIE=<n>`. Per ognuna leggi i membri del suo perimetro col lettore unico:
+Una riga `REGIA|<sessionId>|<perimetro>|<etichetta>` per ogni altra sessione viva che ha lanciato una regia e non l'ha fermata, poi `REGIE=<n>`. Per ognuna leggi i membri del suo perimetro col lettore unico:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro dell'altra regia> --members
