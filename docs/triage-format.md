@@ -204,7 +204,7 @@ triage.sh conta [--dal <YYYY-MM-DD[ HH:MM]>] [--sessione <id>]
 
 **`conta` stampa una tabella a tab**, una riga per chiave: il totale, `umano`, `agente` e `delega`, le dodici coppie `<uscita>.<chi>`, i due momenti, gli scenari dell'umano con l'approfondimento (`approfondimento`) e quelli su delega (`approfondimento.delega`), i record malformati, la data del primo e dell'ultimo record. Con `--dal` aggiunge la colonna dei soli record da quella data in poi. Le righe `scarto.agente` e `ignora.agente` valgono 0 per costruzione. La riga `approfondimento` conta le sole parole dell'umano e non include gli scarti, le cui parole stanno nel record ADR: chi vuole tutte le risposte dell'umano con parole registrate la somma a `scarto.umano`. L'autore `delega` ha righe sue e non entra in nessuna riga dell'umano o dell'agente: chi legge una cella per nome la trova col significato di sempre.
 
-**Il filtro di validità tiene il vocabolario dei campi chiusi**: un record con un valore fuori dominio conta in `malformati` e in nessun'altra riga. Lo stesso vale per un record `delega` senza il campo `Delega`, o per un campo `Delega` su un altro autore — la regola con cui lo scenario si scrive.
+**Il filtro di validità tiene il vocabolario dei campi chiusi**: un record con un valore fuori dominio conta in `malformati` e in nessun'altra riga. Lo stesso vale per un record `delega` senza il campo `Delega`, per un campo `Delega` su un altro autore, e per un `Approfondimento` con `Chi: agente` — la regola con cui lo scenario si scrive. Ne discende che ogni record cade in una riga: o conta in `scenari` con ogni suo campo, o conta in `malformati`.
 
 ## L'uscita eseguita in un altro progetto
 

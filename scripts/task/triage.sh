@@ -447,6 +447,13 @@ cmd_scenario() {
 # trovarle col significato che avevano. Un record `delega` e' valido solo col
 # campo Delega, e un campo Delega su un altro autore lo rende malformato: e' la
 # stessa regola con cui lo scenario si scrive.
+#
+# OGNI SCENARIO CADE IN UNA RIGA: un record valido entra in `scenari`, nella
+# riga del suo autore e in quella della sua coppia, e se porta l'approfondimento
+# anche nella riga d'approfondimento del suo autore. Un record che non avrebbe
+# dove contare un suo campo e' malformato, e non sparisce in silenzio: con
+# `Chi: agente` l'Approfondimento viola il contratto — lo scenario dell'agente
+# nasce prima che una risposta esista — e nessuna riga lo conterebbe.
 cmd_conta() {
     local dal="" sessione=""
 
@@ -481,7 +488,7 @@ cmd_conta() {
             # aggiunto solo alla split finirebbe fra i malformati.
             ok = (usc ~ /^(subito|task|scarto|ignora)$/ && chi ~ /^(umano|agente|delega)$/ &&
                   mom ~ /^(flusso|posteriori)$/ && dat ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$/ &&
-                  (chi == "delega") == del)
+                  (chi == "delega") == del && !(chi == "agente" && app))
             conta("tot", ok, usc, chi, mom, dat, app)
             if (dal != "" && dat >= dal) conta("dal", ok, usc, chi, mom, dat, app)
         }
