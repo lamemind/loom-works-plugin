@@ -235,7 +235,9 @@ Aggiungi `--repo nome=path-relativo` solo per un repo dove lavorano i membri che
 
 **Riarmo.** Il tool `Monitor` uccide il processo dopo 30 minuti al massimo e ti manda un avviso di scadenza. A ogni avviso rilancia **lo stesso comando, con lo stesso `--state`**: il monitor riparte dal punto in cui era, senza ripetere gli eventi già detti e senza perdere quelli capitati nel cambio. Vale anche per il primo armo di una ripresa (§0f): il file è quello del giro ripreso. La riga di armo diventa `monitor ✅ riarmato: …`. Un evento consegnato dopo un `TaskStop` era già in coda: è in ritardo, ignoralo.
 
-Gli eventi del monitor arrivano come notifiche e non sono risposte dell'utente, anche quando arrivano mentre aspetti il suo via. Il fine turno di una sessione arriva come evento `⏸ turno finito`: è il segnale su cui la regia ragiona, perché la notifica di `SendMessage` con `notify_when_idle` non arriva mentre la regia sta lavorando.
+Gli eventi del monitor arrivano come notifiche e non sono risposte dell'utente, anche quando arrivano mentre aspetti il suo via. Il fine turno di una tab arriva come evento `⏸ turno finito`: è il segnale su cui la regia ragiona, perché la notifica di `SendMessage` con `notify_when_idle` non arriva mentre la regia sta lavorando.
+
+Un turno headless il monitor lo vede come un processo che nasce e muore, perché ogni turno è un processo `claude -p` nuovo, anche una `reply` sulla stessa conversazione: `▶ turno headless partito` quando il processo compare nel registro, `⏹ turno headless finito` con la prima riga dell'ultimo testo quando sparisce, e nessun `⏸`. L'evento `⏹` è la **sveglia**, non l'esito: l'esito lo dà `status` (§2, L'esito di un turno headless). Il monitor legge il registro a ogni giro, 15 secondi: un turno che nasce e muore fra due letture non produce né `▶` né `⏹`, ed è per questo che la regia aspetta l'esito con `--wait` dopo ogni lancio.
 
 ## 1. Il quadro e la scelta del passo
 
@@ -310,7 +312,9 @@ A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
 | ciclo chiuso che sblocca un'altra task | cosa si sblocca e cosa lanci adesso |
 | sessione ferma su domande o segnalazioni | chi aspetta, per cosa, e la proposta (§3) |
 | commit, push, fase doc di un checkpoint | una riga: cosa registra, «per il parallelo non cambia niente» |
-| sessione nuova | quale task segue; se la task ha già una conversazione in ciclo, l'avviso di non farle lavorare insieme |
+| sessione nuova (`🆕`, una tab) | quale task segue; se la task ha già una conversazione in ciclo, l'avviso di non farle lavorare insieme |
+| `▶ turno headless partito` | una riga, o nessuna se il turno è della regia e l'ha appena lanciato; di una conversazione che la regia non ha aperto, come una sessione nuova |
+| `⏹ turno headless finito` | nessuna riga sull'evento: è la sveglia. Rileggi l'esito con `status` (§2, L'esito di un turno headless) e riporta quello, come il fine turno di una tab |
 | risposta dell'utente in una tab che rischia un danno | cosa sparisce e cosa resta, per esteso |
 
 - Ogni id di task porta la sua maniglia, sempre: `T32 (campione Naviga su dev)`.
@@ -367,15 +371,17 @@ Con uscita `0` le righe portano `sessionId:` e `titolo:`; scrivi subito la conve
 
 ### L'esito di un turno headless
 
-`open` e `reply` (§Scrivere) tornano subito, a turno appena lanciato. L'esito lo dà un comando solo, e lo stato su disco del turno ne è la fonte:
+`open` e `reply` (§Scrivere) tornano subito, a turno appena lanciato. L'esito lo dà un comando solo, e lo stato su disco del turno ne è la fonte. Subito dopo ogni `open` e ogni `reply`:
 
 ```bash
-loom-deck-headless status <sessionId> --root "<radice del progetto>"
+loom-deck-headless status <sessionId> --wait 30 --root "<radice del progetto>"
 ```
+
+Trenta secondi superano il giro del monitor, 15 (§0j), e lasciano due casi soli. Il turno finisce durante l'attesa: lo tratti subito, senza monitor, anche quando è finito così presto che il monitor non l'ha mai visto. Oppure è ancora `in corso`: allora il monitor lo ha già visto almeno una volta, e l'evento `⏹ turno headless finito` arriverà. A quell'evento rileggi l'esito, senza `--wait`. Un'attesa più lunga terrebbe ferma la regia mentre altre sessioni chiedono; una più corta del giro lascerebbe la regia ad aspettare un `⏹` che non arriva.
 
 | Uscita | Classe | Cosa fai |
 |---|---|---|
-| `3` | `in corso` | il turno lavora: aspetti, nessun messaggio |
+| `3` | `in corso` | il turno lavora: nessun messaggio, aspetti l'evento `⏹` |
 | `0` | `turno chiuso` | leggi il **testo finale**, che `status` stampa per intero: è il report del passo, o una domanda (§3) |
 | `4` | `permesso negato` | ramo fermo, sotto |
 | `1` | `errore` | anomalia (§4): l'errore dell'API o la coda dello stderr, che `status` stampa in `motivo:` |
