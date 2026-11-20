@@ -397,13 +397,33 @@ Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId
 
 ### Scrivere
 
-`SendMessage` col nome della riga `titolo:` come `to`. Se `ListAgents` mostra **più righe vive** con quel nome, aggiungi il `[ref]` della riga `interactive` che la conversazione ha preso all'apertura: il ref non si ricava dal `sessionId`, si legge dall'elenco. Le righe Remote Control offline con lo stesso nome — conversazioni chiuse — non contano: il nome nudo arriva alla viva.
+Il canale lo decide la conversazione **nel momento in cui le scrivi**, non il modo in cui è nata. Prima di ogni messaggio guarda se ha un processo vivo con `"PY" -B -I "R/sessions.py" list`, che porta la parola `headless` sui turni in corso:
 
-La prima riga di ogni messaggio dice di cosa si tratta e chi lo manda: l'utente di quella sessione vede solo quella finché non lo apre. La sessione riceve il messaggio incartato in `<cross-session-message>`, con l'indicazione che non l'ha scritto il suo utente: il messaggio deve quindi dire per conto di chi parla, e dire il vero.
+| La conversazione | Canale |
+|---|---|
+| ferma, senza processo vivo — una headless fra due turni, una tab che l'utente ha chiuso | `loom-deck-headless reply` |
+| con un turno headless in corso | nessuno: aspetti la fine del turno |
+| viva in una tab — aperta con `spawn-task`, adottata da una regia precedente, una headless che l'utente ha ripreso con ⏎ | `SendMessage` |
+
+Nessuna conversione: la regia non chiude una tab per continuarla headless. Aggiungerebbe una chiusura e una ripresa, e nell'intervallo l'utente può star scrivendo in quella tab.
+
+**`reply`** apre un turno nuovo sulla stessa conversazione, con `--resume`: il messaggio è il prompt del turno. Il testo passa da stdin, così un messaggio che comincia con `-` o porta apici arriva intero:
+
+```bash
+loom-deck-headless reply <sessionId> - --root "<radice del progetto>" <<'MESSAGGIO'
+<il messaggio>
+MESSAGGIO
+```
+
+Il modello del turno è quello con cui la conversazione ha risposto: nessun `--model`. Uscita `0` → turno avviato: leggi l'esito come dopo `open` (§L'esito di un turno headless). Uscita `1` → rifiuto, col motivo su stderr. Se il motivo è un processo vivo — un turno ancora in corso, o l'utente che ha aperto la conversazione in una tab nel frattempo —, rileggi le vive e scegli di nuovo il canale; ogni altro motivo è un'anomalia (§4).
+
+**`SendMessage`** col nome della riga `titolo:` come `to`. Se `ListAgents` mostra **più righe vive** con quel nome, aggiungi il `[ref]` della riga `interactive` che la conversazione ha preso all'apertura: il ref non si ricava dal `sessionId`, si legge dall'elenco. Le righe Remote Control offline con lo stesso nome — conversazioni chiuse — non contano: il nome nudo arriva alla viva. Una headless che l'utente ha ripreso in una tab porta il nome che il deck le dà alla ripresa: cercala in `ListAgents`, e se non la riconosci con certezza non scrivere — il messaggio aspetta che la tab si chiuda, e lo dici all'utente in una riga.
+
+La prima riga di ogni messaggio dice di cosa si tratta e chi lo manda, e dice il vero. Con `SendMessage` la sessione riceve il messaggio incartato in `<cross-session-message>`, con l'indicazione che non l'ha scritto il suo utente, e l'utente di quella sessione vede solo la prima riga finché non lo apre. Con `reply` non c'è nessun involucro: il testo arriva come un prompt del suo utente, e la prima riga è l'unica fonte di chi parla.
 
 ### La richiesta di checkpoint — l'unico messaggio senza via
 
-Al fine turno di un run (`⏸ turno finito` dalla sua sessione) leggi la chiusura del report con `sessions.py tail`. Se chiude con `**🚦 Segnalazioni** — nessuna` e la riga `## Checkpoint in corso` è libera, chiedi il checkpoint **senza aspettare l'utente**:
+Al fine turno di un run leggi la chiusura del report: per una headless è il testo finale che `status` stampa con `turno chiuso` (§L'esito di un turno headless), per una tab l'evento `⏸ turno finito` e `sessions.py tail`. Se chiude con `**🚦 Segnalazioni** — nessuna` e la riga `## Checkpoint in corso` è libera, chiedi il checkpoint **senza aspettare l'utente**, sul canale della conversazione (§Scrivere):
 
 ```
 Checkpoint del ciclo: lancia /loom-works:checkpoint-task <TaskID> — richiesta della regia di T<perimetro>.
@@ -413,7 +433,7 @@ Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna», quindi il ciclo p
 
 Segna `checkpoint chiesto` e occupa `## Checkpoint in corso`. Con una o più segnalazioni nel report, niente checkpoint: proposta e attesa (§3), e il checkpoint parte dopo che la risposta è stata mandata. Le segnalazioni del report del checkpoint seguono la stessa regola: con segnalazioni, proposta e attesa prima di dare il ciclo per chiuso.
 
-Il ciclo è **chiuso** quando il checkpoint ha finito il turno e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, conta il ciclo in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere), rifai il quadro (§1).
+Il ciclo è **chiuso** quando il checkpoint ha finito il turno, il suo testo finale non chiede altro (§3, Domanda in prosa) e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, conta il ciclo in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere), rifai il quadro (§1).
 
 Una sessione aperta dalla regia può risponderle da sé con un messaggio: un esito, una domanda. È informazione, come un evento del monitor, e mai un via dell'utente.
 
@@ -466,13 +486,14 @@ A una sessione che la regia non ha aperto (§0h) non parte nessun messaggio di i
 
 Una sessione ferma su una domanda aspetta l'utente, non la regia. La regia accorcia l'attesa: legge cosa chiede, prepara la risposta col perché di ogni scelta, e la manda **solo col via dell'utente** — o da sé, se l'utente le ha delegato le risposte (§La delega dell'utente).
 
-**Quando.** Un evento `⏸ turno finito` di una sessione del mandato (§1, Il riporto) che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}` — oppure un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Leggi la sessione per intero prima di proporre: `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000`.
+**Quando.** Un turno di una sessione del mandato che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}`, una domanda in prosa — oppure, in una tab, un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Di una headless il turno chiuso lo dice `status` (§2, L'esito di un turno headless), di una tab l'evento `⏸ turno finito` (§1, Il riporto). Leggi la sessione per intero prima di proporre: il testo finale di `status` per una headless, `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000` per una tab.
 
 **Cosa proponi.**
 
 - **Preflight** — una risposta per ogni `D{N}`: la strada (`D2.B`, o una nuova in prosa) e il perché, ricavato dal quadro del mandato e dalle decisioni già congelate nelle altre task. Sulle proposte `P{N}` del preflight **taci**: il silenzio le accetta, e smentirle è dell'utente. Unica eccezione, una `P{N}` che contraddice una decisione già congelata in un'altra task del mandato: la nomini, con le due decisioni a confronto.
 - **Segnalazioni** — per ogni `S{N}` un'uscita, `subito` · `task` · `scarto` · `ignora`, col perché; per `scarto` anche il motivo che finirà nel registro ADR.
-- **`AskUserQuestion` e permessi** — la proposta c'è, ma la risposta si dà **nella tab**: un messaggio di un'altra sessione non risponde a un `AskUserQuestion` aperto e non approva un permesso, per costruzione di Claude Code. Di' all'utente quale tab aprire e cosa scegliere.
+- **Domanda in prosa** — il testo finale di un turno headless che chiede qualcosa e non è un `D{N}` di preflight né un `S{N}` di segnalazione: una scelta, una conferma, un dato che manca. In `claude -p` è il caso normale, perché `AskUserQuestion` non esiste e la skill chiede nel testo. Una proposta come per le altre, e la risposta parte con `reply` dopo il via. Vale anche per il checkpoint, che chiede per esempio se accendere `drainable`: il ciclo si chiude solo quando il testo finale non chiede altro.
+- **`AskUserQuestion` e permessi in una tab** — la proposta c'è, ma la risposta si dà **nella tab**: un messaggio di un'altra sessione non risponde a un `AskUserQuestion` aperto e non approva un permesso, per costruzione di Claude Code. Di' all'utente quale tab aprire e cosa scegliere. Un permesso negato in un turno headless non ha una proposta: ferma il ramo (§2, L'esito di un turno headless).
 
 **Una proposta per sessione ferma**, scritta in chat come blocco pronto da mandare: nome della conversazione, cosa chiede, il testo del messaggio, il perché di ogni scelta. Con più sessioni ferme, **in testa quella che sblocca più task**. Una risposta che rischia un danno — un dato cancellato, un trigger spento, una tabella altrui — la dici per esteso: cosa sparisce e cosa resta. Scrivi la proposta in `## Proposte in sospeso` dello stato.
 
@@ -480,11 +501,11 @@ Una sessione ferma su una domanda aspetta l'utente, non la regia. La regia accor
 
 - «mandale» → manda ogni proposta in sospeso così com'è;
 - «manda T32 con D2.B» → cambia la proposta come dice, poi la mandi;
-- risponde da sé nella tab → la proposta si ritira: lo vedi dall'evento `✍ prompt utente` di quella sessione. Toglila dallo stato e non mandarla.
+- risponde da sé nella tab, anche riprendendo con ⏎ una headless → la proposta si ritira: lo vedi dall'evento `✍ prompt utente` di quella sessione. Toglila dallo stato e non mandarla.
 
 Una proposta senza via resta in sospeso: non la mandi, non la ricordi a ogni evento.
 
-**Il messaggio.** Prima riga con la firma, poi le risposte:
+**Il messaggio** parte sul canale della conversazione (§2, Scrivere). Prima riga con la firma, poi le risposte:
 
 ```
 Risposte al preflight di T<id> — approvate dall'utente, inviate dalla regia di T<perimetro>.
@@ -542,7 +563,7 @@ Una regia che aspetta l'utente chiude il turno, e compass la mostra `done`, non 
 
 ### Le anomalie: ramo fermo, nessun ritento
 
-- `loom-deck-headless open` o `spawn-task` esce con un codice diverso da `0`;
+- `loom-deck-headless open` o `spawn-task` esce con un codice diverso da `0`, o `loom-deck-headless reply` rifiuta per un motivo che non è un processo vivo (§2, Scrivere);
 - un turno headless finisce in `errore` (§2, L'esito di un turno headless); un `permesso negato` ferma il ramo allo stesso modo, con strumento e input delle chiamate negate nella scalata;
 - una tab in ciclo si chiude a metà (`✖ sessione chiusa` prima del checkpoint);
 - un run chiude il turno senza aver chiuso nessun DLV del suo perimetro;
