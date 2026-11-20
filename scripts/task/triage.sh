@@ -4,12 +4,12 @@
 # triage.sh — l'unico script che sa scrivere e contare gli scenari di triage
 # Usage:
 #   triage.sh scenario --slug <slug> --uscita subito|task|scarto|ignora
-#                      --chi umano|agente --momento flusso|posteriori --skill <nome>
-#                      [--progetto <id>] [--sessione <id>]
+#                      --chi umano|agente|delega --momento flusso|posteriori --skill <nome>
+#                      [--delega <testo>] [--progetto <id>] [--sessione <id>]
 #                      [--ancora <path>]... [--no-commit]
 #                      [--segnalazione <testo>] [--perche <testo>]
 #                      [--approfondimento <testo>]
-#                      [< riga 1 = la segnalazione, righe dopo = le parole dell'umano:
+#                      [< riga 1 = la segnalazione, righe dopo = le parole di chi decide:
 #                         il perché sullo scarto, l'approfondimento su subito|task|ignora]
 #   triage.sh conta    [--dal <YYYY-MM-DD[ HH:MM]>] [--sessione <id>]
 # =============================================================================
@@ -32,8 +32,9 @@
 # scrive e' una sessione detached: un file condiviso entrerebbe intero nel commit
 # della prima sessione che lo tocca, record altrui compresi.
 #
-# LA SEGNALAZIONE ARRIVA SU STDIN, riga 1; le righe dopo sono le parole
-# dell'umano — il perché sullo scarto, l'approfondimento sulle altre uscite. Una
+# LA SEGNALAZIONE ARRIVA SU STDIN, riga 1; le righe dopo sono le parole di chi
+# decide — l'umano, o la regia su delega: il perché sullo scarto,
+# l'approfondimento sulle altre uscite. Una
 # grammatica sola per tutte e quattro: chi scrive non sceglie il canale a seconda
 # dell'uscita. Un heredoc col delimitatore fra apici e' l'unico canale che porta
 # un testo arbitrario intatto — fra virgolette doppie la shell eseguirebbe i
@@ -43,7 +44,7 @@
 # restano per chi chiama da uno script; con `--segnalazione` lo stdin non si legge
 # affatto, e lo stesso campo passato sui due canali e' un rifiuto.
 #
-# APPROFONDIMENTO — le parole con cui l'umano accompagna l'uscita, alla lettera:
+# APPROFONDIMENTO — le parole con cui chi decide accompagna l'uscita, alla lettera:
 # il criterio con cui la sceglie, la forma dell'azione, il progetto dove
 # eseguirla. Un'uscita copre forme diverse («task» e' una task nuova, una task in
 # un altro progetto, un DLV aggiunto a una task che c'e' gia', l'umano che se ne
@@ -52,16 +53,30 @@
 # ADR/Ancore, scritto solo quando c'e': i lettori del record (l'awk di `conta`, i
 # grep delle misure) cercano righe `- **Campo**:` su tutto il file, e un valore
 # scritto dopo l'etichetta non puo' essere scambiato per un campo, una riga di un
-# corpo libero si'. Rifiutato con --chi agente (sono parole dell'umano, e lo
-# scenario dell'agente nasce prima che una risposta esista) e sullo scarto, dove
-# le parole dell'umano sono il perché e stanno nel record ADR: una seconda copia
-# nello scenario divergerebbe.
+# corpo libero si'. Rifiutato con --chi agente (lo scenario dell'agente nasce
+# prima che una risposta esista) e sullo scarto, dove le parole di chi decide
+# sono il perché e stanno nel record ADR: una seconda copia nello scenario
+# divergerebbe.
 #
 # CONTRATTO ASIMMETRICO — l'agente non scarta e non ignora: scarto e ignora con
 # --chi agente sono un rifiuto, prima di ogni scrittura. Lo scarto e' l'unico
 # errore che nessuno recupera: una task in piu' si cancella, un subito sbagliato si
 # ripristina con un diff, uno scarto sbagliato e' un segnale perso. L'ignora
 # dell'agente e' una segnalazione non stampata, e l'agente riporta tutto.
+#
+# DELEGA — il terzo autore: la regia che decide una segnalazione su una delega
+# che l'utente le ha dato nella sua chat. Non e' l'umano, che non ha letto la
+# segnalazione, e non e' l'agente che decide da se': mescolarla a uno dei due
+# falserebbe la raccolta che `Chi` separa. Tiene le regole dell'umano, uscita per
+# uscita — quattro uscite, approfondimento ammesso (le parole della regia), ancore
+# obbligatorie sull'ignora, perché obbligatorio sullo scarto — e in piu' vuole le
+# parole con cui l'utente ha dato la delega, alla lettera e su una riga
+# (--delega): sono cio' che rende la decisione riconducibile all'umano che l'ha
+# affidata, e uno scenario scritto senza non si completa dopo. Campo di header
+# `Delega`, subito dopo `Chi`; sullo scarto le stesse parole passano ad adr.sh,
+# che le scrive nel record ADR — `adr.sh scarta` si chiama anche da solo, senza
+# scenario, e un record col solo autore non le porterebbe da nessuna parte.
+# --delega con un altro autore e' un rifiuto: il record non avrebbe dove scriverlo.
 #
 # IGNORA → NESSUN REGISTRO ADR. Scarto e ignora chiudono entrambi «non si fa», e
 # li separa la ricorrenza. Il record ADR serve a far tacere una segnalazione che
@@ -92,7 +107,8 @@
 #   scenario 0 scenario scritto (e record ADR, sullo scarto)
 #            1 input malformato, scarto o ignora con chi = agente, ancora
 #              assente o inesistente, approfondimento con chi = agente o sullo
-#              scarto o su piu' righe, progetto o sessione non risolvibili —
+#              scarto o su piu' righe, chi = delega senza --delega o --delega
+#              con un altro autore, progetto o sessione non risolvibili —
 #              NESSUNA scrittura
 #            2 scenario o record ADR gia' esistenti con lo stesso id — NESSUNA
 #              scrittura
@@ -136,8 +152,8 @@ fail() {  # <exit> <messaggio>
 # =============================================================================
 cmd_scenario() {
     local slug="" uscita="" chi="" momento="" skill="" progetto="" sessione=""
-    local segnalazione="" perche="" approfondimento="" no_commit=0
-    local seg_flag=0 perche_flag=0 appro_flag=0
+    local segnalazione="" perche="" approfondimento="" delega="" no_commit=0
+    local seg_flag=0 perche_flag=0 appro_flag=0 delega_flag=0
     local -a ancore=()
 
     while [[ $# -gt 0 ]]; do
@@ -153,6 +169,7 @@ cmd_scenario() {
             --segnalazione) segnalazione="${2:-}"; seg_flag=1; shift 2 ;;
             --perche)       perche="${2:-}"; perche_flag=1; shift 2 ;;
             --approfondimento) approfondimento="${2:-}"; appro_flag=1; shift 2 ;;
+            --delega)       delega="${2:-}"; delega_flag=1; shift 2 ;;
             --no-commit)    no_commit=1; shift ;;
             # Nessun --default: la segnalazione non decisa non produce un record.
             *) fail 1 "argomento ignoto: $1" ;;
@@ -166,15 +183,25 @@ cmd_scenario() {
         *)  fail 1 "--uscita deve essere subito|task|scarto|ignora (ricevuto: '${uscita}')" ;;
     esac
     case "$chi" in
-        umano|agente) ;;
-        "") fail 1 "--chi obbligatorio (umano|agente) — senza default: separa il corpus dell'umano dal campione delle decisioni dell'agente" ;;
-        *)  fail 1 "--chi deve essere umano|agente (ricevuto: '${chi}')" ;;
+        umano|agente|delega) ;;
+        "") fail 1 "--chi obbligatorio (umano|agente|delega) — senza default: separa il corpus dell'umano, il campione delle decisioni dell'agente e le decisioni della regia su delega" ;;
+        *)  fail 1 "--chi deve essere umano|agente|delega (ricevuto: '${chi}')" ;;
     esac
     if [[ "$uscita" == scarto && "$chi" == agente ]]; then
         fail 1 "l'agente non scarta: uno scarto sbagliato e' un segnale perso che nessuno recupera — riporta la segnalazione e lascia la decisione all'umano"
     fi
     if [[ "$uscita" == ignora && "$chi" == agente ]]; then
         fail 1 "l'agente non ignora: un ignora dell'agente e' una segnalazione non stampata — riportala e lascia la decisione all'umano"
+    fi
+
+    # --- delega: le parole dell'utente, solo con l'autore delega --------------
+    if [[ "$chi" == delega ]]; then
+        [[ -n "${delega//[[:space:]]/}" ]] \
+            || fail 1 "--chi delega vuole --delega <le parole con cui l'utente ha dato la delega, alla lettera> — sono cio' che riconduce la decisione all'umano, e uno scenario scritto senza non si completa dopo"
+        [[ "$delega" == *$'\n'* ]] \
+            && fail 1 "la delega sta su UNA riga: e' un campo di header — parole su piu' righe si uniscono con uno spazio"
+    elif (( delega_flag )); then
+        fail 1 "--delega vale solo con --chi delega: lo scenario di '${chi}' non ha dove scriverla"
     fi
 
     # --- momento, skill, slug -------------------------------------------------
@@ -205,9 +232,9 @@ cmd_scenario() {
     [[ "$sessione" =~ ^[A-Za-z0-9._:-]+$ ]] \
         || fail 1 "sessione fuori formato: '${sessione}'"
 
-    # --- segnalazione e parole dell'umano: flag, oppure stdin -----------------
+    # --- segnalazione e parole di chi decide: flag, oppure stdin ---------------
     # Grammatica di stdin fissa: riga 1 = la segnalazione, il resto = le parole
-    # dell'umano, che l'uscita smista — il perché sullo scarto, l'approfondimento
+    # di chi decide, che l'uscita smista — il perché sullo scarto, l'approfondimento
     # altrove. Si legge solo se --segnalazione manca: con due canali per lo stesso
     # campo non si saprebbe quale vince.
     if (( ! seg_flag )) && [[ ! -t 0 ]]; then
@@ -235,7 +262,7 @@ cmd_scenario() {
     [[ "$segnalazione" == *$'\n'* ]] \
         && fail 1 "la segnalazione sta su UNA riga: e' la riga 1 del record, citata alla lettera"
 
-    # trim delle righe vuote di testa e coda delle parole dell'umano: gli a-capo
+    # trim delle righe vuote di testa e coda delle parole di chi decide: gli a-capo
     # di bordo li porta l'heredoc, non chi ha parlato
     while [[ "$perche" == $'\n'* ]]; do perche="${perche#$'\n'}"; done
     while [[ "$perche" == *$'\n' ]]; do perche="${perche%$'\n'}"; done
@@ -243,16 +270,17 @@ cmd_scenario() {
     while [[ "$approfondimento" == *$'\n' ]]; do approfondimento="${approfondimento%$'\n'}"; done
 
     # --- approfondimento ------------------------------------------------------
-    # Le parole dell'umano, alla lettera e su una riga. Un valore accettato dove il
-    # record non lo scrive si perderebbe in silenzio: sullo scarto le parole sono
-    # il perché, con --chi agente non c'e' ancora nessuna risposta.
+    # Le parole di chi decide — l'umano, o la regia su delega —, alla lettera e su
+    # una riga. Un valore accettato dove il record non lo scrive si perderebbe in
+    # silenzio: sullo scarto le parole sono il perché, con --chi agente non c'e'
+    # ancora nessuna risposta.
     if (( appro_flag )); then
         [[ -n "${approfondimento//[[:space:]]/}" ]] \
-            || fail 1 "approfondimento vuoto: senza parole dell'umano il campo non si scrive — ometti --approfondimento"
+            || fail 1 "approfondimento vuoto: senza parole di chi decide il campo non si scrive — ometti --approfondimento"
         [[ "$uscita" == scarto ]] \
-            && fail 1 "sullo scarto le parole dell'umano sono il perché e stanno nel record ADR: passale come perché (righe di stdin dopo la segnalazione, o --perche), non come approfondimento"
+            && fail 1 "sullo scarto le parole di chi decide sono il perché e stanno nel record ADR: passale come perché (righe di stdin dopo la segnalazione, o --perche), non come approfondimento"
         [[ "$chi" == agente ]] \
-            && fail 1 "l'approfondimento porta le parole dell'umano: con --chi agente non c'e' ancora nessuna risposta da citare"
+            && fail 1 "l'approfondimento porta le parole di chi risponde, l'umano o la regia su delega: con --chi agente non c'e' ancora nessuna risposta da citare"
         [[ "$approfondimento" == *$'\n'* ]] \
             && fail 1 "l'approfondimento sta su UNA riga: e' un campo di header, e una riga in piu' potrebbe essere letta come un campo"
     fi
@@ -327,6 +355,7 @@ cmd_scenario() {
     if [[ "$uscita" == scarto ]]; then
         local -a adr_args=(scarta --slug "$slug" --chi "$chi" --segnalazione "$segnalazione"
                            --perche "$perche" --no-commit)
+        [[ "$chi" == delega ]] && adr_args+=(--delega "$delega")
         for a in "${ancore_norm[@]}"; do adr_args+=(--ancora "$a"); done
         adr_out="$(LOOM_ADR_NOW="$now" "$ADR_SH" "${adr_args[@]}" < /dev/null 2>&1)"
         adr_rc=$?
@@ -346,6 +375,9 @@ cmd_scenario() {
         printf '# %s\n\n' "$segnalazione"
         printf -- '- **Uscita**: %s\n' "$uscita"
         printf -- '- **Chi**: %s\n' "$chi"
+        # Solo con l'autore delega, subito dopo Chi: e' cio' che qualifica chi
+        # ha deciso. Senza, il record e' identico a quello di prima del campo.
+        [[ "$chi" == delega ]] && printf -- '- **Delega**: %s\n' "$delega"
         printf -- '- **Momento**: %s\n' "$momento"
         printf -- '- **Skill**: %s\n' "$skill"
         printf -- '- **Progetto**: %s\n' "$progetto"
@@ -403,11 +435,18 @@ cmd_scenario() {
 # quali combinazioni esistono. Con --dal si aggiunge la colonna dei record da
 # quella data in poi — il conteggio «dall'ultima iterazione».
 #
-# La riga `approfondimento` conta gli scenari che portano il campo, cioe' le
-# risposte in cui l'umano ha detto il proprio criterio. Gli scarti non ci entrano
-# per costruzione — le loro parole stanno nel perché del record ADR — e stanno
-# gia' in `scarto.umano`: chi vuole tutte le risposte con parole registrate somma
-# le due righe.
+# La riga `approfondimento` conta gli scenari dell'umano che portano il campo,
+# cioe' le risposte in cui l'umano ha detto il proprio criterio. Gli scarti non ci
+# entrano per costruzione — le loro parole stanno nel perché del record ADR — e
+# stanno gia' in `scarto.umano`: chi vuole tutte le risposte con parole registrate
+# somma le due righe.
+#
+# L'autore delega ha righe sue — `delega`, le quattro `<uscita>.delega`,
+# `approfondimento.delega` — e non entra in nessuna riga di prima: le parole della
+# regia non sono il criterio dell'umano, e chi legge una cella per nome deve
+# trovarle col significato che avevano. Un record `delega` e' valido solo col
+# campo Delega, e un campo Delega su un altro autore lo rende malformato: e' la
+# stessa regola con cui lo scenario si scrive.
 cmd_conta() {
     local dal="" sessione=""
 
@@ -438,30 +477,35 @@ cmd_conta() {
             if (!aperto) return
             aperto = 0
             if (sessione != "" && ses != sessione) return
-            ok = (usc ~ /^(subito|task|scarto|ignora)$/ && chi ~ /^(umano|agente)$/ &&
-                  mom ~ /^(flusso|posteriori)$/ && dat ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$/)
+            # Le chiavi sono chiuse qui E nella split di END: un valore nuovo
+            # aggiunto solo alla split finirebbe fra i malformati.
+            ok = (usc ~ /^(subito|task|scarto|ignora)$/ && chi ~ /^(umano|agente|delega)$/ &&
+                  mom ~ /^(flusso|posteriori)$/ && dat ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$/ &&
+                  (chi == "delega") == del)
             conta("tot", ok, usc, chi, mom, dat, app)
             if (dal != "" && dat >= dal) conta("dal", ok, usc, chi, mom, dat, app)
         }
         function conta(k, ok, usc, chi, mom, dat, app) {
             if (!ok) { n[k, "malformati"]++; return }
             n[k, "scenari"]++; n[k, chi]++; n[k, usc "." chi]++; n[k, mom]++
-            if (app) n[k, "approfondimento"]++
+            if (app && chi == "umano")  n[k, "approfondimento"]++
+            if (app && chi == "delega") n[k, "approfondimento.delega"]++
             if (primo[k] == "" || dat < primo[k]) primo[k] = dat
             if (dat > ultimo[k]) ultimo[k] = dat
         }
-        FNR == 1 { chiudi(); aperto = 1; usc = chi = mom = dat = ses = ""; app = 0 }
+        FNR == 1 { chiudi(); aperto = 1; usc = chi = mom = dat = ses = ""; app = del = 0 }
         /^- \*\*Uscita\*\*:/   { usc = campo($0) }
         /^- \*\*Chi\*\*:/      { chi = campo($0) }
         /^- \*\*Momento\*\*:/  { mom = campo($0) }
         /^- \*\*Data\*\*:/     { dat = campo($0) }
         /^- \*\*Sessione\*\*:/ { ses = campo($0) }
         /^- \*\*Approfondimento\*\*:/ { app = 1 }
+        /^- \*\*Delega\*\*:/   { del = (campo($0) != "") }
         END {
             chiudi()
             # Il numero di righe lo da split: una chiave aggiunta alla lista
             # entra nella tabella senza toccare il ciclo.
-            nchiavi = split("scenari umano agente subito.umano subito.agente task.umano task.agente scarto.umano scarto.agente ignora.umano ignora.agente flusso posteriori approfondimento malformati", chiavi, " ")
+            nchiavi = split("scenari umano agente delega subito.umano subito.agente subito.delega task.umano task.agente task.delega scarto.umano scarto.agente scarto.delega ignora.umano ignora.agente ignora.delega flusso posteriori approfondimento approfondimento.delega malformati", chiavi, " ")
             printf "chiave\ttotale"; if (dal != "") printf "\tdal %s", dal; printf "\n"
             for (i = 1; i <= nchiavi; i++) {
                 c = chiavi[i]
