@@ -13,6 +13,10 @@ Ogni riga su stdout è un evento per il tool Monitor di Claude Code:
   - da git: commit locali nuovi e push su origin, per ogni repo guardato: la
     radice, ogni submodule di .gitmodules e i --repo in più
 
+Con --filter le righe passano da whitelist e blacklist prima di uscire
+(watch_filter.py): il file si rilegge quando cambia, e le righe `monitor`
+escono sempre. Senza --filter escono tutte.
+
 Le sessioni sono quelle del registro vivo con `cwd` dentro la radice del
 progetto, comprese quelle nate in un submodule: il transcript di ognuna si
 ricava dal suo `cwd`. La chiave di una sessione è il processo (pid +
@@ -26,6 +30,7 @@ Uso (lo lancia la skill della regia, dalla cache del plugin):
   python -u -I watch_sessions.py --project-root <radice del progetto> \\
       --own-session <id della sessione che lancia il monitor> \\
       --state <radice>/.claude/loom/regia/T<perimetro>-watch.json \\
+      [--filter <radice>/.claude/loom/regia/T<perimetro>-filter.json] \\
       [--repo nome=path-relativo-alla-radice]...
 """
 
@@ -46,8 +51,13 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import watch_filter  # noqa: E402
 
 CHECKBOX_PATTERN = re.compile(r"^- \[([ x])\]")
+
+# Il file del filtro (watch_filter.FilterSource), o None senza --filter. Lo
+# assegna `main`; lo legge `emit_event`, il punto da cui esce ogni evento.
+filter_source = None
 
 
 def parse_arguments():
@@ -56,6 +66,8 @@ def parse_arguments():
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     parser.add_argument("--own-session", default="", help="session id da saltare: quello che lancia il monitor")
     parser.add_argument("--state", required=True, help="file JSON di stato, in una cartella che git ignora")
+    parser.add_argument("--filter", default="",
+                        help="file JSON con whitelist e blacklist, riletto quando cambia")
     parser.add_argument("--repo", action="append", default=[],
                         help="nome=path relativo alla radice, oltre a radice e submodule; ripetibile")
     parser.add_argument("--poll-seconds", type=int, default=15)
@@ -67,7 +79,37 @@ def parse_arguments():
 
 
 def emit(line):
+    """Una riga `monitor`: esce sempre, il filtro non la vede. Un monitor rotto
+    che tace per un filtro sembrerebbe un monitor zitto."""
     print(line.replace("\n", " ")[:300], flush=True)
+
+
+def emit_event(line, tasks=(), session_ids=None):
+    """Un evento: esce se il filtro lo ammette. `tasks` le task dell'evento,
+    `session_ids` i sessionId del processo per un evento di sessione, `None`
+    per tutti gli altri. La regex del filtro guarda la riga come esce."""
+    text = line.replace("\n", " ")[:300]
+    active = filter_source.active if filter_source is not None else None
+    if active is not None and not active.admits(text, tasks, session_ids):
+        return
+    print(text, flush=True)
+
+
+def process_tasks(process):
+    """La task di una sessione, come insieme: nessuna per una sessione `?`."""
+    label = process.get("label") or ""
+    return set() if not label or label.startswith("?") else {label}
+
+
+def process_session_ids(process):
+    """Ogni sessionId che il processo ha avuto, l'attuale compreso: un filtro
+    `session:` segue il processo, e un /clear non fa ricomparire una
+    conversazione esclusa."""
+    return process.get("session_ids") or [process["session_id"]]
+
+
+def emit_session(process, line):
+    emit_event(line, process_tasks(process), process_session_ids(process))
 
 
 def load_state(state_path):
@@ -97,11 +139,11 @@ def handle_transcript_record(record, process, label):
         if process.get("headless"):
             return
         summary = regia_common.first_meaningful_line(process.get("last_text", ""))
-        emit(f"{label} ⏸ turno finito, aspetta l'utente: {summary[:160]}")
+        emit_session(process, f"{label} ⏸ turno finito, aspetta l'utente: {summary[:160]}")
         return
     prompt = regia_common.user_prompt_text(record)
     if prompt is not None:
-        emit(f"{label} ✍ prompt utente: {regia_common.describe_prompt(prompt)[:140]}")
+        emit_session(process, f"{label} ✍ prompt utente: {regia_common.describe_prompt(prompt)[:140]}")
         return
     content = (record.get("message") or {}).get("content")
     if record_type != "assistant" or record.get("isSidechain") or not isinstance(content, list):
@@ -117,10 +159,10 @@ def handle_transcript_record(record, process, label):
             tool_input = block.get("input") or {}
             process["last_tool"] = tool_name
             if tool_name == "Skill":
-                emit(f"{label} ▶ skill {tool_input.get('skill')} {str(tool_input.get('args') or '')[:80]}")
+                emit_session(process, f"{label} ▶ skill {tool_input.get('skill')} {str(tool_input.get('args') or '')[:80]}")
             elif tool_name == "AskUserQuestion":
                 questions = tool_input.get("questions") or [{}]
-                emit(f"{label} ❓ domanda all'utente: {questions[0].get('question', '')[:160]}")
+                emit_session(process, f"{label} ❓ domanda all'utente: {questions[0].get('question', '')[:160]}")
 
 
 def read_new_records(process):
@@ -208,7 +250,7 @@ def check_status(process, session, settings, initialized, now):
     if (initialized and session.status == "waiting" and process.get("status") != "waiting"
             and process.get("last_tool") != "AskUserQuestion"):
         tool = process.get("last_tool")
-        emit(f"{label} ⏳ aspetta un permesso" + (f": {tool}" if tool else ""))
+        emit_session(process, f"{label} ⏳ aspetta un permesso" + (f": {tool}" if tool else ""))
     process["status"] = session.status
     process["status_since"] = session.status_since
     moved = last_activity(process)
@@ -222,7 +264,7 @@ def check_status(process, session, settings, initialized, now):
             details += f", ultimo tool {process['last_tool']}"
         if session.alive is None:
             details += ", o processo morto"
-        emit(f"{label} 🧊 ferma da {int((now - moved) / 60)} min ({details})")
+        emit_session(process, f"{label} 🧊 ferma da {int((now - moved) / 60)} min ({details})")
         process["stall_reported"] = True
 
 
@@ -263,18 +305,23 @@ def announce_label_change(process, old_label):
     if new_label == old_label:
         return
     session = short_id(process["session_id"])
+    # L'evento porta la task vecchia e la nuova: passa una whitelist che ne
+    # ammette una, così la regia vede entrare e uscire una sessione dal mandato.
+    tasks = {label for label in (old_label, new_label) if not label.startswith("?")}
+    session_ids = process_session_ids(process)
     if old_label.startswith("?"):
-        emit(f"{new_label} 🏷 sessione {session} legata a {new_label}")
+        emit_event(f"{new_label} 🏷 sessione {session} legata a {new_label}", tasks, session_ids)
     elif new_label.startswith("?"):
-        emit(f"{new_label} 🔀 sessione {session} staccata da {old_label}")
+        emit_event(f"{new_label} 🔀 sessione {session} staccata da {old_label}", tasks, session_ids)
     else:
-        emit(f"{new_label} 🔀 sessione {session} riassegnata: {old_label} → {new_label}")
+        emit_event(f"{new_label} 🔀 sessione {session} riassegnata: {old_label} → {new_label}", tasks, session_ids)
 
 
 def new_process(session, transcript, offset):
     return {
         "pid": session.pid,
         "session_id": session.session_id,
+        "session_ids": [session.session_id],
         "cwd": session.cwd,
         "transcript": transcript,
         "offset": offset,
@@ -297,9 +344,9 @@ def announce_start(process):
     """
     session = short_id(process["session_id"])
     if process.get("headless"):
-        emit(f"{process['label']} ▶ turno headless partito {session}{process['where']}")
+        emit_session(process, f"{process['label']} ▶ turno headless partito {session}{process['where']}")
     else:
-        emit(f"{process['label']} 🆕 nuova sessione {session}{process['where']}")
+        emit_session(process, f"{process['label']} 🆕 nuova sessione {session}{process['where']}")
 
 
 def announce_end(process):
@@ -310,9 +357,10 @@ def announce_end(process):
     session = short_id(process["session_id"])
     if process.get("headless"):
         summary = regia_common.first_meaningful_line(process.get("last_text", ""))
-        emit(f"{process['label']} ⏹ turno headless finito {session}" + (f": {summary[:160]}" if summary else ""))
+        emit_session(process, f"{process['label']} ⏹ turno headless finito {session}"
+                     + (f": {summary[:160]}" if summary else ""))
     else:
-        emit(f"{process['label']} ✖ sessione chiusa {session}")
+        emit_session(process, f"{process['label']} ✖ sessione chiusa {session}")
 
 
 def is_own(session, state, settings):
@@ -354,13 +402,14 @@ def scan_sessions(state, settings):
                 announce_start(process)
         elif process["session_id"] != session.session_id:
             process.update(session_id=session.session_id, transcript=transcript,
+                           session_ids=process_session_ids(process) + [session.session_id],
                            offset=start_offset(transcript, since),
                            transcript_task=regia_common.task_of_transcript(transcript),
                            sidecar_task=bindings.get(session.session_id))
             refresh_label(process)
             if initialized:
-                emit(f"{process['label']} 🔄 transcript nuovo {short_id(session.session_id)} "
-                     f"(/clear o compattazione)")
+                emit_session(process, f"{process['label']} 🔄 transcript nuovo {short_id(session.session_id)} "
+                                      f"(/clear o compattazione)")
         else:
             old_label = process["label"]
             process["transcript"] = transcript
@@ -450,7 +499,8 @@ def scan_task_files(state, settings):
         if previous["progress"] != summary["progress"]:
             deltas.append(f"Prog {summary['progress']}")
         changed_label = ", ".join(changed_sections) if changed_sections else "intestazione"
-        emit(f"{task_id} 📝 task file: {changed_label}" + (f" · {' · '.join(deltas)}" if deltas else ""))
+        emit_event(f"{task_id} 📝 task file: {changed_label}" + (f" · {' · '.join(deltas)}" if deltas else ""),
+                   {task_id})
 
 
 def overview_progress(text):
@@ -488,7 +538,7 @@ def scan_progress_table(state, settings):
         previous = state["progress"].get(task_id)
         state["progress"][task_id] = progress
         if previous is not None and previous != progress and state.get("initialized"):
-            emit(f"{task_id} 📊 tasks.md: Prog {previous} → {progress}")
+            emit_event(f"{task_id} 📊 tasks.md: Prog {previous} → {progress}", {task_id})
 
 
 def run_git(repo_path, *arguments):
@@ -516,14 +566,33 @@ def scan_git(state, settings):
                 continue
             short_ref = ref_name.replace("refs/heads/", "").replace("refs/remotes/", "")
             if ref_name.startswith("refs/remotes/"):
-                emit(f"git {repo_name} ⬆ {short_ref} → {sha[:7]}")
+                # Un push non ha task: con una whitelist passa solo se una
+                # regex lo ammette.
+                emit_event(f"git {repo_name} ⬆ {short_ref} → {sha[:7]}")
                 continue
             if old_sha:
                 log_output = run_git(repo_path, "log", "--format=%h %s", "-n", "5", f"{old_sha}..{sha}")
             else:
                 log_output = run_git(repo_path, "log", "--format=%h %s", "-n", "1", sha)
             for commit_line in log_output.strip().splitlines():
-                emit(f"git {repo_name} ● {short_ref}: {commit_line[:160]}")
+                subject = commit_line.partition(" ")[2]
+                emit_event(f"git {repo_name} ● {short_ref}: {commit_line[:160]}",
+                           watch_filter.commit_tasks(subject, lambda task_id: parent_task(settings, task_id)))
+
+
+def parent_task(settings, task_id):
+    """La task del campo `Parent Task` del task file di `task_id`, `None` se il
+    file o il campo mancano. Il campo può portare una maniglia dopo l'id."""
+    path = regia_common.find_task_file(settings.project_root, settings.docs_root, task_id)
+    if path is None:
+        return None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as task_handle:
+            value = regia_common.header_field(task_handle.read().splitlines(), "Parent Task")
+    except OSError:
+        return None
+    match = re.match(r"(T\d+)\b", value)
+    return match.group(1) if match else None
 
 
 def submodule_paths(project_root):
@@ -544,7 +613,8 @@ def submodule_paths(project_root):
 def build_settings(arguments):
     arguments.project_root = os.path.abspath(
         arguments.project_root or regia_common.find_project_root(os.getcwd()))
-    arguments.docs_path = os.path.join(arguments.project_root, regia_common.docs_root(arguments.project_root))
+    arguments.docs_root = regia_common.docs_root(arguments.project_root)
+    arguments.docs_path = os.path.join(arguments.project_root, arguments.docs_root)
     repos = {"root": arguments.project_root}
     for relative_path in submodule_paths(arguments.project_root):
         repos[relative_path] = os.path.join(arguments.project_root, relative_path)
@@ -555,14 +625,48 @@ def build_settings(arguments):
     return arguments
 
 
+def arm_line(word, state):
+    """La riga di armo: ogni sessione seguita con stato ed età. Col filtro
+    elenca le sole sessioni che passano e conta quelle fuori, così un silenzio
+    si spiega; la regex del filtro guarda il pezzo della sessione
+    (`T31 waiting 4 min [loom-deck]`)."""
+    now = time.time()
+    entries = [(describe_status(process, now), process) for process in state["processes"].values()]
+    active = filter_source.active if filter_source is not None else None
+    if active is None:
+        sessions = sorted(text for text, _ in entries)
+        return f"monitor ✅ {word}: {', '.join(sessions) or 'nessuna sessione viva'}"
+    sessions = sorted(text for text, process in entries
+                      if active.admits(text, process_tasks(process), process_session_ids(process)))
+    outside = len(entries) - len(sessions)
+    return (f"monitor ✅ {word} col filtro (sessioni fuori: {outside}): "
+            f"{', '.join(sessions) or 'nessuna sessione viva nel filtro'}")
+
+
+def refresh_filter(state):
+    """Rilegge il file del filtro se è cambiato, e salva nello stato l'ultimo
+    filtro valido: un riarmo davanti a un file rotto lo ritrova lì."""
+    if filter_source is None:
+        return
+    line = filter_source.refresh()
+    if line:
+        emit(line)
+    if filter_source.active is not None:
+        state["filter"] = filter_source.active.rules
+
+
 def main():
+    global filter_source
     regia_common.setup_stdout()
     settings = build_settings(parse_arguments())
     state = load_state(settings.state)
+    if settings.filter:
+        filter_source = watch_filter.FilterSource(settings.filter, state.get("filter"))
     scanners = (scan_sessions, scan_task_files, scan_progress_table, scan_git)
     first_scan = True
     while True:
         scan_started = time.time()
+        refresh_filter(state)
         for scanner in scanners:
             try:
                 scanner(state, settings)
@@ -571,8 +675,7 @@ def main():
         if first_scan:
             word = "riarmato" if state.get("initialized") else "armato"
             state["initialized"] = True
-            sessions = sorted(describe_status(process, time.time()) for process in state["processes"].values())
-            emit(f"monitor ✅ {word}: {', '.join(sessions) or 'nessuna sessione viva'}")
+            emit(arm_line(word, state))
             first_scan = False
         state["last_scan"] = scan_started
         save_state(settings.state, state)
