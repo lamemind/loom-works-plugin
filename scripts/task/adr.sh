@@ -3,8 +3,8 @@
 # =============================================================================
 # adr.sh — l'unico script che sa scrivere e interrogare il registro ADR
 # Usage:
-#   adr.sh scarta --slug <slug> --chi umano|agente --segnalazione <testo>
-#                 --ancora <path> [--ancora <path>]...
+#   adr.sh scarta --slug <slug> --chi umano|agente|delega --segnalazione <testo>
+#                 --ancora <path> [--ancora <path>]... [--delega <testo>]
 #                 [--supera <id>[#<voce>]]... [--perche <testo>] [--no-commit]
 #                 [< il perché su stdin, in alternativa a --perche]
 #   adr.sh cerca  <ancora> [--superate]
@@ -33,9 +33,18 @@
 # esiste gia' (exit 2). Una decisione superata si marca con un record NUOVO che
 # nomina il vecchio in `Supera`; il vecchio resta leggibile dov'e'.
 #
+# DELEGA — il terzo autore: la regia che scarta su una delega che l'utente le ha
+# dato nella sua chat. Vuole le parole della delega, alla lettera e su una riga
+# (--delega), e le scrive nel campo `Delega` subito dopo `Chi`; senza, l'autore
+# e' un rifiuto, e --delega con un altro autore pure. Le porta il record e non
+# solo lo scenario di triage dello stesso scarto: questo comando si chiama anche
+# da solo, senza scenario, e un record non si riscrive — il campo che manca alla
+# nascita non si aggiunge piu'.
+#
 # Exit code per sottocomando:
 #   scarta   0 record scritto
-#            1 input malformato o ancora inesistente — NESSUNA scrittura
+#            1 input malformato, ancora inesistente, chi = delega senza --delega
+#              o --delega con un altro autore — NESSUNA scrittura
 #            2 record gia' esistente — NESSUNA scrittura
 #   cerca    0 almeno un record vivo trovato (elencato su stdout)
 #            2 nessuno — e' il verdetto che l'agente legge prima di risollevare
@@ -72,7 +81,7 @@ fail() {  # <exit> <messaggio>
 # scarta
 # =============================================================================
 cmd_scarta() {
-    local slug="" chi="" segnalazione="" perche="" no_commit=0
+    local slug="" chi="" segnalazione="" perche="" delega="" delega_flag=0 no_commit=0
     local -a ancore_raw=() supera_raw=()
 
     while [[ $# -gt 0 ]]; do
@@ -83,6 +92,7 @@ cmd_scarta() {
             --ancora)       ancore_raw+=("${2:-}"); shift 2 ;;
             --supera)       supera_raw+=("${2:-}"); shift 2 ;;
             --perche)       perche="${2:-}"; shift 2 ;;
+            --delega)       delega="${2:-}"; delega_flag=1; shift 2 ;;
             --no-commit)    no_commit=1; shift ;;
             *) fail 1 "argomento ignoto: $1" ;;
         esac
@@ -96,12 +106,22 @@ cmd_scarta() {
     # --- chi ------------------------------------------------------------------
     # Senza default di proposito: lo scarto deciso da un agente e' esattamente
     # cio' che l'umano vuole poter rileggere a campione, e un default renderebbe
-    # i due indistinguibili.
+    # i due indistinguibili. Lo stesso vale per lo scarto deciso su delega.
     case "$chi" in
-        umano|agente) ;;
-        "") fail 1 "--chi obbligatorio (umano|agente) — senza default: lo scarto dell'agente e' cio' che l'umano campiona" ;;
-        *)  fail 1 "--chi deve essere umano|agente (ricevuto: '${chi}')" ;;
+        umano|agente|delega) ;;
+        "") fail 1 "--chi obbligatorio (umano|agente|delega) — senza default: lo scarto dell'agente e quello su delega sono cio' che l'umano campiona" ;;
+        *)  fail 1 "--chi deve essere umano|agente|delega (ricevuto: '${chi}')" ;;
     esac
+
+    # --- delega: le parole dell'utente, solo con l'autore delega --------------
+    if [[ "$chi" == delega ]]; then
+        [[ -n "${delega//[[:space:]]/}" ]] \
+            || fail 1 "--chi delega vuole --delega <le parole con cui l'utente ha dato la delega, alla lettera> — un record non si riscrive, e senza quelle parole lo scarto non e' riconducibile all'umano che l'ha affidato"
+        [[ "$delega" == *$'\n'* ]] \
+            && fail 1 "la delega sta su UNA riga: e' un campo di header — parole su piu' righe si uniscono con uno spazio"
+    elif (( delega_flag )); then
+        fail 1 "--delega vale solo con --chi delega: il record di '${chi}' non ha dove scriverla"
+    fi
 
     # --- segnalazione ---------------------------------------------------------
     [[ -n "$segnalazione" ]] || fail 1 "--segnalazione obbligatoria"
@@ -180,6 +200,7 @@ cmd_scarta() {
         printf -- '- **Tipo**: scarto\n'
         printf -- '- **Data**: %s\n' "$rec_data"
         printf -- '- **Chi**: %s\n' "$chi"
+        [[ "$chi" == delega ]] && printf -- '- **Delega**: %s\n' "$delega"
         printf -- '- **Ancore**: %s\n' "$campo_ancore"
         [[ -n "$campo_supera" ]] && printf -- '- **Supera**: %s\n' "$campo_supera"
         printf '\n## Perché\n\n%s\n' "$perche"
