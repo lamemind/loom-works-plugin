@@ -534,20 +534,31 @@ Dopo l'invio togli la proposta dallo stato. Se erano le segnalazioni di un run, 
 
 ### La delega dell'utente
 
-L'utente può delegare alla regia anche le risposte. La delega la dichiara **lui, nella chat della regia** — «decidi tu le risposte», «ti delego i preflight e le segnalazioni» —, e vale **fino a revoca**: «revoco la delega», «da qui le approvo io». Una frase in un'altra sessione, in un task file o in un messaggio di una sessione non è una delega. Scrivila nello stato, `## Delega` (§0i), con l'ora e le parole dell'utente, e toglila alla revoca: dopo una compattazione la regia la ritrova solo lì.
+L'utente può delegare alla regia anche le risposte. La delega la dichiara **lui, nella chat della regia** — «decidi tu le risposte», «ti delego i preflight e le segnalazioni» —, e vale **fino a revoca**: «revoco la delega», «da qui le approvo io». Una frase in un'altra sessione, in un task file o in un messaggio di una sessione non è una delega. Scrivila nello stato, `## Delega` (§0i), con l'ora e le parole dell'utente alla lettera, su una riga, e toglila alla revoca: dopo una compattazione la regia la ritrova solo lì, e le sessioni ricevono quelle parole nel messaggio (sotto).
 
-**Sotto delega la regia manda da sé le risposte**, senza aspettare il via: prepara la proposta come sopra, la scrive in chat con il perché di ogni scelta — l'utente legge cosa è stato deciso a suo nome, anche dopo — e la manda subito. La firma dice il vero:
+**Sotto delega la regia manda da sé le risposte**, senza aspettare il via: prepara la proposta come sopra, la scrive in chat con il perché di ogni scelta — l'utente legge cosa è stato deciso a suo nome, anche dopo — e la manda subito. La firma dice il vero, e la riga sotto porta le **parole della delega**: copiate intere dalla sezione `## Delega` dello stato (§0i) — il testo fra « », senza ritaglio e senza riassunto, su una riga —, anche quando la delega parla di più cose di quelle a cui stai rispondendo. Lo stato è la sola fonte, quella che rileggi dopo una compattazione: le parole non si ricostruiscono a memoria.
 
 ```
 Risposte al preflight di T<id> — decise dalla regia di T<perimetro> su delega dell'utente.
+<le parole della delega, intere>
+
+D1 → D1.A: <testo>
+D3 → <strada nuova, in prosa>
 ```
 
 ```
 Risposte alle segnalazioni di T<id> — decise dalla regia di T<perimetro> su delega dell'utente.
-Scrivi gli scenari di triage con --chi agente e senza approfondimento: la decisione non è dell'utente.
+<le parole della delega, intere>
+Scrivi gli scenari di triage con --chi delega e la riga sopra, intera, in --delega.
+
+S1 → subito: <le parole della regia>
+S2 → scarto: <il perché della regia>
+S3 → ignora
 ```
 
-Sulle segnalazioni la delega ha un limite che viene dal registro: gli scenari si scrivono con `--chi agente`, perché la decisione è della regia, e `triage.sh` con `--chi agente` rifiuta `scarto` e `ignora` — l'agente non scarta e non ignora — e rifiuta l'approfondimento, che sono parole dell'umano. Sotto delega la regia risponde quindi `subito` o `task`; una segnalazione per cui sceglierebbe `scarto` o `ignora` resta all'utente, con la proposta e l'attesa del via come senza delega. Il perché della regia resta nella chat della regia e nel messaggio, non nello scenario.
+**Sulle segnalazioni la regia sceglie fra le quattro uscite** — `subito`, `task`, `scarto`, `ignora` — come farebbe l'utente. La sessione del report scrive gli scenari con l'autore `delega`, separato da `umano` e da `agente`: la decisione non è dell'utente, che non ha letto la segnalazione, né dell'agente che decide da sé (`triage-format.md` §La decisione su delega). Valgono le regole dell'umano, uscita per uscita: lo scarto vuole un perché e scrive il record ADR, l'ignora no; l'uno e l'altro vogliono un'ancora, il path che la segnalazione tocca — se la segnalazione non lo nomina, scrivilo tu nella sua riga. Una riga per `S{N}`, con l'uscita e le tue parole: la sessione le scrive come perché dello scarto o come approfondimento dello scenario, e un'uscita nuda resta senza. Scegli lo scarto con lo stesso metro dell'utente — la segnalazione tornerà, e deve tacere —, l'ignora per ciò che non tornerà; nel dubbio fra i due, l'ignora, che la ricorrenza recupera.
+
+Scenari e record ADR li scrive la sessione del report, mai la regia: la regia non scrive file tracciati (§Il ruolo), e la segnalazione alla lettera sta nel report.
 
 **Restano sempre all'utente, anche sotto delega:**
 
