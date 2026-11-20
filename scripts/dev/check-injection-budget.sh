@@ -13,9 +13,12 @@
 #   ./scripts/dev/check-injection-budget.sh [--project <dir>] [--threshold N]
 #                                           [--restamp-threshold N]
 #
-# - Entry statiche: eseguite as-is (senza LOOM_TASK), misurate una volta.
+# - Entry statiche: eseguite as-is (senza LOOM_TASK ne' LOOM_REGIA), misurate una volta.
 # - Entry dinamica (inject-task.sh): sweep su TUTTI i task file del progetto --project
 #   (default: cwd se contiene runtime/tasks o docs/tasks), una run per LOOM_TASK.
+# - Entry della regia (inject-regia.sh): senza LOOM_REGIA non stampa niente, e la
+#   misura a vuoto direbbe 0. Si misura con un perimetro dall'id piu' lungo che un
+#   progetto plausibile porta (REGIA_PROBE), cioe' col testo che arriva davvero.
 #
 # Exit: 0 = tutte le entry sotto soglia · 1 = almeno una sfora · 2 = errore uso.
 
@@ -45,6 +48,10 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HOOKS="$ROOT/hooks/hooks.json"
 [ -f "$HOOKS" ] || { echo "hooks.json non trovato: $HOOKS" >&2; exit 2; }
 command -v jq >/dev/null || { echo "jq richiesto" >&2; exit 2; }
+
+# T220 — il perimetro con cui si misura la riga dell'organigramma: sei cifre sono
+# oltre ogni contatore di task di un progetto.
+REGIA_PROBE="T999999"
 
 fail=0
 printf '%-18s %-52s %8s  %s\n' "EVENT" "ENTRY" "CHAR" "STATUS"
@@ -88,8 +95,11 @@ while IFS=$'\t' read -r ev cmd; do
     else
       check "$ev" "$label (max su $found task: $maxid)" "$max"
     fi
+  elif [[ "$cmd" == *inject-regia.sh* ]]; then
+    n=$( (unset LOOM_TASK; LOOM_REGIA="$REGIA_PROBE" CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd") 2>/dev/null </dev/null | count_chars )
+    check "$ev" "$label (LOOM_REGIA=$REGIA_PROBE)" "$n"
   else
-    n=$( (unset LOOM_TASK; CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd") 2>/dev/null </dev/null | count_chars )
+    n=$( (unset LOOM_TASK LOOM_REGIA; CLAUDE_PROJECT_DIR="$PROJECT" bash -c "$rcmd") 2>/dev/null </dev/null | count_chars )
     check "$ev" "$label" "$n"
   fi
 done < <(jq -r '.hooks | to_entries[] | .key as $ev | .value[].hooks[].command | $ev + "\t" + .' "$HOOKS")
