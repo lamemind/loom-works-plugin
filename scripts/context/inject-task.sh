@@ -11,7 +11,11 @@
 # Budget (T40): Claude Code ha un cap di 10.000 CHAR (non byte) per comando hook;
 # oltre soglia l'output viene SOSTITUITO da anteprima ~2KB + path -> mutilazione
 # silenziosa. Fill greedy per priorita', stop al primo che non entra:
-#   - cappello + filepath + Description: sempre presenti
+#   - cappello + filepath + Description: sempre presenti. Una Description che da
+#     sola sfora il budget si tronca a riga intera, e nient'altro entra: un'epica
+#     o un mandato riscritti dai checkpoint crescono fin li', e senza il taglio
+#     il payload intero oltre il cap arriverebbe mutilato al modello (e
+#     check-injection-budget.sh fermerebbe ogni publish del plugin)
 #   - sezioni canoniche in ordine di priorita' finche' il totale sta nel budget
 #   - sezioni non canoniche: mai iniettate
 #   - marcatore finale: elenco sezioni omesse + path per recupero via Read
@@ -63,6 +67,12 @@ if [ -n "$f" ] && [ -f "$f" ]; then
     if (n ~ /^progress log/)        return "Progress Log"
     return ""
   }
+  # Il marcatore finale: cosa manca, e dove leggerlo per intero.
+  function marker(om, trunc) {
+    if (trunc)
+      return sprintf("\n_[budget iniezione %d char] Description troncata%s. Contenuto integrale nel file indicato sopra (Read on-demand)._\n", budget, (om != "" ? "; sezioni omesse: " om : ""))
+    return sprintf("\n_[budget iniezione %d char] Sezioni omesse: %s. Contenuto integrale nel file indicato sopra (Read on-demand)._\n", budget, om)
+  }
   BEGIN {
     nsec = 0
     nprio = split("Acceptance Criteria|Deliverables Checklist|Materiale|Decisions|Dependencies|Implementation Notes|Testing Notes|Doc Impact|Prod Validation|Progress Log", prio, "|")
@@ -83,9 +93,31 @@ if [ -n "$f" ] && [ -f "$f" ]; then
     out = out "_File completo: " path "_\n\n"
     out = out header
 
-    # Description: imprescindibile, entra sempre
+    # Description: imprescindibile, entra sempre per prima
+    desc = 0
     for (i = 1; i <= nsec; i++)
-      if (canon(name[i]) == "Description") { out = out body[i]; used[i] = 1 }
+      if (canon(name[i]) == "Description") {
+        used[i] = 1
+        if (length(out) + length(body[i]) <= budget - reserve) out = out body[i]
+        else desc = i
+      }
+
+    # Description oltre il budget: si taglia a riga intera, col marcatore misurato
+    # e non stimato (la lista delle omesse qui è lunga quanto le sezioni del file).
+    # Il taglio sull ultimo a-capo resta pulito anche dove length() conta
+    # byte (awk senza locale UTF-8): la riga finisce sempre su un carattere intero.
+    if (desc) {
+      om = ""
+      for (i = 1; i <= nsec; i++)
+        if (i != desc) om = om (om == "" ? "" : ", ") name[i]
+      tail = marker(om, 1)
+      room = budget - length(out) - length(tail)
+      piece = substr(body[desc], 1, (room > 0 ? room : 0))
+      for (k = length(piece); k > 0 && substr(piece, k, 1) != "\n"; k--) ;
+      if (k > 0) piece = substr(piece, 1, k)
+      printf "%s%s%s", out, piece, tail
+      exit
+    }
 
     # greedy per priorita, stop al primo che non entra
     stopped = 0
@@ -108,8 +140,7 @@ if [ -n "$f" ] && [ -f "$f" ]; then
       if (!used[i]) om = om (om == "" ? "" : ", ") name[i]
 
     printf "%s", out
-    if (om != "")
-      printf "\n_[budget iniezione %d char] Sezioni omesse: %s. Contenuto integrale nel file indicato sopra (Read on-demand)._\n", budget, om
+    if (om != "") printf "%s", marker(om, 0)
   }
   ' "$f"
 fi
