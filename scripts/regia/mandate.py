@@ -23,16 +23,19 @@ da chi.
 Il perimetro è un id solo, un'epica o un mandato (`Size: Mandate`). I suoi
 membri non li cerca questo script: le figlie di un'epica e la lista di un
 mandato le legge il lettore unico, `resolve-task.sh <id> --members`, e la skill
-le passa dopo `--children`. Una regola sola per contare i membri.
+le passa dopo `--children`. Una regola sola per contare i membri. `--children`
+è obbligatoria per `tree` e `verify`: senza, lo script non legge il perimetro
+come vuoto, esce 2 e rimanda al lettore.
 
 Uso:
   python -I mandate.py [--project-root <radice>] gate --own-session <session id>
-  python -I mandate.py [--project-root <radice>] tree <perimetro> [--children T1 T2 …] [--save <file.json>]
-  python -I mandate.py [--project-root <radice>] verify <perimetro> [--children T1 T2 …]
+  python -I mandate.py [--project-root <radice>] tree <perimetro> --children [T1 T2 …] [--save <file.json>]
+  python -I mandate.py [--project-root <radice>] verify <perimetro> --children [T1 T2 …]
   python -I mandate.py [--project-root <radice>] recap --before <file.json>
 
-Exit: 0 ok · 1 errore d'uso o file mancante · 2 gate chiuso, analisi che non
-combacia o assente.
+Exit: 0 ok · 1 id malformato o file mancante · 2 gate chiuso, analisi che non
+combacia o assente, e ogni errore di argparse — un'opzione ignota, `--children`
+mancante a `tree` e `verify`.
 """
 
 import argparse
@@ -530,21 +533,38 @@ def command_recap(project_root, before_path):
     return 0
 
 
+MEMBERS_HINT = ("i membri del perimetro li legge il lettore unico, "
+                "resolve-task.sh <perimetro> --members, e si passano dopo --children")
+
+
+class SubcommandParser(argparse.ArgumentParser):
+    """Il parser dei sottocomandi: a un `--children` mancante aggiunge dove si
+    leggono i membri. Senza i membri `tree` e `verify` vedrebbero un perimetro
+    vuoto — `verify` darebbe ogni riga dell'analisi come `fuori`, anche sui
+    membri aperti — e argparse da solo dice che manca l'opzione, non dove si
+    prendono i valori."""
+
+    def error(self, message):
+        if "--children" in message:
+            message = f"{message} — {MEMBERS_HINT}"
+        super().error(message)
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Letture della regia sul mandato")
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
-    subcommands = parser.add_subparsers(dest="command", required=True)
+    subcommands = parser.add_subparsers(dest="command", required=True, parser_class=SubcommandParser)
     gate_parser = subcommands.add_parser("gate")
     gate_parser.add_argument("--own-session", required=True, help="session id della sessione della regia")
     tree_parser = subcommands.add_parser("tree")
     tree_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
-    tree_parser.add_argument("--children", nargs="*", default=[],
+    tree_parser.add_argument("--children", nargs="*", required=True,
                              help="i membri, dal lettore unico resolve-task.sh --members")
     tree_parser.add_argument("--save", default="", help="file JSON delle cifre di partenza, fuori dai repo")
     verify_parser = subcommands.add_parser("verify")
     verify_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
-    verify_parser.add_argument("--children", nargs="*", default=[],
+    verify_parser.add_argument("--children", nargs="*", required=True,
                                help="i membri, dal lettore unico resolve-task.sh --members")
     recap_parser = subcommands.add_parser("recap")
     recap_parser.add_argument("--before", required=True)
