@@ -142,7 +142,9 @@ La riga `STATE=` dice cosa hai trovato:
 | `illeggibile` | il file c'è, la testa no | fermati, exit `2` |
 
 - **Giro nuovo** (`ROUND=nuovo`). Lo script ha già tolto lo stato del monitor (`WATCH=tolto`): riarmato su un file vecchio, il monitor darebbe come eventi tutto ciò che è cambiato dal giro prima. Le cifre di partenza si riscrivono (§0g). Su `ferma` leggi lo stato vecchio con `Read` prima di riscriverlo, e porta nello stato nuovo la sezione `## Fatti del perimetro` intera, aperti e superati: lo stop non lancia il checkpoint del perimetro, e quei fatti possono stare solo lì. Li riesamini al primo quadro (§1): un fatto aperto che i membri hanno chiuso nel frattempo diventa superato. Conversazioni, proposte, rami fermi, collisioni e delega ripartono da zero.
-- **Ripresa** (`ROUND=ripresa`). Leggi lo stato con `Read` e riparti da lì. Lo stato del monitor resta, e il monitor riarmato riparte dal punto in cui era (§0j). Le cifre di partenza restano quelle salvate all'avvio del giro (`BEFORE=tieni`), e si riscrivono solo se il file manca (`BEFORE=scrivi`). Su `morta` la regia di prima si è chiusa senza stop — un crash, una tab chiusa, un reboot: adotti conversazioni, proposte in sospeso, rami fermi e fatti; le conversazioni della tabella che `sessions.py list` non dà più vive (§0h) diventano `abbandonata (non più viva alla ripresa)`, e un `## Checkpoint in corso` su una di loro si libera; la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: conversazioni adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta.
+- **Ripresa** (`ROUND=ripresa`). Leggi lo stato con `Read` e riparti da lì. Lo stato del monitor resta, e il monitor riarmato riparte dal punto in cui era (§0j). Le cifre di partenza restano quelle salvate all'avvio del giro (`BEFORE=tieni`), e si riscrivono solo se il file manca (`BEFORE=scrivi`). Su `morta` la regia di prima si è chiusa senza stop — un crash, una tab chiusa, un reboot: adotti conversazioni, proposte in sospeso, rami fermi e fatti; le conversazioni `tab` della tabella che `sessions.py list` non dà più vive (§0h) diventano `abbandonata (non più viva alla ripresa)`, e un `## Checkpoint in corso` su una di loro si libera; la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: conversazioni adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta.
+
+  **Una conversazione `headless` non diventa mai `abbandonata` solo perché non è viva**: fra due turni non ha processo per costruzione, e il suo transcript e i suoi file in `.claude/loom/headless/` sopravvivono alla regia. In ogni ripresa, `mia` o `morta`, ogni riga `headless` in ciclo si rilegge con `loom-deck-headless status` (§2, L'esito di un turno headless): `in corso` aspetta la fine del turno; `turno chiuso` si legge, e il ciclo prosegue dal punto che il testo finale dice — un report da cui chiedere il checkpoint, una domanda da proporre, un checkpoint finito; `errore` e `permesso negato` fermano il ramo come sempre.
 - **`viva`** → **fermati senza aprire niente**: un'altra regia viva tiene lo stato di questo perimetro, la sessione di `STATE_HOLDER`. Le strade sono quelle della guardia sopra: fermarla nella sua chat, o chiuderne la conversazione.
 - **`passata`** → **fermati senza aprire niente**: un'altra regia ha passato le consegne a questa sessione, e la ripresa di chi riceve le consegne non c'è ancora. Di' all'utente il path dello stato.
 - **`illeggibile`** → **fermati senza aprire niente**, e di' all'utente il path: lo stato lo corregge o lo toglie lui. La regia non sovrascrive un file che non sa leggere, perché può portare i fatti di un giro.
@@ -191,8 +193,9 @@ Perimetro: T<perimetro> · Created on <CREATED_ON>
 - cifre di partenza: <BEFORE_FILE>
 
 ## Conversazioni della regia
-| Task | Passo | sessionId | Nome | Stato |
-|------|-------|-----------|------|-------|
+| Task | Passo | Canale | sessionId | Nome | Stato |
+|------|-------|--------|-----------|------|-------|
+<!-- Canale: headless (loom-deck-headless open) · tab (spawn-task su richiesta dell'utente, o adottata) -->
 <!-- Stato: in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
 
 ## Fatti del perimetro
@@ -268,7 +271,7 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 
 - `preflight` — nessun preflight valido su una task 🔵: manca il blocco datato in `## Decisions`; oppure, a ogni Prog, l'ultimo blocco è una «premessa decaduta». Una task 🟢 o 🟡 senza blocco è già partita senza preflight, che per una S o una M non è obbligatorio: va a `run` o a `checkpoint`. Una Size L senza blocco va a `preflight` a ogni Prog: `run-task` su una L senza preflight si rifiuta di partire. Il primo caso lo lanci; il secondo no: la ricostruzione delle premesse è dell'utente, e la task diventa un ramo fermo (§4).
 - `run` — preflight fatto, o task già partita, e DLV aperti.
-- `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è interrotto prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2): scala all'utente.
+- `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è fermato prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2). Se lo stato porta la conversazione del run di quella task ancora `in ciclo`, col suo `sessionId`, il checkpoint si chiede lì, sul suo canale (§2, Scrivere): una headless ferma lo riceve con `reply`. Senza, il ciclo è interrotto: scala all'utente.
 - `chiusa` — Prog ✔️, niente da fare.
 - `epica` — un'epica o un mandato fra i membri non si esegue: è un perimetro a sé, e si orchestra con una regia a parte.
 - `assente` — nessun task file: scartala con una riga all'utente.
@@ -360,7 +363,7 @@ loom-deck-headless open <perimetro> checkpoint --root "<radice del progetto>"
 
 `open` compone titolo, modello e binding come il tasto del deck, con gli override di progetto, e scrive il binding nel sidecar prima di lanciare il processo: la conversazione compare nel deck sotto la sua task. Toglie da sé l'ambiente di questa conversazione — `LOOM_TASK`, `PTYXIS_PROFILE`, le variabili di sessione di Claude Code —: nessun `env -u` davanti. Non serve il deck acceso.
 
-Con uscita `0` le righe portano `sessionId:` e `titolo:`; scrivi subito la conversazione nello stato, con `Stato: in ciclo`, poi leggi l'esito del turno (§L'esito di un turno headless). Il **nome** della conversazione è la riga `titolo:`, il titolo che il deck le darebbe col tasto. Uscita `1` è un rifiuto, col motivo su stderr — task assente, DLV chiusi o fuori range, run su un mandato, `permissionMode` `manual` —; uscita `2` una riga composta male. Tutte e due sono un'anomalia (§4): non ritentare.
+Con uscita `0` le righe portano `sessionId:` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: headless` e `Stato: in ciclo`, poi leggi l'esito del turno (§L'esito di un turno headless). Il **nome** della conversazione è la riga `titolo:`, il titolo che il deck le darebbe col tasto. Uscita `1` è un rifiuto, col motivo su stderr — task assente, DLV chiusi o fuori range, run su un mandato, `permissionMode` `manual` —; uscita `2` una riga composta male. Tutte e due sono un'anomalia (§4): non ritentare.
 
 ### L'esito di un turno headless
 
@@ -393,7 +396,7 @@ args:  <TaskID> run [perimetro]
 args:  <perimetro> checkpoint
 ```
 
-Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare — un rifiuto per la finestra non in focus si risolve solo dall'utente, che porta davanti una finestra del progetto e richiede la tab. Il passo resta in quella tab fino alla chiusura: messaggi con `SendMessage` finché è viva (§Scrivere), `close-session` a passo finito (§Chiudere).
+Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: tab` e `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare — un rifiuto per la finestra non in focus si risolve solo dall'utente, che porta davanti una finestra del progetto e richiede la tab. Il passo resta in quella tab fino alla chiusura: messaggi con `SendMessage` finché è viva (§Scrivere), `close-session` a passo finito (§Chiudere).
 
 ### Scrivere
 
@@ -466,7 +469,9 @@ Una conversazione aperta dalla regia si chiude quando il suo passo è finito, e 
 - **ciclo di lavoro** — quando il ciclo è chiuso, cioè dopo il checkpoint e le risposte alle sue segnalazioni (§La richiesta di checkpoint);
 - **checkpoint del perimetro** — quando ha finito il turno e le sue segnalazioni hanno una risposta.
 
-Una invocazione del tool `Skill` per conversazione, col `sessionId` che `spawn-task` ha restituito all'apertura e che sta nello stato:
+**Una conversazione `headless`** non ha un processo da chiudere: a passo finito il suo ultimo turno è già terminato. Segnala `chiusa` nello stato, senza `close-session`, che chiude solo una tab viva nata dall'endpoint. Se l'utente l'ha ripresa in una tab con ⏎, quella tab è sua: la regia segna `chiusa` e non la tocca.
+
+**Una conversazione `tab`** si chiude con una invocazione del tool `Skill`, col `sessionId` che `spawn-task` ha restituito all'apertura e che sta nello stato:
 
 ```
 skill: loom-works:close-session
@@ -573,7 +578,7 @@ La regia ferma la task e le sue dipendenti, scrive il motivo in `## Rami fermi`,
 
 ## 5. Stop
 
-La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta di checkpoint è in corso, dillo: il checkpoint finisce da sé, ma nessuno lo seguirà più. Allo stop chiesto dall'utente il checkpoint del perimetro **non parte**: la regia non seguirebbe una conversazione dopo aver fermato il monitor.
+La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta di checkpoint è in corso o un turno headless della regia lavora ancora, dillo: il turno finisce da sé, ma nessuno ne leggerà l'esito. Allo stop chiesto dall'utente il checkpoint del perimetro **non parte**: la regia non seguirebbe una conversazione dopo aver fermato il monitor.
 
 1. **`TaskStop` sul monitor.** Un evento che arriva dopo è in ritardo: ignoralo.
 2. **La riga di testa dello stato** diventa `Stato: ferma · SID`, e il resto del file resta com'è. Una regia lanciata dopo sullo stesso perimetro trova un giro chiuso, e ne eredita i soli fatti (§0f).
@@ -587,7 +592,7 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
 4. **Il recap**, in chat:
    - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia; i membri entrati o usciti durante il giro, con una parola che lo dice;
    - i progressi in lista, una riga per ciclo chiuso;
-   - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, nome, `sessionId`. L'utente le chiude quando vuole. Le `chiusa` non si elencano;
+   - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, canale, nome, `sessionId`. Una `tab` l'utente la chiude quando vuole; una `headless` non ha niente da chiudere, e l'utente la riprende in una tab dal deck con ⏎ — la regia del giro dopo non la adotta, perché da uno stato `ferma` eredita i soli fatti (§0f). Le `chiusa` non si elencano;
    - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza;
    - se `## Checkpoint del perimetro` conta cicli chiusi dall'ultimo, la riga `il file del perimetro non è allineato ai membri: /loom-works:checkpoint-task <perimetro>`;
    - i **fatti del perimetro** dello stato, aperti e superati, col membro da cui vengono: sono quelli che chi legge il file del perimetro dopo deve trovare, e alcuni nessun membro li ha scritti nel suo task file. Il prossimo `checkpoint-task` sul perimetro li porta nel file, chiunque lo lanci.
