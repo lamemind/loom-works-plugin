@@ -27,8 +27,10 @@ Questa skill costruisce il perimetro **prima** che la regia parta, e ne scrive l
 | Modo | Cosa scrive | Chi committa |
 |---|---|---|
 | creazione (§2) | un task file nuovo `Size: Mandate`, e la sua riga in `tasks.md` | `create-task.sh` |
-| modifica (§4) | `## Membri`, `## Preferenze d'ordine` e `## Analisi del perimetro` di un mandato che esiste, la Description se chiesta | la skill, il solo file del mandato |
-| epica (§5) | la sola `## Analisi del perimetro` di un'epica | la skill, il solo file dell'epica |
+| modifica (§4) | `## Membri`, `## Preferenze d'ordine` e `## Analisi del perimetro` di un mandato che esiste, la Description se chiesta, la voce 🎬 se manca | la skill, il solo file del mandato |
+| epica (§5) | `## Analisi del perimetro` di un'epica, e la voce 🎬 se manca | la skill, il solo file dell'epica |
+
+In tutti e tre i modi il perimetro porta in `## Materiale` la voce 🎬, il puntatore allo stato della regia (§7).
 
 Confini, in ogni modo:
 
@@ -160,6 +162,11 @@ Il task file del mandato si scrive **prima** dell'analisi e **non si committa** 
    ## Analisi del perimetro
 
    <scritta al §2d>
+
+   ## Materiale
+   *📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato della regia; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
+
+   - 🎬 `.claude/loom/regia/<id>.md` — seguire il giro della regia: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
    ```
 
 Le regole del file:
@@ -170,6 +177,7 @@ Le regole del file:
 - **Description**: dalle parole dell'utente. Da soli id, un paragrafo corto sul tema comune, che l'utente corregge alla conferma. Niente sullo stato dei membri.
 - **Membri**: `- T<id> (maniglia)`, con la maniglia verbo+oggetto ricavata dal titolo del membro. Niente Prog, niente checkbox, niente epica di provenienza: la parentela vive nel `Parent Task` del membro.
 - **Preferenze d'ordine**: solo se l'utente ha detto un ordine per questo giro; altrimenti la sezione non c'è. Una dipendenza vera non è una preferenza: se l'utente dice «T61 ha bisogno del formato di T52», quella va in `## Dependencies` di T61, che questa skill non scrive — lo dici alla conferma.
+- **Materiale**: la sola voce 🎬 (§7).
 - Niente `## Acceptance Criteria` e niente `## Deliverables Checklist`: un mandato non ha lavoro proprio (`mandate-format.md` §Acceptance e Deliverables).
 
 ### 2d. L'analisi
@@ -238,11 +246,12 @@ In chat, prima della domanda:
 - la differenza di `## Membri`: `+ T64 (maniglia)`, `− T52 (maniglia)`;
 - le preferenze d'ordine e la descrizione nuove, se cambiano;
 - la differenza dell'analisi riga per riga (`=` `+` `-` `~`, §6);
+- la voce 🎬, se il mandato non la porta (§7);
 - le note del §3: avvisi sui membri, dipendenze aperte fuori dal perimetro, dipendenze non dichiarate, punti ciechi.
 
 Poi la fermata: `AskUserQuestion` con la domanda «Aggiorno il mandato <id>?» e tre opzioni — aggiorna · correggo · annulla.
 
-- **Aggiorna** → scrivi col tool `Edit` le sole sezioni che cambiano: `## Membri`, `## Preferenze d'ordine` (creata se prima non c'era, tolta se l'utente la svuota), `## Analisi del perimetro` sostituita intera, e la Description se l'utente l'ha chiesto. Poi il commit del **solo** file del mandato:
+- **Aggiorna** → scrivi col tool `Edit` le sole sezioni che cambiano: `## Membri`, `## Preferenze d'ordine` (creata se prima non c'era, tolta se l'utente la svuota), `## Analisi del perimetro` sostituita intera, la Description se l'utente l'ha chiesto, e la voce 🎬 se manca (§7). Poi il commit del **solo** file del mandato:
 
   ```bash
   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
@@ -256,7 +265,7 @@ Poi la fermata: `AskUserQuestion` con la domanda «Aggiorno il mandato <id>?» e
 
 ## 5. L'analisi in un'epica
 
-Un'epica ha già i suoi membri — le figlie, che dichiarano `**Parent Task**` — e non ha una lista da costruire. Le manca, finché nessuno la scrive, l'analisi: la stessa sezione di un mandato, con lo stesso nome e la stessa forma, così chi la cerca la cerca con un nome solo. In questo modo la skill scrive **solo** quella sezione: le figlie, la loro checkbox nell'Acceptance dell'epica, la Prog e `tasks.md` non si toccano.
+Un'epica ha già i suoi membri — le figlie, che dichiarano `**Parent Task**` — e non ha una lista da costruire. Le manca, finché nessuno la scrive, l'analisi: la stessa sezione di un mandato, con lo stesso nome e la stessa forma, così chi la cerca la cerca con un nome solo. In questo modo la skill scrive **solo** quella sezione e la voce 🎬 (§7): le figlie, la loro checkbox nell'Acceptance dell'epica, la Prog e `tasks.md` non si toccano.
 
 1. **Il file è pulito** — la guardia del §4a, sul file dell'epica.
 2. **Le figlie** — dal lettore unico:
@@ -267,8 +276,8 @@ Un'epica ha già i suoi membri — le figlie, che dichiarano `**Parent Task**` �
 
    `TASK_MEMBERS_COUNT=0` → dillo e fermati: un'epica senza figlie non ha coppie da analizzare.
 3. **L'analisi** — col metodo del §6, con l'epica in testa e le figlie dopo `--children`, nell'ordine del lettore. Se `## Analisi del perimetro` esiste già, è una rianalisi, con la tabella vecchia in ingresso; altrimenti si parte da zero.
-4. **La conferma** — in chat la sezione nuova, o la differenza riga per riga se c'era, e le note del §3. Una dipendenza aperta verso una task che non è figlia non si può aggiungere ai membri da qui, perché le figlie le decide il `Parent Task` della figlia: la nota dice che per seguirla insieme all'epica serve un mandato. Poi `AskUserQuestion` con la domanda «Scrivo l'analisi del perimetro nell'epica <id>?» e tre opzioni — scrivi · correggo · annulla.
-5. **La scrittura** — col tool `Edit`. Se la sezione esiste, si sostituisce intera dove sta. Se non esiste, entra subito dopo `## Description`, prima del primo heading `## ` che la segue: nel mandato la sezione sta nello stesso punto, dopo la Description e le sezioni proprie.
+4. **La conferma** — in chat la sezione nuova, o la differenza riga per riga se c'era, la voce 🎬 se l'epica non la porta (§7), e le note del §3. Una dipendenza aperta verso una task che non è figlia non si può aggiungere ai membri da qui, perché le figlie le decide il `Parent Task` della figlia: la nota dice che per seguirla insieme all'epica serve un mandato. Poi `AskUserQuestion` con la domanda «Scrivo l'analisi del perimetro nell'epica <id>?» e tre opzioni — scrivi · correggo · annulla.
+5. **La scrittura** — col tool `Edit`. Se la sezione esiste, si sostituisce intera dove sta. Se non esiste, entra subito dopo `## Description`, prima del primo heading `## ` che la segue: nel mandato la sezione sta nello stesso punto, dopo la Description e le sezioni proprie. Poi la voce 🎬, se manca (§7).
 6. **Il commit** — il solo file dell'epica:
 
    ```bash
@@ -293,6 +302,20 @@ In breve, le due metà:
 2. **Del modello** — il task file intero di ogni membro aperto, e `git grep` sui soli path e simboli che due membri nominano, per sapere se cadono sullo stesso file.
 
 Le note che l'analisi produce oltre alla tabella vanno alla conferma, mai nel file: le dipendenze aperte verso task fuori dal perimetro, le dipendenze non dichiarate, i punti ciechi.
+
+## 7. La voce 🎬 — il puntatore allo stato della regia
+
+La regia di un perimetro tiene il suo stato in `.claude/loom/regia/<id>.md` del progetto, ignorata da git: conversazioni, fatti del perimetro, proposte in sospeso (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-mandate/SKILL.md` §0f). Il perimetro lo punta da `## Materiale` con una voce sola:
+
+```markdown
+- 🎬 `.claude/loom/regia/<id>.md` — seguire il giro della regia: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
+```
+
+- **È un puntatore per chi legge il task file**, e nient'altro. La regia e `checkpoint-mandate` ricavano il path dall'id del perimetro e non leggono la voce: un perimetro preparato prima che la voce esistesse viene seguito lo stesso. Il file può non esserci ancora — la regia lo crea al primo lancio — e la voce resta valida.
+- **La scrive questa skill**, l'unica che prepara il perimetro: la regia non scrive nei task file.
+- **Una sola volta.** Una voce 🎬 già presente in `## Materiale` non si riscrive e non si ripete.
+- **Dove.** In un mandato nuovo la sezione `## Materiale` sta in coda, dopo `## Analisi del perimetro` (§2c). In un file che la sezione non la porta — un mandato preparato prima, un'epica senza `## Materiale` — la crei con la legenda del template, prima del primo heading fra `## Decisions`, `## Implementation Notes`, `## Testing Notes`, `## Doc Impact`, `## Prod Validation` e `## Progress Log`; in coda se il file non ne porta nessuno. È il punto in cui il task template mette `## Materiale`.
+- **Non è una collisione.** `mandate.py tree` salta le voci 🎬: nessun membro scrive lo stato della regia.
 
 ## Convenzione TTS
 
