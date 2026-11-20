@@ -4,7 +4,8 @@ mandate — le letture della regia sul mandato: gate, albero, cifre prima → do
   gate    se la regia può partire: il permission mode della sessione che la
           lancia, letto dal suo transcript, e quello del progetto, letto da
           `.claude/loom-works.json`, entrambi `auto`; e `loom-deck-headless`
-          sul PATH, il comando con cui la regia apre e porta avanti i membri
+          sul PATH, il comando con cui la regia apre e porta avanti i membri,
+          in una versione che conosce `--regia`
   tree    lo stato del perimetro dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
           `## Materiale`; poi le coppie di membri che non possono girare insieme
@@ -44,6 +45,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 
 # Il modulo comune si carica dal path esplicito della cartella dello script:
@@ -75,6 +77,33 @@ PERMISSION_MODE_FIELD = re.compile(r'"permissionMode"\s*:\s*"([A-Za-z]+)"')
 # headless. Su Windows npm lo installa come `.cmd`: `shutil.which` lo trova
 # lo stesso, perché prova le estensioni di PATHEXT.
 HEADLESS_COMMAND = "loom-deck-headless"
+# L'opzione con cui la regia dichiara sé stessa a ogni apertura e a ogni
+# risposta: la conversazione nasce con `LOOM_REGIA`. Un `loom-deck-headless`
+# più vecchio la rifiuta con uscita 2, e la regia lo scoprirebbe al primo membro.
+HEADLESS_REGIA_FLAG = "--regia"
+HEADLESS_HELP_TIMEOUT_S = 20
+
+
+def headless_knows_regia(headless):
+    """`True` se l'uso di `loom-deck-headless` nomina `--regia`.
+
+    L'uso è la sola fonte che il comando offre senza fare niente: `--help` esce
+    0 e non apre nessun turno. Un comando che non parte, che non risponde in
+    tempo o che non nomina l'opzione vale `False`, e il gate si chiude.
+    """
+    try:
+        result = subprocess.run(
+            [headless, "--help"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=HEADLESS_HELP_TIMEOUT_S,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return HEADLESS_REGIA_FLAG in result.stdout
 
 
 def last_permission_mode(transcript):
@@ -120,7 +149,12 @@ def command_gate(project_root, own_session):
     # avviato, come un'anomalia: il gate la scopre prima di aprire niente.
     headless = shutil.which(HEADLESS_COMMAND)
     print(f"HEADLESS={headless or 'assente'}")
-    open_gate = own_mode == "auto" and project_mode == "auto" and headless is not None
+    # Un deck installato da prima di `--regia` apre i membri senza `LOOM_REGIA`
+    # solo se la regia non lo passa; la regia lo passa sempre, e quel deck
+    # rifiuterebbe ogni apertura: anche questo si scopre qui, non al primo membro.
+    knows_regia = headless is not None and headless_knows_regia(headless)
+    print(f"HEADLESS_REGIA={'sì' if knows_regia else ('no' if headless else '-')}")
+    open_gate = own_mode == "auto" and project_mode == "auto" and knows_regia
     print(f"GATE={'ok' if open_gate else 'stop'}")
     return 0 if open_gate else 2
 

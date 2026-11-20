@@ -52,6 +52,7 @@ La scratchpad non tiene niente della regia: sta nella temp di sistema, e un rebo
 Exit `0` (`GATE=ok`) → avanti. Exit `2` → **fermati senza aprire niente** e di' all'utente quale controllo non passa, e cosa succede:
 
 - `HEADLESS=assente`: `loom-deck-headless`, il comando del pacchetto del deck con cui la regia apre e porta avanti i membri (§2), non è sul PATH. Senza, la regia scoprirebbe la mancanza al primo membro, a giro avviato. Rimedio: `npm install -g @lamemind/loom-deck@latest` e rilanciare la skill. `HEADLESS=<path>` dice quale comando la regia userà.
+- `HEADLESS_REGIA=no`: il `loom-deck-headless` installato è più vecchio di `--regia`, l'opzione con cui la regia si dichiara a ogni apertura e a ogni risposta (§2, Aprire), e rifiuterebbe ogni comando della regia con uscita `2`. Rimedio: lo stesso `npm install -g`, e rilanciare la skill.
 - `OWN_MODE` diverso da `auto` (o `?`, transcript non trovato): fuori da auto mode ogni comando `loom-deck-headless` e ogni `spawn-task` chiede conferma, e la regia smette di essere semi-automatica. Rimedio: passare la sessione in auto mode e rilanciare la skill.
 - `PROJECT_MODE` diverso da `auto`: le conversazioni nascono col `permissionMode` di `.claude/loom-works.json`, headless o in una tab. Un turno headless non ha nessuno che approva: in `manual` `loom-deck-headless open` rifiuta run e checkpoint, e in ogni modo diverso da `auto` il turno si vede negare ciò che il modo non concede da sé. Una tab con un modo diverso da quello della regia tiene i suoi messaggi in attesa dell'approvazione del suo utente. Rimedio: `"permissionMode": "auto"` nel file del progetto.
 
@@ -361,12 +362,14 @@ Una **tab** nasce solo quando l'utente la chiede per **quel** passo, nella chat 
 Una chiamata Bash per conversazione:
 
 ```bash
-loom-deck-headless open <TaskID> preflight --root "<radice del progetto>"
-loom-deck-headless open <TaskID> run [perimetro] --root "<radice del progetto>"
-loom-deck-headless open <perimetro> checkpoint --root "<radice del progetto>"
+loom-deck-headless open <TaskID> preflight --regia T<perimetro> --root "<radice del progetto>"
+loom-deck-headless open <TaskID> run [perimetro] --regia T<perimetro> --root "<radice del progetto>"
+loom-deck-headless open <perimetro> checkpoint --regia T<perimetro> --root "<radice del progetto>"
 ```
 
 `open` compone titolo, modello e binding come il tasto del deck, con gli override di progetto, e scrive il binding nel sidecar prima di lanciare il processo: la conversazione compare nel deck sotto la sua task. Toglie da sé l'ambiente di questa conversazione — `LOOM_TASK`, `PTYXIS_PROFILE`, le variabili di sessione di Claude Code —: nessun `env -u` davanti. Non serve il deck acceso.
+
+**`--regia T<perimetro>` a ogni apertura, anche per il checkpoint del perimetro.** È la posizione della conversazione nell'organigramma: nasce con `LOOM_REGIA`, e un hook all'avvio le dice che le domande vanno in chat a fine turno, dove la regia le legge e risponde (§3, Domanda in prosa). Il sidecar registra perimetro e sessione della regia; la sessione la legge il comando dal tuo ambiente. Senza `--regia` la conversazione non sa di essere orchestrata.
 
 Con uscita `0` le righe portano `sessionId:` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: headless` e `Stato: in ciclo`, poi leggi l'esito del turno (§L'esito di un turno headless). Il **nome** della conversazione è la riga `titolo:`, il titolo che il deck le darebbe col tasto. Uscita `1` è un rifiuto, col motivo su stderr — task assente, DLV chiusi o fuori range, run su un mandato, `permissionMode` `manual` —; uscita `2` una riga composta male. Tutte e due sono un'anomalia (§4): non ritentare.
 
@@ -398,10 +401,12 @@ Quando l'utente chiede una tab per un passo, una invocazione del tool `Skill`:
 
 ```
 skill: loom-works:spawn-task
-args:  <TaskID> preflight
-args:  <TaskID> run [perimetro]
-args:  <perimetro> checkpoint
+args:  <TaskID> preflight --regia T<perimetro>
+args:  <TaskID> run [perimetro] --regia T<perimetro>
+args:  <perimetro> checkpoint --regia T<perimetro>
 ```
+
+`--regia` come in `open` (§Aprire): la tab nasce con `LOOM_REGIA`, e lì `AskUserQuestion` è negato da un hook — le domande arrivano in chat a fine turno, dove le leggi. Una riga `⚠ LOOM_REGIA non impostata` vuol dire che il deck acceso è più vecchio: la tab è aperta senza, e va trattata come una tab senza `LOOM_REGIA` (§3); di' all'utente di riavviare il deck.
 
 Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: tab` e `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare — un rifiuto per la finestra non in focus si risolve solo dall'utente, che porta davanti una finestra del progetto e richiede la tab. Il passo resta in quella tab fino alla chiusura: messaggi con `SendMessage` finché è viva (§Scrivere), `close-session` a passo finito (§Chiudere).
 
@@ -420,12 +425,12 @@ Nessuna conversione: la regia non chiude una tab per continuarla headless. Aggiu
 **`reply`** apre un turno nuovo sulla stessa conversazione, con `--resume`: il messaggio è il prompt del turno. Il testo passa da stdin, così un messaggio che comincia con `-` o porta apici arriva intero:
 
 ```bash
-loom-deck-headless reply <sessionId> - --root "<radice del progetto>" <<'MESSAGGIO'
+loom-deck-headless reply <sessionId> - --regia T<perimetro> --root "<radice del progetto>" <<'MESSAGGIO'
 <il messaggio>
 MESSAGGIO
 ```
 
-Il modello del turno è quello con cui la conversazione ha risposto: nessun `--model`. Uscita `0` → turno avviato: leggi l'esito come dopo `open` (§L'esito di un turno headless). Uscita `1` → rifiuto, col motivo su stderr. Se il motivo è un processo vivo — un turno ancora in corso, o l'utente che ha aperto la conversazione in una tab nel frattempo —, rileggi le vive e scegli di nuovo il canale; ogni altro motivo è un'anomalia (§4).
+Il modello del turno è quello con cui la conversazione ha risposto: nessun `--model`. **`--regia` a ogni `reply`**, come all'apertura: ogni turno è un processo nuovo, e `LOOM_REGIA` la porta solo il comando che lo lancia — il deck non la rilegge dal sidecar. Un turno lanciato senza nasce senza la riga dell'organigramma. Uscita `0` → turno avviato: leggi l'esito come dopo `open` (§L'esito di un turno headless). Uscita `1` → rifiuto, col motivo su stderr. Se il motivo è un processo vivo — un turno ancora in corso, o l'utente che ha aperto la conversazione in una tab nel frattempo —, rileggi le vive e scegli di nuovo il canale; ogni altro motivo è un'anomalia (§4).
 
 **`SendMessage`** col nome della riga `titolo:` come `to`. Se `ListAgents` mostra **più righe vive** con quel nome, aggiungi il `[ref]` della riga `interactive` che la conversazione ha preso all'apertura: il ref non si ricava dal `sessionId`, si legge dall'elenco. Le righe Remote Control offline con lo stesso nome — conversazioni chiuse — non contano: il nome nudo arriva alla viva. Una headless che l'utente ha ripreso in una tab porta il nome che il deck le dà alla ripresa: cercala in `ListAgents`, e se non la riconosci con certezza non scrivere — il messaggio aspetta che la tab si chiuda, e lo dici all'utente in una riga.
 
@@ -461,7 +466,7 @@ Parte quando valgono tutte:
 Si lancia come ogni altro passo, headless (§Aprire), e occupa `## Checkpoint in corso`:
 
 ```bash
-loom-deck-headless open <perimetro> checkpoint --root "<radice del progetto>"
+loom-deck-headless open <perimetro> checkpoint --regia T<perimetro> --root "<radice del progetto>"
 ```
 
 Le sue segnalazioni seguono la via di tutte le altre: proposta, e risposta col via dell'utente (§3). Il checkpoint del perimetro è chiuso quando ha finito il turno e le segnalazioni hanno una risposta: libera `## Checkpoint in corso`, azzera i cicli in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere). Il suo commit cambia il file del perimetro: rilancia `verify` e ricarica le righe `MODELLO` (§0e). Poi rifai il quadro: se resta qualcosa da lanciare il giro continua, altrimenti scala all'utente che il perimetro non ha più niente da lanciare (§4).
@@ -498,14 +503,14 @@ A una sessione che la regia non ha aperto (§0h) non parte nessun messaggio di i
 
 Una sessione ferma su una domanda aspetta l'utente, non la regia. La regia accorcia l'attesa: legge cosa chiede, prepara la risposta col perché di ogni scelta, e la manda **solo col via dell'utente** — o da sé, se l'utente le ha delegato le risposte (§La delega dell'utente).
 
-**Quando.** Un turno di una sessione del mandato che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}`, una domanda in prosa — oppure, in una tab, un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Di una headless il turno chiuso lo dice `status` (§2, L'esito di un turno headless), di una tab l'evento `⏸ turno finito` (§1, Il riporto). Leggi la sessione per intero prima di proporre: il testo finale di `status` per una headless, `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000` per una tab.
+**Quando.** Un turno di una sessione del mandato che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}`, una domanda in prosa — oppure, in una tab, un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Il fine turno di una conversazione aperta da te va letto sempre, anche quando nessun evento parla di domande: è lì che chiede. Di una headless il turno chiuso lo dice `status` (§2, L'esito di un turno headless), di una tab l'evento `⏸ turno finito` (§1, Il riporto). Leggi la sessione per intero prima di proporre: il testo finale di `status` per una headless, `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000` per una tab.
 
 **Cosa proponi.**
 
 - **Preflight** — una risposta per ogni `D{N}`: la strada (`D2.B`, o una nuova in prosa) e il perché, ricavato dal quadro del mandato e dalle decisioni già congelate nelle altre task. Sulle proposte `P{N}` del preflight **taci**: il silenzio le accetta, e smentirle è dell'utente. Unica eccezione, una `P{N}` che contraddice una decisione già congelata in un'altra task del mandato: la nomini, con le due decisioni a confronto.
 - **Segnalazioni** — per ogni `S{N}` un'uscita, `subito` · `task` · `scarto` · `ignora`, col perché; per `scarto` anche il motivo che finirà nel registro ADR.
-- **Domanda in prosa** — il testo finale di un turno headless che chiede qualcosa e non è un `D{N}` di preflight né un `S{N}` di segnalazione: una scelta, una conferma, un dato che manca. In `claude -p` è il caso normale, perché `AskUserQuestion` non esiste e la skill chiede nel testo. Una proposta come per le altre, e la risposta parte con `reply` dopo il via. Vale anche per il checkpoint, che chiede per esempio se accendere `drainable`: il ciclo si chiude solo quando il testo finale non chiede altro.
-- **`AskUserQuestion` e permessi in una tab** — la proposta c'è, ma la risposta si dà **nella tab**: un messaggio di un'altra sessione non risponde a un `AskUserQuestion` aperto e non approva un permesso, per costruzione di Claude Code. Di' all'utente quale tab aprire e cosa scegliere. Un permesso negato in un turno headless non ha una proposta: ferma il ramo (§2, L'esito di un turno headless).
+- **Domanda in prosa** — la domanda libera: il testo finale di un turno che chiede qualcosa e non è un `D{N}` di preflight né un `S{N}` di segnalazione — una scelta, una conferma, un dato che manca. Nessun marcatore la annuncia: la riconosci leggendo la fine del turno, che leggi comunque a ogni passo. Vale per ogni conversazione aperta con `--regia`. In un turno headless è il caso normale, perché in `claude -p` `AskUserQuestion` non esiste: la leggi nel testo finale di `status`, e la risposta parte con `reply`. In una tab con `LOOM_REGIA` l'hook nega `AskUserQuestion`, e la sessione scrive la domanda in chat: la leggi con `sessions.py tail` dopo l'evento `⏸ turno finito`, e la risposta parte con `SendMessage`. Una proposta come per le altre, col via dell'utente, o mandata da sé sotto delega (§La delega dell'utente) — coi limiti di sempre: un permesso, un'azione negata dal classificatore, un'azione distruttiva restano all'utente. Vale anche per il checkpoint, che chiede per esempio se accendere `drainable`: il ciclo si chiude solo quando il testo finale non chiede altro.
+- **`AskUserQuestion` in una tab senza `LOOM_REGIA`, e i permessi in ogni tab** — la proposta c'è, ma la risposta si dà **nella tab**: un messaggio di un'altra sessione non risponde a un `AskUserQuestion` aperto e non approva un permesso, per costruzione di Claude Code. Una tab senza `LOOM_REGIA` è una tab che non hai aperto tu con `--regia`: esterna, adottata da una regia precedente, ripresa dall'utente con ⏎, o aperta da un deck più vecchio. Di' all'utente quale tab aprire e cosa scegliere. Un permesso negato in un turno headless non ha una proposta: ferma il ramo (§2, L'esito di un turno headless).
 
 **Una proposta per sessione ferma**, scritta in chat come blocco pronto da mandare: nome della conversazione, cosa chiede, il testo del messaggio, il perché di ogni scelta. Con più sessioni ferme, **in testa quella che sblocca più task**. Una risposta che rischia un danno — un dato cancellato, un trigger spento, una tabella altrui — la dici per esteso: cosa sparisce e cosa resta. Scrivi la proposta in `## Proposte in sospeso` dello stato.
 
