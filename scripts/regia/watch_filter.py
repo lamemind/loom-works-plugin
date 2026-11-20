@@ -136,14 +136,16 @@ class FilterSource:
     Una `stat` per giro, nessun processo figlio: il file si rilegge solo quando
     cambiano data di modifica, dimensione o inode. L'ultimo filtro valido si
     salva nello stato del monitor (`saved`), così un riarmo davanti a un file
-    rotto tiene il filtro di prima invece di lasciar passare tutto.
+    rotto tiene il filtro di prima invece di lasciar passare tutto. Lo stato
+    tiene anche `broken`: il file tornato valido si annuncia anche dopo un
+    riarmo.
     """
 
-    def __init__(self, path, saved):
+    def __init__(self, path, saved, broken=False):
         self.path = os.path.abspath(path)
         self.name = os.path.basename(self.path)
         self.signature = "unread"
-        self.broken = False
+        self.broken = broken
         self.active = None
         if saved is not None:
             try:

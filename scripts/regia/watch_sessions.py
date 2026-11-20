@@ -645,7 +645,7 @@ def arm_line(word, state):
 
 def refresh_filter(state):
     """Rilegge il file del filtro se è cambiato, e salva nello stato l'ultimo
-    filtro valido: un riarmo davanti a un file rotto lo ritrova lì."""
+    filtro valido e se il file è guasto: un riarmo li ritrova lì."""
     if filter_source is None:
         return
     line = filter_source.refresh()
@@ -653,6 +653,7 @@ def refresh_filter(state):
         emit(line)
     if filter_source.active is not None:
         state["filter"] = filter_source.active.rules
+    state["filter_broken"] = filter_source.broken
 
 
 def main():
@@ -661,7 +662,7 @@ def main():
     settings = build_settings(parse_arguments())
     state = load_state(settings.state)
     if settings.filter:
-        filter_source = watch_filter.FilterSource(settings.filter, state.get("filter"))
+        filter_source = watch_filter.FilterSource(settings.filter, state.get("filter"), state.get("filter_broken", False))
     scanners = (scan_sessions, scan_task_files, scan_progress_table, scan_git)
     first_scan = True
     while True:
