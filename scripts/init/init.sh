@@ -70,7 +70,13 @@ copy_template() {
         log "ERROR template missing: $src"
         return 1
     fi
+    # Il modo della copia lo fissa init, non il sorgente: un file creato da `cp`
+    # eredita i bit del template, e un template finito eseguibile in git
+    # (succede: un markdown 100755 non lo segnala nessuno) farebbe nascere
+    # eseguibili tasks.md e INDEX.md di ogni progetto inizializzato. Il chmod
+    # copre anche --force su un file già esistente, dove `cp` tiene il modo di dest.
     cp "$src" "$dest"
+    chmod 644 "$dest"
     log "wrote: $label"
 }
 
