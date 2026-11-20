@@ -47,14 +47,17 @@ Secondo l'uscita del comando, senza ritentare:
 | Uscita | Esito | Cosa scrivi |
 |---|---|---|
 | `0` | tab aperta | le righe di stdout così come sono: `sessionId`, task, kind e modello, prompt, titolo, comando in-tab, la riga `regia:` quando la regia è impostata, e le righe `⚠` quando ci sono |
-| `1` | il deck ha rifiutato o non ha risposto | il motivo da stderr così com'è (task assente, DLV chiusi o fuori range, spawn spento sulla piattaforma, finestra del progetto non in focus) |
+| `1` | il deck ha rifiutato o non ha risposto | il motivo da stderr così com'è (task assente, DLV chiusi o fuori range, spawn spento sulla piattaforma, finestra del progetto non in focus con un compass senza la coda) |
 | `2` | errore d'uso | il messaggio da stderr: la riga composta al passo 1 era sbagliata |
 | `3` | nessun deck in ascolto sul progetto | che serve il deck acceso sul progetto, o aggiornato: l'endpoint c'è da `loom-deck` 0.87.0 |
+| `4` | in coda: la tab non c'è ancora | le righe di stdout così come sono: `⏳ in coda`, `sessionId`, task, kind e modello, prompt, la riga `regia:` quando la regia è impostata, `scade:`. La conversazione nascerà con quel `sessionId` |
 | `127` | `loom-deck-spawn` non trovato | che il deck installato è più vecchio dell'endpoint: `npm install -g @lamemind/loom-deck@latest` |
 
 Una riga `⚠ spawn inerte` in testa allo stdout vuol dire che il deck gira col freno dei test (`LOOM_DECK_NO_SPAWN`): il binding è scritto, la tab no. Riportalo com'è.
 
-**Finestra del progetto non in focus** (Linux). Ptyxis apre la tab nella sua finestra attiva, e il deck non sposta il focus per conto proprio: prima di aprire chiede a compass se la finestra in focus è del progetto, e se non lo è rifiuta. Il motivo porta già l'istruzione per l'utente — portare davanti una finestra del progetto e richiedere lo spawn —: riportalo e non ritentare, perché solo l'utente può cambiare la finestra in focus.
+**Finestra del progetto non in focus — in coda** (Linux, uscita `4`). Ptyxis apre la tab nella sua finestra attiva, e il deck non sposta il focus per conto proprio: prima di aprire chiede a compass se la finestra in focus è del progetto, e se non lo è mette la richiesta in coda. compass mostra all'utente una notifica dello spawn in attesa col bottone «Vai», e la tab nasce quando una finestra del progetto torna in focus, col `sessionId` già stampato: la finestra la porta davanti l'utente, col bottone o a mano. Non c'è ancora la riga `titolo:`: il titolo lo compone il deck quando la tab nasce. Riporta le righe e che la tab aspetta una finestra del progetto in focus, e **non ritentare**: una seconda richiesta aprirebbe una seconda conversazione sulla stessa task, quando arriva il focus. Una richiesta in coda scade all'ora della riga `scade:` — trenta minuti —, e allora nessuna tab nasce: il deck lo dice all'utente con una notifica, a chi ha chiesto non arriva niente.
+
+**Finestra del progetto non in focus — rifiuto** (Linux, uscita `1`). Con un compass che ha il controllo della finestra ma non la coda, il deck rifiuta come prima della coda: il motivo porta l'istruzione per l'utente — portare davanti una finestra del progetto e richiedere lo spawn — e il motivo `compass senza AwaitProjectFocus, da aggiornare`. Riportalo e non ritentare, perché solo l'utente può cambiare la finestra in focus.
 
 **`⚠ LOOM_REGIA non impostata`** in stdout vuol dire che la richiesta dichiarava la regia e il deck acceso è più vecchio: l'ha ignorata, e la tab è aperta senza `LOOM_REGIA` — lì `AskUserQuestion` funziona, e una domanda posta così resta ferma nella tab finché l'utente non ci va. L'uscita è `0` perché la tab esiste già. Riportalo com'è: il rimedio è riavviare il deck.
 

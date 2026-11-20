@@ -144,7 +144,7 @@ La riga `STATE=` dice cosa hai trovato:
 | `illeggibile` | il file c'è, la testa no | fermati, exit `2` |
 
 - **Giro nuovo** (`ROUND=nuovo`). Lo script ha già tolto lo stato del monitor (`WATCH=tolto`): riarmato su un file vecchio, il monitor darebbe come eventi tutto ciò che è cambiato dal giro prima. Ha tolto anche il filtro (`FILTER=tolto`): le conversazioni che l'utente ha escluso valgono per il giro, come la delega. Le cifre di partenza si riscrivono (§0g). Su `ferma` leggi lo stato vecchio con `Read` prima di riscriverlo, e porta nello stato nuovo la sezione `## Fatti del perimetro` intera, aperti e superati: lo stop non lancia il checkpoint del perimetro, e quei fatti possono stare solo lì. Li riesamini al primo quadro (§1): un fatto aperto che i membri hanno chiuso nel frattempo diventa superato. Conversazioni, proposte, rami fermi, collisioni e delega ripartono da zero.
-- **Ripresa** (`ROUND=ripresa`). Leggi lo stato con `Read` e riparti da lì. Lo stato del monitor resta, e il monitor riarmato riparte dal punto in cui era (§0j). Resta anche il filtro (`FILTER=resta`), su `mia` e su `morta`: le conversazioni escluse restano escluse. Le cifre di partenza restano quelle salvate all'avvio del giro (`BEFORE=tieni`), e si riscrivono solo se il file manca (`BEFORE=scrivi`). Su `morta` la regia di prima si è chiusa senza stop — un crash, una tab chiusa, un reboot: adotti conversazioni, proposte in sospeso, rami fermi e fatti; le conversazioni `tab` della tabella che `sessions.py list` non dà più vive (§0h) diventano `abbandonata (non più viva alla ripresa)`, e un `## Checkpoint in corso` su una di loro si libera; la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: conversazioni adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta, conversazioni escluse dal monitor.
+- **Ripresa** (`ROUND=ripresa`). Leggi lo stato con `Read` e riparti da lì. Lo stato del monitor resta, e il monitor riarmato riparte dal punto in cui era (§0j). Resta anche il filtro (`FILTER=resta`), su `mia` e su `morta`: le conversazioni escluse restano escluse. Le cifre di partenza restano quelle salvate all'avvio del giro (`BEFORE=tieni`), e si riscrivono solo se il file manca (`BEFORE=scrivi`). Su `morta` la regia di prima si è chiusa senza stop — un crash, una tab chiusa, un reboot: adotti conversazioni, proposte in sospeso, rami fermi e fatti; le conversazioni `tab` della tabella che `sessions.py list` non dà più vive (§0h) diventano `abbandonata (non più viva alla ripresa)`, e un `## Checkpoint in corso` su una di loro si libera — tranne le righe `in coda`, che non hanno ancora un processo per costruzione: restano `in coda` fino all'ora della loro scadenza (§2, Aprire una tab); la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: conversazioni adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta, conversazioni escluse dal monitor.
 
   **Una conversazione `headless` non diventa mai `abbandonata` solo perché non è viva**: fra due turni non ha processo per costruzione, e il suo transcript e i suoi file in `.claude/loom/headless/` sopravvivono alla regia. In ogni ripresa, `mia` o `morta`, ogni riga `headless` in ciclo si rilegge con `loom-deck-headless status` (§2, L'esito di un turno headless): `in corso` aspetta la fine del turno; `turno chiuso` si legge, e il ciclo prosegue dal punto che il testo finale dice — un report da cui chiedere il checkpoint, una domanda da proporre, un checkpoint finito; `errore` e `permesso negato` fermano il ramo come sempre.
 - **`viva`** → **fermati senza aprire niente**: un'altra regia viva tiene lo stato di questo perimetro, la sessione di `STATE_HOLDER`. Le strade sono quelle della guardia sopra: fermarla nella sua chat, o chiuderne la conversazione.
@@ -198,7 +198,7 @@ Perimetro: T<perimetro> · Created on <CREATED_ON>
 | Task | Passo | Canale | sessionId | Nome | Stato |
 |------|-------|--------|-----------|------|-------|
 <!-- Canale: headless (loom-deck-headless open) · tab (spawn-task su richiesta dell'utente, o adottata) -->
-<!-- Stato: in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
+<!-- Stato: in coda (scade <ora>) · in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
 
 ## Fatti del perimetro
 - T.. · <il fatto> · <dove l'ha detto: report del run, messaggio, preflight> [· superato: <cosa lo chiude>]
@@ -309,7 +309,7 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 
 Una conversazione nuova parte solo se valgono tutte:
 
-1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua, esterna (§0h) o esclusa dal monitor e ancora viva (§Escludere una conversazione).
+1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua, esterna (§0h) o esclusa dal monitor e ancora viva (§Escludere una conversazione). Una tab `in coda` (§2, Aprire una tab) conta come in ciclo, qui e nel parallelo: nascerà al ritorno del focus, e lavorerebbe accanto a quella nuova.
 2. **Dipendenze soddisfatte**, per ogni passo, preflight compreso: le decisioni di una task poggiano su ciò che la dipendenza ha fatto davvero. Una dipendenza è soddisfatta quando è ✔️, oppure quando la sua voce in `## Dependencies` nomina dei DLV precisi («serve il DLV2 di T21») e quei DLV sono **chiusi a ciclo finito**. Le voci le leggi tu nel task file: `blocked=` conta solo le task, non i DLV.
 3. **Un DLV conta come chiuso solo a ciclo finito.** `run-task` spunta e committa ogni DLV appena chiuso, prima del checkpoint e prima delle risposte alle segnalazioni del suo report. Per la regia il DLV diventa una base solo dopo il checkpoint del suo ciclo e le risposte alle segnalazioni. Una task con segnalazioni in sospeso non fa da base a nessuna: si fermano le sue dipendenti, i rami indipendenti continuano.
 4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia — né una dipendenza fra loro, né un path in comune nei loro `## Materiale` che almeno una delle due scrive — e nessuna riga di `## Collisioni del modello` nello stato (§0e): una collisione che nessun campo dichiara ferma il parallelo come una `CONFLICT`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
@@ -337,7 +337,7 @@ A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
 | ciclo chiuso che sblocca un'altra task | cosa si sblocca e cosa lanci adesso |
 | sessione ferma su domande o segnalazioni | chi aspetta, per cosa, e la proposta (§3) |
 | commit o fase doc di un checkpoint | una riga: cosa registra, «per il parallelo non cambia niente» |
-| sessione nuova (`🆕`, una tab) | quale task segue; se la task ha già una conversazione in ciclo, l'avviso di non farle lavorare insieme |
+| sessione nuova (`🆕`, una tab) | quale task segue; se il suo `sessionId` è di una riga `in coda` dello stato, è la tab chiesta che nasce: la riga diventa `in ciclo` e prende il nome (§2, Aprire una tab), senza avvisi. Altrimenti, se la task ha già una conversazione in ciclo, l'avviso di non farle lavorare insieme |
 | `▶ turno headless partito` | una riga, o nessuna se il turno è della regia e l'ha appena lanciato; di una conversazione che la regia non ha aperto, come una sessione nuova |
 | `⏹ turno headless finito` | nessuna riga sull'evento: è la sveglia. Rileggi l'esito con `status` (§2, L'esito di un turno headless) e riporta quello, come il fine turno di una tab |
 | risposta dell'utente in una tab che rischia un danno | cosa sparisce e cosa resta, per esteso |
@@ -393,7 +393,7 @@ Finito il passo la regia non scrive più a quella conversazione, e la chiude (§
 
 ### Headless, e la tab solo su richiesta
 
-Ogni passo che la regia decide parte **headless**: un processo `claude -p` staccato, senza tab, che esegue un turno e finisce da solo. Una regia lavora in momenti che l'utente non sceglie: una tab aperta da lei prende la tastiera dell'utente, e sul deck Linux lo spawn in una tab viene rifiutato ogni volta che la finestra in focus non è del progetto. Un turno headless non apre tab, non sposta il focus e non cambia desktop. La conversazione compare nel deck sotto la sua task, e l'utente la apre in una tab con ⏎ quando vuole guardarla.
+Ogni passo che la regia decide parte **headless**: un processo `claude -p` staccato, senza tab, che esegue un turno e finisce da solo. Una regia lavora in momenti che l'utente non sceglie: una tab aperta da lei prende la tastiera dell'utente, e sul deck Linux lo spawn in una tab resta in coda ogni volta che la finestra in focus non è del progetto, finché l'utente non ne porta davanti una. Un turno headless non apre tab, non sposta il focus e non cambia desktop. La conversazione compare nel deck sotto la sua task, e l'utente la apre in una tab con ⏎ quando vuole guardarla.
 
 Una **tab** nasce solo quando l'utente la chiede per **quel** passo, nella chat della regia: «apri il run di T23 in una tab». Si apre con `spawn-task` (§Aprire una tab), e la richiesta vale per quel passo soltanto: nessuna preferenza che dura, e nessun criterio con cui la regia sceglie la tab da sé.
 
@@ -448,7 +448,13 @@ args:  <perimetro> checkpoint --regia T<perimetro>
 
 `--regia` come in `open` (§Aprire): la tab nasce con `LOOM_REGIA`, e lì `AskUserQuestion` è negato da un hook — le domande arrivano in chat a fine turno, dove le leggi. Una riga `⚠ LOOM_REGIA non impostata` vuol dire che il deck acceso è più vecchio: la tab è aperta senza, e va trattata come una tab senza `LOOM_REGIA` (§3); di' all'utente di riavviare il deck.
 
-Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: tab` e `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare — un rifiuto per la finestra non in focus si risolve solo dall'utente, che porta davanti una finestra del progetto e richiede la tab. Il passo resta in quella tab fino alla chiusura: messaggi con `SendMessage` finché è viva (§Scrivere), `close-session` a passo finito (§Chiudere).
+Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: tab` e `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` e da `4` è un'anomalia (§4): non ritentare — un rifiuto per la finestra non in focus si risolve solo dall'utente, che porta davanti una finestra del progetto e richiede la tab.
+
+**Uscita `4` — la tab è in coda, non è un'anomalia.** La finestra in focus non era del progetto: il deck tiene la richiesta, compass mostra all'utente una notifica col bottone «Vai», e la tab nasce quando una finestra del progetto torna in focus, col `sessionId` della riga `sessionId:`. Scrivi subito la conversazione nello stato con `Canale: tab`, quel `sessionId`, `Nome` vuoto e `Stato: in coda (scade <ora della riga scade:>)`, e di' all'utente in una riga che la tab aspetta una finestra del progetto. Non ritentare: una seconda richiesta aprirebbe una seconda conversazione sulla stessa task al ritorno del focus.
+
+- **Nasce** → arriva l'evento `🆕 nuova sessione` con quel `sessionId`: la riga diventa `in ciclo`, e il **nome** lo leggi allora da `"PY" -B -I "R/sessions.py" list` e da `ListAgents`, perché il titolo lo compone il deck quando la tab nasce.
+- **Scade** → passata l'ora di `scade:` senza l'evento — la guardi a ogni evento e a ogni quadro —, nessuna tab nascerà: il deck l'ha già detto all'utente con una notifica, e a te non arriva niente. La riga diventa `abbandonata (scaduta in coda)`, e scali all'utente (§4): il passo non è partito, e lo rilancia solo se l'utente lo chiede di nuovo.
+- **Conta come `in ciclo`** per la regola 1 e per il parallelo (§1, Le regole di partenza) e per il checkpoint del perimetro (§Il checkpoint del perimetro); non si chiude con `close-session`, che non ha ancora un processo da chiudere. Il passo resta in quella tab fino alla chiusura: messaggi con `SendMessage` finché è viva (§Scrivere), `close-session` a passo finito (§Chiudere).
 
 ### Scrivere
 
@@ -499,7 +505,7 @@ Durante il giro la regia non riallinea il file del perimetro: i paralleli li cal
 Parte quando valgono tutte:
 
 1. **niente è lanciabile**: nessun membro ha un passo che le regole di partenza (§1) lascerebbero partire;
-2. **nessuna conversazione della regia è in ciclo**: tutte `chiusa` o `abbandonata`;
+2. **nessuna conversazione della regia è in ciclo né in coda**: tutte `chiusa` o `abbandonata`;
 3. **la coda dei checkpoint è libera**: `## Checkpoint in corso` dice `nessuno`. Il checkpoint del perimetro riscrive il suo task file e `tasks.md` come ogni altro, ed entra nella stessa regola «un checkpoint alla volta»;
 4. **almeno un ciclo si è chiuso dall'ultimo checkpoint del perimetro** (`## Checkpoint del perimetro` nello stato): senza lavoro nuovo dei membri sarebbe una conversazione aperta per niente.
 
@@ -625,13 +631,13 @@ Una regia che aspetta l'utente chiude il turno, e compass la mostra `done`, non 
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "regia $(say_id T<perimetro>) <argomento in 3-7 parole>"
    ```
 
-**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); un permesso negato in un turno headless (§2, L'esito di un turno headless); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); un'anomalia; un perimetro che non ha più niente da lanciare, dopo il suo checkpoint o quando non ce n'è bisogno (§2, Il checkpoint del perimetro).
+**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); un permesso negato in un turno headless (§2, L'esito di un turno headless); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); una tab `in coda` scaduta senza nascere (§2, Aprire una tab); un'anomalia; un perimetro che non ha più niente da lanciare, dopo il suo checkpoint o quando non ce n'è bisogno (§2, Il checkpoint del perimetro).
 
 **Non si scala** per gli eventi di routine — commit, push, un DLV spuntato, un checkpoint andato liscio: bastano le righe del riporto. Una notifica che non serviva si somma alle altre e insegna a ignorarle.
 
 ### Le anomalie: ramo fermo, nessun ritento
 
-- `loom-deck-headless open` o `spawn-task` esce con un codice diverso da `0`, o `loom-deck-headless reply` rifiuta per un motivo che non è un processo vivo (§2, Scrivere);
+- `loom-deck-headless open` esce con un codice diverso da `0`, `spawn-task` con un codice diverso da `0` e da `4` (in coda, §2, Aprire una tab), o `loom-deck-headless reply` rifiuta per un motivo che non è un processo vivo (§2, Scrivere);
 - un turno headless finisce in `errore` (§2, L'esito di un turno headless); un `permesso negato` ferma il ramo allo stesso modo, con strumento e input delle chiamate negate nella scalata;
 - una tab in ciclo si chiude a metà (`✖ sessione chiusa` prima del checkpoint);
 - un run chiude il turno senza aver chiuso nessun DLV del suo perimetro;
@@ -655,7 +661,7 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
 4. **Il recap**, in chat:
    - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia; i membri entrati o usciti durante il giro, con una parola che lo dice;
    - i progressi in lista, una riga per ciclo chiuso;
-   - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo: task, passo, canale, nome, `sessionId`. Una `tab` l'utente la chiude quando vuole; una `headless` non ha niente da chiudere, e l'utente la riprende in una tab dal deck con ⏎ — la regia del giro dopo non la adotta, perché da uno stato `ferma` eredita i soli fatti (§0f). Le `chiusa` non si elencano;
+   - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo o in coda: task, passo, canale, nome, `sessionId`. Una tab `in coda` nasce ancora al ritorno del focus fino all'ora della sua scadenza, anche a regia ferma. Una `tab` l'utente la chiude quando vuole; una `headless` non ha niente da chiudere, e l'utente la riprende in una tab dal deck con ⏎ — la regia del giro dopo non la adotta, perché da uno stato `ferma` eredita i soli fatti (§0f). Le `chiusa` non si elencano;
    - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza;
    - se `## Checkpoint del perimetro` conta cicli chiusi dall'ultimo, la riga `il file del perimetro non è allineato ai membri: /loom-works:checkpoint-task <perimetro>`;
    - i **fatti del perimetro** dello stato, aperti e superati, col membro da cui vengono: sono quelli che chi legge il file del perimetro dopo deve trovare, e alcuni nessun membro li ha scritti nel suo task file. Il prossimo `checkpoint-task` sul perimetro li porta nel file, chiunque lo lanci.
