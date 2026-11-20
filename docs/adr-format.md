@@ -35,20 +35,23 @@ eviterebbe è sotto la soglia di percezione: si rivaluta se il repo supera le 30
 ```
 
 - **Riga 1 è la segnalazione**, per esteso e su una riga: è ciò che l'agente confronta con quello che sta per risollevare.
-- **L'header è a campi**, nell'ordine canonico `Tipo` · `Data` · `Chi` · `Ancore` · `Supera`. Solo `Supera` è facoltativo.
+- **L'header è a campi**, nell'ordine canonico `Tipo` · `Data` · `Chi` · `Delega` · `Ancore` · `Supera`. `Delega` compare solo con `Chi: delega`, `Supera` solo quando il record ne supera un altro; gli altri ci sono sempre.
 - **Il corpo è `## Perché`**, prosa libera e non vuota. Sta dopo l'header perché la query stampa l'header e lascia il corpo a chi apre il file.
 
 | Campo | Dominio | Regola |
 |---|---|---|
 | `Tipo` | `scarto` | vocabolario chiuso |
 | `Data` | `YYYY-MM-DD HH:MM` | la scrive il comando |
-| `Chi` | `umano` \| `agente` | obbligatorio, **senza default** |
+| `Chi` | `umano` \| `agente` \| `delega` | obbligatorio, **senza default** |
+| `Delega` | testo libero, una riga | le parole con cui l'utente ha dato la delega, alla lettera; obbligatorio con `Chi: delega`, un rifiuto con gli altri autori |
 | `Ancore` | path relativi alla project root, separati da `, ` | almeno uno, ognuno deve esistere |
 | `Supera` | `<id>[#<voce>]`, separati da `, ` | facoltativo, ogni `<id>` deve esistere in `adr/` |
 
 `Tipo` ha oggi un valore solo. Il vocabolario è chiuso e non aperto a testo libero perché un tipo inventato da chi scrive non sarebbe interrogabile da chi legge; chi ne aggiunge uno lo dichiara qui nello stesso commit.
 
 **`Chi` non ha default**, ed è la scelta che rende il registro campionabile: lo scarto deciso da un agente è esattamente ciò che l'umano vuole poter rileggere a campione. Un default lo renderebbe indistinguibile da uno deciso da una persona.
+
+**`delega` è lo scarto che la regia di un perimetro decide su una delega dell'utente**, data nella chat della regia. Non è dell'umano, che non ha letto la segnalazione, né dell'agente che decide da sé, e scritto come uno dei due falserebbe chi campiona l'uno o l'altro. Il record porta in `Delega` le parole con cui l'utente ha dato la delega, e senza è un rifiuto: sono ciò che riconduce lo scarto all'umano che l'ha affidato. Le porta il record e non solo lo scenario di triage dello stesso scarto, perché `adr.sh scarta` si chiama anche da solo, senza scenario, e un record non si riscrive — il campo che manca alla nascita non si aggiunge più. Su un altro autore `Delega` è un rifiuto, perché il record non ha dove scriverlo.
 
 **`Ancore` porta solo path**, verificati sul filesystem con `test -e`. Keyword e id task non hanno un campo proprio: la query fa match testuale sul record intero, e stanno già nella segnalazione e nel perché. Un campo tipizzato in più sarebbe una seconda sorgente per la stessa ricerca, e le due divergerebbero. Il path si verifica sul filesystem e non su `git ls-files` perché è ciò che un futuro rilevatore «path modificato dopo la data del record» leggerà, accoppiando `test -e` a `git log --since`.
 
@@ -79,12 +82,14 @@ L'annotazione stampa i frammenti trovati nei `Supera` altrui, non il testo della
 Un solo script, `scripts/task/adr.sh`, con due sottocomandi. Il dettaglio d'uso e gli exit code stanno nel suo header; qui il contratto di forma.
 
 ```bash
-adr.sh scarta --slug <slug> --chi umano|agente --segnalazione <testo> \
-              --ancora <path> [--ancora <path>]... \
+adr.sh scarta --slug <slug> --chi umano|agente|delega --segnalazione <testo> \
+              --ancora <path> [--ancora <path>]... [--delega <testo>] \
               [--supera <id>[#<voce>]]... [--perche <testo>] [--no-commit]
 
 adr.sh cerca <ancora> [--superate]
 ```
+
+**`cerca` stampa l'autore** di ogni record trovato, nella riga `<id> · <chi> · <data>`: uno scarto su delega si riconosce senza aprire il file, e `adr.sh cerca delega` trova anche un record che nomina la delega solo nel perché.
 
 **`scarta` committa da sé** il solo file del record, con pathspec e senza push. Il chiamante tipico è il modello in chat, in una sessione detached dove nessun altro commit nominerà quel file: un record non committato è uno scarto che può ancora sparire. Chi batcha — una skill che chiude con un commit suo — passa `--no-commit`.
 

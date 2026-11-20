@@ -1,6 +1,6 @@
 # Il file degli scenari di triage — formato del record e sede
 
-Contratto per chi **scrive e conta** gli scenari di triage: la sezione del report da cui nascono, la sede su disco, i campi di un record — le parole dell'umano comprese —, la regola che manda lo scarto nel registro ADR e tiene l'ignora fuori, l'assenza di ogni default, e l'uscita eseguita in un altro progetto.
+Contratto per chi **scrive e conta** gli scenari di triage: la sezione del report da cui nascono, la sede su disco, i campi di un record — le parole dell'umano comprese —, la decisione presa dalla regia su delega dell'utente, la regola che manda lo scarto nel registro ADR e tiene l'ignora fuori, l'assenza di ogni default, e l'uscita eseguita in un altro progetto.
 
 Uno **scenario** è la decisione presa su una segnalazione del report di fine skill: la segnalazione citata alla lettera, l'uscita scelta fra `subito` · `task` · `scarto` · `ignora`, e chi l'ha scelta. Il file degli scenari sta **fuori dal sistema documentale**, per la stessa ragione del registro ADR (`adr-format.md`): un record è datato, cita alla lettera e porta chi ha deciso, e nessuno di questi tratti ha posto in una doc as-is. È stato di task, e nessun attore del sistema doc lo legge, lo misura o lo instrada.
 
@@ -29,6 +29,16 @@ La conferma vale quanto il ribaltamento: «ok» sulla segnalazione marcata dall'
 
 **Il modello della riga nel body delle skill porta `S{N}`, mai un numero.** Il body di una skill entra nel transcript a ogni invocazione: un id in grassetto con un numero vero lì verrebbe contato come segnalazione stampata da chi conta gli id a `grep` sui transcript. Il titolo invece compare per forza anche lì, e nei tool call che lo scrivono: chi lo cerca in un transcript filtra i blocchi di testo dell'assistente.
 
+## La decisione su delega
+
+La regia di un perimetro (`orchestrate-mandate`) risponde alle segnalazioni del report di un'altra sessione al posto dell'utente quando l'utente gliel'ha delegato, nella chat della regia. La risposta arriva nella sessione del report come messaggio, con la firma «decise dalla regia di T<perimetro> su delega dell'utente» in prima riga e, sulla riga sotto, le parole con cui l'utente ha dato la delega, alla lettera. La sessione riconosce la firma e scrive ogni scenario con `--chi delega` e quelle parole in `--delega`.
+
+**Un terzo autore, perché `Chi` separa raccolte che si contano.** Gli scenari `umano` sono il corpus su cui si misura un triage delegato, quelli `agente` il campione delle decisioni che l'agente prende da sé. Una decisione della regia su delega non appartiene a nessuno dei due: l'umano non ha letto la segnalazione, e l'agente non ha deciso di sua iniziativa ma su un mandato esplicito. Scritta come `umano` gonfierebbe il corpus con risposte che l'umano non ha dato; scritta come `agente` farebbe passare per scarti autonomi scarti che l'umano ha affidato.
+
+**Sotto delega valgono le regole dell'umano, uscita per uscita.** Quattro uscite; l'ignora vuole le ancore e nessun perché, lo scarto vuole perché e ancore e scrive il record ADR. Le parole della regia sono l'approfondimento su `subito`, `task` e `ignora`, e il perché sullo scarto. Il contratto asimmetrico resta legato a `Chi: agente`: è l'agente che decide da sé a non scartare e non ignorare, perché nessuno gli ha affidato quella decisione.
+
+**Le parole della delega sono obbligatorie, e viaggiano solo nel messaggio.** Sono ciò che riconduce la decisione all'umano che l'ha affidata, e un record scritto senza non si completa dopo: `--chi delega` senza `--delega` è un rifiuto. Non passano per una variabile d'ambiente perché la delega si dà e si revoca nella chat della regia a sessioni già nate, mentre una variabile si fissa alla nascita del processo. Una sessione che riceve la firma senza le parole non scrive nessuno scenario e lo chiede nel testo finale: non ripiega su `umano` né su `agente`.
+
 ## La sede
 
 `{docs_root}/triage/`, sorella di `adr/` e `tasks/`. Un file per record, nessuna sottocartella, nessun indice.
@@ -55,9 +65,9 @@ Sta sotto la docs-root perché la docs-root è per-progetto: un progetto che tie
 ```
 
 - **Riga 1 è la segnalazione alla lettera**, byte per byte come stampata nel report dopo `**S{N}** — `: backtick, virgolette e spazi restano com'erano. È la chiave con cui una segnalazione ritrovata in un transcript si accoppia al suo scenario. Per questo il record è markdown e non JSON: un escaper fra il testo stampato e il file renderebbe la citazione un'altra stringa.
-- **L'header è a campi**, nell'ordine canonico della tabella sotto. `Approfondimento` compare solo quando l'umano ha detto qualcosa oltre l'uscita, `ADR` solo sullo scarto, `Ancore` solo sull'ignora: l'ultimo campo è `ADR` o `Ancore` quando ci sono, e i due non coesistono mai.
+- **L'header è a campi**, nell'ordine canonico della tabella sotto. `Delega` compare solo con `Chi: delega`, `Approfondimento` solo quando chi risponde ha detto qualcosa oltre l'uscita, `ADR` solo sullo scarto, `Ancore` solo sull'ignora: l'ultimo campo è `ADR` o `Ancore` quando ci sono, e i due non coesistono mai.
 - **Nessun corpo.** Il perché di uno scarto sta nel record ADR: duplicarlo qui lo farebbe divergere al primo record scritto a mano. L'ignora non ha perché: la sua ragione è la marginalità, e chiederla costa più della decisione.
-- **Le parole dell'umano stanno in un campo di header, su una riga, mai in un corpo.** I lettori del record — l'awk di `conta` e i `grep` delle misure — cercano righe `- **Campo**:` su tutto il file, non solo nell'header: in un corpo libero una riga dell'umano che iniziasse come un campo verrebbe letta come campo, mentre un valore scritto dopo l'etichetta sulla stessa riga non può. Il comando rifiuta un a-capo nel valore, come nella segnalazione.
+- **Le parole dell'umano, della regia e della delega stanno in un campo di header, su una riga, mai in un corpo.** I lettori del record — l'awk di `conta` e i `grep` delle misure — cercano righe `- **Campo**:` su tutto il file, non solo nell'header: in un corpo libero una riga che iniziasse come un campo verrebbe letta come campo, mentre un valore scritto dopo l'etichetta sulla stessa riga non può. Il comando rifiuta un a-capo nel valore, come nella segnalazione: parole dette su più righe si uniscono con uno spazio prima di passarle.
 
 Lo scenario di un ignora chiude con le ancore al posto del campo `ADR`:
 
@@ -74,7 +84,7 @@ Lo scenario di un ignora chiude con le ancore al posto del campo `ADR`:
 - **Ancore**: loom-deck/scripts/deck-run
 ```
 
-Le parole dell'umano, quando la risposta le porta, stanno nel campo `Approfondimento`, dopo `Data`:
+Le parole di chi risponde, quando la risposta le porta, stanno nel campo `Approfondimento`, dopo `Data`:
 
 ```markdown
 # Il banco del deck sfora il timeout del foreground e il turno si chiude sull'attesa
@@ -89,28 +99,47 @@ Le parole dell'umano, quando la risposta le porta, stanno nel campo `Approfondim
 - **Approfondimento**: task, ma come DLV della task aperta sul banco: è lo stesso difetto di `run_in_background`, non uno nuovo
 ```
 
+Uno scenario deciso su delega porta le parole della delega nel campo `Delega`, subito dopo `Chi`, e quelle della regia nell'`Approfondimento`:
+
+```markdown
+# `deck-run` accetta un `--model` fuori dominio e lo passa a `claude`
+
+- **Uscita**: subito
+- **Chi**: delega
+- **Delega**: ti delego i preflight e le segnalazioni, fino a revoca
+- **Momento**: flusso
+- **Skill**: run-task
+- **Progetto**: loom-works
+- **Sessione**: 0a0f369d-c827-4fd4-ba34-ddc1b3be56c3
+- **Data**: 2026-09-24 18:46
+- **Approfondimento**: subito: è una riga di validazione nel case dei modelli, dentro il perimetro della task
+```
+
 | Campo | Dominio | Regola |
 |---|---|---|
 | `Uscita` | `subito` \| `task` \| `scarto` \| `ignora` | vocabolario chiuso |
-| `Chi` | `umano` \| `agente` | obbligatorio, **senza default**; lo scarto e l'ignora con `agente` sono un rifiuto |
+| `Chi` | `umano` \| `agente` \| `delega` | obbligatorio, **senza default**; lo scarto e l'ignora con `agente` sono un rifiuto |
+| `Delega` | testo libero, una riga | le parole con cui l'utente ha dato la delega, alla lettera; obbligatorio con `Chi: delega`, un rifiuto con gli altri autori |
 | `Momento` | `flusso` \| `posteriori` | obbligatorio, **senza default** |
 | `Skill` | `[a-z0-9-]+` | token libero: il nome della skill del report |
 | `Progetto` | `[A-Za-z0-9._-]+` | l'`id` di `.claude/loom-works.json`, override `--progetto` |
 | `Sessione` | `[A-Za-z0-9._:-]+` | `CLAUDE_CODE_SESSION_ID`, override `--sessione` |
 | `Data` | `YYYY-MM-DD HH:MM` | la scrive il comando |
-| `Approfondimento` | testo libero, una riga | le parole dell'umano alla lettera; solo con `Chi: umano` e `Uscita` diversa da `scarto`, presente solo quando la risposta le porta |
+| `Approfondimento` | testo libero, una riga | le parole di chi risponde alla lettera; solo con `Chi: umano` o `delega` e `Uscita` diversa da `scarto`, presente solo quando la risposta le porta |
 | `ADR` | id di un record in `adr/` | solo con `Uscita: scarto`; lo scrive il comando |
 | `Ancore` | path relativi alla project root, separati da `, ` | solo con `Uscita: ignora`, almeno uno, ognuno deve esistere |
 
 **`Uscita` e `Chi` sono chiusi perché si contano.** `Skill` no: dice solo da quale report viene lo scenario, e una skill che adotti la sezione delle segnalazioni non deve richiedere una modifica del comando.
 
-**`Chi` non ha default**, ed è ciò che separa i due usi del file: gli scenari con `umano` sono il corpus su cui si misura un triage delegato, quelli con `agente` sono il campione delle decisioni che l'agente ha già preso da sé.
+**`Chi` non ha default**, ed è ciò che separa i tre usi del file: gli scenari con `umano` sono il corpus su cui si misura un triage delegato, quelli con `agente` sono il campione delle decisioni che l'agente ha già preso da sé, quelli con `delega` le decisioni che la regia ha preso su un mandato dell'utente (§La decisione su delega).
 
 **`Momento` distingue la decisione che ha avuto effetto da quella che non l'ha avuto.** Nel flusso — l'umano risponde al report nella stessa conversazione — «subito» e «task» sono operativi: l'agente esegue il primo e apre la task del secondo. A posteriori — una sessione aperta dopo, che rilegge i transcript — le stesse parole sono un esito: registrano che si sarebbe voluto farlo, e nessuno lo esegue. La data non basta a distinguerli, perché una risposta a posteriori sulla segnalazione di ieri porta la data di oggi. Il campo sta nel formato dal primo record per la stessa ragione di `Supera` nel registro ADR: aggiunto dopo, lascerebbe su disco due generazioni di record che un parser legge in modo diverso.
 
 **`Uscita` è il solo campo che si conta; le parole dell'umano si registrano, non si classificano.** «Fallo subito ma in un subagente» resta `subito`: il modo di esecuzione non ha un campo strutturato, perché aprirebbe un dominio che nessuno sa contare — e lo stesso vale per il progetto dove l'uscita si esegue e per ciò che ha prodotto. Quando l'umano li dice, entrano nell'`Approfondimento` alla lettera, con tutto il resto delle sue parole.
 
-**`Approfondimento` porta solo parole dell'umano.** Con `Chi: agente` è un rifiuto: lo scenario dell'agente si scrive prima di stampare la sezione, quando una risposta ancora non esiste. Sullo scarto è un rifiuto anche con `Chi: umano`: le parole dell'umano sono il perché, il record ADR le porta e lo scenario lo raggiunge col campo `ADR` — una seconda copia divergerebbe.
+**`Approfondimento` porta solo parole di chi ha risposto**: l'umano, o la regia su delega. Con `Chi: agente` è un rifiuto: lo scenario dell'agente si scrive prima di stampare la sezione, quando una risposta ancora non esiste. Sullo scarto è un rifiuto con ogni autore: le parole di chi decide sono il perché, il record ADR le porta e lo scenario lo raggiunge col campo `ADR` — una seconda copia divergerebbe.
+
+**`Delega` sta anche nel record ADR dello stesso scarto.** Lo scenario e il record portano la stessa riga, scritta dalla stessa invocazione: `adr.sh scarta` si chiama anche da solo, senza scenario, e su quella via un record col solo autore non porterebbe le parole da nessuna parte. Un record non si riscrive, quindi il campo che manca alla nascita non si aggiunge più.
 
 **`Ancore` è lo stesso campo del record ADR**: stesso nome, stesso separatore `, `, stessa grafia relativa alla project root, e la stessa normalizzazione — `lw_norm_ancora` in `lib.sh`, che `adr.sh` e `triage.sh` chiamano entrambi. Lo stesso file produce quindi la stessa stringa nei due registri, e un solo pattern `^- \*\*Ancore\*\*:` li legge tutti e due: accoppiare due ignora sullo stesso path, o un ignora a uno scarto, è un confronto fra stringhe. Sull'ignora le ancore sono obbligatorie perché sono la chiave che accoppia una segnalazione che torna allo scenario di prima, e un record scritto senza non si completa dopo. Sullo scarto non si scrivono: stanno nel record ADR, e una copia divergerebbe come il perché. Su `subito` e `task` sono un rifiuto, perché nessuno le legge.
 
@@ -118,7 +147,7 @@ Le parole dell'umano, quando la risposta le porta, stanno nel campo `Approfondim
 
 ## Nessun default
 
-**Uno scenario è sempre una risposta vera.** La segnalazione che nessuno decide non produce nessun record, e il comando non ha un modo di scriverne uno «di default». Ne discende che il conteggio degli esiti umani non ha bisogno di un filtro che escluda i default: ogni record con `Chi: umano` è una decisione che un umano ha preso. Il recupero delle segnalazioni rimaste senza risposta è un'operazione a posteriori, e scrive `Momento: posteriori`.
+**Uno scenario è sempre una risposta vera.** La segnalazione che nessuno decide non produce nessun record, e il comando non ha un modo di scriverne uno «di default». Ne discende che il conteggio degli esiti umani non ha bisogno di un filtro che escluda i default: ogni record con `Chi: umano` è una decisione che un umano ha preso, e ogni record con `Chi: delega` una decisione presa su un mandato che un umano ha dato. Il recupero delle segnalazioni rimaste senza risposta è un'operazione a posteriori, e scrive `Momento: posteriori`.
 
 L'ignora non è un default: è sempre una risposta dell'umano. È anche ciò che separa «vista, e non è niente» dalla segnalazione che nessuno ha letto — la non-risposta non scrive niente, e nel file degli scenari le due sarebbero indistinguibili.
 
@@ -135,10 +164,10 @@ Scarto e ignora chiudono entrambi una segnalazione con «non si fa», e li separ
 
 Le uscite sbagliano a costi diversi: una task in più si cancella, un «subito» sbagliato si ripristina con un diff, uno scarto sbagliato è un segnale perso che nessuno recupera. Quindi **l'agente non scarta**: il comando rifiuta uno scarto con `Chi: agente` (exit 1) prima di scrivere qualunque cosa. Per la stessa ragione **l'agente non ignora**: un suo ignora è una segnalazione non stampata, e l'agente riporta tutto.
 
-Lo scarto di un umano scrive due record, e la sequenza è fissa:
+Lo scarto di un umano, o della regia su delega, scrive due record, e la sequenza è fissa:
 
-1. il comando valida tutti i campi dello scenario, il perché e le ancore, e verifica che né `triage/<id>.md` né `adr/<id>.md` esistano;
-2. chiama `adr.sh scarta --no-commit` con lo stesso slug e lo stesso istante;
+1. il comando valida tutti i campi dello scenario, il perché, le ancore e le parole della delega, e verifica che né `triage/<id>.md` né `adr/<id>.md` esistano;
+2. chiama `adr.sh scarta --no-commit` con lo stesso slug, lo stesso istante, lo stesso autore e, su delega, le stesse parole della delega;
 3. scrive lo scenario col campo `ADR` preso dall'output di `adr.sh` — mai ricopiato da chi chiama;
 4. committa i due file in un commit solo.
 
@@ -155,23 +184,27 @@ Una decisione che ne ribalta un'altra — l'umano che risponde «task» dove l'a
 Un solo script, `scripts/task/triage.sh`, con due sottocomandi. Il dettaglio d'uso e gli exit code stanno nel suo header; qui il contratto di forma.
 
 ```bash
-triage.sh scenario --slug <slug> --uscita subito|task|scarto|ignora --chi umano|agente \
-                   --momento flusso|posteriori --skill <nome> \
+triage.sh scenario --slug <slug> --uscita subito|task|scarto|ignora --chi umano|agente|delega \
+                   --momento flusso|posteriori --skill <nome> [--delega <testo>] \
                    [--progetto <id>] [--sessione <id>] \
                    [--ancora <path>]... [--no-commit] <<'SCENARIO'
 <la segnalazione alla lettera, su una riga>
-<le parole dell'umano: il perché dello scarto, anche su più righe;
+<le parole di chi decide: il perché dello scarto, anche su più righe;
  l'approfondimento su subito, task e ignora, su una riga>
 SCENARIO
 
 triage.sh conta [--dal <YYYY-MM-DD[ HH:MM]>] [--sessione <id>]
 ```
 
-**La segnalazione arriva su stdin**, riga 1, e le righe dopo sono le parole dell'umano, che l'uscita smista: il perché sullo scarto, l'approfondimento su `subito`, `task` e `ignora`. Una grammatica sola per le quattro uscite, perché le parole dell'umano portano backtick e apostrofi quanto la segnalazione e vogliono lo stesso canale. Un heredoc col delimitatore fra apici è l'unico canale che porta un testo arbitrario intatto: fra virgolette doppie la shell eseguirebbe i backtick come comandi, fra apici singoli ogni apostrofo va spezzato a mano. `--segnalazione`, `--perche` e `--approfondimento` esistono per chi chiama da uno script; lo stesso campo passato sui due canali è un rifiuto.
+**La segnalazione arriva su stdin**, riga 1, e le righe dopo sono le parole di chi decide, che l'uscita smista: il perché sullo scarto, l'approfondimento su `subito`, `task` e `ignora`. Una grammatica sola per le quattro uscite, perché le parole di chi decide portano backtick e apostrofi quanto la segnalazione e vogliono lo stesso canale. Un heredoc col delimitatore fra apici è l'unico canale che porta un testo arbitrario intatto: fra virgolette doppie la shell eseguirebbe i backtick come comandi, fra apici singoli ogni apostrofo va spezzato a mano. `--segnalazione`, `--perche` e `--approfondimento` esistono per chi chiama da uno script; lo stesso campo passato sui due canali è un rifiuto.
+
+**Le parole della delega passano solo da `--delega`**, perché lo stdin porta già segnalazione e parole di chi decide. Per tenerle intatte chi chiama le legge prima in una variabile da un heredoc fra apici, nella stessa invocazione: `DELEGA="$(cat <<'DELEGA'` … `DELEGA` `)"`, poi `--delega "$DELEGA"`. Una variabile fra virgolette doppie non riesegue il suo contenuto: backtick e `$` restano testo.
 
 **`scenario` committa da sé** i propri file, con pathspec e senza push. Chi batcha — la skill che scrive più scenari dopo un report — passa `--no-commit` e committa i path che il comando stampa.
 
-**`conta` stampa una tabella a tab**, una riga per chiave: il totale, `umano` e `agente`, le otto coppie `<uscita>.<chi>`, i due momenti, gli scenari con l'approfondimento, i record malformati, la data del primo e dell'ultimo record. Con `--dal` aggiunge la colonna dei soli record da quella data in poi. Le righe `scarto.agente` e `ignora.agente` valgono 0 per costruzione. La riga `approfondimento` non include gli scarti, le cui parole stanno nel record ADR: chi vuole tutte le risposte con parole registrate la somma a `scarto.umano`.
+**`conta` stampa una tabella a tab**, una riga per chiave: il totale, `umano`, `agente` e `delega`, le dodici coppie `<uscita>.<chi>`, i due momenti, gli scenari dell'umano con l'approfondimento (`approfondimento`) e quelli su delega (`approfondimento.delega`), i record malformati, la data del primo e dell'ultimo record. Con `--dal` aggiunge la colonna dei soli record da quella data in poi. Le righe `scarto.agente` e `ignora.agente` valgono 0 per costruzione. La riga `approfondimento` conta le sole parole dell'umano e non include gli scarti, le cui parole stanno nel record ADR: chi vuole tutte le risposte dell'umano con parole registrate la somma a `scarto.umano`. L'autore `delega` ha righe sue e non entra in nessuna riga dell'umano o dell'agente: chi legge una cella per nome la trova col significato di sempre.
+
+**Il filtro di validità tiene il vocabolario dei campi chiusi**: un record con un valore fuori dominio conta in `malformati` e in nessun'altra riga. Lo stesso vale per un record `delega` senza il campo `Delega`, o per un campo `Delega` su un altro autore — la regola con cui lo scenario si scrive.
 
 ## L'uscita eseguita in un altro progetto
 

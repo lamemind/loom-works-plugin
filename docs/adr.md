@@ -13,10 +13,10 @@ Exit `0` = esiste già un record: quella segnalazione è stata scartata con un m
 **Registra lo scarto.** Quando una segnalazione viene scartata, da te o dall'utente, scrivila subito — uno scarto senza registro non è uno scarto, è un rinvio, e al giro dopo la stessa segnalazione torna e va ridecisa:
 
 ```bash
-{PLUGIN_ROOT}/scripts/task/adr.sh scarta --slug <slug> --chi umano|agente \
-  --segnalazione "<cosa>" --ancora <path> --perche "<perché>"
+{PLUGIN_ROOT}/scripts/task/adr.sh scarta --slug <slug> --chi umano|agente|delega \
+  --segnalazione "<cosa>" --ancora <path> --perche "<perché>" [--delega "<parole>"]
 ```
 
-`--chi` non ha default: `umano` se la decisione è dell'utente, `agente` se è tua. Committa da sé; `--no-commit` per chi batcha. Un record non si riscrive: una decisione superata si marca con un record nuovo che la nomina in `--supera`.
+`--chi` non ha default: `umano` se la decisione è dell'utente, `agente` se è tua, `delega` se la prendi su una delega che l'utente ti ha dato — e allora `--delega` porta le sue parole, alla lettera. Committa da sé; `--no-commit` per chi batcha. Un record non si riscrive: una decisione superata si marca con un record nuovo che la nomina in `--supera`.
 
 Campi, supersessione e sede: `{PLUGIN_ROOT}/docs/adr-format.md`.
