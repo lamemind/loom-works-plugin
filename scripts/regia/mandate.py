@@ -3,7 +3,8 @@ mandate — le letture della regia sul mandato: gate, albero, cifre prima → do
 
   gate    se la regia può partire: il permission mode della sessione che la
           lancia, letto dal suo transcript, e quello del progetto, letto da
-          `.claude/loom-works.json`. Parte solo se sono entrambi `auto`
+          `.claude/loom-works.json`, entrambi `auto`; e `loom-deck-headless`
+          sul PATH, il comando con cui la regia apre e porta avanti i membri
   tree    lo stato del perimetro dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
           `## Materiale`; poi le coppie di membri che non possono girare insieme
@@ -42,6 +43,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import sys
 
 # Il modulo comune si carica dal path esplicito della cartella dello script:
@@ -69,6 +71,10 @@ REGIA_STATE_GLYPH = "🎬"
 # ---------------------------------------------------------------------------
 
 PERMISSION_MODE_FIELD = re.compile(r'"permissionMode"\s*:\s*"([A-Za-z]+)"')
+# Il comando del pacchetto del deck che apre e porta avanti le conversazioni
+# headless. Su Windows npm lo installa come `.cmd`: `shutil.which` lo trova
+# lo stesso, perché prova le estensioni di PATHEXT.
+HEADLESS_COMMAND = "loom-deck-headless"
 
 
 def last_permission_mode(transcript):
@@ -110,7 +116,11 @@ def command_gate(project_root, own_session):
     print(f"OWN_TRANSCRIPT={transcript if os.path.exists(transcript) else '(non trovato)'}")
     print(f"OWN_MODE={own_mode or '?'}")
     print(f"PROJECT_MODE={project_mode}")
-    open_gate = own_mode == "auto" and project_mode == "auto"
+    # Senza il comando la regia scoprirebbe la mancanza al primo membro, a giro
+    # avviato, come un'anomalia: il gate la scopre prima di aprire niente.
+    headless = shutil.which(HEADLESS_COMMAND)
+    print(f"HEADLESS={headless or 'assente'}")
+    open_gate = own_mode == "auto" and project_mode == "auto" and headless is not None
     print(f"GATE={'ok' if open_gate else 'stop'}")
     return 0 if open_gate else 2
 

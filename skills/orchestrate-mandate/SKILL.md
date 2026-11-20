@@ -49,8 +49,9 @@ La scratchpad non tiene niente della regia: sta nella temp di sistema, e un rebo
 "PY" -B -I "R/mandate.py" gate --own-session SID
 ```
 
-Exit `0` (`GATE=ok`) → avanti. Exit `2` → **fermati senza aprire niente** e di' all'utente quale dei due modi non è `auto`, e cosa succede:
+Exit `0` (`GATE=ok`) → avanti. Exit `2` → **fermati senza aprire niente** e di' all'utente quale controllo non passa, e cosa succede:
 
+- `HEADLESS=assente`: `loom-deck-headless`, il comando del pacchetto del deck con cui la regia apre e porta avanti i membri (§2), non è sul PATH. Senza, la regia scoprirebbe la mancanza al primo membro, a giro avviato. Rimedio: `npm install -g @lamemind/loom-deck@latest` e rilanciare la skill. `HEADLESS=<path>` dice quale comando la regia userà.
 - `OWN_MODE` diverso da `auto` (o `?`, transcript non trovato): fuori da auto mode ogni comando `loom-deck-headless` e ogni `spawn-task` chiede conferma, e la regia smette di essere semi-automatica. Rimedio: passare la sessione in auto mode e rilanciare la skill.
 - `PROJECT_MODE` diverso da `auto`: le conversazioni nascono col `permissionMode` di `.claude/loom-works.json`, headless o in una tab. Un turno headless non ha nessuno che approva: in `manual` `loom-deck-headless open` rifiuta run e checkpoint, e in ogni modo diverso da `auto` il turno si vede negare ciò che il modo non concede da sé. Una tab con un modo diverso da quello della regia tiene i suoi messaggi in attesa dell'approvazione del suo utente. Rimedio: `"permissionMode": "auto"` nel file del progetto.
 
