@@ -259,7 +259,7 @@ Le righe che legge la regia:
 |---|---|
 | `TASK\|<id>\|prog=…\|size=…\|preflight=…\|dlv=a/b\|ac=a/b\|next=…\|blocked=…\|title=…` | stato della task e prossimo passo del suo ciclo |
 | `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo. Il perimetro non compare: si chiude dopo i membri, e un membro che lo nomina non lo aspetta |
-| `MATERIALE\|<id>\|<path> · …` | i path di `## Materiale`, `📁/` sciolto nella task folder |
+| `MATERIALE\|<id>\|<path> · …` | i path di `## Materiale`, `📁/` sciolto nella task folder; le voci 🎬, lo stato della regia, non entrano |
 | `CONFLICT\|<id>\|<id>\|dipendenza` · `…\|materiale: <path>` | due task aperte che non possono girare insieme: una dipendenza fra loro, o un path in comune che almeno una delle due non dichiara come 📖 fonte (due letture non si scontrano) |
 
 Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **mai dai glifi del grafo**: fra la promozione e il checkpoint i glifi del grafo restano indietro. Il grafo dà solo le frecce.

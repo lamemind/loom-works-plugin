@@ -79,7 +79,7 @@ Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-la
 
 **Epiche (task cappello)**: `Size: Epic` marca il cappello. Serve un marker: la parentela la scrive la **figlia**, il padre non sa di averne. Nel cappello: visione, ordine delle fasi, una checkbox per figlia in Acceptance; nelle figlie il lavoro eseguibile. Un **mandato** (`Size: Mandate`) elenca nel suo file membri anche di epiche diverse. Nessuno dei due copia stato o cifre dei membri, e `run-task` non li esegue. Membri: `resolve-task.sh <id> --members`; formato: `mandate-format.md`.
 
-**Materiale della task**: la sezione `## Materiale` dichiara i file di **alto rilievo**, non l'inventario della folder. Voce = glifo + path + maniglia verbo+oggetto. 📖 fonte · 🔬 analisi · 📤 prodotto · `📁/` = radice della task folder (campo `Folder`).
+**Materiale della task**: la sezione `## Materiale` dichiara i file di **alto rilievo**, non l'inventario della folder. Voce = glifo + path + maniglia verbo+oggetto. 📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato della regia · `📁/` = radice della task folder (campo `Folder`).
 
 ### Detached (più task in parallelo, stesso worktree)
 
@@ -90,7 +90,7 @@ Più task piccole in parallelo nello stesso worktree, una per sessione Claude. D
 Differenze vs linked:
 - **Analisi diff** (`checkpoint-task-analyze.sh`, finestra `<baseline>..HEAD`): **skippata** — il diff raccoglierebbe anche il lavoro delle altre task. Deliverables dal contesto conversazione
 - **Staging commit**: la lista dei file passa allo script come pathspec (linked: `git add -A` da script). Ogni commit porta la propria pathspec: lo stage altrui resta in stage. Su `TASK_SRC=env` senza pathspec lo script esce in errore: la contaminazione è silenziosa e si scopre a push fatto
-- **Concorrenza**: N task per worktree, sessioni separate (linked: 1 task per worktree)
+- **Concorrenza**: N task per worktree (linked: una)
 
 Vincoli:
 - **Task piccole**: ogni sessione fa una task auto-contenuta. Se diventa grande, non usare detached.

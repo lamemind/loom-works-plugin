@@ -61,6 +61,8 @@ CHECKBOX = re.compile(r"^- \[([ xX])\]")
 DATED_HEADING = re.compile(r"^###\s.*\d{4}-\d{2}-\d{2}")
 BACKTICKED = re.compile(r"`([^`]+)`")
 VARIATION_SELECTOR = "️"
+# Il glifo della voce di `## Materiale` che punta allo stato della regia.
+REGIA_STATE_GLYPH = "🎬"
 
 # ---------------------------------------------------------------------------
 # gate
@@ -227,7 +229,11 @@ def materiale_paths(lines, folder):
 
     Restituisce la lista dei path e l'insieme di quelli che la task dichiara
     solo come 📖 fonte, cioè legge e basta: un path nominato anche con un altro
-    glifo non ci entra."""
+    glifo non ci entra.
+
+    Una voce 🎬 non è un path della task: punta allo stato della regia del
+    perimetro, in `.claude/loom/regia/`, che scrive solo la regia. Non entra
+    nella lista, e non si confronta con nessun membro."""
     # Solo il prefisso `./`: la folder stessa comincia con un punto
     # (`./.26-11-16-slug`), e uno strip dei caratteri lo mangerebbe.
     folder = (folder or "").strip()
@@ -241,6 +247,8 @@ def materiale_paths(lines, folder):
             continue
         match = BACKTICKED.search(line)
         if not match:
+            continue
+        if REGIA_STATE_GLYPH in line[:match.start()]:
             continue
         source_only = "📖" in line[:match.start()]
         path = match.group(1).strip()

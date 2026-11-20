@@ -47,7 +47,14 @@ Perché questo perimetro esiste e cosa vuole ottenere.
 | T61 → T52 | dipende | il gate legge il formato scritto da T52 | dichiarata |
 | T52 · T64 | collide | `scripts/utils/lib.sh` | materiale |
 | T61 · T64 | collide | entrambe riscrivono il poll del deck | modello |
+
+## Materiale
+*📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato della regia; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
+
+- 🎬 `.claude/loom/regia/T230.md` — seguire il giro della regia: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
 ```
+
+`## Materiale` non è una sezione propria del mandato: è quella del task template, e in un perimetro porta la voce 🎬 (§La voce 🎬).
 
 ### `## Membri`
 
@@ -76,12 +83,20 @@ Le relazioni fra coppie di membri sull'intero perimetro. Ha **lo stesso nome e l
 | `Fonte` | `dichiarata` · `materiale` · `modello` |
 
 - **`dichiarata`** — una dipendenza che un membro dichiara in `## Dependencies` o che il grafo di `tasks.md` porta: le righe `DEPS` di `scripts/regia/mandate.py tree`.
-- **`materiale`** — due membri aperti che nominano path sovrapposti in `## Materiale`, e almeno uno dei due non come 📖 fonte: le righe `CONFLICT` di `mandate.py tree`. Due letture dello stesso file non si scontrano.
+- **`materiale`** — due membri aperti che nominano path sovrapposti in `## Materiale`, e almeno uno dei due non come 📖 fonte: le righe `CONFLICT` di `mandate.py tree`. Due letture dello stesso file non si scontrano, e una voce 🎬 non conta: punta allo stato della regia, che nessun membro scrive.
 - **`modello`** — una collisione che nessun campo dichiara, trovata leggendo i DLV dei membri.
 
 Le righe `dichiarata` e `materiale` si ricalcolano dai file, quindi un confronto meccanico le verifica contro lo stato attuale: `scripts/regia/mandate.py verify`. Le righe `modello` vengono da una lettura, e si riesaminano quando un membro cambia. La sezione non porta sha né data: il commit da cui l'analisi vale si ricava dalla storia, ed è il più recente fra l'ultimo che ha cambiato le righe della sezione e l'ultimo `### Avanzamento` del perimetro.
 
 Il metodo con cui la sezione si scrive e si riscrive — trascrizione delle righe di `tree`, lettura dei membri, rianalisi — è `mandate-analysis.md`.
+
+### La voce 🎬
+
+Il glifo 🎬, **stato della regia**, marca in `## Materiale` di un perimetro — mandato o epica — la voce che punta al file in cui la regia tiene il suo giro: `.claude/loom/regia/T<id>.md`, sotto la project root, ignorato da git. Il file porta conversazioni, fatti del perimetro e proposte in sospeso, e `checkpoint-mandate` ne porta i fatti nella prosa del perimetro.
+
+- La scrive `prepare-mandate`, una volta sola; la regia non scrive nei task file.
+- È un puntatore per chi legge il task file. La regia e `checkpoint-mandate` ricavano il path dall'id del perimetro, quindi un perimetro senza la voce viene seguito lo stesso.
+- Il file può non esserci ancora: nasce al primo lancio della regia.
 
 ### Acceptance e Deliverables
 
