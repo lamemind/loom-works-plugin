@@ -25,7 +25,7 @@ giro registra lo stato attuale e non emette niente sul passato.
 Uso (lo lancia la skill della regia, dalla cache del plugin):
   python -u -I watch_sessions.py --project-root <radice del progetto> \\
       --own-session <id della sessione che lancia il monitor> \\
-      --state <scratchpad>/watch_state.json \\
+      --state <radice>/.claude/loom/regia/T<perimetro>-watch.json \\
       [--repo nome=path-relativo-alla-radice]...
 """
 
@@ -55,7 +55,7 @@ def parse_arguments():
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     parser.add_argument("--own-session", default="", help="session id da saltare: quello che lancia il monitor")
-    parser.add_argument("--state", required=True, help="file JSON di stato; tenerlo fuori dal repo")
+    parser.add_argument("--state", required=True, help="file JSON di stato, in una cartella che git ignora")
     parser.add_argument("--repo", action="append", default=[],
                         help="nome=path relativo alla radice, oltre a radice e submodule; ripetibile")
     parser.add_argument("--poll-seconds", type=int, default=15)

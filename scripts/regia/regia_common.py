@@ -1,9 +1,11 @@
 """
-regia_common — le letture condivise dai due script della regia.
+regia_common — le letture condivise dagli script della regia.
 
-`watch_sessions.py` (il monitor) e `sessions.py` (list, tail) leggono le stesse
-fonti: la radice del progetto e la sua docs-root. Stanno qui, in un posto solo,
-perché due copie della stessa lettura divergono alla prima correzione.
+`watch_sessions.py` (il monitor), `sessions.py` (list, tail, regie),
+`mandate.py` e `regia_state.py` leggono le stesse fonti: la radice del progetto,
+la sua docs-root, i task file, il registro delle sessioni vive. Stanno qui, in
+un posto solo, perché due copie della stessa lettura divergono alla prima
+correzione.
 
 Solo libreria standard di Python: gli script girano dalla cache del plugin su
 Linux e su Windows, dove nessuno installa pacchetti per loro.
@@ -67,6 +69,27 @@ def docs_root(project_root):
     except (OSError, ValueError, AttributeError):
         pass
     return os.environ.get("LOOM_DOCS_ROOT") or "docs"
+
+
+def find_task_file(project_root, docs, task_id):
+    """Il task file di `task_id` sotto `<docs>/tasks/`, `None` se non c'è.
+
+    Il nome è `<id>-<slug>.md`: il trattino dopo l'id tiene `T7` fuori da
+    `T74-…`. Con più file per lo stesso id vale il primo in ordine alfabetico.
+    """
+    matches = sorted(glob.glob(os.path.join(glob.escape(os.path.join(project_root, docs, "tasks")),
+                                            glob.escape(task_id) + "-*.md")))
+    return matches[0] if matches else None
+
+
+def header_field(lines, name):
+    """Il valore di un campo dell'header di un task file (`- **<name>**: …`),
+    stringa vuota se il campo manca."""
+    prefix = f"- **{name}**:"
+    for line in lines:
+        if line.startswith(prefix):
+            return line[len(prefix):].strip()
+    return ""
 
 
 # ---------------------------------------------------------------------------

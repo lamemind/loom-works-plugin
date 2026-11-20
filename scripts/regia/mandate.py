@@ -13,7 +13,7 @@ mandate — le letture della regia sul mandato: gate, albero, cifre prima → do
   recap   le cifre di oggi accanto a quelle salvate da `tree --save` all'armo
 
 Solo letture: nessuno di questi comandi scrive nei repo. `tree --save` scrive il
-file che gli si indica, che la skill tiene nella scratchpad della regia.
+file che gli si indica: la skill lo tiene in `.claude/loom/regia/`, ignorata da git.
 
 Lo stato di una task si legge dalla cella Prog della tabella Tasks Overview e
 dal task file, mai dai glifi del grafo: fra la promozione e il checkpoint i
@@ -39,7 +39,6 @@ mancante a `tree` e `verify`.
 """
 
 import argparse
-import glob
 import json
 import os
 import re
@@ -178,20 +177,6 @@ def graph_edges(tasks_md_lines):
     return edges
 
 
-def find_task_file(project_root, docs, task_id):
-    matches = sorted(glob.glob(os.path.join(glob.escape(os.path.join(project_root, docs, "tasks")),
-                                            glob.escape(task_id) + "-*.md")))
-    return matches[0] if matches else None
-
-
-def header_field(lines, name):
-    prefix = f"- **{name}**:"
-    for line in lines:
-        if line.startswith(prefix):
-            return line[len(prefix):].strip()
-    return ""
-
-
 def count_checkboxes(section):
     marks = [CHECKBOX.match(line).group(1) for line in section if CHECKBOX.match(line)]
     return sum(1 for mark in marks if mark in "xX"), len(marks)
@@ -277,7 +262,7 @@ def read_task(project_root, docs, task_id, overview):
     task = {"id": task_id, "prog": normalize_glyph(progress) or "?", "title": title,
             "file": None, "size": "?", "preflight": "none",
             "dlv": [0, 0], "ac": [0, 0], "deps": [], "materiale": [], "read_only": set()}
-    path = find_task_file(project_root, docs, task_id)
+    path = regia_common.find_task_file(project_root, docs, task_id)
     if path is None:
         return task
     with open(path, encoding="utf-8", errors="replace") as task_handle:
@@ -285,12 +270,12 @@ def read_task(project_root, docs, task_id, overview):
     task["file"] = os.path.relpath(path, project_root)
     if not task["title"] and lines and lines[0].startswith("# Task:"):
         task["title"] = lines[0][len("# Task:"):].strip()
-    task["size"] = header_field(lines, "Size") or "?"
+    task["size"] = regia_common.header_field(lines, "Size") or "?"
     task["preflight"] = preflight_state(lines)
     task["dlv"] = list(count_checkboxes(section_lines(lines, "Deliverables Checklist")))
     task["ac"] = list(count_checkboxes(section_lines(lines, "Acceptance Criteria")))
     task["deps"] = declared_dependencies(lines)
-    task["materiale"], task["read_only"] = materiale_paths(lines, header_field(lines, "Folder"))
+    task["materiale"], task["read_only"] = materiale_paths(lines, regia_common.header_field(lines, "Folder"))
     return task
 
 
@@ -561,7 +546,7 @@ def parse_arguments():
     tree_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
     tree_parser.add_argument("--children", nargs="*", required=True,
                              help="i membri, dal lettore unico resolve-task.sh --members")
-    tree_parser.add_argument("--save", default="", help="file JSON delle cifre di partenza, fuori dai repo")
+    tree_parser.add_argument("--save", default="", help="file JSON delle cifre di partenza, in una cartella che git ignora")
     verify_parser = subcommands.add_parser("verify")
     verify_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
     verify_parser.add_argument("--children", nargs="*", required=True,
