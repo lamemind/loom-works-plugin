@@ -7,13 +7,15 @@ regia_state — lo stato su disco della regia di un perimetro: dove sta, di chi 
   facts   per `checkpoint-mandate`: la sezione `## Fatti del perimetro` dello
           stato, se lo stato è di questo perimetro
 
-I tre file stanno in `<radice>/.claude/loom/regia/`, col nome ricavato dall'id
-del perimetro:
+I quattro file stanno in `<radice>/.claude/loom/regia/`, col nome ricavato
+dall'id del perimetro:
 
-  T<id>.md          lo stato della regia, scritto dalla regia col tool `Write`
-  T<id>-prima.json  le cifre di partenza, scritte da `mandate.py tree --save`
-  T<id>-watch.json  il punto da cui riparte il monitor, scritto da
-                    `watch_sessions.py --state`
+  T<id>.md           lo stato della regia, scritto dalla regia col tool `Write`
+  T<id>-prima.json   le cifre di partenza, scritte da `mandate.py tree --save`
+  T<id>-watch.json   il punto da cui riparte il monitor, scritto da
+                     `watch_sessions.py --state`
+  T<id>-filter.json  whitelist e blacklist del monitor, scritte dalla regia col
+                     tool `Write` e lette da `watch_sessions.py --filter`
 
 Non nella scratchpad della conversazione: sta nella temp di sistema, e un
 reboot o una pulizia la svuotano a giro aperto. Non nella task folder del
@@ -52,8 +54,10 @@ Verdetti di `check` (riga `STATE=`):
   illeggibile  il file c'è, ma la testa non si legge                   exit 2
 
 Un giro nuovo toglie `-watch.json` (il monitor darebbe come eventi tutto ciò
-che è cambiato dallo stop precedente) e chiede di riscrivere `-prima.json`; una
-ripresa li tiene, e riscrive le cifre solo se mancano.
+che è cambiato dallo stop precedente) e `-filter.json` (le conversazioni che
+l'utente ha escluso valgono per il giro, come la delega), e chiede di
+riscrivere `-prima.json`; una ripresa li tiene, e riscrive le cifre solo se
+mancano.
 
 Uso:
   python -I regia_state.py [--project-root <radice>] check <perimetro> --own-session <session id>
@@ -98,7 +102,8 @@ def state_paths(project_root, perimeter):
     return {"dir": directory,
             "state": os.path.join(directory, f"{perimeter}.md"),
             "before": os.path.join(directory, f"{perimeter}-prima.json"),
-            "watch": os.path.join(directory, f"{perimeter}-watch.json")}
+            "watch": os.path.join(directory, f"{perimeter}-watch.json"),
+            "filter": os.path.join(directory, f"{perimeter}-filter.json")}
 
 
 def perimeter_created_on(project_root, perimeter):
@@ -189,6 +194,7 @@ def command_check(project_root, perimeter, own_session):
     print(f"STATE_FILE={paths['state']}")
     print(f"BEFORE_FILE={paths['before']}")
     print(f"WATCH_FILE={paths['watch']}")
+    print(f"FILTER_FILE={paths['filter']}")
     print(f"CREATED_ON={created_on}")
 
     ignored = gitignore_state(project_root, paths["state"])
@@ -217,15 +223,17 @@ def command_check(project_root, perimeter, own_session):
         print(f"STATE_CREATED_ON={head['created_on']}")
 
     if verdict in NEW_ROUND:
-        if os.path.exists(paths["watch"]):
-            os.remove(paths["watch"])
-            print("WATCH=tolto")
-        else:
-            print("WATCH=assente")
+        for key, word in (("watch", "WATCH"), ("filter", "FILTER")):
+            if os.path.exists(paths[key]):
+                os.remove(paths[key])
+                print(f"{word}=tolto")
+            else:
+                print(f"{word}=assente")
         print("BEFORE=scrivi")
         print("ROUND=nuovo")
     elif VERDICT_EXIT[verdict] == GO:
         print(f"WATCH={'resta' if os.path.exists(paths['watch']) else 'assente'}")
+        print(f"FILTER={'resta' if os.path.exists(paths['filter']) else 'assente'}")
         print(f"BEFORE={'tieni' if os.path.exists(paths['before']) else 'scrivi'}")
         print("ROUND=ripresa")
     print(f"CHECK={'ok' if VERDICT_EXIT[verdict] == GO else 'stop'}")

@@ -16,11 +16,11 @@ I membri di un perimetro avanzano uno per conversazione, e nessuna conversazione
 
 - **Lancia da sé** preflight, run e checkpoint quando le dipendenze lo permettono: l'utente ha dato il mandato invocando la skill, e un ok a ogni conversazione non serve.
 - **Non risponde da sé**, salvo delega. Alle domande delle sessioni — un preflight che chiede, le segnalazioni 🚦 di un report — prepara una proposta motivata e la manda solo col via dell'utente. L'unico messaggio che parte senza via è la richiesta di checkpoint dopo un run pulito (§2). Con una delega che l'utente dichiara nella chat della regia, manda da sé anche le risposte, entro i limiti del §3.
-- **Non scrive mai nei task file né in un file tracciato.** Nessun `Edit`, `Write` o commit su un file che git segue. Agisce sulle conversazioni e basta: le apre e le porta avanti come turni headless con `loom-deck-headless` (§2); apre una tab con `spawn-task` solo quando l'utente la chiede per un passo; scrive a una tab viva con `SendMessage`, e chiude con `close-session` le tab che ha aperto, a passo finito. I soli file che scrive stanno in `.claude/loom/regia/` del progetto, che git ignora: lo stato della regia, le cifre di partenza e lo stato del monitor (§0f, Lo stato su disco).
+- **Non scrive mai nei task file né in un file tracciato.** Nessun `Edit`, `Write` o commit su un file che git segue. Agisce sulle conversazioni e basta: le apre e le porta avanti come turni headless con `loom-deck-headless` (§2); apre una tab con `spawn-task` solo quando l'utente la chiede per un passo; scrive a una tab viva con `SendMessage`, e chiude con `close-session` le tab che ha aperto, a passo finito. I soli file che scrive stanno in `.claude/loom/regia/` del progetto, che git ignora: lo stato della regia, le cifre di partenza, lo stato del monitor e il suo filtro (§0f, Lo stato su disco).
 
 Il **perimetro** è un id solo negli argomenti: un'**epica** (`Size: Epic`), i cui membri sono le figlie, o un **mandato** (`Size: Mandate`), che elenca i membri nel proprio file (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). La regia li tratta allo stesso modo: i membri arrivano dal lettore unico, `resolve-task.sh <id> --members`, e il perimetro con tutti i suoi membri è ciò che la regia porta avanti. Un perimetro più largo — un'epica e qualche task in più, task di epiche diverse — si costruisce prima del lancio con `/loom-works:prepare-mandate`, mai negli argomenti. Nessun tetto alle conversazioni aperte.
 
-Gli script della regia stanno in `${CLAUDE_PLUGIN_ROOT}/scripts/regia/`, solo libreria standard di Python, Linux e Windows: `watch_sessions.py` (il monitor), `sessions.py` (`list` delle vive, `tail` di una sessione, `regie` delle altre regie vive), `mandate.py` (`gate`, `tree`, `verify`, `recap`), `regia_state.py` (`check` dello stato su disco al lancio, `facts` per `checkpoint-mandate`). Nessuno scrive un file tracciato: scrivono solo sotto `.claude/loom/regia/`.
+Gli script della regia stanno in `${CLAUDE_PLUGIN_ROOT}/scripts/regia/`, solo libreria standard di Python, Linux e Windows: `watch_sessions.py` (il monitor, col filtro di `watch_filter.py`), `sessions.py` (`list` delle vive, `tail` di una sessione, `regie` delle altre regie vive, `find` del sessionId intero di una viva), `mandate.py` (`gate`, `tree`, `verify`, `recap`), `regia_state.py` (`check` dello stato su disco al lancio, `facts` per `checkpoint-mandate`). Nessuno scrive un file tracciato: scrivono solo sotto `.claude/loom/regia/`.
 
 ## 0. Avvio
 
@@ -120,13 +120,13 @@ Un membro è **in comune** se compare fra i tuoi membri aperti — le righe `TAS
 
 #### Lo stato su disco
 
-La regia tiene tre file in `.claude/loom/regia/` del progetto, col nome ricavato dall'id del perimetro: `T<perimetro>.md`, lo stato (§0i); `T<perimetro>-prima.json`, le cifre di partenza (§0g); `T<perimetro>-watch.json`, il punto da cui riparte il monitor (§0j). Stanno nel progetto perché sopravvivano a un reboot, e sotto `.claude/loom/` perché git la ignora: nella task folder del perimetro, che è tracciata, il `git add -A` di un `checkpoint-task` linked committerebbe lo stato a metà giro. Nessuno li cancella: il giro dopo eredita i fatti del perimetro, e `checkpoint-mandate` li legge da lì.
+La regia tiene quattro file in `.claude/loom/regia/` del progetto, col nome ricavato dall'id del perimetro: `T<perimetro>.md`, lo stato (§0i); `T<perimetro>-prima.json`, le cifre di partenza (§0g); `T<perimetro>-watch.json`, il punto da cui riparte il monitor (§0j); `T<perimetro>-filter.json`, whitelist e blacklist del monitor (§0j). Stanno nel progetto perché sopravvivano a un reboot, e sotto `.claude/loom/` perché git la ignora: nella task folder del perimetro, che è tracciata, il `git add -A` di un `checkpoint-task` linked committerebbe lo stato a metà giro. Nessuno li cancella: il giro dopo eredita i fatti del perimetro, e `checkpoint-mandate` li legge da lì.
 
 ```bash
 "PY" -B -I "R/regia_state.py" check <perimetro> --own-session SID
 ```
 
-`STATE_FILE`, `BEFORE_FILE` e `WATCH_FILE` sono i tre path: da qui in poi li scrivi per esteso, come `PY` e `R`. `CREATED_ON` è il `Created on` del task file del perimetro, che entra nella testa dello stato (§0i). Lo script crea la cartella.
+`STATE_FILE`, `BEFORE_FILE`, `WATCH_FILE` e `FILTER_FILE` sono i quattro path: da qui in poi li scrivi per esteso, come `PY` e `R`. `CREATED_ON` è il `Created on` del task file del perimetro, che entra nella testa dello stato (§0i). Lo script crea la cartella.
 
 **`IGNORED=no`** (exit `2`, `CHECK=stop`) → **fermati senza aprire niente**: git non ignora `.claude/loom/`, e lo stato finirebbe nel commit del primo `checkpoint-task` linked. Di' all'utente la riga da aggiungere al `.gitignore` del progetto, quella di `IGNORE_RULE`, e di rilanciare la regia. `IGNORED=fuori da git` va avanti; `IGNORED=?` — git non risponde — va avanti con una riga all'utente.
 
@@ -143,8 +143,8 @@ La riga `STATE=` dice cosa hai trovato:
 | `passata` | `passata a` questa sessione | fermati, exit `2` |
 | `illeggibile` | il file c'è, la testa no | fermati, exit `2` |
 
-- **Giro nuovo** (`ROUND=nuovo`). Lo script ha già tolto lo stato del monitor (`WATCH=tolto`): riarmato su un file vecchio, il monitor darebbe come eventi tutto ciò che è cambiato dal giro prima. Le cifre di partenza si riscrivono (§0g). Su `ferma` leggi lo stato vecchio con `Read` prima di riscriverlo, e porta nello stato nuovo la sezione `## Fatti del perimetro` intera, aperti e superati: lo stop non lancia il checkpoint del perimetro, e quei fatti possono stare solo lì. Li riesamini al primo quadro (§1): un fatto aperto che i membri hanno chiuso nel frattempo diventa superato. Conversazioni, proposte, rami fermi, collisioni e delega ripartono da zero.
-- **Ripresa** (`ROUND=ripresa`). Leggi lo stato con `Read` e riparti da lì. Lo stato del monitor resta, e il monitor riarmato riparte dal punto in cui era (§0j). Le cifre di partenza restano quelle salvate all'avvio del giro (`BEFORE=tieni`), e si riscrivono solo se il file manca (`BEFORE=scrivi`). Su `morta` la regia di prima si è chiusa senza stop — un crash, una tab chiusa, un reboot: adotti conversazioni, proposte in sospeso, rami fermi e fatti; le conversazioni `tab` della tabella che `sessions.py list` non dà più vive (§0h) diventano `abbandonata (non più viva alla ripresa)`, e un `## Checkpoint in corso` su una di loro si libera; la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: conversazioni adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta.
+- **Giro nuovo** (`ROUND=nuovo`). Lo script ha già tolto lo stato del monitor (`WATCH=tolto`): riarmato su un file vecchio, il monitor darebbe come eventi tutto ciò che è cambiato dal giro prima. Ha tolto anche il filtro (`FILTER=tolto`): le conversazioni che l'utente ha escluso valgono per il giro, come la delega. Le cifre di partenza si riscrivono (§0g). Su `ferma` leggi lo stato vecchio con `Read` prima di riscriverlo, e porta nello stato nuovo la sezione `## Fatti del perimetro` intera, aperti e superati: lo stop non lancia il checkpoint del perimetro, e quei fatti possono stare solo lì. Li riesamini al primo quadro (§1): un fatto aperto che i membri hanno chiuso nel frattempo diventa superato. Conversazioni, proposte, rami fermi, collisioni e delega ripartono da zero.
+- **Ripresa** (`ROUND=ripresa`). Leggi lo stato con `Read` e riparti da lì. Lo stato del monitor resta, e il monitor riarmato riparte dal punto in cui era (§0j). Resta anche il filtro (`FILTER=resta`), su `mia` e su `morta`: le conversazioni escluse restano escluse. Le cifre di partenza restano quelle salvate all'avvio del giro (`BEFORE=tieni`), e si riscrivono solo se il file manca (`BEFORE=scrivi`). Su `morta` la regia di prima si è chiusa senza stop — un crash, una tab chiusa, un reboot: adotti conversazioni, proposte in sospeso, rami fermi e fatti; le conversazioni `tab` della tabella che `sessions.py list` non dà più vive (§0h) diventano `abbandonata (non più viva alla ripresa)`, e un `## Checkpoint in corso` su una di loro si libera; la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: conversazioni adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta, conversazioni escluse dal monitor.
 
   **Una conversazione `headless` non diventa mai `abbandonata` solo perché non è viva**: fra due turni non ha processo per costruzione, e il suo transcript e i suoi file in `.claude/loom/headless/` sopravvivono alla regia. In ogni ripresa, `mia` o `morta`, ogni riga `headless` in ciclo si rilegge con `loom-deck-headless status` (§2, L'esito di un turno headless): `in corso` aspetta la fine del turno; `turno chiuso` si legge, e il ciclo prosegue dal punto che il testo finale dice — un report da cui chiedere il checkpoint, una domanda da proporre, un checkpoint finito; `errore` e `permesso negato` fermano il ramo come sempre.
 - **`viva`** → **fermati senza aprire niente**: un'altra regia viva tiene lo stato di questo perimetro, la sessione di `STATE_HOLDER`. Le strade sono quelle della guardia sopra: fermarla nella sua chat, o chiuderne la conversazione.
@@ -176,7 +176,7 @@ Una sessione viva su una task fuori dal perimetro, o senza task, non è esterna:
 
 ### 0i. Lo stato della regia
 
-Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `STATE_FILE` (§0f) col tool `Write`, riscrivilo intero a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo.
+Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `STATE_FILE` (§0f) col tool `Write`, riscrivilo intero a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo, insieme a `FILTER_FILE`: le conversazioni escluse dal monitor stanno solo lì (§0j).
 
 Le due righe di testa stanno prima di ogni heading, e `regia_state.py check` le legge al lancio di una regia dopo questa:
 
@@ -225,17 +225,40 @@ Perimetro: T<perimetro> · Created on <CREATED_ON>
 - no | sì dal <ora>: «<le parole dell'utente>»
 ```
 
-### 0j. Armo e riarmo del monitor
+### 0j. Il filtro, l'armo e il riarmo del monitor
 
-Lancia il tool `Monitor` con `timeout_ms: 1800000`, una `description` che nomina il perimetro e il progetto («regia T197: sessioni di loom-works»), e questo comando:
+Il monitor segue tutte le sessioni vive del progetto, e ogni sua riga ti arriva come notifica: anche per ignorarla spendi un turno. Il **filtro** toglie le righe fuori dal mandato prima che escano dal monitor.
 
-```bash
-"PY" -u -B -I "R/watch_sessions.py" --project-root "<radice del progetto>" --own-session SID --state "<WATCH_FILE>" 2>&1
+**Il filtro, prima del primo armo del giro**, nuovo o ripreso. Scrivi `FILTER_FILE` (§0f) col tool `Write`:
+
+```json
+{"whitelist": ["task:T<perimetro>", "task:T<membro>", "task:T<membro>"], "blacklist": []}
 ```
 
-Aggiungi `--repo nome=path-relativo` solo per un repo dove lavorano i membri che non sia la radice né un submodule di `.gitmodules`: quelli il monitor li guarda da sé. Aspetta la riga `monitor ✅ armato: …`: deve elencare ogni sessione viva che ti aspetti, con stato ed età. Una sessione attesa che manca va cercata con `sessions.py list` prima di fidarti del silenzio.
+- **`whitelist`** — `task:` per il perimetro e per ogni membro dell'ultima lettura di `resolve-task.sh --members` (§0d), senza i `TASK_MEMBER_MISSING`. Le dipendenze esterne dei membri restano fuori.
+- **`blacklist`** — vuota in un giro nuovo. In una ripresa (`FILTER=resta`) leggi prima il file con `Read` e tieni la sua blacklist: sono le conversazioni che l'utente ha escluso (§1, Escludere una conversazione).
 
-**Riarmo.** Il tool `Monitor` uccide il processo dopo 30 minuti al massimo e ti manda un avviso di scadenza. A ogni avviso rilancia **lo stesso comando, con lo stesso `--state`**: il monitor riparte dal punto in cui era, senza ripetere gli eventi già detti e senza perdere quelli capitati nel cambio. Vale anche per il primo armo di una ripresa (§0f): il file è quello del giro ripreso. La riga di armo diventa `monitor ✅ riarmato: …`. Un evento consegnato dopo un `TaskStop` era già in coda: è in ritardo, ignoralo.
+Il file è l'unica sede delle liste. Il monitor lo rilegge da sé quando cambia, quindi il comando di armo non cambia mai: riscrivi il file intero, con le due chiavi, quando cambia la riga `membri:` dello stato (§1, I membri, a ogni quadro) e quando l'utente esclude o riammette una conversazione, e nessun riarmo. Un filtro è una stringa col tipo in testa: `task:T<n>`, `session:<sessionId>` o `re:<regex>`. La regex guarda la riga come esce dal monitor, e la scrivi solo se l'utente la chiede.
+
+Cosa passa:
+
+- un evento di **sessione** porta la task della sessione: una sessione `?` non passa finché un evento non la lega a un membro, e un cambio di legame passa se la task vecchia o la nuova è un membro;
+- un evento di **task file** o di **`tasks.md`** porta la sua task;
+- un **commit** porta l'id dello scope (`run(T23): …`), o senza scope ogni id del soggetto. Il commit di creazione `task(T<n>): create` porta anche il `Parent Task` della task nata: così passa la figlia nuova di un'epica, e la creazione di una task estranea no;
+- un **push** e un commit senza id non hanno task, e non passano: nessuna regola della regia parte da loro;
+- le righe **`monitor`** passano sempre.
+
+**L'armo.** Lancia il tool `Monitor` con `timeout_ms: 1800000`, una `description` che nomina il perimetro e il progetto («regia T197: sessioni di loom-works»), e questo comando:
+
+```bash
+"PY" -u -B -I "R/watch_sessions.py" --project-root "<radice del progetto>" --own-session SID --state "<WATCH_FILE>" --filter "<FILTER_FILE>" 2>&1
+```
+
+Aggiungi `--repo nome=path-relativo` solo per un repo dove lavorano i membri che non sia la radice né un submodule di `.gitmodules`: quelli il monitor li guarda da sé. Aspetta la riga `monitor ✅ armato col filtro (sessioni fuori: N): …`: deve elencare ogni sessione viva del mandato che ti aspetti, con stato ed età, e `N` conta le sessioni vive che il filtro tiene fuori. Una sessione attesa che manca va cercata con `sessions.py list` prima di fidarti del silenzio.
+
+**Un file del filtro guasto non ferma il monitor.** Una riga `monitor ⚠ filtro <file>: <motivo> — …` dice che il file manca, non è JSON o porta un filtro che non vale, e cosa fa il monitor intanto: `resta il filtro di prima`, l'ultimo valido, o `passa tutto` se non ne ha ancora uno. Riscrivi il file: alla rilettura buona arriva `monitor ✅ filtro <file>: di nuovo in vigore`.
+
+**Riarmo.** Il tool `Monitor` uccide il processo dopo 30 minuti al massimo e ti manda un avviso di scadenza. A ogni avviso rilancia **lo stesso comando, con lo stesso `--state` e lo stesso `--filter`**, senza riscrivere il filtro: il monitor riparte dal punto in cui era, senza ripetere gli eventi già detti e senza perdere quelli capitati nel cambio. Vale anche per il primo armo di una ripresa (§0f): il file è quello del giro ripreso. La riga di armo diventa `monitor ✅ riarmato col filtro …`. Un evento consegnato dopo un `TaskStop` era già in coda: è in ritardo, ignoralo.
 
 Gli eventi del monitor arrivano come notifiche e non sono risposte dell'utente, anche quando arrivano mentre aspetti il suo via. Il fine turno di una tab arriva come evento `⏸ turno finito`: è il segnale su cui la regia ragiona, perché la notifica di `SendMessage` con `notify_when_idle` non arriva mentre la regia sta lavorando.
 
@@ -250,6 +273,8 @@ Il passo successivo si decide sul quadro dei file, mai a memoria. Rifai il quadr
 "PY" -B -I "R/mandate.py" tree <perimetro> --children <membri>
 ```
 
+Con una o più conversazioni nella blacklist del filtro, il quadro ha una terza lettura, `"PY" -B -I "R/sessions.py" list`: il monitor non dice più quando una conversazione esclusa si apre o si chiude, e la regola 1 di §Le regole di partenza la conta finché è viva (§Escludere una conversazione).
+
 ### I membri, a ogni quadro
 
 I membri si rileggono dal lettore unico a ogni quadro, e i `<membri>` di `tree` sono quelli di **questa** lettura, non quelli dell'avvio: un perimetro cambia durante il giro. In un'epica nasce una figlia nuova, che dichiara il `Parent Task`; in un mandato `prepare-mandate` aggiunge o toglie una riga di `## Membri`. Confronta la lettura con la riga `membri:` dello stato:
@@ -258,7 +283,7 @@ I membri si rileggono dal lettore unico a ogni quadro, e i `<membri>` di `tree` 
 - **Un membro tolto** esce dal mandato della regia: nessuna conversazione nuova su di lui. Un suo ciclo già aperto da questa regia arriva al checkpoint come gli altri, poi la task si lascia andare. Una riga all'utente.
 - **Un `TASK_MEMBER_MISSING` nuovo** — un membro purgato da `clean-tasks` durante il giro — esce come un membro tolto.
 
-Riscrivi la riga `membri:` dello stato a ogni cambio. Le cifre di partenza del recap (§5) restano quelle salvate all'avvio: un membro entrato dopo non ha un «prima», e il recap lo dice.
+Riscrivi la riga `membri:` dello stato a ogni cambio, e con lei la whitelist del filtro, blacklist intatta (§0j): un membro nuovo fuori dalla whitelist resterebbe muto per il monitor. Le cifre di partenza del recap (§5) restano quelle salvate all'avvio: un membro entrato dopo non ha un «prima», e il recap lo dice.
 
 Le righe che legge la regia:
 
@@ -284,7 +309,7 @@ Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **
 
 Una conversazione nuova parte solo se valgono tutte:
 
-1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua o esterna (§0h).
+1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e la regia non apre una conversazione su una task che ne ha già una in ciclo — sua, esterna (§0h) o esclusa dal monitor e ancora viva (§Escludere una conversazione).
 2. **Dipendenze soddisfatte**, per ogni passo, preflight compreso: le decisioni di una task poggiano su ciò che la dipendenza ha fatto davvero. Una dipendenza è soddisfatta quando è ✔️, oppure quando la sua voce in `## Dependencies` nomina dei DLV precisi («serve il DLV2 di T21») e quei DLV sono **chiusi a ciclo finito**. Le voci le leggi tu nel task file: `blocked=` conta solo le task, non i DLV.
 3. **Un DLV conta come chiuso solo a ciclo finito.** `run-task` spunta e committa ogni DLV appena chiuso, prima del checkpoint e prima delle risposte alle segnalazioni del suo report. Per la regia il DLV diventa una base solo dopo il checkpoint del suo ciclo e le risposte alle segnalazioni. Una task con segnalazioni in sospeso non fa da base a nessuna: si fermano le sue dipendenti, i rami indipendenti continuano.
 4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia — né una dipendenza fra loro, né un path in comune nei loro `## Materiale` che almeno una delle due scrive — e nessuna riga di `## Collisioni del modello` nello stato (§0e): una collisione che nessun campo dichiara ferma il parallelo come una `CONFLICT`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
@@ -298,13 +323,11 @@ Un ciclo di lavoro è una sola chiamata `run`. Prima del lancio guarda le voci `
 
 ### Il riporto
 
-Il monitor segue tutte le sessioni vive del progetto, non solo quelle del perimetro. Il **mandato** della regia è il perimetro e i suoi membri dell'ultima lettura (§I membri, a ogni quadro), e l'etichetta in testa a un evento dice a quale task appartiene. Prima di riportare, guarda l'etichetta:
+Il monitor è armato col filtro del perimetro (§0j), e gli eventi che arrivano sono di norma del **mandato**: il perimetro e i suoi membri dell'ultima lettura (§I membri, a ogni quadro). Tre finestre ne lasciano arrivare altri: i 15 secondi fra un membro tolto e il filtro riscritto, una regex che l'utente ha chiesto, un file del filtro guasto (`monitor ⚠ filtro …`). Per questo guardi comunque l'etichetta in testa all'evento, che dice a quale task appartiene, e un evento fuori dal mandato lo ignori del tutto: nessuna riga in chat, nessuna proposta (§3), nessun messaggio, nessuna chiusura, nessuna scalata (§4), niente nello stato — anche quando dentro il mandato chiederebbe una mossa, come una domanda o `🧊 ferma da N min`. Quella sessione risponde al suo utente, non al mandato.
 
-- **Task del mandato** → l'evento si riporta, come nella tabella sotto.
-- **Task fuori dal mandato** — una sessione legata a un'altra task, il task file di un'altra task, la sua cella Prog in `tasks.md` → la regia ignora l'evento del tutto: nessuna riga in chat, nessuna proposta (§3), nessun messaggio, nessuna chiusura, nessuna scalata (§4), niente nello stato. Vale anche per gli eventi che dentro il mandato chiedono una mossa: una domanda, un permesso in attesa, `🧊 ferma da N min`. Quella sessione risponde al suo utente, non al mandato: una proposta o un messaggio della regia sarebbero un'azione che l'utente non le ha chiesto.
 - **Sessione senza task** — etichetta `?` più l'inizio del sessionId → fuori dal mandato, finché un evento non la lega a una task del mandato.
 - **Cambio di legame** — `🏷 legata a`, `🔀 staccata da`, `🔀 riassegnata` → conta se la task vecchia o la nuova è del mandato: una riga, e da lì la sessione è dentro o fuori secondo la nuova. Una conversazione della regia in ciclo che esce dal mandato ha il ciclo interrotto: è un'anomalia (§4).
-- **Eventi `git`** → non portano un'etichetta di task, la riga del commit di norma sì (`run(T23): …`, `checkpoint(T23): …`): un commit che nomina solo task fuori dal mandato si ignora. Unica eccezione, il commit di creazione di una task, `task(T<n>): create …`: rifai il quadro prima di ignorarlo, perché è così che si presenta una figlia nuova dell'epica — il monitor non riporta un task file appena nato, e la sua etichetta è fuori dal mandato finché il lettore non la conta. Se il quadro non la porta fra i membri, l'evento resta ignorato.
+- **Commit** → conta se il soggetto nomina una task del mandato (`run(T23): …`). Il commit di creazione `task(T<n>): create …` passa il filtro per il suo `Parent Task`: rifai il quadro prima di ignorarlo, perché è così che si presenta una figlia nuova dell'epica. Se il quadro non la porta fra i membri, l'evento resta ignorato.
 - **Eventi `monitor`** → si guardano sempre: parlano del monitor, non di una task.
 
 A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
@@ -313,7 +336,7 @@ A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
 |---|---|
 | ciclo chiuso che sblocca un'altra task | cosa si sblocca e cosa lanci adesso |
 | sessione ferma su domande o segnalazioni | chi aspetta, per cosa, e la proposta (§3) |
-| commit, push, fase doc di un checkpoint | una riga: cosa registra, «per il parallelo non cambia niente» |
+| commit o fase doc di un checkpoint | una riga: cosa registra, «per il parallelo non cambia niente» |
 | sessione nuova (`🆕`, una tab) | quale task segue; se la task ha già una conversazione in ciclo, l'avviso di non farle lavorare insieme |
 | `▶ turno headless partito` | una riga, o nessuna se il turno è della regia e l'ha appena lanciato; di una conversazione che la regia non ha aperto, come una sessione nuova |
 | `⏹ turno headless finito` | nessuna riga sull'evento: è la sveglia. Rileggi l'esito con `status` (§2, L'esito di un turno headless) e riporta quello, come il fine turno di una tab |
@@ -324,6 +347,23 @@ A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
 - L'evento è un fatto, la deduzione si dice come tale («molto probabilmente è il DLV3»).
 - Quando la notifica non basta, apri il transcript prima di scrivere: `"PY" -B -I "R/sessions.py" tail <prefisso del sessionId> --chars 6000`.
 - Il monitor etichetta una sessione con la sua task: due conversazioni sulla stessa task portano la stessa etichetta. Quale delle due ha parlato lo dice `sessions.py list`, con stato ed età di ognuna.
+
+### Escludere una conversazione
+
+L'utente può chiedere, nella chat della regia, di togliere dal monitor una conversazione — di solito una sua tab su un membro, aperta per domande o verifiche: «escludi 0a1b2c3d». E di rimetterla: «riprendi a seguire 0a1b2c3d».
+
+**Escludere**, in quest'ordine:
+
+1. Sciogli l'id fra le sessioni vive del progetto: `"PY" -B -I "R/sessions.py" find <id>`. Exit `0` → una riga `SESSIONE|<sessionId intero>|<etichetta>|<stato>`. Exit `1`, nessuna, o `2`, più d'una con le loro righe → non scrivi niente e lo dici all'utente: un id che indica due conversazioni escluderebbe anche quella che non ha nominato.
+2. Se il sessionId è di una conversazione della tua tabella ancora in ciclo, rifiuta e di' perché: senza i suoi eventi non vedresti la fine del suo turno — il `⏸` di una tab, il `⏹` di una headless —, e il ciclo resterebbe appeso.
+3. Riscrivi `FILTER_FILE` con `session:<sessionId intero>` in più nella blacklist, whitelist intatta (§0j).
+4. Conferma in una riga: la conversazione, la sua task con la maniglia, e cosa passa ancora. Una conversazione in blacklist perde i soli eventi di sessione — turni, prompt, domande, permessi, apertura e chiusura —; il task file, la cella Prog e i commit della sua task passano, perché il monitor vede un file che cambia e non chi lo cambia. Per zittire anche quelli serve `task:T<n>` in blacklist, e lo chiede l'utente.
+
+**Riammettere.** Togli dalla blacklist le voci `session:` che cominciano con l'id che l'utente dice, e conferma in una riga. Nessuna voce corrisponde → dillo.
+
+**La conversazione esclusa tace, ma conta.** Nessun evento e nessuna proposta; però finché è viva la sua task non riceve un passo nuovo dalla regia (§Le regole di partenza, regola 1), come per una sessione esterna: due cicli sugli stessi file, o due checkpoint in gara su `tasks.md`, sono guasti che nessuno vedrebbe. Il monitor non ti dice più quando si chiude: lo leggi da `sessions.py list` a ogni quadro (§1). Una tab esclusa lasciata aperta tiene ferma la sua task: quando un passo pronto aspetta solo lei, dillo all'utente in una riga, una volta.
+
+L'esclusione segue il processo: un `/clear` nella conversazione cambia il suo sessionId, e lei non ricompare. Vale per il giro: un giro nuovo riparte con la blacklist vuota, una ripresa la tiene (§0f).
 
 ### I fatti del perimetro
 
@@ -620,4 +660,4 @@ La regia si ferma quando l'utente lo chiede. Prima di fermarti, se una richiesta
    - se `## Checkpoint del perimetro` conta cicli chiusi dall'ultimo, la riga `il file del perimetro non è allineato ai membri: /loom-works:checkpoint-task <perimetro>`;
    - i **fatti del perimetro** dello stato, aperti e superati, col membro da cui vengono: sono quelli che chi legge il file del perimetro dopo deve trovare, e alcuni nessun membro li ha scritti nel suo task file. Il prossimo `checkpoint-task` sul perimetro li porta nel file, chiunque lo lanci.
 
-Lo stato non si cancella, né allo stop né dopo: i fatti servono al giro dopo sullo stesso perimetro (§0f) e a un `checkpoint-mandate` lanciato a mano. I tre file restano in `.claude/loom/regia/`, fuori da git.
+Lo stato non si cancella, né allo stop né dopo: i fatti servono al giro dopo sullo stesso perimetro (§0f) e a un `checkpoint-mandate` lanciato a mano. I quattro file restano in `.claude/loom/regia/`, fuori da git.

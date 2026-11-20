@@ -1,7 +1,7 @@
 """
 regia_common — le letture condivise dagli script della regia.
 
-`watch_sessions.py` (il monitor), `sessions.py` (list, tail, regie),
+`watch_sessions.py` (il monitor), `sessions.py` (list, tail, regie, find),
 `mandate.py` e `regia_state.py` leggono le stesse fonti: la radice del progetto,
 la sua docs-root, i task file, il registro delle sessioni vive. Stanno qui, in
 un posto solo, perché due copie della stessa lettura divergono alla prima

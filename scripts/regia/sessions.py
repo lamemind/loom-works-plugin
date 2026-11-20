@@ -10,6 +10,9 @@ sessions — legge le altre sessioni Claude Code di un progetto loom-works.
          chiusa si rilegge anche dopo il suo ciclo
   regie  le altre regie vive sul progetto, su questa macchina, col perimetro
          che ognuna porta avanti: la guardia al lancio di una regia
+  find   le sessioni vive il cui sessionId comincia col prefisso, col sessionId
+         intero: la regia scioglie così l'id che l'utente chiede di escludere
+         dal monitor, prima di scriverlo nella blacklist del filtro
 
 Stesse fonti del monitor (watch_sessions.py), lette da regia_common.
 
@@ -17,6 +20,7 @@ Uso:
   python -I sessions.py [--project-root <radice>] list
   python -I sessions.py [--project-root <radice>] tail <prefisso del session id> [--chars 4000] [--prompts 5]
   python -I sessions.py [--project-root <radice>] regie --own-session <session id>
+  python -I sessions.py [--project-root <radice>] find <prefisso del session id>
 """
 
 import argparse
@@ -262,6 +266,32 @@ def command_regie(project_root, own_session):
     print(f"REGIE={found}")
 
 
+def command_find(project_root, session_prefix):
+    """Le sessioni vive del progetto il cui sessionId comincia col prefisso:
+    una riga `SESSIONE|<sessionId intero>|<etichetta>|<stato>` ciascuna, poi
+    `TROVATE=<n>`. Exit 0 con una sola, 1 con nessuna, 2 con più d'una.
+
+    Solo fra le vive, a differenza di `tail`: la blacklist del filtro esclude
+    una conversazione aperta, e un id che indica due sessioni non si scrive,
+    perché escluderebbe anche quella che l'utente non ha nominato.
+    """
+    registry = regia_common.read_registry(project_root)
+    if not registry.readable:
+        print("registro delle sessioni illeggibile: ~/.claude/sessions")
+        sys.exit(1)
+    bindings = regia_common.load_task_bindings(project_root)
+    now = time.time()
+    matches = sorted((session for session in registry.sessions if session.session_id.startswith(session_prefix)),
+                     key=lambda live: live.session_id)
+    for session in matches:
+        path = regia_common.transcript_path(session.cwd, session.session_id)
+        label = regia_common.session_label(
+            session.session_id, bindings.get(session.session_id), regia_common.task_of_transcript(path))
+        print(f"SESSIONE|{session.session_id}|{label}|{status_with_age(session, now)}")
+    print(f"TROVATE={len(matches)}")
+    sys.exit(0 if len(matches) == 1 else 1 if not matches else 2)
+
+
 def main():
     regia_common.setup_stdout()
     parser = argparse.ArgumentParser(description="Legge le altre sessioni di un progetto loom-works")
@@ -275,12 +305,16 @@ def main():
     tail_parser.add_argument("--prompts", type=int, default=5)
     regie_parser = subcommands.add_parser("regie")
     regie_parser.add_argument("--own-session", default="", help="session id della regia che chiede: fuori dall'elenco")
+    find_parser = subcommands.add_parser("find")
+    find_parser.add_argument("session_prefix")
     arguments = parser.parse_args()
     project_root = os.path.abspath(arguments.project_root or regia_common.find_project_root(os.getcwd()))
     if arguments.command == "list":
         command_list(project_root)
     elif arguments.command == "regie":
         command_regie(project_root, arguments.own_session)
+    elif arguments.command == "find":
+        command_find(project_root, arguments.session_prefix)
     else:
         command_tail(project_root, arguments.session_prefix, arguments.chars, arguments.prompts)
 
