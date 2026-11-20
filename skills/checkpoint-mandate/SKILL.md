@@ -320,6 +320,20 @@ Il contratto completo — forma, sede degli scenari, risposta, uscite, uscita in
 SCENARIO
 ```
 
+**Una risposta firmata «decise dalla regia di T<perimetro> su delega dell'utente»** porta sotto la firma le parole con cui l'umano ha delegato la regia, alla lettera: ogni scenario si scrive con `--chi delega` e quelle parole intere in `--delega`, con le regole dell'umano per il resto (`triage-format.md` §La decisione su delega). Firma senza le parole → nessuno scenario, e lo dici nel testo finale: non ripieghi su `umano` né su `agente`.
+
+```bash
+DELEGA="$(cat <<'DELEGA'
+<le parole della delega, dalla riga sotto la firma, intere>
+DELEGA
+)"
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto|ignora --chi delega \
+  --delega "$DELEGA" --momento flusso --skill checkpoint-mandate [--ancora <path>]... --no-commit <<'SCENARIO'
+<la segnalazione, identica al testo della riga S{N}>
+<le parole della regia su quella segnalazione>
+SCENARIO
+```
+
 Poi un commit solo per tutti, coi path che lo script stampa:
 
 ```bash

@@ -311,6 +311,24 @@ Poi un commit solo per tutti, con lo snippet sopra.
 - **La conferma e il ribaltamento valgono uguale.** Sulla segnalazione che avevi marcato `☑ subito (agente)`, «ok» è uno scenario `subito` e «fanne una task» uno scenario `task`, entrambi `--chi umano`, accanto al tuo: non si riscrive niente, i due record sono il dato.
 - **Detta a posteriori, la stessa parola è un esito e non un'azione.** Chi rilegge il report da un'altra sessione registra con `--momento posteriori` e non esegue niente.
 
+**Una risposta firmata «su delega» è della regia, non dell'umano.** Un messaggio che apre con `Risposte alle segnalazioni di T<id> — decise dalla regia di T<perimetro> su delega dell'utente.` arriva dalla regia del perimetro, che decide al posto dell'umano perché l'umano gliel'ha delegato; la riga sotto la firma porta le parole con cui l'ha delegato, alla lettera. Ogni scenario di quella risposta si scrive con `--chi delega` e quelle parole intere in `--delega`, senza ritaglio: le legge prima una variabile da un heredoc fra apici, così backtick e apostrofi restano testo.
+
+```bash
+DELEGA="$(cat <<'DELEGA'
+<le parole della delega, dalla riga sotto la firma, intere>
+DELEGA
+)"
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto|ignora --chi delega \
+  --delega "$DELEGA" --momento flusso --skill checkpoint-task [--ancora <path>]... --no-commit <<'SCENARIO'
+<la segnalazione, identica al testo della riga S{N}>
+<le parole della regia su quella segnalazione: il perché sullo scarto, l'approfondimento sulle altre uscite>
+SCENARIO
+```
+
+- **Sotto delega valgono le regole dell'umano.** Le quattro uscite, le parole della regia come approfondimento o come perché sullo scarto, l'ancora sull'ignora e sullo scarto, «subito» e «task» operativi: le parole della regia stanno al posto di quelle dell'umano, e lo script le tratta allo stesso modo.
+- **Firma senza le parole della delega → nessuno scenario.** Non scrivi niente e lo dici nel testo finale: le parole mancano, e senza non c'è uno scenario `delega` da scrivere. Non ripieghi su `--chi umano`, che dichiarerebbe una risposta che l'umano non ha dato, né su `--chi agente`, che farebbe di uno scarto affidato uno scarto autonomo.
+- **Una risposta firmata «approvate dall'utente» resta `--chi umano`**: l'ha decisa l'umano, la regia l'ha solo portata.
+
 ### L'uscita che riguarda un altro progetto
 
 **Il destinatario lo porta la segnalazione.** Una segnalazione nomina di norma il progetto o i file che riguarda, e «subito» e «task» agiscono lì, senza una conferma prima del lancio. Quando l'umano nomina un progetto nelle sue parole vince quello; quando nessuno ne nomina uno resta il progetto della sessione, e si esegue qui. Lo scenario si scrive comunque qui: il destinatario sta nella segnalazione o nell'approfondimento, e non ha un campo suo.
