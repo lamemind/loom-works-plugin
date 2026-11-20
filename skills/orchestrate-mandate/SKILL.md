@@ -1,6 +1,6 @@
 ---
 name: orchestrate-mandate
-description: Fa da regia su un perimetro loom-works — un id solo, un'epica (le sue figlie) o un mandato (`Size: Mandate`, la sua lista di membri) — e porta avanti i membri in modo semi-automatico. Al lancio verifica l'analisi del perimetro scritta nel task file e si ferma se non combacia; poi recap, sessioni vive, monitor delle sessioni armato e riarmato. Lancia da sé preflight, run e checkpoint quando le dipendenze lo permettono, chiude le conversazioni a passo finito, e a fine giro lancia il checkpoint del perimetro; alle domande delle sessioni prepara una proposta di risposta motivata e la manda solo col via dell'utente, o da sé sotto una delega che l'utente dichiara. Tiene il suo stato in `.claude/loom/regia/` del progetto, ignorata da git, e lo riprende al rilancio; non scrive mai nei task file né in un file tracciato. Usa quando l'utente dice «fai da regia su T21», «orchestra l'epica T197», «orchestra il mandato T214».
+description: Fa da regia su un perimetro loom-works — un id solo, un'epica (le sue figlie) o un mandato (`Size: Mandate`, la sua lista di membri) — e porta avanti i membri in modo semi-automatico. Al lancio verifica l'analisi del perimetro scritta nel task file e si ferma se non combacia; poi recap, sessioni vive, monitor delle sessioni armato e riarmato. Lancia da sé preflight, run e checkpoint quando le dipendenze lo permettono, come turni headless senza tab — una tab solo quando l'utente la chiede per un passo —, chiude le conversazioni a passo finito, e a fine giro lancia il checkpoint del perimetro; alle domande delle sessioni prepara una proposta di risposta motivata e la manda solo col via dell'utente, o da sé sotto una delega che l'utente dichiara. Tiene il suo stato in `.claude/loom/regia/` del progetto, ignorata da git, e lo riprende al rilancio; non scrive mai nei task file né in un file tracciato. Usa quando l'utente dice «fai da regia su T21», «orchestra l'epica T197», «orchestra il mandato T214».
 argument-hint: "<epica|mandato>"
 allowed-tools: Bash(*), Read, Write, Edit, Skill, Monitor, TaskStop, SendMessage, ListAgents, PushNotification
 ---
@@ -16,7 +16,7 @@ I membri di un perimetro avanzano uno per conversazione, e nessuna conversazione
 
 - **Lancia da sé** preflight, run e checkpoint quando le dipendenze lo permettono: l'utente ha dato il mandato invocando la skill, e un ok a ogni conversazione non serve.
 - **Non risponde da sé**, salvo delega. Alle domande delle sessioni — un preflight che chiede, le segnalazioni 🚦 di un report — prepara una proposta motivata e la manda solo col via dell'utente. L'unico messaggio che parte senza via è la richiesta di checkpoint dopo un run pulito (§2). Con una delega che l'utente dichiara nella chat della regia, manda da sé anche le risposte, entro i limiti del §3.
-- **Non scrive mai nei task file né in un file tracciato.** Nessun `Edit`, `Write` o commit su un file che git segue. Agisce in tre modi soli: apre conversazioni con `spawn-task`, scrive alle conversazioni con `SendMessage`, chiude con `close-session` quelle che ha aperto, a passo finito. I soli file che scrive stanno in `.claude/loom/regia/` del progetto, che git ignora: lo stato della regia, le cifre di partenza e lo stato del monitor (§0f, Lo stato su disco).
+- **Non scrive mai nei task file né in un file tracciato.** Nessun `Edit`, `Write` o commit su un file che git segue. Agisce sulle conversazioni e basta: le apre e le porta avanti come turni headless con `loom-deck-headless` (§2); apre una tab con `spawn-task` solo quando l'utente la chiede per un passo; scrive a una tab viva con `SendMessage`, e chiude con `close-session` le tab che ha aperto, a passo finito. I soli file che scrive stanno in `.claude/loom/regia/` del progetto, che git ignora: lo stato della regia, le cifre di partenza e lo stato del monitor (§0f, Lo stato su disco).
 
 Il **perimetro** è un id solo negli argomenti: un'**epica** (`Size: Epic`), i cui membri sono le figlie, o un **mandato** (`Size: Mandate`), che elenca i membri nel proprio file (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). La regia li tratta allo stesso modo: i membri arrivano dal lettore unico, `resolve-task.sh <id> --members`, e il perimetro con tutti i suoi membri è ciò che la regia porta avanti. Un perimetro più largo — un'epica e qualche task in più, task di epiche diverse — si costruisce prima del lancio con `/loom-works:prepare-mandate`, mai negli argomenti. Nessun tetto alle conversazioni aperte.
 
@@ -51,8 +51,8 @@ La scratchpad non tiene niente della regia: sta nella temp di sistema, e un rebo
 
 Exit `0` (`GATE=ok`) → avanti. Exit `2` → **fermati senza aprire niente** e di' all'utente quale dei due modi non è `auto`, e cosa succede:
 
-- `OWN_MODE` diverso da `auto` (o `?`, transcript non trovato): fuori da auto mode ogni `spawn-task` chiede conferma, e la regia smette di essere semi-automatica. Rimedio: passare la sessione in auto mode e rilanciare la skill.
-- `PROJECT_MODE` diverso da `auto`: il deck apre le conversazioni col `permissionMode` di `.claude/loom-works.json`, e una sessione con un modo diverso da quello della regia tiene i suoi messaggi in attesa dell'approvazione del suo utente. Rimedio: `"permissionMode": "auto"` nel file del progetto.
+- `OWN_MODE` diverso da `auto` (o `?`, transcript non trovato): fuori da auto mode ogni comando `loom-deck-headless` e ogni `spawn-task` chiede conferma, e la regia smette di essere semi-automatica. Rimedio: passare la sessione in auto mode e rilanciare la skill.
+- `PROJECT_MODE` diverso da `auto`: le conversazioni nascono col `permissionMode` di `.claude/loom-works.json`, headless o in una tab. Un turno headless non ha nessuno che approva: in `manual` `loom-deck-headless open` rifiuta run e checkpoint, e in ogni modo diverso da `auto` il turno si vede negare ciò che il modo non concede da sé. Una tab con un modo diverso da quello della regia tiene i suoi messaggi in attesa dell'approvazione del suo utente. Rimedio: `"permissionMode": "auto"` nel file del progetto.
 
 Il modo della regia si legge dal suo transcript, perché il registro delle sessioni vive non lo porta.
 
@@ -336,15 +336,55 @@ I fatti stanno nello stato perché la conversazione si compatta: rileggendo lo s
 
 Una conversazione fa **un solo passo**, poi si chiude: il contesto di una sessione riusata per più passi arriva al tetto, e la qualità cala a ogni passo.
 
-- **preflight** → una conversazione aperta con `spawn-task`, kind `preflight`.
-- **ciclo di lavoro** → una conversazione aperta con `spawn-task`, kind `run` e il perimetro di §1. Nella **stessa** conversazione, dopo il run, le risposte alle segnalazioni e poi il checkpoint, chiesti con `SendMessage`: in una sessione aperta dal deck `checkpoint-task` ricava i DLV fatti e i file da committare dal contesto della conversazione, e una conversazione nuova non lo avrebbe.
-- **checkpoint del perimetro** → una conversazione aperta con `spawn-task`, kind `checkpoint`, sull'id del perimetro, a fine giro (§Il checkpoint del perimetro).
+- **preflight** → una conversazione headless, kind `preflight`.
+- **ciclo di lavoro** → una conversazione headless, kind `run` e il perimetro di §1. Nella **stessa** conversazione, dopo il run, le risposte alle segnalazioni e poi il checkpoint, ognuno un turno nuovo (§Scrivere): in una sessione aperta dal deck `checkpoint-task` ricava i DLV fatti e i file da committare dal contesto della conversazione, e una conversazione nuova non lo avrebbe.
+- **checkpoint del perimetro** → una conversazione headless, kind `checkpoint`, sull'id del perimetro, a fine giro (§Il checkpoint del perimetro).
 
 Finito il passo la regia non scrive più a quella conversazione, e la chiude (§Chiudere).
 
+### Headless, e la tab solo su richiesta
+
+Ogni passo che la regia decide parte **headless**: un processo `claude -p` staccato, senza tab, che esegue un turno e finisce da solo. Una regia lavora in momenti che l'utente non sceglie: una tab aperta da lei prende la tastiera dell'utente, e sul deck Linux lo spawn in una tab viene rifiutato ogni volta che la finestra in focus non è del progetto. Un turno headless non apre tab, non sposta il focus e non cambia desktop. La conversazione compare nel deck sotto la sua task, e l'utente la apre in una tab con ⏎ quando vuole guardarla.
+
+Una **tab** nasce solo quando l'utente la chiede per **quel** passo, nella chat della regia: «apri il run di T23 in una tab». Si apre con `spawn-task` (§Aprire una tab), e la richiesta vale per quel passo soltanto: nessuna preferenza che dura, e nessun criterio con cui la regia sceglie la tab da sé.
+
 ### Aprire
 
-Una invocazione del tool `Skill` per conversazione:
+Una chiamata Bash per conversazione:
+
+```bash
+loom-deck-headless open <TaskID> preflight --root "<radice del progetto>"
+loom-deck-headless open <TaskID> run [perimetro] --root "<radice del progetto>"
+loom-deck-headless open <perimetro> checkpoint --root "<radice del progetto>"
+```
+
+`open` compone titolo, modello e binding come il tasto del deck, con gli override di progetto, e scrive il binding nel sidecar prima di lanciare il processo: la conversazione compare nel deck sotto la sua task. Toglie da sé l'ambiente di questa conversazione — `LOOM_TASK`, `PTYXIS_PROFILE`, le variabili di sessione di Claude Code —: nessun `env -u` davanti. Non serve il deck acceso.
+
+Con uscita `0` le righe portano `sessionId:` e `titolo:`; scrivi subito la conversazione nello stato, con `Stato: in ciclo`, poi leggi l'esito del turno (§L'esito di un turno headless). Il **nome** della conversazione è la riga `titolo:`, il titolo che il deck le darebbe col tasto. Uscita `1` è un rifiuto, col motivo su stderr — task assente, DLV chiusi o fuori range, run su un mandato, `permissionMode` `manual` —; uscita `2` una riga composta male. Tutte e due sono un'anomalia (§4): non ritentare.
+
+### L'esito di un turno headless
+
+`open` e `reply` (§Scrivere) tornano subito, a turno appena lanciato. L'esito lo dà un comando solo, e lo stato su disco del turno ne è la fonte:
+
+```bash
+loom-deck-headless status <sessionId> --root "<radice del progetto>"
+```
+
+| Uscita | Classe | Cosa fai |
+|---|---|---|
+| `3` | `in corso` | il turno lavora: aspetti, nessun messaggio |
+| `0` | `turno chiuso` | leggi il **testo finale**, che `status` stampa per intero: è il report del passo, o una domanda (§3) |
+| `4` | `permesso negato` | ramo fermo, sotto |
+| `1` | `errore` | anomalia (§4): l'errore dell'API o la coda dello stderr, che `status` stampa in `motivo:` |
+| `2` | — | sessione ignota o riga sbagliata: anomalia (§4) |
+
+**`turno chiuso` non dice che il passo è finito.** In `claude -p` lo strumento `AskUserQuestion` non esiste: una skill che chiederebbe con lui scrive la domanda nel testo finale e chiude il turno, con l'esito di ogni altro turno. Il testo finale si legge sempre, prima di dare un passo per finito.
+
+**`permesso negato` ferma il ramo, anche se il testo finale dice che il lavoro è fatto.** Il turno ha ricevuto il rifiuto come risultato dello strumento ed è andato avanti: un lavoro chiuso dopo un rifiuto è passato per una via che nessuno ha approvato. La regia ferma la task e le sue dipendenti, scrive il motivo in `## Rami fermi` e scala all'utente (§4) con strumento e input di ogni chiamata negata, come li stampa `status`, e la via: riprendere la conversazione in una tab dal deck con ⏎, dove l'utente approva. Nessun `reply` che riformuli la richiesta, nemmeno sotto delega. Il ramo riparte quando l'utente lo dice.
+
+### Aprire una tab — su richiesta dell'utente
+
+Quando l'utente chiede una tab per un passo, una invocazione del tool `Skill`:
 
 ```
 skill: loom-works:spawn-task
@@ -353,7 +393,7 @@ args:  <TaskID> run [perimetro]
 args:  <perimetro> checkpoint
 ```
 
-Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare.
+Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` è un'anomalia (§4): non ritentare — un rifiuto per la finestra non in focus si risolve solo dall'utente, che porta davanti una finestra del progetto e richiede la tab. Il passo resta in quella tab fino alla chiusura: messaggi con `SendMessage` finché è viva (§Scrivere), `close-session` a passo finito (§Chiudere).
 
 ### Scrivere
 
@@ -388,11 +428,10 @@ Parte quando valgono tutte:
 3. **la coda dei checkpoint è libera**: `## Checkpoint in corso` dice `nessuno`. Il checkpoint del perimetro riscrive il suo task file e `tasks.md` come ogni altro, ed entra nella stessa regola «un checkpoint alla volta»;
 4. **almeno un ciclo si è chiuso dall'ultimo checkpoint del perimetro** (`## Checkpoint del perimetro` nello stato): senza lavoro nuovo dei membri sarebbe una conversazione aperta per niente.
 
-Si lancia come ogni altro passo, e occupa `## Checkpoint in corso`:
+Si lancia come ogni altro passo, headless (§Aprire), e occupa `## Checkpoint in corso`:
 
-```
-skill: loom-works:spawn-task
-args:  <perimetro> checkpoint
+```bash
+loom-deck-headless open <perimetro> checkpoint --root "<radice del progetto>"
 ```
 
 Le sue segnalazioni seguono la via di tutte le altre: proposta, e risposta col via dell'utente (§3). Il checkpoint del perimetro è chiuso quando ha finito il turno e le segnalazioni hanno una risposta: libera `## Checkpoint in corso`, azzera i cicli in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere). Il suo commit cambia il file del perimetro: rilancia `verify` e ricarica le righe `MODELLO` (§0e). Poi rifai il quadro: se resta qualcosa da lanciare il giro continua, altrimenti scala all'utente che il perimetro non ha più niente da lanciare (§4).
@@ -497,14 +536,15 @@ Una regia che aspetta l'utente chiude il turno, e compass la mostra `done`, non 
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "regia $(say_id T<perimetro>) <argomento in 3-7 parole>"
    ```
 
-**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); un'anomalia; un perimetro che non ha più niente da lanciare, dopo il suo checkpoint o quando non ce n'è bisogno (§2, Il checkpoint del perimetro).
+**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); un permesso negato in un turno headless (§2, L'esito di un turno headless); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); un'anomalia; un perimetro che non ha più niente da lanciare, dopo il suo checkpoint o quando non ce n'è bisogno (§2, Il checkpoint del perimetro).
 
 **Non si scala** per gli eventi di routine — commit, push, un DLV spuntato, un checkpoint andato liscio: bastano le righe del riporto. Una notifica che non serviva si somma alle altre e insegna a ignorarle.
 
 ### Le anomalie: ramo fermo, nessun ritento
 
-- `spawn-task` esce con un codice diverso da `0`;
-- una conversazione in ciclo si chiude a metà (`✖ sessione chiusa` prima del checkpoint);
+- `loom-deck-headless open` o `spawn-task` esce con un codice diverso da `0`;
+- un turno headless finisce in `errore` (§2, L'esito di un turno headless); un `permesso negato` ferma il ramo allo stesso modo, con strumento e input delle chiamate negate nella scalata;
+- una tab in ciclo si chiude a metà (`✖ sessione chiusa` prima del checkpoint);
 - un run chiude il turno senza aver chiuso nessun DLV del suo perimetro;
 - un evento `🧊 ferma da N min` su una conversazione in ciclo.
 
