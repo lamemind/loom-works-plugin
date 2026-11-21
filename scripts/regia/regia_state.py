@@ -27,9 +27,19 @@ ferma, perché `init` non scrive la regola.
 La testa dello stato, le prime righe prima del primo heading:
 
   Stato: attiva · <sessionId>       una regia in corso, e la sessione che la tiene
-  Stato: passata a <sessionId>      consegne passate a un'altra sessione
+  Stato: in passaggio · <sessionId> la regia ha chiesto la successora e
+                                    aspetta che nasca: il passaggio di consegne
+                                    è cominciato, e chi lo tiene è ancora lei
+  Stato: passata a <nuova> · da <vecchia>
+                                    consegne passate: la successora e la regia
+                                    che le ha passate, che la successora chiude
   Stato: ferma · <sessionId>        la regia si è fermata allo stop
   Perimetro: T<id> · Created on <data del task file del perimetro>
+
+`in passaggio` esiste perché il `sessionId` della successora si conosce solo
+dopo lo spawn: senza la riga intermedia, una successora che legge lo stato
+prima che la regia vecchia scriva `passata a` troverebbe `attiva` di una
+sessione viva, e si fermerebbe.
 
 La riga `Perimetro` è l'identità. Un id non identifica un perimetro per sempre:
 `get-next-task-id.sh` dà il massimo più uno fra i task file e le righe di
@@ -45,13 +55,21 @@ Verdetti di `check` (riga `STATE=`):
   altro        lo stato di un perimetro passato con lo stesso id:
                giro nuovo, la regia lo sovrascrive                     exit 0
   ferma        una regia fermata: giro nuovo che eredita i fatti       exit 0
-  mia          `attiva` scritta da questa sessione: ripresa            exit 0
-  morta        `attiva` o `passata a` di una sessione che non è
-               più viva: ripresa, senza la delega                      exit 0
+  mia          `attiva` o `in passaggio` scritta da questa sessione:
+               ripresa                                                 exit 0
+  consegne     `passata a` questa sessione: la ripresa della
+               successora, delega compresa (`STATE_FROM` = la regia
+               che ha passato le consegne)                             exit 0
+  morta        `attiva`, `in passaggio` o `passata a` di una sessione
+               che non è più viva: ripresa, senza la delega            exit 0
   viva         `attiva` o `passata a` di un'altra sessione viva        exit 2
-  passata      `passata a` questa sessione: la ripresa della
-               successora non c'è ancora                               exit 2
+  in passaggio `in passaggio` di un'altra sessione viva, anche dopo
+               l'attesa di --wait: la regia vecchia non ha finito      exit 2
   illeggibile  il file c'è, ma la testa non si legge                   exit 2
+
+Con --wait <secondi>, su `in passaggio` di un'altra sessione viva `check`
+rilegge lo stato ogni WAIT_POLL_S secondi, fino al tetto: è l'attesa della
+successora mentre la regia vecchia chiude il passaggio.
 
 Un giro nuovo toglie `-watch.json` (il monitor darebbe come eventi tutto ciò
 che è cambiato dallo stop precedente) e `-filter.json` (le conversazioni che
@@ -60,7 +78,7 @@ riscrivere `-prima.json`; una ripresa li tiene, e riscrive le cifre solo se
 mancano.
 
 Uso:
-  python -I regia_state.py [--project-root <radice>] check <perimetro> --own-session <session id>
+  python -I regia_state.py [--project-root <radice>] check <perimetro> --own-session <session id> [--wait <secondi>]
   python -I regia_state.py [--project-root <radice>] facts <perimetro>
 
 Exit: 0 avanti · 1 id malformato, task file del perimetro mancante, registro
@@ -73,6 +91,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 # Il modulo comune si carica dal path esplicito della cartella dello script:
 # con `python -I` la cartella non entra da sola in sys.path. Nessun __pycache__:
@@ -86,15 +105,17 @@ TASK_ID_PATTERN = re.compile(r"^T\d+$")
 STATE_DIR = os.path.join(".claude", "loom", "regia")
 GITIGNORE_RULE = ".claude/loom/"
 
-STATE_LINE = re.compile(r"^Stato:\s*(attiva|ferma)\s*·\s*(\S+)\s*$")
-HANDED_LINE = re.compile(r"^Stato:\s*passata a\s+(\S+)\s*$")
+STATE_LINE = re.compile(r"^Stato:\s*(attiva|ferma|in passaggio)\s*·\s*(\S+)\s*$")
+HANDED_LINE = re.compile(r"^Stato:\s*passata a\s+(\S+?)(?:\s*·\s*da\s+(\S+))?\s*$")
 IDENTITY_LINE = re.compile(r"^Perimetro:\s*(T\d+)\s*·\s*Created on\s*(.*?)\s*$")
 FACTS_HEADING = "## Fatti del perimetro"
 
 GO, STOP = 0, 2
-VERDICT_EXIT = {"assente": GO, "altro": GO, "ferma": GO, "mia": GO, "morta": GO,
-                "viva": STOP, "passata": STOP, "illeggibile": STOP}
+VERDICT_EXIT = {"assente": GO, "altro": GO, "ferma": GO, "mia": GO, "consegne": GO, "morta": GO,
+                "viva": STOP, "in passaggio": STOP, "illeggibile": STOP}
 NEW_ROUND = {"assente", "altro", "ferma"}
+# Ogni quanto `check --wait` rilegge uno stato `in passaggio`.
+WAIT_POLL_S = 10
 
 
 def state_paths(project_root, perimeter):
@@ -117,8 +138,9 @@ def perimeter_created_on(project_root, perimeter):
 
 
 def read_head(state_path):
-    """La testa dello stato: `{kind, holder, perimeter, created_on}`, oppure
-    `None` se manca la riga `Stato:` o la riga `Perimetro:`.
+    """La testa dello stato: `{kind, holder, perimeter, created_on}` più
+    `from` su `passata a … · da …`, oppure `None` se manca la riga `Stato:` o
+    la riga `Perimetro:`.
 
     La testa sono le righe prima del primo heading: la regia la scrive in cima
     e riscrive il file intero a ogni cambio."""
@@ -135,6 +157,8 @@ def read_head(state_path):
                 head["kind"], head["holder"] = state_match.group(1), state_match.group(2)
             elif handed_match:
                 head["kind"], head["holder"] = "passata", handed_match.group(1)
+                if handed_match.group(2):
+                    head["from"] = handed_match.group(2)
             elif identity_match:
                 head["perimeter"], head["created_on"] = identity_match.group(1), identity_match.group(2)
     if "kind" not in head or "perimeter" not in head:
@@ -175,16 +199,29 @@ def verdict_of(head, perimeter, created_on, own_session, live_session_ids):
     if head["kind"] == "ferma":
         return "ferma"
     holder = head["holder"]
-    if head["kind"] == "attiva" and same_session(holder, own_session):
-        return "mia"
-    if head["kind"] == "passata" and same_session(holder, own_session):
-        return "passata"
+    if same_session(holder, own_session):
+        return "consegne" if head["kind"] == "passata" else "mia"
     if any(same_session(holder, session_id) for session_id in live_session_ids):
-        return "viva"
+        return "in passaggio" if head["kind"] == "in passaggio" else "viva"
     return "morta"
 
 
-def command_check(project_root, perimeter, own_session):
+def read_verdict(project_root, paths, perimeter, created_on, own_session):
+    """`(verdetto, testa)` dello stato su disco, o `None` se il registro delle
+    sessioni non si legge."""
+    if not os.path.exists(paths["state"]):
+        return "assente", None
+    head = read_head(paths["state"])
+    live_session_ids = []
+    if head is not None and head["kind"] != "ferma":
+        registry = regia_common.read_registry(project_root)
+        if not registry.readable:
+            return None
+        live_session_ids = [session.session_id for session in registry.sessions]
+    return verdict_of(head, perimeter, created_on, own_session, live_session_ids), head
+
+
+def command_check(project_root, perimeter, own_session, wait_seconds=0):
     created_on = perimeter_created_on(project_root, perimeter)
     if created_on is None:
         print(f"ERROR: task file di {perimeter} non trovato", file=sys.stderr)
@@ -205,21 +242,26 @@ def command_check(project_root, perimeter, own_session):
         return STOP
     os.makedirs(paths["dir"], exist_ok=True)
 
-    if not os.path.exists(paths["state"]):
-        verdict, head = "assente", None
-    else:
-        head = read_head(paths["state"])
-        live_session_ids = []
-        if head is not None and head["kind"] != "ferma":
-            registry = regia_common.read_registry(project_root)
-            if not registry.readable:
-                print("ERROR: registro delle sessioni illeggibile: ~/.claude/sessions", file=sys.stderr)
-                return 1
-            live_session_ids = [session.session_id for session in registry.sessions]
-        verdict = verdict_of(head, perimeter, created_on, own_session, live_session_ids)
+    deadline = time.monotonic() + max(wait_seconds, 0)
+    waited = 0
+    while True:
+        found = read_verdict(project_root, paths, perimeter, created_on, own_session)
+        if found is None:
+            print("ERROR: registro delle sessioni illeggibile: ~/.claude/sessions", file=sys.stderr)
+            return 1
+        verdict, head = found
+        if verdict != "in passaggio" or time.monotonic() >= deadline:
+            break
+        time.sleep(WAIT_POLL_S)
+        waited += WAIT_POLL_S
     print(f"STATE={verdict}")
+    if wait_seconds > 0:
+        print(f"WAITED={waited}")
     if head is not None:
+        print(f"STATE_KIND={head['kind']}")
         print(f"STATE_HOLDER={head['holder']}")
+        if head.get("from"):
+            print(f"STATE_FROM={head['from']}")
         print(f"STATE_CREATED_ON={head['created_on']}")
 
     if verdict in NEW_ROUND:
@@ -297,6 +339,8 @@ def parse_arguments():
     check_parser = subcommands.add_parser("check")
     check_parser.add_argument("perimeter", help="l'id del perimetro: un'epica o un mandato")
     check_parser.add_argument("--own-session", required=True, help="session id della regia che chiede")
+    check_parser.add_argument("--wait", type=int, default=0,
+                              help="secondi di attesa su `in passaggio` di un'altra sessione viva")
     facts_parser = subcommands.add_parser("facts")
     facts_parser.add_argument("perimeter", help="l'id del perimetro: un'epica o un mandato")
     return parser.parse_args()
@@ -311,7 +355,7 @@ def main():
     project_root = os.path.abspath(arguments.project_root) if arguments.project_root \
         else regia_common.find_project_root(os.getcwd())
     if arguments.command == "check":
-        return command_check(project_root, arguments.perimeter, arguments.own_session)
+        return command_check(project_root, arguments.perimeter, arguments.own_session, arguments.wait)
     return command_facts(project_root, arguments.perimeter)
 
 

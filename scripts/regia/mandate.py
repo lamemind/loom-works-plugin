@@ -5,7 +5,9 @@ mandate — le letture della regia sul mandato: gate, albero, cifre prima → do
           lancia, letto dal suo transcript, e quello del progetto, letto da
           `.claude/loom-works.json`, entrambi `auto`; e `loom-deck-headless`
           sul PATH, il comando con cui la regia apre e porta avanti i membri,
-          in una versione che conosce `--regia`
+          in una versione che conosce `--regia`. Dice anche, senza chiudere
+          il gate, se `loom-deck-spawn` sa aprire la regia successora di un
+          passaggio di consegne (`HANDOFF`)
   tree    lo stato del perimetro dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
           `## Materiale`; poi le coppie di membri che non possono girare insieme
@@ -82,6 +84,39 @@ HEADLESS_COMMAND = "loom-deck-headless"
 # più vecchio la rifiuta con uscita 2, e la regia lo scoprirebbe al primo membro.
 HEADLESS_REGIA_FLAG = "--regia"
 HEADLESS_HELP_TIMEOUT_S = 20
+# Il client dell'endpoint del deck, con cui la regia apre la successora quando
+# passa le consegne (kind `regia`).
+SPAWN_COMMAND = "loom-deck-spawn"
+USAGE_KIND_LINE = re.compile(r"^\s*<kind>\s+(.*)$", re.M)
+
+
+def command_usage(command):
+    """L'uso di un comando del deck (`--help`), o stringa vuota se il comando
+    non parte o non risponde in tempo."""
+    try:
+        result = subprocess.run(
+            [command, "--help"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=HEADLESS_HELP_TIMEOUT_S,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout
+
+
+def spawn_knows_regia(spawn):
+    """`True` se la riga `<kind>` dell'uso di `loom-deck-spawn` elenca `regia`.
+
+    La riga dei kind, e non l'uso intero: l'uso nomina la regia anche per
+    `--regia`, che c'è da prima del passaggio di consegne. La riga nasce dalla
+    stessa tabella con cui il deck rifiuta un kind, quindi un kind elencato è un
+    kind che il deck accetta."""
+    match = USAGE_KIND_LINE.search(command_usage(spawn))
+    return bool(match) and "regia" in [kind.strip() for kind in match.group(1).split("|")]
 
 
 def headless_knows_regia(headless):
@@ -91,19 +126,7 @@ def headless_knows_regia(headless):
     0 e non apre nessun turno. Un comando che non parte, che non risponde in
     tempo o che non nomina l'opzione vale `False`, e il gate si chiude.
     """
-    try:
-        result = subprocess.run(
-            [headless, "--help"],
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=HEADLESS_HELP_TIMEOUT_S,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return HEADLESS_REGIA_FLAG in result.stdout
+    return HEADLESS_REGIA_FLAG in command_usage(headless)
 
 
 def last_permission_mode(transcript):
@@ -154,6 +177,10 @@ def command_gate(project_root, own_session):
     # rifiuterebbe ogni apertura: anche questo si scopre qui, non al primo membro.
     knows_regia = headless is not None and headless_knows_regia(headless)
     print(f"HEADLESS_REGIA={'sì' if knows_regia else ('no' if headless else '-')}")
+    # Il passaggio di consegne serve solo ai giri lunghi: un deck che non sa
+    # aprire la successora non ferma il lancio, e la regia lo dice in una riga.
+    spawn = shutil.which(SPAWN_COMMAND)
+    print(f"HANDOFF={'sì' if spawn is not None and spawn_knows_regia(spawn) else 'no'}")
     open_gate = own_mode == "auto" and project_mode == "auto" and knows_regia
     print(f"GATE={'ok' if open_gate else 'stop'}")
     return 0 if open_gate else 2
