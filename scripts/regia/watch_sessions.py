@@ -17,6 +17,11 @@ Con --filter le righe passano da whitelist e blacklist prima di uscire
 (watch_filter.py): il file si rilegge quando cambia, e le righe `monitor`
 escono sempre. Senza --filter escono tutte.
 
+Con --context-threshold il monitor misura anche il contesto della sessione che
+lo lancia, la regia, dal suo transcript (watch_context.py): una riga `regia 🧠`
+al 20, 40, 60, 80, 100 e 120% della soglia, una volta per gradino. Come le righe
+`monitor`, escono sempre.
+
 Le sessioni sono quelle del registro vivo con `cwd` dentro la radice del
 progetto, comprese quelle nate in un submodule: il transcript di ognuna si
 ricava dal suo `cwd`. La chiave di una sessione è il processo (pid +
@@ -24,13 +29,15 @@ ricava dal suo `cwd`. La chiave di una sessione è il processo (pid +
 
 Lo stato sta in un file JSON (--state): un monitor riarmato con lo stesso file
 non ripete gli eventi già detti e non perde quelli capitati nel cambio. Il primo
-giro registra lo stato attuale e non emette niente sul passato.
+giro registra lo stato attuale e non emette niente sul passato, tranne il
+contesto della regia: la regia deve sapere subito se è già oltre un gradino.
 
 Uso (lo lancia la skill della regia, dalla cache del plugin):
   python -u -I watch_sessions.py --project-root <radice del progetto> \\
       --own-session <id della sessione che lancia il monitor> \\
       --state <radice>/.claude/loom/regia/T<perimetro>-watch.json \\
       [--filter <radice>/.claude/loom/regia/T<perimetro>-filter.json] \\
+      [--context-threshold <token>] \\
       [--repo nome=path-relativo-alla-radice]...
 """
 
@@ -51,6 +58,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import watch_context  # noqa: E402
 import watch_filter  # noqa: E402
 
 CHECKBOX_PATTERN = re.compile(r"^- \[([ x])\]")
@@ -58,6 +66,10 @@ CHECKBOX_PATTERN = re.compile(r"^- \[([ x])\]")
 # Il file del filtro (watch_filter.FilterSource), o None senza --filter. Lo
 # assegna `main`; lo legge `emit_event`, il punto da cui esce ogni evento.
 filter_source = None
+
+# La sessione della regia vista nell'ultimo giro del registro (`sessionId`,
+# `cwd`), o None: la scrive `scan_sessions`, la legge `scan_context`.
+own_live = None
 
 
 def parse_arguments():
@@ -73,6 +85,8 @@ def parse_arguments():
     parser.add_argument("--poll-seconds", type=int, default=15)
     parser.add_argument("--stall-minutes", type=float, default=10,
                         help="una sessione busy col transcript fermo da più tempo produce un evento")
+    parser.add_argument("--context-threshold", type=int, default=0,
+                        help="soglia di contesto della regia in token: eventi 🧠 ai gradini; 0 = nessuna misura")
     parser.add_argument("--once", action="store_true",
                         help="un giro solo: legge, salva lo stato ed esce")
     return parser.parse_args()
@@ -366,16 +380,23 @@ def announce_end(process):
 def is_own(session, state, settings):
     """La sessione che lancia il monitor non si segue: riporterebbe i propri
     turni. Il processo si ricorda, così un /clear della regia, che cambia il
-    suo sessionId, non la fa ricomparire."""
-    if session.key in state["own_processes"]:
-        return True
+    suo sessionId, non la fa ricomparire.
+
+    Il processo che risponde a --own-session è anche quello di cui si misura il
+    contesto (`own_key`). Gli altri processi della lista sono regie di prima
+    sullo stesso file di stato, come quella che ha passato le consegne: non si
+    seguono, e non si misurano."""
     if settings.own_session and session.session_id.startswith(settings.own_session):
-        state["own_processes"].append(session.key)
+        state["own_key"] = session.key
+        if session.key not in state["own_processes"]:
+            state["own_processes"].append(session.key)
         return True
-    return False
+    return session.key in state["own_processes"]
 
 
 def scan_sessions(state, settings):
+    global own_live
+    own_live = None
     now = time.time()
     initialized = state.get("initialized")
     since = state.get("last_scan") if initialized else None
@@ -387,6 +408,8 @@ def scan_sessions(state, settings):
     seen = set()
     for session in registry.sessions:
         if is_own(session, state, settings):
+            if session.key == state.get("own_key"):
+                own_live = {"session_id": session.session_id, "cwd": session.cwd}
             continue
         seen.add(session.key)
         process = state["processes"].get(session.key)
@@ -432,6 +455,19 @@ def scan_sessions(state, settings):
             # processo da cui risalire al transcript.
             read_new_records(process)
             announce_end(process)
+
+
+def scan_context(state, settings):
+    """Il contesto della regia, dal suo transcript: un evento `🧠` per gradino
+    nuovo. Anche al primo armo, a differenza delle altre fonti: la regia deve
+    sapere subito se è già oltre un gradino."""
+    if settings.context_threshold <= 0 or own_live is None:
+        return
+    transcript = regia_common.transcript_path(own_live["cwd"], own_live["session_id"])
+    state["context"], line = watch_context.measure(
+        state.get("context"), own_live["session_id"], transcript, settings.context_threshold)
+    if line:
+        emit(line)
 
 
 def relative_cwd(cwd, settings):
@@ -663,7 +699,7 @@ def main():
     state = load_state(settings.state)
     if settings.filter:
         filter_source = watch_filter.FilterSource(settings.filter, state.get("filter"), state.get("filter_broken", False))
-    scanners = (scan_sessions, scan_task_files, scan_progress_table, scan_git)
+    scanners = (scan_sessions, scan_context, scan_task_files, scan_progress_table, scan_git)
     first_scan = True
     while True:
         scan_started = time.time()
