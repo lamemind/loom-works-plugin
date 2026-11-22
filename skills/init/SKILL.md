@@ -27,9 +27,9 @@ Solo se **assenti** (idempotente):
 - `{docs_root}/reference/INDEX.md` — dal template `reference-index-skeleton.md`
 - `{docs_root}/tasks/` — directory per i file task
 - `{docs_root}/reference/` — directory per doc offline
-- `{docs_root}/inbox/` — directory per le nozioni non ancora collocate, che il checkpoint riempie e `drain-notions` svuota. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
+- `{docs_root}/inbox/` — directory per le nozioni che il checkpoint vi trasloca, e che restano lì, indicizzate. Nasce vuota e non si versiona: nessun `.gitkeep`, e ogni lettore ne tollera l'assenza
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`. Unico file che init tocca anche quando esiste già: su un progetto registrato lo step 1b ripropone i campi non identitari coi valori attuali, per far crescere un file scritto prima che un campo esistesse
-- `.claude/settings.json` — solo la regola `Read(~/.claude/plugins/cache/…/**)`, aggiunta in coda alle esistenti senza toccare il resto del file. Serve agli agent doc, che aprono i propri contratti dalla cache del plugin: senza, la `Read` cade sotto approvazione e l'agent **prosegue senza contratto** invece di fermarsi. Il path è sul segmento stabile, mai sulla versione — una regola concessa a mano da un «non chiedere più» nasce version-pinned e muore al primo bump
+- `.claude/settings.json` — solo la regola `Read(~/.claude/plugins/cache/…/**)`, aggiunta in coda alle esistenti senza toccare il resto del file. Serve a chi apre i contratti del plugin dalla cache (`${CLAUDE_PLUGIN_ROOT}/docs/…`): senza, la `Read` cade sotto approvazione, e una sessione non presidiata **prosegue senza contratto** invece di fermarsi. Il path è sul segmento stabile, mai sulla versione — una regola concessa a mano da un «non chiedere più» nasce version-pinned e muore al primo bump
 
 **CLAUDE.md**: init **propone** (non forza) due blocchi — gli `@-import` base e la sezione `User assumed knowledge` — vedi step 2. **Non tocca**: file git, config, dipendenze.
 
@@ -119,7 +119,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/config/register.sh
 
 `CLAUDE.md` è il punto di ingresso, e init ci **propone** (non forza) due blocchi indipendenti: gli `@-import` della doc e la sezione `User assumed knowledge`. Il file può esistere già — il plugin si installa anche su un progetto maturo — con uno dei due blocchi, entrambi o nessuno: **ogni blocco si valuta per conto proprio, e ciò che c'è non si riscrive.**
 
-**Blocco 1 — `@-import` della doc.** Senza queste righe le skill task-level e il doc-writer partono ciechi, perché non sanno dove stiano `{docs_root}/tasks.md` e `{docs_root}/reference/INDEX.md`. Ogni riga porta insieme l'`@-import` e l'ancora MD cliccabile:
+**Blocco 1 — `@-import` della doc.** Senza queste righe le skill task-level partono cieche, perché non sanno dove stiano `{docs_root}/tasks.md` e `{docs_root}/reference/INDEX.md`. Ogni riga porta insieme l'`@-import` e l'ancora MD cliccabile:
 
 ```markdown
 - @{docs_root}/tasks.md [Tasks]({docs_root}/tasks.md)

@@ -53,18 +53,10 @@ Then bootstrap the project structure:
 | `/loom-works:spawn-lane` | Create a persistent git worktree lane |
 | `/loom-works:merge-lane` | Merge lane into main, keep worktree |
 | `/loom-works:drop-lane` | Destroy a lane without merging |
-| `/loom-works:recap-status` | Recap dispatcher: resolves the active task and routes to one of the three below |
-| `/loom-works:recap-status-project` | Whole-project recap with doc↔git cross-check — no next-step proposal |
+| `/loom-works:recap-status` | Recap dispatcher: resolves the active task and routes to one of the two below; with no task resolved it answers «nessuna task» |
 | `/loom-works:recap-status-task` | Single-task recap: open DLV/AC, material produced, one named next step |
 | `/loom-works:recap-status-epic` | Umbrella-task recap: children with DLV/AC figures, deps, two-level entry point |
-| `/loom-works:drain-notions` | Drain the `nozioni` inbox queue: router → registro → writer → validator → commit |
-| `/loom-works:derive-notions` | Consume `derivazione` orders: diff → disallineamenti → new `nozioni` inbox file |
-| `/loom-works:create-sweep` | Write a `sweep` order: analyse targets, editorial scope and dead references, then commit the inbox file |
-| `/loom-works:align-doc` | Execute `sweep` orders: extractor + writer on a `doc/sweep-<slug>` branch with PR |
-| `/loom-works:pull-repos` | Pull umbrella + submodules, unlock `branch:` inboxes found on main, derive from foreign merges |
-| `/loom-works:rebalance-doc` | Doc topology: split / merge review / regroup on doc-metrics flags |
-| `/loom-works:write-tldr` | Produce line 3 of touched `reference/` files: collector → grep gate → pruner |
-| `/loom-works:nightly-doc` | Nightly composition: spot-commit derivation, pull, derive, drain, sweeps |
+| `/loom-works:pull-repos` | Pull umbrella + submodules, unlock `branch:` inboxes found on main |
 | `/loom-works:statusline-task` | Manage the 📌 active-task widget in the global statusline (default patch, token `unpatch`) |
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |
 | `/loom-works:set-task-folder` | Attach a task folder to an existing task |

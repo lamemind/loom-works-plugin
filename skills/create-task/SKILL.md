@@ -123,7 +123,7 @@ Analizza il contesto conversazionale immediatamente precedente all'invocazione d
 
 **Scope della cattura: nozione + ancora. NON decidere il target doc.**
 
-Il routing della nozione verso uno specifico file doc è una decisione che richiede conoscenza dell'intero landscape documentale e va deferita al processing (checkpoint-task + doc-writer, con accesso a INDEX). A create-task manca quel contesto — qualsiasi target ipotizzato qui è un guess rumoroso.
+Il routing della nozione verso uno specifico file doc è una decisione che richiede conoscenza dell'intero landscape documentale, e nessuna skill la prende: la nozione resta nell'inbox della task, indicizzata. A create-task manca quel contesto — qualsiasi target ipotizzato qui è un guess rumoroso.
 
 Estrai e popola la sezione `## Doc Impact` nel task file come bullet list conciso. Per ogni nozione:
 

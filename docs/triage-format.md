@@ -225,9 +225,8 @@ Lo script è `scripts/task/triage-altrove.sh`, con tre sottocomandi — `risolvi
 
 ## Il file degli scenari non entra nel sistema doc
 
-Due esclusioni, entrambe su `triage/`, le stesse del registro ADR:
+Un'esclusione sola, su `triage/`, la stessa del registro ADR:
 
-- `doc_excluded` in `lib-doc.sh` — la usa `doc-metrics.sh`, che percorre la docs-root intera. Senza, ogni record prenderebbe `MERGE?` e gli scenari diventerebbero una coda di lavoro per `rebalance-doc`.
-- il `case` del perimetro in `check-doc-links.sh` — senza, ogni path citato in una segnalazione diventerebbe `DANGLING` per sempre su un file che per contratto non si riscrive.
+- `doc_excluded` in `lib-doc.sh` — la usa `doc-metrics.sh`, che percorre la docs-root intera. Senza, ogni scenario entrerebbe nelle misure della doc come un file di doc, con un layer che non ha.
 
 `md-wrap.py` non ha un canale di esclusione e non gli serve: i record li scrive uno script, a campi su una riga.

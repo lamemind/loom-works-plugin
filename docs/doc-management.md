@@ -1,10 +1,10 @@
 # Gestione Documentazione
 
-Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive non sta qui: alla chat lo dà l'output style, agli agent il contratto editoriale inline nel loro body.
+Contratto delle convenzioni doc: **cosa** è doc e **dove** va. *Come* si scrive non sta qui: alla chat lo dà l'output style.
 
 ## Il paradigma: la doc è l'as-is di prod
 
-Il codice cambia da più fonti — le task, i merge altrui, i commit spot — e un commit non è un rilascio. **La doc descrive prod.** Le nozioni emerse restano della task finché la feature non è materializzata, riesaminate a ogni checkpoint; la chiusura le rende drenabili; il drain le colloca. La cronaca sta in git, l'intenzione nel task file, il cantiere nella task folder, lo sviluppo non rilasciato negli inbox di branch.
+Il codice cambia da più fonti — le task, i merge altrui, i commit spot — e un commit non è un rilascio. **La doc descrive prod.** Le nozioni emerse restano della task finché la feature non è materializzata, riesaminate a ogni checkpoint; la chiusura le congela nell'inbox della task, dove restano indicizzate. La cronaca sta in git, l'intenzione nel task file, il cantiere nella task folder, lo sviluppo non rilasciato negli inbox di branch.
 
 ## I quattro layer
 
@@ -21,25 +21,24 @@ Nei primi due la doc **è** la verità. Negli altri due la verità sta altrove, 
 
 ## La base di un path
 
-Un path in doc dichiara la propria base con la grafia. Dal token nudo `check-doc-links.sh` non può sapere da dove l'autore lo intendesse, e provare entrambe le basi darebbe per buono un riferimento rotto che trova un omonimo dall'altra parte.
+Un path in doc dichiara la propria base con la grafia. Dal token nudo chi legge non può sapere da dove l'autore lo intendesse, e provare entrambe le basi darebbe per buono un riferimento rotto che trova un omonimo dall'altra parte.
 
-- **`🏠/<path>`** parte da project root, e solo da lì, anche quando risale sopra la root: un riferimento a un progetto fratello (il corpus di gruppo) si scrive `🏠/../<fratello>/…`. Il checker lo verifica solo da project root, senza ripiego sulla cartella del file.
+- **`🏠/<path>`** parte da project root, e solo da lì, anche quando risale sopra la root: un riferimento a un progetto fratello (il corpus di gruppo) si scrive `🏠/../<fratello>/…`. Si risolve solo da project root, senza ripiego sulla cartella del file.
 - **`./…` e `../…` senza marcatore** partono dalla cartella del file che li cita, mai da project root. È la forma dei link markdown, l'unica che un editor risolve: un `../<fratello>/…` scritto pensando alla root risulta appeso anche quando il file esiste.
 - **Un path nudo con almeno una barra** (`{docs_root}/reference/x.md`) si prova dalla cartella del file e poi da project root. Il marcatore è additivo: i path nudi restano validi.
 
-Un target fuori da project root compare nell'output del checker con la stessa grafia, `🏠/../…`.
+La grafia è una convenzione di scrittura: nessuno script verifica i riferimenti di una pagina.
 
-## L'inbox — stato di transizione
+## L'inbox — il punto d'arrivo
 
-`{docs_root}/inbox/` tiene i file in attesa di smaltimento. Non è un quinto verdetto: è uno **stato di transizione** verso i quattro. Tre nature, dichiarate dal marker in riga 3 del file (`nozioni` · `derivazione` · `sweep`); il formato e il vocabolario dei token sono degli script (`scripts/docs/inbox.sh`), mai di un prompt.
+`{docs_root}/inbox/` tiene le nozioni che le task hanno prodotto. Non è un quinto verdetto: è il **punto d'arrivo** di una nozione, che resta lì, indicizzata in `INDEX.md`. Nessun processo la sposta nei quattro layer. Tre nature, dichiarate dal marker in riga 3 del file (`nozioni` · `derivazione` · `sweep`); il formato e il vocabolario dei token sono degli script (`scripts/docs/inbox.sh`), mai di un prompt. Il checkpoint produce solo `nozioni`: le altre due nature restano leggibili per i file già scritti, e nessuna skill le esegue.
 
-- **`drainable` è un passaggio di proprietà.** Senza il token l'owner è la task che scrive il file: nessun consumer lo prende, quindi non c'è consistenza da proteggere e il corpo si appende, si riscrive e si pota a ogni checkpoint (`inbox-format.md`). Col token il file passa al sistema documentale e **si congela**: da lì le uniche scritture sono il marker (`pull-repos`) e il registro del drain.
-- **Una task, un inbox**: il primo trasloco lo crea, e da lì è l'unica sede delle nozioni di quella task. Un file per trasloco moltiplicherebbe i file senza moltiplicare il contenuto, e il costo del drain scala col numero di file.
-- **Accumulo libero**: nessun cap sulla coda, nessuna soglia che blocchi. Sul singolo file il checkpoint conta le nozioni e stampa un avviso sopra `LW_DOC_INBOX_NOZIONI` (`lib-doc.sh`), senza tagliare né splittare.
-- **Due stati, due semantiche.** Un file **drainable** descrive un rilascio che la doc consolidata non ha ancora assorbito: se contraddice `reference/`, **vince l'inbox**. Un file **non-drainable** descrive lavoro in corso, che il checkpoint successivo può smentire: è **inconsistenza, non precedenza** — a disposizione, non garantito, e si legge insieme alla task che lo scrive. `build-index.sh` li tiene in due sezioni distinte.
+- **`drainable` dice che il file descrive un rilascio chiuso.** Senza il token l'owner è la task che scrive il file: il corpo si appende, si riscrive e si pota a ogni checkpoint (`inbox-format.md`). La chiusura della task accende il token e il file **si congela**: da lì l'unica scrittura è il marker, che `pull-repos` riscrive quando sblocca un inbox di branch. Il nome del token resta perché lo leggono gli script, il deck e ogni inbox già scritto.
+- **Una task, un inbox**: il primo trasloco lo crea, e da lì è l'unica sede delle nozioni di quella task. Un file per trasloco moltiplicherebbe i file senza moltiplicare il contenuto.
+- **Accumulo libero**: nessun cap sul numero di file inbox, nessuna soglia che blocchi. Sul singolo file il checkpoint conta le nozioni e stampa un avviso sopra `LW_DOC_INBOX_NOZIONI` (`lib-doc.sh`), senza tagliare né splittare.
+- **Due stati, due semantiche.** Un file **drainable** descrive un rilascio: se contraddice `reference/`, **vince l'inbox**. Un file **non-drainable** descrive lavoro in corso, che il checkpoint successivo può smentire: è **inconsistenza, non precedenza** — a disposizione, non garantito, e si legge insieme alla task che lo scrive. `build-index.sh` li tiene in due sezioni distinte.
 - **`branch:<nome>`** qualifica *per chi* la nozione è vera: la precedenza vale solo per chi lavora su quel branch, per chi sta su prod non conta niente. Non congela il file per la task che ne è owner.
-- **Esente da split e merge**: un file inbox aggrega un trasloco e nasce per morire al drain.
-- La ridondanza in inbox è ammessa: «è già scritto altrove» è un criterio dipendente e si paga allo smaltimento, non alla transizione.
+- La ridondanza in inbox è ammessa: «è già scritto altrove» è un criterio dipendente, e non lo applica nessuno.
 
 ## Cosa non va in doc
 
@@ -67,20 +66,13 @@ costata scoprirla?             no → taglia, il codice basta
 le nove parole                 riconoscibili dal testo
 ```
 
-Tutti gli altri — *eco*, *sorpresa*, *sopravvive al refactor* (dipendono dal codice) · *inventario*, *calco* (dalla fonte viva) · *già scritto*, *online o offline*, *quale file*, *noto* (dalla doc e dalla competenza di progetto) — sono **dipendenti**: li paga il drain, aprendo quelle fonti una volta per file inbox invece che una per nozione. Pretenderli prima rimetterebbe la lettura dell'intera doc dentro il checkpoint.
-
-`noto` si misura contro la competenza **di progetto** (`{docs_root}/reference/assumed-knowledge.md`, §Project assumed knowledge), mai contro quella di chi lancia.
+Tutti gli altri — *eco*, *sorpresa*, *sopravvive al refactor* (dipendono dal codice) · *inventario*, *calco* (dalla fonte viva) · *già scritto*, *online o offline*, *quale file* (dalla doc) — sono **dipendenti**, e nessun passo li applica. Pretenderli al checkpoint rimetterebbe la lettura dell'intera doc dentro ogni checkpoint. Ne segue che un inbox può contenere doppioni ed echi di ciò che `reference/` dice già.
 
 ## Chi scrive la doc
 
-**La doc non si scrive a mano**: ogni scrittura passa da una skill.
+- nozione emersa in una task → vive nella sede che il task file dichiara (`## Doc Impact`, poi l'inbox della task dal primo trasloco), **riesaminata** a ogni checkpoint (`checkpoint-task`), congelata alla chiusura
+- `reference/` e le pagine online → **nessuna skill le scrive**: si scrivono e si correggono a mano. Niente segnala una pagina che descrive pezzi che il codice non ha più
 
-- nozione emersa in una task → vive nella sede che il task file dichiara (`## Doc Impact`, poi l'inbox della task dal primo trasloco), **riesaminata** a ogni checkpoint (`checkpoint-task`)
-- file inbox `nozioni` drainable → `drain-notions` (router → writer → validator, registro nel file)
-- file inbox `derivazione` → `derive-notions` (dal diff a un file `nozioni` nuovo)
-- file inbox `sweep` → `align-doc` (estrazione + stesura, su branch `doc/sweep-<slug>` con PR)
-- topologia (split · merge · regroup) → `rebalance-doc`, sui flag di `doc-metrics.sh`
+L'unica soglia vive in uno **script**, mai in un prompt: l'avviso sul numero di nozioni di un inbox (`LW_DOC_INBOX_NOZIONI`).
 
-Le soglie vivono negli **script**, mai nei prompt: chi decide legge i flag dall'output. Nessun man-in-the-loop nei flussi non presidiati; l'unico presidio dello sweep è la review della PR.
-
-**La doc segue il rilascio.** Atomicità richiesta: inbox + doc derivata nello stesso commit di drain; codice + task file nel checkpoint. Nuovo file in `reference/` o in `inbox/` → rigenera l'indice con `scripts/docs/build-index.sh`.
+**La doc segue il rilascio.** Codice + task file nel checkpoint. Nuovo file in `reference/` o in `inbox/` → rigenera l'indice con `scripts/docs/build-index.sh`; un file di `reference/` senza TLDR in riga 3 entra col solo titolo.

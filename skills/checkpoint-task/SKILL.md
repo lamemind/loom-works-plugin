@@ -12,9 +12,9 @@ allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion, Skill
 
 Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa il valore ottenuto ovunque sotto compaia `{docs_root}`. È un fatto per-progetto, letto dal file config del progetto in cui giri: non assumerlo e non riportarlo da un'altra sessione. Lo stato shell non sopravvive fra invocazioni Bash — risolvilo una volta e riusa il valore letterale.
 
-Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna il task file e `{docs_root}/tasks.md`, committa e pusha. **La doc segue il rilascio, non il commit**: le nozioni traslocano presto in un inbox WIP, che resta della task e si riesamina a ogni checkpoint, ma la doc lo assorbe solo quando diventa `drainable`.
+Checkpoint di progresso sulla task attiva: analizza il diff dall'ultimo avanzamento consolidato, aggiorna il task file e `{docs_root}/tasks.md`, committa e pusha. **La doc segue il rilascio, non il commit**: le nozioni traslocano presto in un inbox WIP, che resta della task e si riesamina a ogni checkpoint, e la chiusura lo congela con `drainable`: da lì descrive un rilascio, e l'indice gli dà precedenza su `reference/`.
 
-**Una task, un inbox.** Il primo trasloco lo crea (6.2); da lì è l'unica sede delle nozioni della task, e il riesame (6.1) ci lavora dentro — appende, riscrive, elimina. **Ogni file inbox nasce non-drainable**: la drenabilità la accende la **chiusura della task** (6.4), ed è il momento in cui il corpo si congela. Sede e drenabilità restano quindi due decisioni distinte — la prima dice *dove* vive la nozione, la seconda *quando* la doc può assorbirla e chi ne è proprietario.
+**Una task, un inbox.** Il primo trasloco lo crea (6.2); da lì è l'unica sede delle nozioni della task, e il riesame (6.1) ci lavora dentro — appende, riscrive, elimina. **Ogni file inbox nasce non-drainable**: la drenabilità la accende la **chiusura della task** (6.4), ed è il momento in cui il corpo si congela. Sede e drenabilità restano quindi due decisioni distinte — la prima dice *dove* vive la nozione, la seconda *da quando* il file descrive un rilascio chiuso.
 
 ## Note utente
 ~~~human
@@ -123,11 +123,11 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
 
    **La sede delle nozioni è una sola in ogni momento, e la dichiara il task file.** `## Doc Impact` porta le voci finché l'inbox della task non esiste; dal primo trasloco in poi porta la sola riga `- → inbox <basename> · storia: <sha>`, e la sede è quel file. **Leggila prima di tutto il resto**: decide su cosa gira il riesame e se il trasloco deve girare affatto.
 
-   **6.1 — Riesame: rigiudica, non smaltire.** Leggi ogni voce **nella sede corrente** — `## Doc Impact` finché l'inbox non esiste, il file inbox da lì in avanti. La voce è **viva**: riscrivila se il codice di questo checkpoint l'ha cambiata, eliminala se l'ha resa falsa o inutile. Applichi i **soli criteri indipendenti** — *sopravvive alla task* · *costo di scoperta* · le nove parole leggibili nel testo (cronaca, intenzione, ipotesi, cantiere, scarto, eco, inventario, calco, cornice: le prime cinque si giudicano qui, le altre dipendono da fonti e le paga il drain). **Nessun marker di esito**: una voce eliminata sparisce, non viene marcata.
+   **6.1 — Riesame: rigiudica, non collocare.** Leggi ogni voce **nella sede corrente** — `## Doc Impact` finché l'inbox non esiste, il file inbox da lì in avanti. La voce è **viva**: riscrivila se il codice di questo checkpoint l'ha cambiata, eliminala se l'ha resa falsa o inutile. Applichi i **soli criteri indipendenti** — *sopravvive alla task* · *costo di scoperta* · le nove parole leggibili nel testo (cronaca, intenzione, ipotesi, cantiere, scarto, eco, inventario, calco, cornice: le prime cinque si giudicano qui, le altre dipendono da fonti e non le applica nessuno). **Nessun marker di esito**: una voce eliminata sparisce, non viene marcata.
 
    Sull'inbox le operazioni sono tre e hanno una regola sola non ovvia — **gli id non si rinumerano mai**, i buchi sono attesi. Apri `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md` prima di scrivere: porta il formato, le tre operazioni e gli snippet.
 
-   **Un inbox `drainable` non si tocca**: la proprietà è passata al sistema documentale, e il drain può averlo già in lavorazione. Capita su una task riaperta dopo la chiusura — leggi la riga 3 con `inbox.sh parse`, e se il token c'è dichiara in output che il riesame è saltato e perché.
+   **Un inbox `drainable` non si tocca**: descrive un rilascio chiuso ed è congelato. Capita su una task riaperta dopo la chiusura — leggi la riga 3 con `inbox.sh parse`, e se il token c'è dichiara in output che il riesame è saltato e perché.
 
    **6.2 — Il trasloco: una volta sola per task.** Scatta al **primo** checkpoint che trova voci in `## Doc Impact`, e crea l'inbox della task. Non è condizionato al rilascio né alla chiusura: quelle governano `drainable` (6.4), non *dove* vive la nozione. Se il puntatore c'è già, il trasloco non gira — le nozioni sono già nella loro sede.
 
@@ -160,13 +160,13 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
       ```bash
       [[ -d "{docs_root}/reference" ]] && "${CLAUDE_PLUGIN_ROOT}/scripts/docs/build-index.sh" --docs-root "{docs_root}"
       ```
-      Cartella assente = la doc del progetto vive in un corpus di gruppo, fuori da questo repo: l'indice lo rigenera chi drena lì, e da qui non c'è niente da fare. Exit 2 = indice scritto ma un TLDR sfora il cap: se è il tuo, accorcialo e rilancia.
+      Cartella assente = la doc del progetto vive in un corpus di gruppo, fuori da questo repo: l'indice lo rigenera chi lavora lì, e da qui non c'è niente da fare.
 
    **6.3 — Riconciliazione.** Se il puntatore esiste **e** `## Doc Impact` porta comunque delle voci, qualcuno ha scritto nella sede sbagliata (una skill non allineata, il modello in chat prima di leggere il puntatore). Spostale nell'inbox con `Edit`, con id `max+1`, e togli le righe dal task file. Non è un secondo trasloco: nessun file nuovo, nessuna riga puntatore in più.
 
    **6.4 — Accensione della drenabilità.** Gira **solo se la task si è chiusa** allo step 4, e **dopo** il 6.2: il trasloco ha appena scritto la propria riga puntatore, e questo giro la deve vedere.
 
-   La lista degli inbox della task è già nel task file: il trasloco ha lasciato in `## Doc Impact` la riga `- → inbox <basename>.md · storia: <sha>`. Normalmente è una sola — una task ha un inbox — ma una task riaperta dopo un drain ne ha una seconda, e il giro le prende tutte. È la fonte esatta, e risolve da sé il caso della figlia di un'epica: il file si chiama col cappello (`T74-…`), ma la riga sta nel task file della task che ha traslocato.
+   La lista degli inbox della task è già nel task file: il trasloco ha lasciato in `## Doc Impact` la riga `- → inbox <basename>.md · storia: <sha>`. Normalmente è una sola — una task ha un inbox — ma una task riaperta dopo la chiusura può averne una seconda, e il giro le prende tutte. È la fonte esatta, e risolve da sé il caso della figlia di un'epica: il file si chiama col cappello (`T74-…`), ma la riga sta nel task file della task che ha traslocato.
 
    ```bash
    grep -oP '^- → inbox \K\S+\.md' "${task_file}"
@@ -178,9 +178,9 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
    "${CLAUDE_PLUGIN_ROOT}/scripts/docs/inbox.sh" marker --file "{docs_root}/inbox/<basename>" --set drainable
    ```
 
-   - **File assente = già drenato**, mai un errore: `drain-notions` cancella il file a fine ciclo, ma la riga puntatore resta nel task file per sempre (è l'indirizzo storico). Una task riaperta e ri-chiusa ripassa sugli stessi basename e ne trova una parte sparita.
+   - **File assente**, mai un errore: un file inbox può essere uscito dal repo, ma la riga puntatore resta nel task file per sempre (è l'indirizzo storico). Salta quel basename e prosegui.
    - **File con `branch:` → salta**, non accendere. I due token sono gate distinti e cumulativi: `pull-repos` accende `drainable` al merge quando il branch è la sola cosa che manca, ma un file che porta ancora `branch:` non è in esercizio comunque. Leggi il marker con `inbox.sh parse` prima di decidere.
-   - **Materializzazione incerta** — non sai se la feature è davvero in esercizio: `AskUserQuestion` all'utente, drainable sì/no. `No` salta l'intero giro, inbox vecchi compresi: la task è chiusa ma la doc non deve ancora assorbirla.
+   - **Materializzazione incerta** — non sai se la feature è davvero in esercizio: `AskUserQuestion` all'utente, drainable sì/no. `No` salta l'intero giro, inbox vecchi compresi: la task è chiusa ma il file non descrive ancora un rilascio.
    - Un `marker` su un file già drainable è un no-op scritto: nessun danno, la riga 3 si riscrive identica.
 
    **6.5 — Conteggio dell'inbox.** Ultimo passo della fase doc, sullo stato finale del file:
@@ -197,7 +197,7 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
    1. Nella tabella Tasks Overview trova la riga `| {taskId} |`
    2. Aggiorna la colonna Prog: `✔️` se completata (step 4), altrimenti `🟡`
    3. Se la task appare nel grafo Execution Plan, allinea l'emoji davanti all'ID
-   4. L'ordine fra questo step e la fase doc è **libero**: la Prog in `tasks.md` non è un cancello per niente — a governare le code è il marker dentro il file inbox, che il 6.4 accende alla chiusura.
+   4. L'ordine fra questo step e la fase doc è **libero**: la Prog in `tasks.md` non è un cancello per niente — a governare le sezioni dell'indice è il marker dentro il file inbox, che il 6.4 accende alla chiusura.
 
 8. **Commit e push — fase tracking e doc**
 
@@ -212,7 +212,7 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --doc-message "docs(${taskId}): trasloco in inbox" "checkpoint(${taskId}): Prog + riesame" -- "{docs_root}/tasks.md" "{docs_root}/inbox/<ogni file inbox toccato>.md" "{docs_root}/reference/INDEX.md"
    ```
 
-   La pathspec nomina **ogni file inbox toccato**, non solo quello appena creato: il riesame (6.1) riscrive il corpo di un inbox nato in un checkpoint precedente e il 6.4 ne riscrive la riga marker, e un file modificato ma fuori pathspec resta dirty nel worktree — dove la guardia d'ingresso di `drain-notions` lo trova e ferma il drain.
+   La pathspec nomina **ogni file inbox toccato**, non solo quello appena creato: il riesame (6.1) riscrive il corpo di un inbox nato in un checkpoint precedente e il 6.4 ne riscrive la riga marker, e un file modificato ma fuori pathspec resta dirty nel worktree, con un riesame che nessun commit porta su main.
 
    Nessun file sotto `inbox/` toccato → pathspec col solo `tasks.md` e **ometti `--doc-message`**.
 
@@ -228,7 +228,7 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
    `<sha>` è l'ultimo commit che lo step 8 stampa — `-> commit 2 (doc-nozione, …)` se c'è, altrimenti `-> commit 1 (…)` — cioè lo stato finale della chiusura; con lo step 8 saltato, l'ultimo dello step 5. Le skill si invocano come dice §Hook di progetto. Un checkpoint che non chiude non solleva `taskDone`.
 
 9. **Feedback finale**
-   Riporta: avanzamento registrato, su quale sede è girato il riesame e cosa ha riscritto o eliminato, se il trasloco ha creato l'inbox e con quali marker, e — se la task si è chiusa — quali inbox sono diventati drainable e quali sono stati saltati (già drenati, o congelati da `branch:`). Se il progetto dichiara hook, riporta anche quelli invocati in questo giro, evento per evento, col loro esito. Il feedback chiude con la sezione `🚦 Segnalazioni` (§🚦 Segnalazioni, sotto), sempre. Poi il ping TTS:
+   Riporta: avanzamento registrato, su quale sede è girato il riesame e cosa ha riscritto o eliminato, se il trasloco ha creato l'inbox e con quali marker, e — se la task si è chiusa — quali inbox sono diventati drainable e quali sono stati saltati (assenti, o congelati da `branch:`). Se il progetto dichiara hook, riporta anche quelli invocati in questo giro, evento per evento, col loro esito. Il feedback chiude con la sezione `🚦 Segnalazioni` (§🚦 Segnalazioni, sotto), sempre. Poi il ping TTS:
    ```bash
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "checkpoint $(say_id ${taskId}) done"
    ```
@@ -364,7 +364,7 @@ Topic = argomento concreto della domanda. NO generici.
 - **Due fasi di commit**: la fase codice (step 5) chiude e pusha il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e l'eventuale trasloco con pathspec esplicita. Un fallimento della fase doc non porta con sé il codice.
 - **Due eventi, ognuno dopo il proprio push**: `deliverableDone` dopo lo step 5, solo per i DLV spuntati in questo giro; `taskDone` dopo lo step 8, solo nel giro che chiude. Un checkpoint che non spunta e non chiude non invoca niente.
 - **Riesame ≠ archivio**: il riesame (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta — ed è il grosso del lavoro dopo il primo, perché da lì in avanti c'è solo lui. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola. Sull'inbox vale di più che sul task file: rigiudica un file già pubblicato e indicizzato, letto da chi non ha la task in mano.
-- **Il file inbox è WIP finché la task è aperta**: l'owner è la task, e il corpo si appende, si riscrive e si pota a ogni checkpoint — le tre operazioni e la regola degli id stanno in `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`. Il congelamento arriva con `drainable` (6.4), quando la proprietà passa al sistema documentale: da lì le uniche scritture ammesse sono la riga marker (lo sblocco di `pull-repos`) e il registro del drain.
+- **Il file inbox è WIP finché la task è aperta**: l'owner è la task, e il corpo si appende, si riscrive e si pota a ogni checkpoint — le tre operazioni e la regola degli id stanno in `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`. Il congelamento arriva con `drainable` (6.4): da lì l'unica scrittura ammessa è la riga marker (lo sblocco di `pull-repos`).
 - **Baseline del diff**: derivato, mai storato — dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD`.
 - **Detached**: niente analyze script, niente symlink. Stage selettivo obbligatorio.
-- **Nessuna allerta di coda**: l'accumulo *della coda* inbox è libero — nessun cap sul numero di file, nessun tetto. A drenare sono `drain-notions` / il giro `nightly-doc`, non un invito a fine checkpoint. L'unico conteggio è quello del 6.5, dentro un singolo file, e stampa un numero senza chiedere niente.
+- **Nessuna allerta sul numero di file**: l'accumulo degli inbox è libero — nessun cap, nessun tetto. L'unico conteggio è quello del 6.5, dentro un singolo file, e stampa un numero senza chiedere niente.

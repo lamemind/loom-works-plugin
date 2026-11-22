@@ -1,6 +1,6 @@
 # Convenzioni di path nei sorgenti del plugin
 
-Vale per `skills/`, `agents/`, `templates/` e i file di `docs/` — i sorgenti che un modello legge. **Non** per `scripts/`, che è bash vero: lì una variabile è una variabile.
+Vale per `skills/`, `templates/` e i file di `docs/` — i sorgenti che un modello legge. **Non** per `scripts/`, che è bash vero: lì una variabile è una variabile.
 
 ## La base è la root del progetto
 
@@ -8,7 +8,7 @@ Un path scritto in un sorgente del plugin è **project-root-relative**, e la bas
 
 Ne discende che una risorsa **interna al plugin** non si scrive relativa mai — sempre `${CLAUDE_PLUGIN_ROOT}/...`. Un `docs/task-management.md` nudo esiste in due mondi e ne indica due diversi (la `docs/` del plugin, e la docs-root di default di un progetto), quindi non fallisce: risolve al posto sbagliato in silenzio su ogni progetto che non ha personalizzato la docs-root.
 
-La doc di un progetto non ha una base sola: vi convivono link markdown relativi al file e path relativi alla root, e la base la dichiara la grafia — `🏠/` davanti a un path vuol dire «parte da project root» (regola completa: `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md` §La base di un path). Nei sorgenti del plugin la base è già la root, quindi il marcatore non serve a leggerli. Serve a ciò che i sorgenti fanno scrivere: un template, un prompt o un agent che mette in doc un path a un progetto fratello lo scrive `🏠/../<fratello>/…`, perché un `../<fratello>/…` nudo parte dalla cartella del file che lo cita e `check-doc-links.sh` lo riporta appeso anche quando il file esiste.
+La doc di un progetto non ha una base sola: vi convivono link markdown relativi al file e path relativi alla root, e la base la dichiara la grafia — `🏠/` davanti a un path vuol dire «parte da project root» (regola completa: `${CLAUDE_PLUGIN_ROOT}/docs/doc-management.md` §La base di un path). Nei sorgenti del plugin la base è già la root, quindi il marcatore non serve a leggerli. Serve a ciò che i sorgenti fanno scrivere: un template, un prompt o un agent che mette in doc un path a un progetto fratello lo scrive `🏠/../<fratello>/…`, perché un `../<fratello>/…` nudo parte dalla cartella del file che lo cita, e risulta appeso anche quando il file esiste.
 
 ## Due segnaposto
 
@@ -40,4 +40,4 @@ Il body dell'agent rilegge quel valore col proprio nome. Sono **due capi dello s
 
 ## Nessuno strumento presidia questo perimetro
 
-`check-doc-links.sh` non scandisce i sorgenti del plugin di default, e puntandoceli con `--also` non distingue un riferimento da un esempio didattico. I `SKILL.md` contengono per mestiere path che **devono** non esistere: righe di invocazione d'esempio, anti-esempi dentro la frase che li vieta, segnaposto non interpolati. Il perimetro si misura e si legge — non può essere un gate a zero.
+Nessuno script verifica i path dei sorgenti del plugin, e uno che lo facesse non distinguerebbe un riferimento da un esempio didattico. I `SKILL.md` contengono per mestiere path che **devono** non esistere: righe di invocazione d'esempio, anti-esempi dentro la frase che li vieta, segnaposto non interpolati. Il perimetro si legge — non può essere un gate a zero.

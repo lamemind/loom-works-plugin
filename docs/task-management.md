@@ -103,7 +103,7 @@ Le nozioni di una task vivono in **un posto solo per volta**, e il task file dic
 
 Il **trasloco** gira **una volta sola**, al primo checkpoint con voci da spostare, e crea l'inbox della task (`inbox.sh new`, cappello = parent aperto o task stessa). Ordine vincolante: commit del task file **con** le voci, poi il file inbox, poi la riga puntatore. Da lì l'inbox è WIP e appartiene alla task — si appende, si riscrive, si pota (`inbox-format.md`) — finché la **chiusura** accende `drainable` e lo congela.
 
-Una task su branch dichiara `**Branch**:` nel task file (si scrive a mano come `Parent Task`; assente = `main`); il suo inbox porta `branch:<nome>` e mai `drainable` — lo sblocco è di `pull-repos`, quando trova il file su main. `branch:` non congela per la task che ne è owner. Dove una nozione atterri lo decide `drain-notions`, in differita.
+Una task su branch dichiara `**Branch**:` nel task file (si scrive a mano come `Parent Task`; assente = `main`); il suo inbox porta `branch:<nome>` e mai `drainable` — lo sblocco è di `pull-repos`, quando trova il file su main. `branch:` non congela per la task che ne è owner. L'inbox congelato resta dov'è, indicizzato.
 
 **La fase doc gira dopo il commit e il push del codice**, mai prima: il push rende il lavoro visibile alle altre sessioni, e un fallimento della fase doc non porta con sé il codice.
 
