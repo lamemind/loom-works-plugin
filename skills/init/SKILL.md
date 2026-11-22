@@ -31,7 +31,9 @@ Solo se **assenti** (idempotente):
 - `.claude/loom-works.json` — config progetto (identità + surface), creata nello **step 1b** (bootstrap interattivo). È anche il marker di project-root per `lib.sh`. Unico file che init tocca anche quando esiste già: su un progetto registrato lo step 1b ripropone i campi non identitari coi valori attuali, per far crescere un file scritto prima che un campo esistesse
 - `.claude/settings.json` — solo la regola `Read(~/.claude/plugins/cache/…/**)`, aggiunta in coda alle esistenti senza toccare il resto del file. Serve a chi apre i contratti del plugin dalla cache (`${CLAUDE_PLUGIN_ROOT}/docs/…`): senza, la `Read` cade sotto approvazione, e una sessione non presidiata **prosegue senza contratto** invece di fermarsi. Il path è sul segmento stabile, mai sulla versione — una regola concessa a mano da un «non chiedere più» nasce version-pinned e muore al primo bump
 
-**CLAUDE.md**: init **propone** (non forza) due blocchi — gli `@-import` base e la sezione `User assumed knowledge` — vedi step 2. **Non tocca**: file git, config, dipendenze.
+- `.gitignore` — solo la riga `.claude/loom/headless/`, in coda, quando git non ignora già quella cartella (una regola più larga come `.claude/loom/` basta). Lì `loom-deck-headless` scrive stato ed esito dei turni `claude -p`: è stato macchina-locale, e senza la regola il primo `checkpoint-task` linked lo committa. Fuori da un repo git non scrive niente
+
+**CLAUDE.md**: init **propone** (non forza) due blocchi — gli `@-import` base e la sezione `User assumed knowledge` — vedi step 2. **Non tocca**: config git, dipendenze.
 
 ## Esecuzione
 
