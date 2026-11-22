@@ -428,7 +428,8 @@ lw_tasks_md_prog_set() {   # <tasks-file> <task-id> <glifo>
 
 # ---- Baseline del diff di checkpoint -----------------------------------------
 #
-# Da dove parte la finestra <base>..HEAD che checkpoint-task-analyze.sh mostra.
+# Da dove parte la finestra <base>..HEAD di un checkpoint: il lavoro su un perimetro
+# dall'ultimo avanzamento (checkpoint-mandate).
 # NON e' un campo scritto nel task file: quello era un chicken-egg — il SHA si
 # conosce solo DOPO il commit, ma scriverlo dentro il file appena committato lo
 # modifica di nuovo, quindi il sed girava post-commit e lasciava il working tree

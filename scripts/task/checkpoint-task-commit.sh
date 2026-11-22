@@ -2,7 +2,7 @@
 
 # =============================================================================
 # checkpoint-task-commit.sh - Commit e push per checkpoint-task
-# Usage: checkpoint-task-commit.sh [--task <id>] [--doc-message "<msg>"] "commit message" [-- <path>...]
+# Usage: checkpoint-task-commit.sh [--task <id>] [--doc-message "<msg>"] "commit message" -- <path>...
 # Env:   PROJECT_ROOT (default: $PWD)
 #
 # Doppio commit: i file doc-nozione (sotto <docs-root>/ ma fuori da tasks.md e
@@ -10,34 +10,29 @@
 # (task file, tasks.md) restano nel commit "checkpoint(...)". Se non ci sono
 # file doc-nozione il comportamento resta a commit singolo.
 #
-# Perimetro del commit — due regimi, decisi dalla pathspec:
-#   - pathspec dopo `--`  → SCOPED. Entrano solo quei path piu' il task file; e'
-#     l'unico regime ammesso in detached (TASK_SRC=env), dove l'indice del worktree
-#     ospita anche lo stage di altre sessioni e lo script non puo' distinguere il
-#     suo dal loro: l'unica fonte della lista e' il chiamante.
-#   - nessuna pathspec → LINKED (TASK_SRC=symlink): `git add -A`, il worktree
-#     appartiene a questa task e il rastrellamento e' legittimo.
-# In entrambi i regimi ogni commit porta la propria pathspec (lw_git_add_n_commit):
-# cio' che era in stage prima e fuori perimetro resta in stage, non entra.
+# Perimetro del commit: la pathspec dopo `--`, obbligatoria. Entrano solo quei
+# path piu' il task file. Il worktree non appartiene a una task: ospita N sessioni,
+# ognuna sulla sua, e l'indice tiene anche lo stage delle altre. Lo script non
+# puo' distinguere il suo dal loro, quindi l'unica fonte della lista e' il
+# chiamante. Senza pathspec esce 1 prima di toccare qualunque file: nessun
+# `git add -A`, nessun commit.
 #
-# `--no-add` e' accettato per compatibilita' ma non ha effetto proprio: lo stage
-# selettivo e' implicato dalla pathspec. `--no-add` senza pathspec e' un errore.
+# Ogni commit porta la propria pathspec (lw_git_add_n_commit): cio' che era in
+# stage prima e fuori perimetro resta in stage, non entra.
 # =============================================================================
 
-NO_ADD=0
 TASK_ID_ARG=""
 DOC_MESSAGE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --docs-root) LOOM_DOCS_ROOT="$2"; shift 2 ;;
         --task) TASK_ID_ARG="$2"; shift 2 ;;
-        --no-add) NO_ADD=1; shift ;;
         --doc-message) DOC_MESSAGE="$2"; shift 2 ;;
         *) break ;;
     esac
 done
 
-COMMIT_MESSAGE="${1:?Usage: checkpoint-task-commit.sh [--task <id>] [--doc-message \"<msg>\"] \"commit message\" [-- <path>...]}"
+COMMIT_MESSAGE="${1:?Usage: checkpoint-task-commit.sh [--task <id>] [--doc-message \"<msg>\"] \"commit message\" -- <path>...}"
 shift
 
 SCOPE_SPEC=()
@@ -69,13 +64,10 @@ elif [[ -n "$TASK_ID_ARG" ]]; then
     exit 1
 fi
 
-# Regime. Senza pathspec l'unico perimetro conoscibile e' "tutto" (git add -A), e
-# "tutto" e' lecito solo quando il worktree appartiene a questa task (symlink).
-SCOPED=0
-if [[ ${#SCOPE_SPEC[@]} -gt 0 ]]; then
-    SCOPED=1
-elif [[ "$TASK_SRC" == "env" || $NO_ADD -eq 1 ]]; then
-    echo "ERROR: stage selettivo senza pathspec. In detached (\$LOOM_TASK=${TASK_ID:-?}) il worktree ospita altre sessioni e lo script non sa quali file sono tuoi: passali dopo '--'." >&2
+# Senza pathspec l'unico perimetro conoscibile sarebbe "tutto" (git add -A), che
+# rastrellerebbe nel commit il lavoro delle altre sessioni sullo stesso worktree.
+if [[ ${#SCOPE_SPEC[@]} -eq 0 ]]; then
+    echo "ERROR: pathspec assente. Il worktree ospita altre sessioni e lo script non sa quali file sono tuoi: passali dopo '--'." >&2
     echo "       es: checkpoint-task-commit.sh --task ${TASK_ID:-Txx} \"msg\" -- src/a.ts src/b.ts" >&2
     exit 1
 fi
@@ -84,7 +76,7 @@ CURRENT_BRANCH=$(lw_current_branch)
 CURRENT_SHA=$(lw_current_sha)
 
 # Normalizza drift Progress: il modello a volte chiude la task con "✔️ 100%"
-# invece di "✔️ Done" (idioma percentuale ereditato da start-task). Replace secco
+# invece di "✔️ Done" (idioma percentuale del campo Progress). Replace secco
 # prima del commit: file committato corretto + gate TASK_DONE (più sotto) matcha.
 if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
     sed -i '0,/^- \*\*Progress\*\*:/s|^\(- \*\*Progress\*\*:\) ✔️ 100%|\1 ✔️ Done|' "$TASK_FILE"
@@ -116,21 +108,13 @@ add_scope() {  # <path>
     SCOPE+=("$p")
 }
 
-if [[ $SCOPED -eq 1 ]]; then
-    for p in "${SCOPE_SPEC[@]}"; do add_scope "$p"; done
-    # Il task file entra sempre: porta la timbratura Done at e i marker Doc Impact,
-    # e il chiamante non deve ricordarsi di elencarlo.
-    if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
-        add_scope "$TASK_FILE"
-    fi
-    echo "-> perimetro dichiarato: ${#SCOPE[@]} path (detached, l'indice altrui resta in stage)"
-else
-    lw_git_add -A
-    # --no-renames: con la rename detection attiva --name-only mostra solo la
-    # destinazione, e la cancellazione della sorgente resterebbe fuori dal commit.
-    while IFS= read -r -d '' f; do add_scope "$f"; done \
-        < <(git -C "$PROJECT_ROOT" diff --cached --name-only --no-renames -z)
+for p in "${SCOPE_SPEC[@]}"; do add_scope "$p"; done
+# Il task file entra sempre: porta la timbratura Done at e i marker Doc Impact,
+# e il chiamante non deve ricordarsi di elencarlo.
+if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
+    add_scope "$TASK_FILE"
 fi
+echo "-> perimetro dichiarato: ${#SCOPE[@]} path (l'indice altrui resta in stage)"
 
 # --- Partizione: doc-nozione vs codice+tracking --------------------------------
 # Doc-nozione = sotto <docs-root>/ ma NON tasks.md e NON tasks/ (quelli sono

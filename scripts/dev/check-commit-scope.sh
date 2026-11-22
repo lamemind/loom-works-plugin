@@ -6,14 +6,11 @@
 # `git commit -m` senza pathspec lo rastrella sotto un messaggio che parla d'altro.
 # Questo gate sporca l'indice di un repo temporaneo con path estranei, poi esegue
 # ogni attore che committa (create-task, lo snippet di preflight, promote-wip, adr,
-# triage, checkpoint nei due regimi, clean-tasks, cleanup-done-tasks) e misura:
+# triage, checkpoint, clean-tasks, cleanup-done-tasks) e misura:
 #   - i file dentro ogni commit prodotto (solo quelli attesi)
 #   - cio' che resta in stage dopo (i path estranei, intatti)
 #   - la timbratura "Done at" dentro il commit di checkpoint
-#
-# Il regime linked (symlink current-task.md) e' l'eccezione dichiarata: il worktree
-# appartiene alla task e `git add -A` e' legittimo — si misura che committa tutto,
-# non che scopa. Per questo gira per ultimo: consuma i path estranei.
+#   - il rifiuto del checkpoint senza pathspec: nessun commit, indice intatto
 #
 # Uso interno pre-publish (publish.sh lo esegue come gate):
 #   ./scripts/dev/check-commit-scope.sh [--keep]
@@ -86,8 +83,8 @@ git -C "$REPO" config user.name gate
 git -C "$REPO" config commit.gpgsign false
 mkdir -p "$REPO/.claude" "$REPO/docs/tasks" "$REPO/docs/reference" "$REPO/src" "$REPO/.26-01-01-altrui" "$REPO/.26-01-01-t03"
 echo '{"id":"gate","emoji":"🧪","name":"gate","docsRoot":"docs"}' > "$REPO/.claude/loom-works.json"
-# come in un progetto reale: il symlink della task attiva e' runtime, non tracciato
-printf 'docs/current-task.md\n*.log\n' > "$REPO/.gitignore"
+# il file ignorato della folder di T03 serve al caso 5 (--ignored-files keep)
+printf '*.log\n' > "$REPO/.gitignore"
 cat > "$REPO/docs/tasks.md" <<'MD'
 # Tasks
 
@@ -236,25 +233,22 @@ expect "commit keep = solo il file ignorato" "$(committed HEAD~1)" .26-01-01-t03
 expect "commit purge = task file + folder + tasks.md" "$(committed HEAD)" docs/tasks.md docs/tasks/T03-baz.md .26-01-01-t03/f.txt .26-01-01-t03/x.log
 expect_foreign_staged "cleanup-done-tasks"
 
-# ── 6. checkpoint-task-commit.sh linked — per ultimo, consuma l'indice ──────
-echo "6. checkpoint-task-commit.sh linked (symlink, git add -A legittimo)"
-# Il regime linked esiste solo dove `ln -s` crea un symlink vero. In Git Bash su
-# Windows senza Modalita' sviluppatore `ln -s` copia il file: la timbratura finisce
-# sulla copia e il caso fallirebbe per la piattaforma, non per il perimetro dei
-# commit. Si dichiara saltato, col motivo, invece che rosso; gli altri casi restano
-# bloccanti.
-ln -s tasks/T02-bar.md docs/current-task.md 2>/dev/null
-if [ ! -L docs/current-task.md ]; then
-  rm -f docs/current-task.md
-  echo "  SKIP regime linked: ln -s non crea un symlink su questa macchina (Git Bash su Windows senza Modalita' sviluppatore)"
-else
-  echo linked >> src/code.txt
-  sed -i 's/^- \*\*Progress\*\*: .*/- **Progress**: ✔️ Done/' docs/tasks/T02-bar.md
-  "$TASK_SCRIPTS/checkpoint-task-commit.sh" "checkpoint(T02): y" >/dev/null 2>&1 || fail "checkpoint linked exit $?"
-  expect "commit = tutto il worktree, rename compreso" "$(committed HEAD)" src/code.txt docs/tasks/T02-bar.md "${FOREIGN[@]}"
-  git show HEAD:docs/tasks/T02-bar.md | grep -q "✔️ Done at 20" && pass "Done at dentro il commit" || fail "Done at assente dal commit"
-  [ -z "$(staged)" ] && pass "indice vuoto dopo il commit linked" || fail "indice non vuoto: $(staged | tr '\n' ' ')"
-fi
+# ── 6. checkpoint-task-commit.sh senza pathspec — rifiuta sempre ────────────
+# Senza pathspec il solo perimetro conoscibile e' "tutto", e un `git add -A`
+# rastrellerebbe nel commit i path estranei. Lo script rifiuta con l'id passato
+# come senza nessun binding, prima di toccare il task file: niente commit, niente
+# timbratura, indice com'era.
+echo "6. checkpoint-task-commit.sh senza pathspec (rifiuta con --task e senza binding)"
+echo senza-pathspec >> src/code.txt
+sed -i 's/^- \*\*Progress\*\*: .*/- **Progress**: ✔️ Done/' docs/tasks/T02-bar.md
+BEFORE="$(git rev-parse HEAD)"
+"$TASK_SCRIPTS/checkpoint-task-commit.sh" --task T02 "checkpoint(T02): y" >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && pass "con --task: rifiuta (exit $rc)" || fail "con --task senza pathspec ha committato"
+"$TASK_SCRIPTS/checkpoint-task-commit.sh" "checkpoint(T02): y" >/dev/null 2>&1; rc=$?
+[ "$rc" -ne 0 ] && pass "senza binding: rifiuta (exit $rc)" || fail "senza binding e senza pathspec ha committato"
+[ "$(git rev-parse HEAD)" = "$BEFORE" ] && pass "nessun commit prodotto" || fail "ha committato"
+grep -q '^- \*\*Progress\*\*: ✔️ Done$' docs/tasks/T02-bar.md && pass "task file non timbrato" || fail "task file timbrato senza commit"
+expect_foreign_staged "checkpoint senza pathspec"
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "OK: ogni commit resta nel proprio perimetro"; exit 0; fi
