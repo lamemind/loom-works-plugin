@@ -12,9 +12,7 @@
 #     riga 4 per l'inbox — la riga e' un PARAMETRO, cosi' l'implementazione resta una
 #   - il conteggio dei caratteri (doc_chars_var, doc_file_chars_var): code
 #     point, indipendente dal locale della shell
-#   - la precedenza di layer (doc_layer): inbox → online → offline → altro
 #   - le regex del formato inbox (usate SOLO da inbox.sh)
-#   - il perimetro escluso condiviso (doc_excluded): il runtime che non e' doc
 #
 # Ogni regex del formato vive qui e in nessun altro posto. Una primitiva che ha
 # bisogno di leggere il formato inbox chiama `inbox.sh parse`, mai una propria
@@ -149,74 +147,6 @@ doc_file_chars_var() {  # <var> <file> → <var> = caratteri (code point UTF-8) 
     [[ -r "$2" ]] && { IFS= read -r -d '' _dfc_t < "$2" || true; }
     _dfc_t="${_dfc_t//$_LW_DOC_UTF8_CONT/}"
     printf -v "$1" '%s' "${#_dfc_t}"
-}
-
-# ---- Layer -------------------------------------------------------------------
-#
-# Precedenza: inbox → online → offline → altro. Online si legge dagli @-import
-# di primo livello di CLAUDE.md (un file online che ne @-importa altri non viene
-# seguito); INDEX.md sta sotto reference/ ma e' online se @-importato.
-
-LW_DOC_ONLINE_LIST=""
-
-doc_load_online() {  # <project_root> — popola la lista degli @-import
-    local claude_md="$1/CLAUDE.md"
-    LW_DOC_ONLINE_LIST=""
-    [[ -f "$claude_md" ]] || return 0
-    LW_DOC_ONLINE_LIST="$(grep -oE '@[^ )]+\.md' "$claude_md" 2>/dev/null | sed 's/^@//' | sort -u)"
-}
-
-# Riga intera della lista, come `grep -qxF`, ma senza processo: chi lo chiama lo
-# fa una volta per file (§Lettura senza sottoprocessi).
-doc_is_online() {  # <rel-to-project-root>
-    [[ -z "$LW_DOC_ONLINE_LIST" ]] && return 1
-    [[ $'\n'"$LW_DOC_ONLINE_LIST"$'\n' == *$'\n'"$1"$'\n'* ]]
-}
-
-# Due forme come per il TLDR: `doc_layer_var` assegna senza processi, `doc_layer`
-# stampa per chi cattura con `$(…)`.
-doc_layer_var() {  # <var> <rel-to-project-root> → <var> = inbox|online|offline|altro
-    local _dly_layer
-    if [[ "$2" == */inbox/* ]]; then
-        _dly_layer="inbox"
-    elif doc_is_online "$2"; then
-        _dly_layer="online"
-    elif [[ "$2" == */reference/* ]]; then
-        _dly_layer="offline"
-    else
-        _dly_layer="altro"
-    fi
-    printf -v "$1" '%s' "$_dly_layer"
-}
-
-doc_layer() {  # <rel-to-project-root> → inbox|online|offline|altro
-    local _dl_out
-    doc_layer_var _dl_out "$1"
-    echo "$_dl_out"
-}
-
-# ---- Perimetro escluso condiviso ---------------------------------------------
-#
-# SOLO cio' che ogni chiamante esclude: il runtime che non e' doc. Un'esclusione
-# che vale per un chiamante solo e' una regola di quel chiamante e sta scritta
-# li' — INDEX.md lo esclude solo build-index.sh, che lo rigenera.
-#
-# adr/ e' il registro delle decisioni (docs/adr-format.md): sta sotto la docs-root
-# perche' e' stato di task, come tasks/, ma non e' doc — nessun layer e nessuna
-# misura. Senza l'esclusione ogni record entrerebbe nelle misure di doc-metrics
-# come un file di doc, con un layer che non ha.
-#
-# triage/ e' il file degli scenari di triage (docs/triage-format.md): stessa
-# natura del registro ADR — record datati, citati alla lettera, append-only — e
-# stessa ragione dell'esclusione.
-
-doc_excluded() {  # <rel-path> → 0 se fuori dal perimetro doc
-    case "$1" in
-        */tasks/*|tasks/*) return 0 ;;
-        */adr/*|adr/*) return 0 ;;
-        */triage/*|triage/*) return 0 ;;
-    esac
-    return 1
 }
 
 # ---- Formato inbox (usate solo da inbox.sh) ----------------------------------

@@ -225,8 +225,4 @@ Lo script è `scripts/task/triage-altrove.sh`, con tre sottocomandi — `risolvi
 
 ## Il file degli scenari non entra nel sistema doc
 
-Un'esclusione sola, su `triage/`, la stessa del registro ADR:
-
-- `doc_excluded` in `lib-doc.sh` — la usa `doc-metrics.sh`, che percorre la docs-root intera. Senza, ogni scenario entrerebbe nelle misure della doc come un file di doc, con un layer che non ha.
-
-`md-wrap.py` non ha un canale di esclusione e non gli serve: i record li scrive uno script, a campi su una riga.
+Nessuno script del sistema doc percorre `triage/`, come per il registro ADR: `build-index.sh` indicizza `reference/` e la cartella inbox, e nessuno misura la docs-root intera. Il file degli scenari non ha quindi bisogno di un'esclusione.

@@ -95,8 +95,4 @@ adr.sh cerca <ancora> [--superate]
 
 ## Il registro non entra nel sistema doc
 
-Un'esclusione sola, su `adr/`:
-
-- `doc_excluded` in `lib-doc.sh` — la usa `doc-metrics.sh`, che percorre la docs-root intera. Senza, ogni record entrerebbe nelle misure della doc come un file di doc, con un layer che non ha.
-
-`md-wrap.py` non ha un canale di esclusione e non gli serve: i record li scrive uno script, a paragrafi su una riga.
+Nessuno script del sistema doc percorre `adr/`: `build-index.sh` indicizza `reference/` e la cartella inbox, e nessuno misura la docs-root intera. Il registro non ha quindi bisogno di un'esclusione.

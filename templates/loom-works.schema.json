@@ -120,7 +120,7 @@
         "properties": {
           "title": {
             "type": "string",
-            "description": "Template della nota nel titolo della tab, coi buchi {TASK} {slug} {file} {path}. Ridotto dal deck all'alfabeto di _sane_note."
+            "description": "Template della nota nel titolo della tab, coi buchi {TASK} {slug}. Ridotto dal deck all'alfabeto di _sane_note."
           },
           "model": {
             "type": "string",

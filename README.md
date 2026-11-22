@@ -85,11 +85,10 @@ Skills read the blocks with `scripts/config/project-config.sh`. Contract — res
 
 ## Runtime dependencies
 
-Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with two exceptions, both Python with the standard library only. One skill, the regia, also needs a command from the deck package.
+Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception, Python with the standard library only. One skill, the regia, also needs a command from the deck package.
 
 | Dependency | Required by | Without it |
 |---|---|---|
-| `python3` | `scripts/docs/md-wrap.py` | The script cannot be spawned at all. A consumer that invokes it must stay silent instead of breaking: the absence of an interpreter is an unavailable measurement, not an error to report. |
 | `python3` (or `python` on Windows) | `scripts/regia/watch_sessions.py`, `scripts/regia/sessions.py` — the monitor that follows the live sessions of a project, and `list`/`tail` on them | No monitor for the regia of an epic. Whoever launches it reports the missing interpreter. |
 | `loom-deck-headless` (npm `@lamemind/loom-deck`) | `orchestrate-mandate` — opens and continues the members' conversations without a tab | The regia stops at launch: `mandate.py gate` prints `HEADLESS=assente` and closes the gate. |
 
