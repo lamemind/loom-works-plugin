@@ -119,7 +119,7 @@ L'utente dichiara il raggio inline, nella forma esplicita `[R0]` `[R1]` `[R2]` `
 
 ### Cosa la sintesi non tocca
 
-**Il codice si scrive normale** — identificatori per esteso, nomi parlanti per variabili, metodi e classi, commenti distesi, nessuna compressione. Le regole di sintesi governano il testo che accompagna il codice, mai il codice stesso.
+**Il codice sorgente segue le proprie regole.** La sintesi di queste regole non si applica al codice sorgente, e nessuna compressione lo tocca. Per sua natura il codice sorgente è parlante. In assenza di specifiche ulteriori, il riferimento è Clean Code.
 
 **Tre casi sospendono la sintesi**, dove un fraintendimento produce un danno:
 
