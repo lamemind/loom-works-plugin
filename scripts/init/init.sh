@@ -12,8 +12,7 @@
 #   {docs_root}/reference/            (dir)
 #   {docs_root}/inbox/                (dir, vuota e senza .gitkeep)
 #   .claude/settings.json             (solo la regola di permesso sulla cache plugin)
-#   .gitignore                        (solo la riga .claude/loom/headless/, se git
-#                                      non la ignora già; fuori da git: niente)
+#   .gitignore                        (riga .claude/loom/headless/)
 #
 # L'inbox nasce vuota e non si versiona: ogni lettore ne tollera già l'assenza —
 # la ricrea il primo checkpoint che ci scrive.
@@ -133,40 +132,6 @@ ensure_cache_permission() {
     fi
 }
 
-# =============================================================================
-# Regola .gitignore sullo stato dei turni headless
-# =============================================================================
-# `loom-deck-headless` scrive stato ed esito di ogni turno `claude -p` sotto
-# .claude/loom/headless/ del progetto. È stato macchina-locale: senza una regola
-# che lo copra, il primo `checkpoint-task` linked (`git add -A`) lo committa.
-#
-# Il controllo è `git check-ignore` sul path, non un grep nel .gitignore: una
-# regola più larga già presente (`.claude/loom/`, `.claude/`) copre la cartella,
-# e aggiungerne una seconda sarebbe rumore. Il path non deve esistere: git
-# confronta il path con le regole. L'excludesFile globale è spento apposta: una
-# regola di questa macchina non copre chi clona il repo su un'altra.
-ensure_gitignore_headless() {
-    local regola='.claude/loom/headless/'
-    local gitignore="${PROJECT_ROOT}/.gitignore"
-
-    if ! git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-        log "fuori da git (skip): .gitignore → $regola"
-        return 0
-    fi
-    if git -C "$PROJECT_ROOT" -c core.excludesFile=/dev/null \
-         check-ignore -q -- "${regola}stato" 2> /dev/null; then
-        log "gitignore covers (skip): $regola"
-        return 0
-    fi
-
-    # Un .gitignore senza newline finale incollerebbe la regola all'ultima riga.
-    if [[ -s "$gitignore" && -n "$(tail -c1 "$gitignore")" ]]; then
-        echo >> "$gitignore"
-    fi
-    echo "$regola" >> "$gitignore"
-    log "gitignore added: $regola"
-}
-
 log "project root: $PROJECT_ROOT"
 log "plugin root:  $PLUGIN_ROOT"
 
@@ -179,7 +144,9 @@ copy_template "${TEMPLATES}/tasks-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/tas
 copy_template "${TEMPLATES}/reference-index-skeleton.md" "${PROJECT_ROOT}/${DOCS_ROOT}/reference/INDEX.md"
 
 ensure_cache_permission
-ensure_gitignore_headless
+
+grep -qxF '.claude/loom/headless/' "${PROJECT_ROOT}/.gitignore" 2>/dev/null \
+    || echo '.claude/loom/headless/' >> "${PROJECT_ROOT}/.gitignore"
 
 # Identità di progetto + marker root: .claude/loom-works.json, creato dallo
 # step 1b della skill (bootstrap interattivo owner/emoji/surfaces). Non qui.
