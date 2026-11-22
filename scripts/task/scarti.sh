@@ -474,13 +474,18 @@ cmd_migra() {
 
     # --- spostamento, tutto o niente ------------------------------------------
     local -a fatti=() paths=()
-    rimetti() {  # rimette in adr/ i record gia' spostati
+    # Rimette in adr/ i record gia' spostati: indice e worktree tornano quelli di
+    # prima del giro. scarti/ si toglie solo se e' rimasta vuota — l'ha creata
+    # questo giro, e lasciata li' direbbe «registro vuoto» invece di «non esiste».
+    rimetti() {
         local n
         mkdir -p -- "$VECCHIA_DIR"
         for n in ${fatti[@]+"${fatti[@]}"}; do
             git -C "$ROOT" mv -- "${SCARTI_REL}/${n}" "${VECCHIA_REL}/${n}" >/dev/null 2>&1 \
                 || echo "[scarti] ERROR: non riesco a rimettere ${n} in ${VECCHIA_REL}/" >&2
         done
+        rmdir -- "$SCARTI_DIR" 2>/dev/null
+        return 0
     }
     mkdir -p -- "$SCARTI_DIR" || fail 1 "non riesco a creare ${SCARTI_REL}"
     for f in "${da_spostare[@]}"; do
