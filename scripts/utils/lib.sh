@@ -373,8 +373,8 @@ lw_task_members() {   # <task-id>
 # ---- Cella Prog della Tasks Overview -----------------------------------------
 #
 # Lettura e riscrittura della cella Prog di una riga `| T<n> | … |` in tasks.md,
-# per i tre script che promuovono (start-task, promote-wip, promote-ready): un awk
-# solo, invece di cinque copie che divergerebbero alla prima correzione.
+# per gli script che promuovono (promote-wip, promote-ready): un awk solo, invece
+# di una copia per chiamante che divergerebbe alla prima correzione.
 #
 # La colonna Prog si localizza dall'HEADER (`| ID | Pri | Prog | … |`), mai per
 # posizione: un indice cablato smette di matchare al primo cambio di forma della

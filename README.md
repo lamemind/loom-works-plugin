@@ -40,7 +40,6 @@ Then bootstrap the project structure:
 |-------|-------------|
 | `/loom-works:init` | Bootstrap loom-works structure on the current project |
 | `/loom-works:create-task` | Create a new task with automation-ready metadata |
-| `/loom-works:start-task` | Activate a task for checkpoint tracking |
 | `/loom-works:run-task` | Execute a task's deliverables — scoped per DLV, one commit each |
 | `/loom-works:checkpoint-task` | Checkpoint progress: analyze changes, commit, update tasks.md |
 | `/loom-works:checkpoint-mandate` | Checkpoint of a scope (epic or mandate): realign its task file to what the members did and found since the last progress entry — blockers, linked tasks, open decisions, scope analysis re-checked, status copies removed; commits only the scope file and tasks.md, no doc phase, no questions. `checkpoint-task` hands epics and mandates over to it |

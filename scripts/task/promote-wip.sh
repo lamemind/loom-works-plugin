@@ -13,13 +13,12 @@
 # promote-ready) perche' run-task apre annunciando cosa fara', e "non ho
 # promosso" e' parte di quell'annuncio.
 #
-# COMMITTA DA SE'. Il 🟡 nasce qui perche' start-task.sh e' precluso in detached
-# (guardia hard su $LOOM_TASK), e in detached tasks.md e' un file condiviso che
-# ogni sessione tocca: una promozione lasciata non committata viaggerebbe sul
-# commit della prima sessione che passa — contenuto giusto, attribuzione
-# sbagliata, `git log` per task che non torna. La pathspec e' esattamente due
-# file noti allo script, quindi lo stage selettivo del detached e' rispettato
-# senza che il chiamante debba passare niente.
+# COMMITTA DA SE'. Il 🟡 nasce solo qui, e tasks.md e' un file condiviso che ogni
+# sessione tocca: una promozione lasciata non committata viaggerebbe sul commit
+# della prima sessione che passa — contenuto giusto, attribuzione sbagliata,
+# `git log` per task che non torna. La pathspec e' esattamente due file noti
+# allo script, quindi lo stage selettivo e' rispettato senza che il chiamante
+# debba passare niente.
 #
 # Nessun lock e nessun retry sulle scritture concorrenti di tasks.md: la
 # finestra fra write e commit e' di circa un secondo, e la collisione fra N
