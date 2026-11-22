@@ -420,8 +420,9 @@ cmd_cerca() {
 #
 # I file che citano un record per path (`adr/<id>.md`) non si riscrivono: un task
 # file racconta un momento passato, e in un progetto vivo altre sessioni possono
-# averli aperti. L'id non cambia, e `cerca <id>` stampa il path nuovo; `migra`
-# li elenca.
+# averli aperti. L'id — il nome del file — non cambia: `adr/<id>.md` si ritrova
+# in `scarti/<id>.md`. `cerca` confronta il testo del record e non il nome del
+# file, quindi l'id non e' una query che lo trova. `migra` li elenca.
 cmd_migra() {
     [[ $# -eq 0 ]] \
         || fail 1 "migra non prende argomenti (ricevuto: $1) — gira sul progetto della cartella corrente"
@@ -527,7 +528,7 @@ cmd_migra() {
     local citanti
     citanti="$(git -C "$ROOT" grep -l -F "${pattern[@]}" 2>/dev/null)"
     if [[ -n "$citanti" ]]; then
-        echo "-> citano un record spostato col path di prima (non riscritti: \`scarti.sh cerca <id>\` stampa il path nuovo):"
+        echo "-> citano un record spostato col path di prima (non riscritti: il record sta in ${SCARTI_REL}/ con lo stesso nome):"
         while IFS= read -r f; do echo "   ${f}"; done <<< "$citanti"
     fi
     return 0

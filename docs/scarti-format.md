@@ -111,7 +111,7 @@ Un progetto nato prima di questo registro tiene i suoi scarti in `adr/` della do
 - è **tutto o niente**: un id già presente in `scarti/`, un record non tracciato da git o con modifiche non committate sono un rifiuto prima del primo spostamento, e un errore a metà rimette a posto i record già spostati;
 - toglie `adr/` solo se è rimasta vuota. Git non traccia le cartelle: su ogni altro clone sparisce da sola al pull;
 - committa i soli file spostati, ai due path, e **non pusha**: un push pubblicherebbe tutti i commit che il ramo locale ha in più del remote, non il solo commit della migrazione;
-- non riscrive i file che citano un record per path (`adr/<id>.md`), e li elenca: un task file racconta un momento passato, e in un progetto vivo altre sessioni possono averli aperti. L'id resta lo stesso, e `scarti.sh cerca <id>` stampa il path nuovo.
+- non riscrive i file che citano un record per path (`adr/<id>.md`), e li elenca: un task file racconta un momento passato, e in un progetto vivo altre sessioni possono averli aperti. L'id — il nome del file — resta lo stesso: `adr/<id>.md` si ritrova in `scarti/<id>.md`. `cerca` confronta il testo del record e non il nome del file, quindi l'id non è una query che lo trova.
 
 Exit: `0` almeno un record spostato, `2` niente da migrare (`adr/` assente, vuota o senza scarti), `1` errore senza nessun record spostato. Un secondo giro sullo stesso progetto esce `2`.
 
