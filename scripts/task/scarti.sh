@@ -8,6 +8,7 @@
 #                    [--supera <id>[#<voce>]]... [--perche <testo>] [--no-commit]
 #                    [< il perché su stdin, in alternativa a --perche]
 #   scarti.sh cerca  <ancora> [--superate]
+#   scarti.sh migra
 # =============================================================================
 #
 # Stato e requisiti rinviati: factory · T12 §Custodia — un limite del triage si segnala lì, non si apre una task qui.
@@ -36,6 +37,15 @@
 # adr.sh, nella stessa cartella, e' il nome di prima: inoltra qui argomenti ed
 # exit, perche' la regia lo chiama per nome.
 #
+# MIGRAZIONE — un progetto nato col registro in adr/ tiene li' i suoi scarti, e
+# `cerca` non li vede: risponde «nessun record» come su un registro vuoto vero, e
+# l'agente risolleva le segnalazioni gia' scartate. `migra` li sposta, sul solo
+# progetto della cartella corrente; finche' non gira, `cerca` e `scarta` contano
+# gli scarti rimasti in adr/ e lo dicono su stderr, senza cambiare l'exit — che
+# e' il contratto letto da chi chiama. L'avviso scatta anche dopo la migrazione,
+# quando una sessione rimasta su una versione precedente del plugin scrive un
+# record nuovo in adr/.
+#
 # IMMUTABILITA' — l'invariante e' una riga sola: il comando rifiuta un path che
 # esiste gia' (exit 2). Uno scarto superato si marca con un record NUOVO che
 # nomina il vecchio in `Supera`; il vecchio resta leggibile dov'e'.
@@ -56,6 +66,9 @@
 #   cerca    0 almeno un record vivo trovato (elencato su stdout)
 #            2 nessuno — e' il verdetto che l'agente legge prima di risollevare
 #            1 errore d'uso
+#   migra    0 almeno uno scarto spostato da adr/ a scarti/, e committato
+#            2 niente da migrare (adr/ assente, vuota o senza scarti)
+#            1 errore — NESSUN record spostato, nessun commit
 #
 # Il `2` distingue il rifiuto di riscrittura dall'input rotto: nelle famiglie di
 # exit code del repo `2` e' sempre un VERDETTO e `1` un errore. Chi chiama sa
@@ -76,6 +89,12 @@ source "${SCRIPT_DIR}/../utils/lib.sh"
 ROOT="$(lw_find_project_root)"
 SCARTI_DIR="${ROOT}/$(lw_docs_root)/scarti"
 SCARTI_REL="$(lw_docs_root)/scarti"
+# La sede di prima: la legge solo chi migra e chi avvisa che la migrazione manca.
+VECCHIA_DIR="${ROOT}/$(lw_docs_root)/adr"
+VECCHIA_REL="$(lw_docs_root)/adr"
+# La riga che fa di un file uno scarto: la scrive `scarta` in ogni record, e
+# distingue uno scarto da ogni altro file che sta in adr/.
+RIGA_TIPO='- **Tipo**: scarto'
 
 # `die` di lib.sh esce sempre 1 e suona il TTS: qui l'exit code e' il contratto,
 # e un errore d'uso non e' un evento da annunciare a voce.
@@ -85,12 +104,34 @@ fail() {  # <exit> <messaggio>
     exit "$rc"
 }
 
+# Gli scarti rimasti nella sede di prima, uno per riga (path assoluto). Solo i
+# file di primo livello che portano la riga del tipo: un altro file in adr/ e' una
+# decisione delle figure, e non e' affare di questo registro.
+scarti_non_migrati() {
+    [[ -d "$VECCHIA_DIR" ]] || return 0
+    local f
+    while IFS= read -r f; do
+        grep -qxF -- "$RIGA_TIPO" "$f" && printf '%s\n' "$f"
+    done < <(find "$VECCHIA_DIR" -maxdepth 1 -type f -name '*.md' | sort)
+    return 0
+}
+
+# Su stderr, mai sull'exit: chi chiama legge l'exit di `cerca` come verdetto.
+avvisa_non_migrati() {
+    local n
+    n="$(scarti_non_migrati | wc -l)"
+    (( n > 0 )) || return 0
+    echo "[scarti] AVVISO: ${n} scarti sono ancora in ${VECCHIA_REL}/, fuori dal registro — la ricerca non li vede. Spostali con: ${SCRIPT_DIR}/scarti.sh migra" >&2
+}
+
 # =============================================================================
 # scarta
 # =============================================================================
 cmd_scarta() {
     local slug="" chi="" segnalazione="" perche="" delega="" delega_flag=0 no_commit=0
     local -a ancore_raw=() supera_raw=()
+
+    avvisa_non_migrati
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -251,6 +292,8 @@ cmd_scarta() {
 cmd_cerca() {
     local query="" mostra_superate=0
 
+    avvisa_non_migrati
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --superate) mostra_superate=1; shift ;;
@@ -351,12 +394,148 @@ cmd_cerca() {
 }
 
 # =============================================================================
+# migra
+# =============================================================================
+#
+# Sposta nel registro gli scarti rimasti nella sede di prima, sul SOLO progetto
+# della cartella corrente, come `cerca` e `scarta`. Non percorre il registry dei
+# progetti: quello e' un fatto di questa macchina, e il comando deve girare anche
+# dove il registry e' un altro; un giro su piu' progetti e' un ciclo fuori da qui.
+#
+# Sposta i soli file di primo livello che portano la riga del tipo. Ogni altro
+# file resta in adr/ ed e' elencato: adr/ e' delle decisioni delle figure, e un
+# `migra` lanciato settimane dopo non deve portarne una nel registro che fa
+# tacere l'agente. A fine giro adr/ si toglie solo se e' rimasta vuota — git non
+# traccia le cartelle, e sugli altri cloni sparisce da sola al pull.
+#
+# Tutto o niente: collisioni con un id gia' in scarti/, record non tracciati o
+# modificati si controllano PRIMA del primo spostamento, e uno spostamento o un
+# commit che fallisce a meta' rimette a posto quelli gia' fatti. Un record
+# modificato o non committato e' lavoro di un'altra sessione: spostarlo lo
+# porterebbe in un commit che non e' il suo.
+#
+# Il commit porta i soli file spostati, ai due path, e non pusha: un push
+# pubblicherebbe tutti i commit che il ramo locale ha in piu' del remote, non il
+# solo commit della migrazione.
+#
+# I file che citano un record per path (`adr/<id>.md`) non si riscrivono: un task
+# file racconta un momento passato, e in un progetto vivo altre sessioni possono
+# averli aperti. L'id non cambia, e `cerca <id>` stampa il path nuovo; `migra`
+# li elenca.
+cmd_migra() {
+    [[ $# -eq 0 ]] \
+        || fail 1 "migra non prende argomenti (ricevuto: $1) — gira sul progetto della cartella corrente"
+
+    if [[ ! -d "$VECCHIA_DIR" ]]; then
+        echo "[scarti] niente da migrare: ${VECCHIA_REL}/ non esiste" >&2
+        return 2
+    fi
+
+    local -a da_spostare=() altri=()
+    local -A spostabile=()
+    local f nome
+    while IFS= read -r f; do
+        da_spostare+=("$f")
+        spostabile["$f"]=1
+    done < <(scarti_non_migrati)
+    while IFS= read -r f; do
+        [[ -n "${spostabile[$f]:-}" ]] || altri+=("$f")
+    done < <(find "$VECCHIA_DIR" -mindepth 1 -maxdepth 1 | sort)
+
+    if [[ ${#da_spostare[@]} -eq 0 ]]; then
+        for f in ${altri[@]+"${altri[@]}"}; do
+            echo "   resta in ${VECCHIA_REL}/: ${f##*/} — non e' uno scarto"
+        done
+        rmdir -- "$VECCHIA_DIR" 2>/dev/null \
+            && echo "-> ${VECCHIA_REL}/ rimossa: era vuota"
+        echo "[scarti] niente da migrare: nessuno scarto in ${VECCHIA_REL}/" >&2
+        return 2
+    fi
+
+    # --- controlli, prima del primo spostamento -------------------------------
+    local -a problemi=()
+    local vecchio nuovo
+    for f in "${da_spostare[@]}"; do
+        nome="${f##*/}"
+        vecchio="${VECCHIA_REL}/${nome}"
+        nuovo="${SCARTI_REL}/${nome}"
+        if [[ -e "${SCARTI_DIR}/${nome}" ]]; then
+            problemi+=("${vecchio}: ${nuovo} esiste gia' — un record non si sovrascrive")
+        elif ! git -C "$ROOT" ls-files --error-unmatch -- "$vecchio" >/dev/null 2>&1; then
+            problemi+=("${vecchio}: non e' tracciato da git — committalo, poi rilancia")
+        elif ! git -C "$ROOT" diff --quiet HEAD -- "$vecchio" 2>/dev/null; then
+            problemi+=("${vecchio}: ha modifiche non committate — committale, poi rilancia")
+        fi
+    done
+    if [[ ${#problemi[@]} -gt 0 ]]; then
+        for f in "${problemi[@]}"; do echo "[scarti]   ${f}" >&2; done
+        fail 1 "migrazione rifiutata, ${#problemi[@]} record non spostabili — nessun record spostato"
+    fi
+
+    # --- spostamento, tutto o niente ------------------------------------------
+    local -a fatti=() paths=()
+    rimetti() {  # rimette in adr/ i record gia' spostati
+        local n
+        mkdir -p -- "$VECCHIA_DIR"
+        for n in ${fatti[@]+"${fatti[@]}"}; do
+            git -C "$ROOT" mv -- "${SCARTI_REL}/${n}" "${VECCHIA_REL}/${n}" >/dev/null 2>&1 \
+                || echo "[scarti] ERROR: non riesco a rimettere ${n} in ${VECCHIA_REL}/" >&2
+        done
+    }
+    mkdir -p -- "$SCARTI_DIR" || fail 1 "non riesco a creare ${SCARTI_REL}"
+    for f in "${da_spostare[@]}"; do
+        nome="${f##*/}"
+        if ! git -C "$ROOT" mv -- "${VECCHIA_REL}/${nome}" "${SCARTI_REL}/${nome}" >/dev/null; then
+            rimetti
+            fail 1 "git mv fallito su ${VECCHIA_REL}/${nome} — nessun record spostato"
+        fi
+        fatti+=("$nome")
+        paths+=("${VECCHIA_REL}/${nome}" "${SCARTI_REL}/${nome}")
+    done
+
+    local rimossa=0
+    rmdir -- "$VECCHIA_DIR" 2>/dev/null && rimossa=1
+
+    local n_fatti=${#fatti[@]}
+    if ! lw_git_add_n_commit "scarti: migra ${n_fatti} record da ${VECCHIA_REL}/ a ${SCARTI_REL}/" \
+            "${paths[@]}" >/dev/null; then
+        rimetti
+        fail 1 "commit fallito — i record sono tornati in ${VECCHIA_REL}/"
+    fi
+
+    for nome in "${fatti[@]}"; do
+        echo "-> spostato: ${VECCHIA_REL}/${nome} → ${SCARTI_REL}/${nome}"
+    done
+    echo "-> committato: $(git -C "$ROOT" log -1 --format=%h -- "${SCARTI_REL}/${fatti[0]}") (${n_fatti} record, senza push)"
+    if (( rimossa )); then
+        echo "-> ${VECCHIA_REL}/ rimossa: era vuota"
+    else
+        echo "-> ${VECCHIA_REL}/ resta: contiene file che non sono scarti"
+        for f in ${altri[@]+"${altri[@]}"}; do
+            echo "   resta in ${VECCHIA_REL}/: ${f##*/} — non e' uno scarto"
+        done
+    fi
+
+    # --- chi cita un record spostato per path ---------------------------------
+    local -a pattern=()
+    for nome in "${fatti[@]}"; do pattern+=(-e "adr/${nome%.md}"); done
+    local citanti
+    citanti="$(git -C "$ROOT" grep -l -F "${pattern[@]}" 2>/dev/null)"
+    if [[ -n "$citanti" ]]; then
+        echo "-> citano un record spostato col path di prima (non riscritti: \`scarti.sh cerca <id>\` stampa il path nuovo):"
+        while IFS= read -r f; do echo "   ${f}"; done <<< "$citanti"
+    fi
+    return 0
+}
+
+# =============================================================================
 # dispatch
 # =============================================================================
-[[ $# -gt 0 ]] || fail 1 "sottocomando richiesto: scarta | cerca"
+[[ $# -gt 0 ]] || fail 1 "sottocomando richiesto: scarta | cerca | migra"
 SUB="$1"; shift
 case "$SUB" in
     scarta) cmd_scarta "$@" ;;
     cerca)  cmd_cerca "$@" ;;
-    *) fail 1 "sottocomando ignoto: ${SUB} (attesi: scarta, cerca)" ;;
+    migra)  cmd_migra "$@" ;;
+    *) fail 1 "sottocomando ignoto: ${SUB} (attesi: scarta, cerca, migra)" ;;
 esac
