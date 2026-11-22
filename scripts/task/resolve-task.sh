@@ -10,12 +10,12 @@
 # skill, che puo' invocare un comando ma non puo' sourcare una libreria bash —
 # uno script che sourca lib.sh chiama la funzione diretta, non questo.
 #
-# Cascata: arg esplicito -> $LOOM_TASK -> symlink {docs_root}/current-task.md
+# Cascata: arg esplicito -> $LOOM_TASK. Nessun altro gradino: senza i due, exit 1.
 #
 # Stampa tre righe, valori shell-quotati (eval-abili anche con spazi nel path):
 #   TASK_ID=T48
 #   TASK_FILE=/abs/path/runtime/tasks/T48-slug.md
-#   TASK_SRC=arg|env|symlink
+#   TASK_SRC=arg|env
 #
 # Con --children aggiunge il conteggio e una riga per figlia (NON %q-quotate,
 # sono per un lettore, non per `eval`):

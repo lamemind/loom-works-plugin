@@ -157,25 +157,24 @@ lw_norm_ancora() {  # <root> <path>
 # ---- Task attiva: cascata di risoluzione -------------------------------------
 #
 # Contratto di famiglia, gemello di inject-task.sh (hook SessionStart) e della
-# statusline. Tre livelli:
+# statusline. Due livelli:
 #
-#   1. arg esplicito                       -> chi invoca ha nominato la task
-#   2. $LOOM_TASK                          -> binding di SESSIONE (spawn deck)
-#   3. symlink {docs_root}/current-task.md -> binding di WORKTREE (linked mode)
+#   1. arg esplicito -> chi invoca ha nominato la task
+#   2. $LOOM_TASK    -> binding di SESSIONE (spawn deck)
 #
 # L'arg sta in cima o una sessione gia' vincolata non potrebbe piu' chiedere
-# un'altra task. L'env batte il symlink perche' N sessioni parallele nello stesso
-# worktree condividono un solo symlink: solo l'env sa quale delle N sei tu.
+# un'altra task. Il worktree non lega nessuna task: N sessioni parallele nello
+# stesso worktree lavorano ognuna sulla sua, e solo l'env sa quale delle N sei tu.
+# Nessun file nella docs-root fa da terzo gradino, nemmeno se c'e'.
 #
 # Stampa tre righe eval-abili (valori %q-quotati, path con spazi al sicuro):
 #
 #   TASK_ID=T48
 #   TASK_FILE=/abs/path/runtime/tasks/T48-slug.md
-#   TASK_SRC=arg|env|symlink
+#   TASK_SRC=arg|env
 #
-# TASK_SRC rende la provenienza DICHIARATA invece che silenziosa: chi decide se la
-# sessione vale linked (git add -A) o detached-equivalente (stage selettivo) lo
-# legge, non lo indovina.
+# TASK_SRC dichiara la provenienza invece di lasciarla silenziosa: chi la stampa
+# in un report dice da dove viene la task su cui lavora.
 #
 # Uso — l'exit code NON sopravvive dentro `eval "$(...)"` (il fallimento resta
 # nella command substitution, eval vede una stringa vuota e ritorna 0):
@@ -185,7 +184,7 @@ lw_norm_ancora() {  # <root> <path>
 #
 # Exit: 0 = risolta · 1 = nessuna fonte · 2 = id noto ma task file assente
 lw_resolve_task() {   # [<task-id>]
-    local id="${1:-}" src="" root docs dir link base file
+    local id="${1:-}" src="" root docs dir file
     root="$(lw_find_project_root)"
     docs="$(lw_docs_root)"
     dir="${root}/${docs}/tasks"
@@ -195,18 +194,10 @@ lw_resolve_task() {   # [<task-id>]
     elif [[ -n "${LOOM_TASK:-}" ]]; then
         id="${LOOM_TASK}"
         src="env"
-    else
-        link="${root}/${docs}/current-task.md"
-        if [[ -L "$link" ]]; then
-            # il symlink punta a tasks/T48-slug.md: l'ID e' il primo token
-            base="$(basename "$(readlink "$link")" .md)"
-            id="${base%%-*}"
-            src="symlink"
-        fi
     fi
 
     if [[ -z "$id" ]]; then
-        echo "ERROR: nessuna task attiva — arg, \$LOOM_TASK e symlink ${docs}/current-task.md tutti assenti" >&2
+        echo "ERROR: nessuna task attiva — nessun id passato e \$LOOM_TASK assente" >&2
         return 1
     fi
 

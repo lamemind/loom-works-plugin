@@ -19,7 +19,7 @@
 # riusa e la stagia.
 # Stampa il folder name (relativo a PROJECT_ROOT).
 #
-# task-id omesso -> cascata $LOOM_TASK -> symlink current-task.md (lw_resolve_task).
+# task-id omesso -> $LOOM_TASK (lw_resolve_task); senza nessuno dei due, exit 1.
 # =============================================================================
 
 set -euo pipefail
