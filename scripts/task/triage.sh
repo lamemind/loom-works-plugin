@@ -50,12 +50,12 @@
 # un altro progetto, un DLV aggiunto a una task che c'e' gia', l'umano che se ne
 # occupa da se'), e senza quelle parole due scenari `task` della stessa sessione
 # sono indistinguibili. Campo di header su UNA riga, dopo Data e prima di
-# ADR/Ancore, scritto solo quando c'e': i lettori del record (l'awk di `conta`, i
+# Scarto/Ancore, scritto solo quando c'e': i lettori del record (l'awk di `conta`, i
 # grep delle misure) cercano righe `- **Campo**:` su tutto il file, e un valore
 # scritto dopo l'etichetta non puo' essere scambiato per un campo, una riga di un
 # corpo libero si'. Rifiutato con --chi agente (lo scenario dell'agente nasce
 # prima che una risposta esista) e sullo scarto, dove le parole di chi decide
-# sono il perché e stanno nel record ADR: una seconda copia nello scenario
+# sono il perché e stanno nel record dello scarto: una seconda copia nello scenario
 # divergerebbe.
 #
 # CONTRATTO ASIMMETRICO — l'agente non scarta e non ignora: scarto e ignora con
@@ -73,19 +73,20 @@
 # parole con cui l'utente ha dato la delega, alla lettera e su una riga
 # (--delega): sono cio' che rende la decisione riconducibile all'umano che l'ha
 # affidata, e uno scenario scritto senza non si completa dopo. Campo di header
-# `Delega`, subito dopo `Chi`; sullo scarto le stesse parole passano ad adr.sh,
-# che le scrive nel record ADR — `adr.sh scarta` si chiama anche da solo, senza
-# scenario, e un record col solo autore non le porterebbe da nessuna parte.
+# `Delega`, subito dopo `Chi`; sullo scarto le stesse parole passano a
+# scarti.sh, che le scrive nel record dello scarto — `scarti.sh scarta` si chiama
+# anche da solo, senza scenario, e un record col solo autore non le porterebbe da
+# nessuna parte.
 # --delega con un altro autore e' un rifiuto: il record non avrebbe dove scriverlo.
 #
-# IGNORA → NESSUN REGISTRO ADR. Scarto e ignora chiudono entrambi «non si fa», e
-# li separa la ricorrenza. Il record ADR serve a far tacere una segnalazione che
-# torna: lo scarto dice «tornera', e deve tacere». L'ignora dice «non tornera', e
-# se torna parla»: scrive solo lo scenario, e una segnalazione che torna arriva di
-# nuovo all'umano. Le ancore sono obbligatorie e stanno nel campo Ancore dello
+# IGNORA → NESSUN RECORD NEL REGISTRO DEGLI SCARTI. Scarto e ignora chiudono
+# entrambi «non si fa», e li separa la ricorrenza. Il record dello scarto serve a
+# far tacere una segnalazione che torna: lo scarto dice «tornera', e deve
+# tacere». L'ignora dice «non tornera', e se torna parla»: scrive solo lo
+# scenario, e una segnalazione che torna arriva di nuovo all'umano. Le ancore sono obbligatorie e stanno nel campo Ancore dello
 # scenario — sono la chiave che accoppia la segnalazione che torna all'ignora di
 # prima, e un record scritto senza non si completa dopo. La normalizzazione e'
-# lw_norm_ancora di lib.sh, la stessa di adr.sh: lo stesso file produce la
+# lw_norm_ancora di lib.sh, la stessa di scarti.sh: lo stesso file produce la
 # stessa stringa nei due registri. L'ignora non ha perché (--perche e' un
 # rifiuto): la sua ragione e' la marginalita'. Le parole con cui l'umano lo
 # accompagna («S5 ignora: gia' gestito in S4») sono un approfondimento.
@@ -94,23 +95,28 @@
 # Uno scenario e' sempre una risposta vera; il recupero delle segnalazioni senza
 # risposta e' un'operazione a posteriori (--momento posteriori), non del flusso.
 #
-# SCARTO → REGISTRO ADR. Sequenza fissa: valida tutto (anche il perché, e che ne'
-# triage/<id>.md ne' adr/<id>.md esistano) → `adr.sh scarta --no-commit` con lo
-# stesso slug e lo stesso istante → scenario col campo ADR preso dall'output di
-# adr.sh → un commit solo coi due file. La validazione precede la chiamata: su un
-# input sbagliato non si scrive niente, ne' lo scenario ne' il record ADR.
+# SCARTO → REGISTRO DEGLI SCARTI. Sequenza fissa: valida tutto (anche il perché,
+# e che ne' triage/<id>.md ne' scarti/<id>.md esistano) → `scarti.sh scarta
+# --no-commit` con lo stesso slug e lo stesso istante → scenario col campo Scarto
+# preso dall'output di scarti.sh → un commit solo coi due file. La validazione
+# precede la chiamata: su un input sbagliato non si scrive niente, ne' lo scenario
+# ne' il record dello scarto.
+#
+# Il campo si chiamava ADR: gli scenari scritti prima lo portano con quel nome e
+# lo stesso valore, e non si riscrivono. Nessuno script legge il campo; chi ne
+# legge uno legge anche l'altro.
 #
 # APPEND-ONLY: un path che esiste gia' e' un rifiuto (exit 2). Una decisione che
 # ne ribalta un'altra e' un record nuovo; i due si accoppiano per Sessione + riga 1.
 #
 # Exit code per sottocomando:
-#   scenario 0 scenario scritto (e record ADR, sullo scarto)
+#   scenario 0 scenario scritto (e, sullo scarto, il suo record in scarti/)
 #            1 input malformato, scarto o ignora con chi = agente, ancora
 #              assente o inesistente, approfondimento con chi = agente o sullo
 #              scarto o su piu' righe, chi = delega senza --delega o --delega
 #              con un altro autore, progetto o sessione non risolvibili —
 #              NESSUNA scrittura
-#            2 scenario o record ADR gia' esistenti con lo stesso id — NESSUNA
+#            2 scenario o record dello scarto gia' esistenti con lo stesso id — NESSUNA
 #              scrittura
 #   conta    0 tabella stampata (anche a zero record: 0 e' un numero, non un verdetto)
 #            1 errore d'uso
@@ -121,8 +127,8 @@
 # Env letto:
 #   CLAUDE_CODE_SESSION_ID — fonte di Sessione (override: --sessione)
 #   LOOM_TRIAGE_NOW        — epoch che sostituisce `now` (solo banco di test);
-#                            passato ad adr.sh come LOOM_ADR_NOW, cosi' la coppia
-#                            scenario + record ADR ha lo stesso id
+#                            passato a scarti.sh come LOOM_SCARTI_NOW, cosi' la
+#                            coppia scenario + record dello scarto ha lo stesso id
 # =============================================================================
 
 set -uo pipefail
@@ -131,13 +137,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../utils/lib.sh
 source "${SCRIPT_DIR}/../utils/lib.sh"
 
-ADR_SH="${SCRIPT_DIR}/adr.sh"
+SCARTI_SH="${SCRIPT_DIR}/scarti.sh"
 ROOT="$(lw_find_project_root)"
 DOCS_ROOT="$(lw_docs_root)"
 TRIAGE_DIR="${ROOT}/${DOCS_ROOT}/triage"
 TRIAGE_REL="${DOCS_ROOT}/triage"
-ADR_DIR="${ROOT}/${DOCS_ROOT}/adr"
-ADR_REL="${DOCS_ROOT}/adr"
+SCARTI_DIR="${ROOT}/${DOCS_ROOT}/scarti"
+SCARTI_REL="${DOCS_ROOT}/scarti"
 
 # `die` di lib.sh esce sempre 1 e suona il TTS: qui l'exit code e' il contratto,
 # e un errore d'uso non e' un evento da annunciare a voce.
@@ -213,7 +219,7 @@ cmd_scenario() {
     [[ -n "$skill" ]] || fail 1 "--skill obbligatoria: il nome della skill del report"
     [[ "$skill" =~ ^[a-z0-9][a-z0-9-]*$ ]] \
         || fail 1 "skill fuori formato: '${skill}' (atteso [a-z0-9-])"
-    [[ -n "$slug" ]] || fail 1 "--slug obbligatorio — lo slug lo da' chi scrive, e sullo scarto nomina anche il record ADR"
+    [[ -n "$slug" ]] || fail 1 "--slug obbligatorio — lo slug lo da' chi scrive, e sullo scarto nomina anche il record dello scarto"
     [[ "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] \
         || fail 1 "slug fuori formato: '${slug}' (atteso [a-z0-9-], iniziale alfanumerica)"
 
@@ -278,7 +284,7 @@ cmd_scenario() {
         [[ -n "${approfondimento//[[:space:]]/}" ]] \
             || fail 1 "approfondimento vuoto: senza parole di chi decide il campo non si scrive — ometti --approfondimento"
         [[ "$uscita" == scarto ]] \
-            && fail 1 "sullo scarto le parole di chi decide sono il perché e stanno nel record ADR: passale come perché (righe di stdin dopo la segnalazione, o --perche), non come approfondimento"
+            && fail 1 "sullo scarto le parole di chi decide sono il perché e stanno nel record dello scarto: passale come perché (righe di stdin dopo la segnalazione, o --perche), non come approfondimento"
         [[ "$chi" == agente ]] \
             && fail 1 "l'approfondimento porta le parole di chi risponde, l'umano o la regia su delega: con --chi agente non c'e' ancora nessuna risposta da citare"
         [[ "$approfondimento" == *$'\n'* ]] \
@@ -286,10 +292,10 @@ cmd_scenario() {
     fi
 
     # --- perché e ancore --------------------------------------------------------
-    # Perché: obbligatorio sullo scarto, che lo porta nel record ADR; altrove
+    # Perché: obbligatorio sullo scarto, che lo porta nel record dello scarto; altrove
     # rifiutato, perche' lo scenario non ha corpo — le parole dell'umano sulle
     # altre uscite sono l'approfondimento, non un perché. Ancore: obbligatorie su scarto
-    # (le porta il record ADR) e ignora (le porta lo scenario, campo Ancore);
+    # (le porta il record dello scarto) e ignora (le porta lo scenario, campo Ancore);
     # rifiutate su subito e task. Un valore accettato senza un campo dove
     # metterlo si perderebbe in silenzio.
     case "$uscita" in
@@ -297,7 +303,7 @@ cmd_scenario() {
             [[ -n "${perche//[[:space:]]/}" ]] \
                 || fail 1 "lo scarto vuole il perché: righe di stdin dopo la segnalazione, o --perche — uno scarto senza motivo non e' uno scarto, e' un rinvio"
             [[ ${#ancore[@]} -gt 0 ]] \
-                || fail 1 "lo scarto vuole almeno un --ancora: il record ADR senza un path non e' raggiungibile da chi cerca"
+                || fail 1 "lo scarto vuole almeno un --ancora: il record dello scarto senza un path non e' raggiungibile da chi cerca"
             ;;
         ignora)
             [[ -n "${perche//[[:space:]]/}" ]] \
@@ -315,7 +321,7 @@ cmd_scenario() {
 
     # Le ancore si normalizzano QUI, prima di ogni scrittura, con la regola di
     # lib.sh: sull'ignora finiscono nel campo Ancore, sullo scarto passano ad
-    # adr.sh gia' root-relative (la normalizzazione e' idempotente).
+    # scarti.sh gia' root-relative (la normalizzazione e' idempotente).
     local -a ancore_norm=()
     local a norm rc
     for a in ${ancore[@]+"${ancore[@]}"}; do
@@ -328,7 +334,7 @@ cmd_scenario() {
     done
     # Join a mano e non con IFS + ${arr[*]}: un separatore di campo globale
     # riscriverebbe anche un path che contiene una virgola. Stesso separatore
-    # del campo Ancore del record ADR.
+    # del campo Ancore del record dello scarto.
     local campo_ancore="" x
     for x in ${ancore_norm[@]+"${ancore_norm[@]}"}; do campo_ancore+="${campo_ancore:+, }${x}"; done
 
@@ -343,30 +349,30 @@ cmd_scenario() {
     rec_rel="${TRIAGE_REL}/${rec_id}.md"
 
     # L'INVARIANTE: un record esistente non si riscrive — e sullo scarto vale anche
-    # per il record ADR che porterebbe lo stesso id.
+    # per il record dello scarto che porterebbe lo stesso id.
     [[ -e "$rec_file" ]] \
         && fail 2 "scenario gia' esistente: ${rec_rel} — uno scenario non si riscrive, scegli un altro slug"
-    if [[ "$uscita" == scarto && -e "${ADR_DIR}/${rec_id}.md" ]]; then
-        fail 2 "record ADR gia' esistente con lo stesso id: ${ADR_REL}/${rec_id}.md — scegli un altro slug"
+    if [[ "$uscita" == scarto && -e "${SCARTI_DIR}/${rec_id}.md" ]]; then
+        fail 2 "record dello scarto gia' esistente con lo stesso id: ${SCARTI_REL}/${rec_id}.md — scegli un altro slug"
     fi
 
-    # --- scarto: prima il record ADR ------------------------------------------
-    local adr_id="" adr_rel="" adr_out adr_rc
+    # --- scarto: prima il record dello scarto ---------------------------------
+    local scarto_id="" scarto_rel="" scarto_out scarto_rc
     if [[ "$uscita" == scarto ]]; then
-        local -a adr_args=(scarta --slug "$slug" --chi "$chi" --segnalazione "$segnalazione"
-                           --perche "$perche" --no-commit)
-        [[ "$chi" == delega ]] && adr_args+=(--delega "$delega")
-        for a in "${ancore_norm[@]}"; do adr_args+=(--ancora "$a"); done
-        adr_out="$(LOOM_ADR_NOW="$now" "$ADR_SH" "${adr_args[@]}" < /dev/null 2>&1)"
-        adr_rc=$?
-        if (( adr_rc != 0 )); then
-            printf '%s\n' "$adr_out" >&2
-            fail "$adr_rc" "adr.sh scarta ha rifiutato lo scarto: nessuno scenario scritto"
+        local -a scarto_args=(scarta --slug "$slug" --chi "$chi" --segnalazione "$segnalazione"
+                              --perche "$perche" --no-commit)
+        [[ "$chi" == delega ]] && scarto_args+=(--delega "$delega")
+        for a in "${ancore_norm[@]}"; do scarto_args+=(--ancora "$a"); done
+        scarto_out="$(LOOM_SCARTI_NOW="$now" "$SCARTI_SH" "${scarto_args[@]}" < /dev/null 2>&1)"
+        scarto_rc=$?
+        if (( scarto_rc != 0 )); then
+            printf '%s\n' "$scarto_out" >&2
+            fail "$scarto_rc" "scarti.sh scarta ha rifiutato lo scarto: nessuno scenario scritto"
         fi
-        adr_rel="$(sed -n 's/^-> record scritto: //p' <<< "$adr_out" | head -1)"
-        adr_id="$(basename "$adr_rel" .md)"
-        if [[ -z "$adr_rel" || ! -f "${ROOT}/${adr_rel}" ]]; then
-            fail 1 "adr.sh non ha dichiarato il record scritto (output: ${adr_out})"
+        scarto_rel="$(sed -n 's/^-> record scritto: //p' <<< "$scarto_out" | head -1)"
+        scarto_id="$(basename "$scarto_rel" .md)"
+        if [[ -z "$scarto_rel" || ! -f "${ROOT}/${scarto_rel}" ]]; then
+            fail 1 "scarti.sh non ha dichiarato il record scritto (output: ${scarto_out})"
         fi
     fi
 
@@ -384,25 +390,25 @@ cmd_scenario() {
         printf -- '- **Sessione**: %s\n' "$sessione"
         printf -- '- **Data**: %s\n' "$rec_data"
         # Solo quando c'e': senza, il record e' identico a quello di prima del
-        # campo, e ADR/Ancore restano l'ultimo campo.
+        # campo, e Scarto/Ancore restano l'ultimo campo.
         (( appro_flag )) && printf -- '- **Approfondimento**: %s\n' "$approfondimento"
-        # Ultimo campo: ADR sullo scarto, Ancore sull'ignora — i due non
-        # coesistono mai. Sullo scarto le ancore stanno nel record ADR, e una
-        # copia qui divergerebbe.
-        [[ -n "$adr_id" ]] && printf -- '- **ADR**: %s\n' "$adr_id"
+        # Ultimo campo: Scarto sullo scarto, Ancore sull'ignora — i due non
+        # coesistono mai. Sullo scarto le ancore stanno nel record dello scarto,
+        # e una copia qui divergerebbe.
+        [[ -n "$scarto_id" ]] && printf -- '- **Scarto**: %s\n' "$scarto_id"
         [[ "$uscita" == ignora ]] && printf -- '- **Ancore**: %s\n' "$campo_ancore"
         true
     } > "$rec_file"; then
-        # Il record ADR e' appena nato, non committato, e senza il suo scenario
+        # Il record dello scarto e' appena nato, non committato, e senza il suo scenario
         # sarebbe uno scarto orfano: si toglie. L'immutabilita' riguarda un record
         # consegnato, non quello che questa stessa invocazione non ha finito.
         rm -f -- "$rec_file"
-        [[ -n "$adr_rel" ]] && rm -f -- "${ROOT}/${adr_rel}"
+        [[ -n "$scarto_rel" ]] && rm -f -- "${ROOT}/${scarto_rel}"
         fail 1 "scrittura fallita: ${rec_rel}"
     fi
 
     echo "-> scenario scritto: ${rec_rel}"
-    [[ -n "$adr_rel" ]] && echo "-> record ADR: ${adr_rel}"
+    [[ -n "$scarto_rel" ]] && echo "-> record dello scarto: ${scarto_rel}"
 
     # --- commit ---------------------------------------------------------------
     # Da se', con pathspec e senza push: il chiamante tipico e' il modello in chat,
@@ -415,7 +421,7 @@ cmd_scenario() {
     local msg_seg="$segnalazione"
     [[ ${#msg_seg} -gt 60 ]] && msg_seg="${msg_seg:0:57}..."
     local -a paths=("$rec_rel")
-    [[ -n "$adr_rel" ]] && paths+=("$adr_rel")
+    [[ -n "$scarto_rel" ]] && paths+=("$scarto_rel")
     lw_git_add_n_commit "triage: ${uscita} — ${msg_seg}" "${paths[@]}" >/dev/null
     case $? in
         0) echo "   committato: ${paths[*]}" ;;
@@ -437,7 +443,8 @@ cmd_scenario() {
 #
 # La riga `approfondimento` conta gli scenari dell'umano che portano il campo,
 # cioe' le risposte in cui l'umano ha detto il proprio criterio. Gli scarti non ci
-# entrano per costruzione — le loro parole stanno nel perché del record ADR — e
+# entrano per costruzione — le loro parole stanno nel perché del record dello
+# scarto — e
 # stanno gia' in `scarto.umano`: chi vuole tutte le risposte con parole registrate
 # somma le due righe.
 #

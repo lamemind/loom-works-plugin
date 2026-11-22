@@ -5,8 +5,9 @@
 # lasciato da un'altra sessione sta in stage quando la skill committa, e un
 # `git commit -m` senza pathspec lo rastrella sotto un messaggio che parla d'altro.
 # Questo gate sporca l'indice di un repo temporaneo con path estranei, poi esegue
-# ogni attore che committa (create-task, lo snippet di preflight, promote-wip, adr,
-# triage, checkpoint, clean-tasks, cleanup-done-tasks) e misura:
+# ogni attore che committa (create-task, lo snippet di preflight, promote-wip,
+# scarti — scarta e migra —, triage, checkpoint, clean-tasks, cleanup-done-tasks)
+# e misura:
 #   - i file dentro ogni commit prodotto (solo quelli attesi)
 #   - cio' che resta in stage dopo (i path estranei, intatti)
 #   - la timbratura "Done at" dentro il commit di checkpoint
@@ -176,35 +177,54 @@ grep -qE '^\| T01 \| ⚡ \| 🟡 \|' docs/tasks.md && pass "cella Prog a 🟡" |
 [ -z "$(git status --porcelain -- docs/tasks.md)" ] && pass "tasks.md pulito dopo la promozione" || fail "tasks.md ancora dirty"
 expect_foreign_staged "promote-wip"
 
-# ── 3c. adr.sh scarta ────────────────────────────────────────────────────────
+# ── 3c. scarti.sh scarta ─────────────────────────────────────────────────────
 # Attore nuovo nel gate: committa per conto del modello in chat, non di una skill,
 # ed e' il caso in cui l'indice sporco e' piu' probabile — una sessione detached
 # che scarta una segnalazione mentre altre stanno lavorando nello stesso worktree.
-echo "3c. adr.sh scarta (commit del solo file del record)"
-ADR_NOW=1754820000
-ADR_REC="docs/adr/$(date -d "@$ADR_NOW" '+%Y-%m-%d-%H%M')-gate-scarto.md"
-LOOM_ADR_NOW="$ADR_NOW" "$TASK_SCRIPTS/adr.sh" scarta --slug gate-scarto --chi agente \
+echo "3c. scarti.sh scarta (commit del solo file del record)"
+SCARTO_NOW=1754820000
+SCARTO_REC="docs/scarti/$(date -d "@$SCARTO_NOW" '+%Y-%m-%d-%H%M')-gate-scarto.md"
+LOOM_SCARTI_NOW="$SCARTO_NOW" "$TASK_SCRIPTS/scarti.sh" scarta --slug gate-scarto --chi agente \
   --segnalazione "Segnalazione scartata dentro il gate di perimetro" \
   --ancora src/code.txt \
   --perche "Il record deve entrare da solo nel commit, con i path estranei intatti in stage." \
-  >/dev/null 2>&1 || fail "adr.sh scarta exit $?"
-expect "commit = solo il file del record" "$(committed HEAD)" "$ADR_REC"
-expect_foreign_staged "adr scarta"
+  >/dev/null 2>&1 || fail "scarti.sh scarta exit $?"
+expect "commit = solo il file del record" "$(committed HEAD)" "$SCARTO_REC"
+expect_foreign_staged "scarti scarta"
+
+# ── 3c-bis. scarti.sh migra ──────────────────────────────────────────────────
+# Lo lancia il modello o un ciclo sui progetti, in un worktree dove altre sessioni
+# possono avere path in stage: il commit porta i soli record spostati, ai due
+# path, e nient'altro — nemmeno un file non-scarto rimasto in adr/.
+echo "3c-bis. scarti.sh migra (commit dei soli record spostati)"
+MIGRA_REC="2025-01-01-1000-gate-migra.md"
+mkdir -p "$REPO/docs/adr"
+printf '# Scarto nella sede di prima\n\n- **Tipo**: scarto\n- **Data**: 2025-01-01 10:00\n- **Chi**: umano\n- **Ancore**: src/code.txt\n\n## Perché\n\nmotivo\n' \
+  > "$REPO/docs/adr/$MIGRA_REC"
+git -C "$REPO" add -- "docs/adr/$MIGRA_REC"
+git -C "$REPO" commit -q -m "fixture: scarto in adr/" -- "docs/adr/$MIGRA_REC"
+echo "decisione di una figura, non tracciata" > "$REPO/docs/adr/figura.md"
+"$TASK_SCRIPTS/scarti.sh" migra >/dev/null 2>&1 || fail "scarti.sh migra exit $?"
+expect "commit = il record ai due path" "$(committed HEAD)" "docs/adr/$MIGRA_REC" "docs/scarti/$MIGRA_REC"
+expect_foreign_staged "scarti migra"
+[ -f "$REPO/docs/adr/figura.md" ] && [ -n "$(git -C "$REPO" status --porcelain -- docs/adr/figura.md)" ] \
+  && pass "il file non-scarto resta in adr/, fuori dal commit" || fail "il file non-scarto e' stato toccato"
+rm -f -- "$REPO/docs/adr/figura.md"
 
 # ── 3d. triage.sh scenario (scarto) ─────────────────────────────────────────
-# Stesso chiamante di adr.sh — il modello in chat, in una sessione detached — ma
-# sullo scarto il commit porta DUE file, lo scenario e il record ADR: si misura
-# che siano quei due e nient'altro.
-echo "3d. triage.sh scenario scarto (commit dello scenario + record ADR)"
+# Stesso chiamante di scarti.sh — il modello in chat, in una sessione detached —
+# ma sullo scarto il commit porta DUE file, lo scenario e il record dello scarto:
+# si misura che siano quei due e nient'altro.
+echo "3d. triage.sh scenario scarto (commit dello scenario + record dello scarto)"
 TRI_NOW=1756512000
 TRI_ID="$(date -d "@$TRI_NOW" '+%Y-%m-%d-%H%M')-gate-triage"
 LOOM_TRIAGE_NOW="$TRI_NOW" "$TASK_SCRIPTS/triage.sh" scenario --slug gate-triage \
   --uscita scarto --chi umano --momento flusso --skill run-task --sessione gate \
   --ancora src/code.txt \
   --segnalazione "Segnalazione scartata dal clic dentro il gate di perimetro" \
-  --perche "Scenario e record ADR devono entrare da soli nel commit." \
+  --perche "Scenario e record dello scarto devono entrare da soli nel commit." \
   </dev/null >/dev/null 2>&1 || fail "triage.sh scenario exit $?"
-expect "commit = scenario + record ADR" "$(committed HEAD)" "docs/triage/$TRI_ID.md" "docs/adr/$TRI_ID.md"
+expect "commit = scenario + record dello scarto" "$(committed HEAD)" "docs/triage/$TRI_ID.md" "docs/scarti/$TRI_ID.md"
 expect_foreign_staged "triage scenario"
 
 # ── 4. checkpoint-task-commit.sh detached ───────────────────────────────────

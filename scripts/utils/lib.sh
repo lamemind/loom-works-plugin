@@ -127,11 +127,11 @@ lw_docs_root() {
 # Stampa il path relativo a <root>; return 1 se non esiste, 2 se sta fuori da
 # <root>. Un path relativo si prova prima sotto <root>, poi sotto $PWD.
 #
-# UNA REGOLA SOLA per tutti i registri che portano ancore — il record ADR
-# (adr.sh scarta) e lo scenario ignora (triage.sh scenario). Lo stesso file deve
-# produrre la stessa stringa in entrambi: chi accoppia due record sullo stesso
-# path (`sort | uniq -d` sulle ancore, o un join fra triage/ e adr/) si regge su
-# quella uguaglianza, e due copie della regola divergerebbero in silenzio.
+# UNA REGOLA SOLA per tutti i registri che portano ancore — il record dello
+# scarto (scarti.sh scarta) e lo scenario ignora (triage.sh scenario). Lo stesso
+# file deve produrre la stessa stringa in entrambi: chi accoppia due record sullo
+# stesso path (`sort | uniq -d` sulle ancore, o un join fra triage/ e scarti/) si
+# regge su quella uguaglianza, e due copie della regola divergerebbero in silenzio.
 #
 # Il path si verifica sul FILESYSTEM e non su `git ls-files`: e' cio' che un
 # rilevatore «path modificato dopo la data del record» legge, accoppiando
