@@ -10,11 +10,14 @@
 # file .md estrae il TLDR di riga 3 (`> **TLDR**: <testo>`). Genera un INDEX.md
 # a sezioni (una per sottocartella) con liste `- \`file.md\` — <tldr>`.
 #
+# Un file di reference/ senza TLDR entra col solo titolo (H1), senza avvisi: il
+# TLDR arricchisce la riga d'indice, non decide se il file c'e'. Senza H1 ne'
+# TLDR la riga porta il solo nome del file.
+#
 # Sezioni inbox (v2):
 #   - L'indicizzazione la decide il MARKER `indexed`, non la presenza del TLDR:
 #     un `nozioni` con `indexed` senza TLDR entra col SOLO TITOLO, in corsivo —
-#     il router che sceglie dove cercare deve poter vedere che quella voce gli
-#     offre meno. Il TLDR resta obbligatorio per reference/.
+#     chi sceglie dove cercare deve poter vedere che quella voce gli offre meno.
 #   - I file inbox si leggono attraverso `inbox.sh parse`, MAI con regex proprie:
 #     da li' arrivano marker, TLDR (riga 4) e titolo insieme. `doc_tldr` diretto
 #     sulla riga 3 resta per i soli file di reference/.
@@ -31,13 +34,11 @@
 #   - Le sezioni si emettono SOLO se contengono almeno un file indicizzabile:
 #     una regola di precedenza che sopravvive a un'inbox vuota drifterebbe da sola.
 #
-# Il cap del TLDR viene da lib-doc.sh (sede unica). I TLDR oltre il cap sono una
-# violazione BLOCCANTE: l'indice viene scritto comunque, ma lo script esce 2.
+# La lunghezza del TLDR non si misura: l'indice lo copia com'e'.
 #
-# Exit (famiglia generatore):
-#   0  indice scritto, nessuna violazione
+# Exit:
+#   0  indice scritto
 #   1  errore duro: indice NON scritto (dir inesistente, argomento ignoto)
-#   2  indice scritto, uno o piu' TLDR oltre il cap
 #
 # Env: PROJECT_ROOT (default: auto-detect)
 # =============================================================================
@@ -101,9 +102,6 @@ TMP="$(mktemp)"
 INBOX_TMP="$(mktemp)"       # "<branch>|<filename>|<voce>" — branch vuoto = prod
 trap 'rm -f "$TMP" "$INBOX_TMP"' EXIT
 
-MISSING=0
-OVERCAP=0
-
 # Dentro i due cicli sui file l'unico processo e' `inbox.sh parse`, uno per file
 # inbox: niente `$(basename …)`, `$(dirname …)`, `$(sed …)`, ma espansioni di
 # parametro e le letture di lib-doc.sh che assegnano senza processi. In Git Bash
@@ -115,19 +113,6 @@ while IFS= read -r -d '' file; do
     should_exclude "$file" && continue
 
     doc_tldr_var tldr "$file" 3
-    if [[ -z "$tldr" ]]; then
-        echo "[build-index] WARN no TLDR: ${file#"$PROJECT_ROOT"/}" >&2
-        MISSING=$((MISSING+1))
-        continue
-    fi
-
-    # Caratteri come code point, non `${#tldr}`: quello dipende dal locale della
-    # shell e in Git Bash conta byte (lib-doc.sh §Conteggio dei caratteri).
-    doc_chars_var tldr_len "$tldr"
-    if (( tldr_len > LW_DOC_TLDR_CAP )); then
-        echo "[build-index] OVER-CAP TLDR ${tldr_len} char (cap ${LW_DOC_TLDR_CAP}): ${file#"$PROJECT_ROOT"/}" >&2
-        OVERCAP=$((OVERCAP+1))
-    fi
 
     rel="${file#"$SCAN_DIR"/}"
     if [[ "$rel" == */* ]]; then reldir="${rel%/*}"; else reldir=""; fi
@@ -135,7 +120,8 @@ while IFS= read -r -d '' file; do
     # Il titolo del documento entra nella riga d'indice accanto al TLDR. E' gia'
     # scritto, da chi il file lo conosce, e dice il perimetro meglio di quanto lo
     # direbbe un TLDR generato — che cosi' non ci spende caratteri e li mette
-    # tutti in ancore. Un H1 assente non e' un errore: la riga porta solo il TLDR.
+    # tutti in ancore. Un H1 assente non e' un errore: la riga porta solo il TLDR,
+    # o il solo nome del file se manca anche quello.
     # Stessa regola di `sed -n '1s/^#[[:space:]]*//p'`: riga 1 solo se apre con
     # `#`, senza quel `#` e senza gli spazi che lo seguono.
     doc_line h1 "$file" 1
@@ -147,6 +133,7 @@ while IFS= read -r -d '' file; do
     fi
     h1="${h1//|/ }"
 
+    # TLDR vuoto = file senza riga 3: entra col titolo, nessun avviso.
     # Nessun escape di `|` sul TLDR: l'output e' a liste, e `read` assegna
     # all'ultima variabile il resto della riga separatori inclusi → arriva
     # intatto. L'H1 invece sta in mezzo, quindi la sua `|` va neutralizzata.
@@ -167,7 +154,7 @@ if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
             continue
         fi
 
-        natura=""; indexed=""; drainable=""; branch=""; titolo=""; tldr=""; tldr_len=0
+        natura=""; indexed=""; drainable=""; branch=""; titolo=""; tldr=""
         # tab tradotto in unit separator: con IFS=$'\t' i tab sono whitespace e i
         # campi vuoti in mezzo collassano (un `nozioni · branch:` senza indexed
         # sposterebbe il branch nella colonna sbagliata)
@@ -175,18 +162,13 @@ if [[ -d "$INBOX_SCAN_DIR" && "$INBOX_SCAN_DIR" != "$SCAN_DIR" ]]; then
             case "$kind" in
                 TITOLO) titolo="$f1" ;;
                 MARKER) natura="$f1"; indexed="$f2"; drainable="$f3"; branch="$f4" ;;
-                TLDR)   tldr="$f1"; tldr_len="$f2" ;;
+                TLDR)   tldr="$f1" ;;
             esac
         done <<< "${parse_out//$'\t'/$'\037'}"
 
         [[ "$natura" == "nozioni" && "$indexed" == "indexed" ]] || continue
 
         if [[ -n "$tldr" ]]; then
-            # tldr_len e' il conteggio di inbox.sh parse, gia' in code point.
-            if (( tldr_len > LW_DOC_TLDR_CAP )); then
-                echo "[build-index] OVER-CAP TLDR ${tldr_len} char (cap ${LW_DOC_TLDR_CAP}): ${file#"$PROJECT_ROOT"/}" >&2
-                OVERCAP=$((OVERCAP+1))
-            fi
             voce="$tldr"
         else
             voce="*${titolo}*"
@@ -228,10 +210,14 @@ fi
             echo ""
             current_section="$section"
         fi
-        if [[ -n "$h1" ]]; then
+        if [[ -n "$h1" && -n "$tldr" ]]; then
             echo "- \`${fname}\` — **${h1}** — ${tldr}"
-        else
+        elif [[ -n "$h1" ]]; then
+            echo "- \`${fname}\` — **${h1}**"
+        elif [[ -n "$tldr" ]]; then
             echo "- \`${fname}\` — ${tldr}"
+        else
+            echo "- \`${fname}\`"
         fi
     done
 
@@ -274,10 +260,4 @@ fi
 } > "$OUTPUT_FILE"
 
 echo "[build-index] wrote: ${OUTPUT_FILE#"$PROJECT_ROOT"/}"
-[[ $MISSING -gt 0 ]] && echo "[build-index] ${MISSING} file(s) skipped (no TLDR)" >&2
-
-if (( OVERCAP > 0 )); then
-    echo "[build-index] FAIL: ${OVERCAP} TLDR oltre il cap ${LW_DOC_TLDR_CAP} — riscrivili come ancora (contratto doc)" >&2
-    exit 2
-fi
 exit 0
