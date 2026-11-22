@@ -11,7 +11,7 @@
 # filtri di stato senza che nessuno l'abbia chiesto.
 #
 # Il confronto legge la cella Prog di tasks.md, non il campo Progress del task
-# file: la cella e' cio' che deck, recap-status e reconcile-tasks interrogano,
+# file: la cella e' cio' che deck, recap-status e la regia interrogano,
 # mentre il campo del task file e' testo libero e puo' portare prosa (`🟡 85%`).
 # =============================================================================
 

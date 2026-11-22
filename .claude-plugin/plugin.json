@@ -1,20 +1,12 @@
 {
   "name": "loom-works",
-  "description": "Lane / Task management with coupled documentation lifecycle",
+  "description": "Task management with coupled documentation lifecycle",
   "version": "12.21.0",
   "settings": {
     "permissions": {
       "allow": [
         "Read(~/.claude/plugins/cache/lamemind/loom-works/**)"
       ]
-    }
-  },
-  "userConfig": {
-    "on_lane_spawned_hook": {
-      "type": "string",
-      "title": "On lane spawned hook",
-      "description": "Path relative to project root, executed once after spawn-lane on the lane worktree root. Empty = noop. $1 = CWD = lane root. Env: LOOM_LANE, LOOM_WORKTREE, LOOM_PROJECT_ROOT.",
-      "sensitive": false
     }
   }
 }
