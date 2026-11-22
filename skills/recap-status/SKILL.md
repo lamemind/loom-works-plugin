@@ -27,7 +27,7 @@ Se le Note utente nominano un ID task (`T113`), passalo come argomento; altrimen
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
-Cascata di famiglia `arg → $LOOM_TASK → symlink {docs_root}/current-task.md`. Exit non-zero significa «nessuna task attiva»: è un caso normale e previsto, che lo step 2 chiude.
+Cascata di famiglia `arg → $LOOM_TASK`. Exit non-zero significa «nessuna task attiva»: è un caso normale e previsto, che lo step 2 chiude.
 
 ## 2. Classifica
 

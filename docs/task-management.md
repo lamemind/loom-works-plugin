@@ -18,17 +18,14 @@ I task file stanno in `docs/tasks/T{N}-{slug}.md`; il materiale di supporto va i
 
 ## Quale task è attiva
 
-Una sola cascata, per ogni consumer: **`arg esplicito → $LOOM_TASK → symlink docs/current-task.md`**.
+Una sola cascata, per ogni consumer: **`arg esplicito → $LOOM_TASK`**. Senza i due nessuna task è attiva, e nessun file del worktree fa da ripiego.
 
 - **arg** — l'ID nominato nell'invocazione (`/loom-works:run-task T48`). In cima, o una sessione già vincolata non potrebbe più chiedere un'altra task.
-- **`$LOOM_TASK`** — binding di **sessione**, esportato allo spawn (`deck-run`). Batte il symlink perché N sessioni parallele nello stesso worktree ne condividono uno solo: quale delle N sei tu lo sa solo l'env.
-- **symlink `docs/current-task.md`** — binding di **worktree**, scritto da `start-task`. In detached non viene creato affatto.
+- **`$LOOM_TASK`** — binding di **sessione**, esportato allo spawn (`deck-run`). Il worktree non lega nessuna task: N sessioni parallele nello stesso worktree lavorano ognuna sulla sua, e quale delle N sei tu lo sa solo l'env.
 
-Implementata **una volta**: `lw_resolve_task` in `scripts/utils/lib.sh`, e per chi non può sourcare bash (il markdown delle skill) il wrapper `scripts/task/resolve-task.sh`. Restituisce `TASK_ID` · `TASK_FILE` · `TASK_SRC` ∈ `arg|env|symlink`. `TASK_SRC` non è cosmetico: rende la provenienza dichiarata invece che silenziosa, ed è ciò che decide linked vs detached (§Detached), cioè `git add -A` contro stage selettivo.
+Implementata **una volta**: `lw_resolve_task` in `scripts/utils/lib.sh`, e per chi non può sourcare bash (il markdown delle skill) il wrapper `scripts/task/resolve-task.sh`. Restituisce `TASK_ID` · `TASK_FILE` · `TASK_SRC` ∈ `arg|env`: la provenienza resta dichiarata invece che silenziosa.
 
-**Un solo canale scrive la task in contesto**: l'hook `SessionStart` (`inject-task.sh`). Il symlink **non va @-importato** in `CLAUDE.md` — entrerebbe in parallelo all'iniezione e in una sessione con `$LOOM_TASK` il modello vedrebbe due task attive divergenti, l'iniettata e quella stale del worktree.
-
-`start-task` **rifiuta di girare** quando `$LOOM_TASK` è settata, anche sullo stesso ID: scriverebbe un symlink che la sessione corrente ignora (l'env lo batte), cioè lo stale che la cascata esiste per non produrre.
+**Un solo canale scrive la task in contesto**: l'hook `SessionStart` (`inject-task.sh`), che la legge da `$LOOM_TASK`. Un task file **non va @-importato** in `CLAUDE.md`: entrerebbe in ogni sessione del progetto, e una sessione legata a un'altra task vedrebbe due task attive divergenti.
 
 ## Grafo dipendenze
 
@@ -49,12 +46,11 @@ Cross-deps:
 
 Ciclo di vita: `🔵 → 🟢 preflight fatto → 🟡 → ✔️`. Tabella e grafo restano due alfabeti: 🔒 è esclusivo del grafo, 🔵 della tabella — nel grafo l'assenza di emoji marca la task in attesa.
 
-**Aggiornamenti**: `preflight-task` → Prog 🟢 + emoji grafo, solo da 🔵 · `start-task` · `run-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella.
+**Aggiornamenti**: `preflight-task` → Prog 🟢 + emoji grafo, solo da 🔵 · `run-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella.
 
 ## Task
 
 - `/loom-works:create-task {id} {name}` — crea task
-- `/loom-works:start-task {id} [detach]` — attiva task, inizia tracking (file task + docs/tasks.md)
 - `/loom-works:run-task [{id}] [perimetro]` — esegue i DLV (perimetro `1,3-5`; nudo = tutti gli aperti), promuove a 🟡, un commit leggero per DLV chiuso
 - `/loom-works:checkpoint-task [{id}]` — checkpoint, commit (file task + docs/tasks.md)
 
@@ -68,18 +64,14 @@ Flusso: `create-task → preflight-task → run-task ⇄ checkpoint-task`; il pr
 
 ### Detached (più task in parallelo, stesso worktree)
 
-Più task piccole in parallelo nello stesso worktree, una per sessione Claude. Due modi di entrarci, stesso regime: `/loom-works:start-task T102 detach` (task ID esplicito in ogni comando) oppure una sessione spawnata dal deck, che porta `$LOOM_TASK`.
+Ogni task è detached: la lega la sessione, mai il worktree. Una sessione entra in una task in due modi, stesso regime: aperta dal deck, che porta `$LOOM_TASK`, oppure con l'ID esplicito in ogni comando. Il worktree ospita N task in parallelo, una per sessione Claude, e il repo si muove anche per mano d'altri. Ne discendono due regole:
 
-**Lo decide `TASK_SRC`, non l'argomento**: `symlink` → linked · `env`/`arg` → detached. Il criterio è chi possiede il binding — il *worktree* (una task sola, tutto il movimento del repo è suo) o la *sessione* (il repo si muove anche per mano d'altri).
-
-Differenze vs linked:
-- **Analisi diff** (`checkpoint-task-analyze.sh`, finestra `<baseline>..HEAD`): **skippata** — il diff raccoglierebbe anche il lavoro delle altre task. Deliverables dal contesto conversazione
-- **Staging commit**: la lista dei file passa allo script come pathspec (linked: `git add -A` da script). Ogni commit porta la propria pathspec: lo stage altrui resta in stage. Su `TASK_SRC=env` senza pathspec lo script esce in errore: la contaminazione è silenziosa e si scopre a push fatto
-- **Concorrenza**: N task per worktree (linked: una)
+- **Nessuna analisi del diff** al checkpoint: il diff del worktree raccoglierebbe anche il lavoro delle altre task. I deliverables chiusi si ricavano dal contesto della conversazione.
+- **Ogni commit porta la propria pathspec**: la lista dei file passa allo script, e lo stage altrui resta in stage. Senza pathspec `checkpoint-task-commit.sh` esce in errore e non committa niente: un `git add -A` rastrellerebbe il lavoro delle altre sessioni, e la contaminazione è silenziosa — si scopre a push fatto.
 
 Vincoli:
-- **Task piccole**: ogni sessione fa una task auto-contenuta. Se diventa grande, non usare detached.
-- **No file overlap**: se due task detached toccano gli stessi file, evita conflitti tu (sequenza, non parallelismo reale).
+- **Task auto-contenute**: ogni sessione lavora su una task sola.
+- **No file overlap**: se due task toccano gli stessi file, evita conflitti tu (sequenza, non parallelismo reale).
 - **Checkpoint sequenziali**: due `checkpoint-task` simultanei possono fare race su `tasks.md` e `git`. Coordinali tu.
 
 ### Doc Impact — sede unica, riesame, trasloco

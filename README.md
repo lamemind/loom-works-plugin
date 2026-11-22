@@ -41,8 +41,8 @@ Then bootstrap the project structure:
 | `/loom-works:init` | Bootstrap loom-works structure on the current project |
 | `/loom-works:create-task` | Create a new task with automation-ready metadata |
 | `/loom-works:run-task` | Execute a task's deliverables — scoped per DLV, one commit each |
-| `/loom-works:checkpoint-task` | Checkpoint progress: analyze changes, commit, update tasks.md |
-| `/loom-works:checkpoint-mandate` | Checkpoint of a scope (epic or mandate): realign its task file to what the members did and found since the last progress entry — blockers, linked tasks, open decisions, scope analysis re-checked, status copies removed; commits only the scope file and tasks.md, no doc phase, no questions. `checkpoint-task` hands epics and mandates over to it |
+| `/loom-works:checkpoint-task` | Checkpoint progress: commit the files you name, update tasks.md |
+| `/loom-works:checkpoint-mandate` | Checkpoint of a scope (epic or mandate): realign its task file to what the members did and found since the last progress entry — blockers, related tasks, open decisions, scope analysis re-checked, status copies removed; commits only the scope file and tasks.md, no doc phase, no questions. `checkpoint-task` hands epics and mandates over to it |
 | `/loom-works:preflight-task` | Freeze design decisions before execution |
 | `/loom-works:spawn-task` | Ask the project's running deck to open a task conversation (preflight, run with scope, recap, checkpoint) — one spawn per call, no questions |
 | `/loom-works:close-session` | Ask the project's running deck to close a live conversation that `spawn-task` opened — the `claude` process ends, the tab closes, the transcript stays resumable; one session per call, no questions |
@@ -62,7 +62,7 @@ The plugin declares no user options (`userConfig`). Every setting is per-project
 
 ### Docs folder — not a user option
 
-The folder holding `tasks.md`, `tasks/`, `reference/` and `current-task.md` is **per-project**, so it lives in the project file `.claude/loom-works.json` under `docsRoot` (default `docs`), not in `userConfig`. User options are global across every project: a project keeping its docs in `runtime/` cannot be described by one.
+The folder holding `tasks.md`, `tasks/` and `reference/` is **per-project**, so it lives in the project file `.claude/loom-works.json` under `docsRoot` (default `docs`), not in `userConfig`. User options are global across every project: a project keeping its docs in `runtime/` cannot be described by one.
 
 ```json
 { "id": "my-project", "docsRoot": "runtime" }

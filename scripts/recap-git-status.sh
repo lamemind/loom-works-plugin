@@ -35,16 +35,6 @@ echo ""
 echo "=== WORKTREES ==="
 git worktree list
 
-echo ""
-echo "=== CURRENT TASK SYMLINK ==="
-if [ -L "${DOCS_ROOT}/current-task.md" ]; then
-  target=$(readlink "${DOCS_ROOT}/current-task.md")
-  resolved=$(readlink -f "${DOCS_ROOT}/current-task.md" 2>/dev/null || echo "(broken)")
-  echo "active: ${target}"
-  echo "resolved: ${resolved}"
-else
-  echo "none"
-fi
 
 echo ""
 echo "=== TASK FILES ==="

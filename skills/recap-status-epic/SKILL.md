@@ -44,7 +44,7 @@ Se le Note utente nominano un ID (`/loom-works:recap-status-epic T74`), passalo 
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --members
 ```
 
-Cascata di famiglia `arg → $LOOM_TASK → symlink {docs_root}/current-task.md`, poi il lettore unico dei membri:
+Cascata di famiglia `arg → $LOOM_TASK`, poi il lettore unico dei membri:
 
 - `TASK_MEMBERS_SRC=parent` — un'epica, o una task qualunque: i membri sono le figlie, in ordine numerico
 - `TASK_MEMBERS_SRC=list` — un mandato: i membri sono la lista `## Membri`, nell'ordine del file

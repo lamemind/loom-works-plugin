@@ -62,7 +62,6 @@ PROJECT_ROOT="$(lw_find_project_root)"
 DOCS_ROOT="$(lw_docs_root)"
 TASKS_FILE="${PROJECT_ROOT}/${DOCS_ROOT}/tasks.md"
 TASKS_DIR="${PROJECT_ROOT}/${DOCS_ROOT}/tasks"
-CURRENT_LINK="${PROJECT_ROOT}/${DOCS_ROOT}/current-task.md"
 
 if [[ ! -f "$TASKS_FILE" ]]; then
     echo "ERROR: tasks.md non trovato: ${TASKS_FILE}" >&2
@@ -87,18 +86,6 @@ remove_task_from_tasksmd() {  # <task_id>
     ' "$TASKS_FILE" > "${TASKS_FILE}.tmp"
     mv "${TASKS_FILE}.tmp" "$TASKS_FILE"
     git -C "$PROJECT_ROOT" add "$TASKS_FILE"
-}
-
-# current-task.md e' un symlink runtime verso la task attiva. Se punta alla task
-# che stiamo rimuovendo, eliminalo per non lasciarlo dangling.
-maybe_drop_current_link() {  # <removed_basename>
-    [[ -L "$CURRENT_LINK" ]] || return 0
-    local target
-    target="$(readlink "$CURRENT_LINK")"
-    if [[ "$(basename "$target")" == "$1" ]]; then
-        rm -f "$CURRENT_LINK"
-        echo "-> rimosso symlink current-task.md (puntava alla task rimossa)"
-    fi
 }
 
 # Stato Done/open dal campo Progress (✔️ o "Done at" => done).
@@ -290,7 +277,6 @@ for c in "${CANDIDATES[@]}"; do
     rel_tf="${DOCS_ROOT}/tasks/$(basename "$tf")"
     git -C "$PROJECT_ROOT" rm -f "$rel_tf"
     echo "-> rimosso: ${rel_tf}"
-    maybe_drop_current_link "$(basename "$tf")"
 
     # Remove folder if present — solo se ancora su disco. Task che condividono la
     # stessa Folder si portano dietro lo STESSO $fp (risolto in blocco a monte):

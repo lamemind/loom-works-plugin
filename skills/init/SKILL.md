@@ -128,7 +128,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/config/register.sh
 - @{docs_root}/reference/INDEX.md [Reference Index]({docs_root}/reference/INDEX.md)
 ```
 
-**`current-task.md` non va @-importato**, mai — nemmeno "per comodità". La task attiva la scrive in contesto **solo** l'hook `SessionStart` (`inject-task.sh`), che risolve la cascata `$LOOM_TASK → symlink`. Un `@-import` la farebbe entrare in parallelo per conto proprio: in una sessione con `$LOOM_TASK` il modello si troverebbe **due** task attive divergenti, l'iniettata e quella (stale) a cui punta il symlink del worktree. Il symlink resta una primitiva di *risoluzione*, non un canale di *iniezione*.
+**Nessun task file va @-importato**, mai — nemmeno "per comodità". La task attiva la scrive in contesto **solo** l'hook `SessionStart` (`inject-task.sh`), che la legge da `$LOOM_TASK`. Un `@-import` la farebbe entrare in tutte le sessioni del progetto, comprese quelle legate a un'altra task: il modello si troverebbe **due** task attive divergenti, l'iniettata e quella importata.
 
 **Blocco 2 — `User assumed knowledge`.** Dichiara, settore per settore, quanto l'utente ne sa, sulla scala `K0` (non possiede né vocabolario né implicazioni) → `K3` (possiede entrambi). È il pavimento su cui una risposta decide se un termine va glossato o resta nudo, e `CLAUDE.md` è l'unico posto dove la dichiarazione vale in permanenza — inline in chat si dichiara solo un override di conversazione.
 

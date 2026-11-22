@@ -42,7 +42,7 @@ Se le Note utente nominano un ID (`/loom-works:recap-status-task T47`), passalo 
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
-Cascata di famiglia `arg → $LOOM_TASK → symlink {docs_root}/current-task.md`. Exit non-zero = nessuna task risolvibile: dillo e fermati, non tirare a indovinare.
+Cascata di famiglia `arg → $LOOM_TASK`. Exit non-zero = nessuna task risolvibile: dillo e fermati, non tirare a indovinare.
 
 Fai **sempre** `Read` di `TASK_FILE`, per intero. Non lavorare su ciò che l'iniezione ha portato in contesto: il fill del budget si ferma alla prima sezione che non entra, quindi una sezione può mancare dal contesto senza mancare dal file.
 

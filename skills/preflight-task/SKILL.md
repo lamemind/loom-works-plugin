@@ -13,7 +13,7 @@ $ARGUMENTS
 
 ## 0. Risoluzione task file
 
-Stessa cascata di `run-task` — `arg → $LOOM_TASK → symlink`, risolta dallo script:
+Stessa cascata di `run-task` — `arg → $LOOM_TASK`, risolta dallo script:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
@@ -21,7 +21,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 
 `${taskId}` = ID nelle Note utente (es. `T310`); ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` · `TASK_SRC`.
 
-**Exit non-zero = nessun binding risolvibile: termina con un errore.** Non chiedere all'utente quale task: aprire un preflight su un bersaglio che nessuno ha nominato significa congelare e committare decisioni su una task indovinata, e il costo non si paga nel turno ma a valle. La cascata `arg → $LOOM_TASK → symlink` esiste apposta — quando non risolve, la risposta corretta è invocare la skill nominando la task.
+**Exit non-zero = nessun binding risolvibile: termina con un errore.** Non chiedere all'utente quale task: aprire un preflight su un bersaglio che nessuno ha nominato significa congelare e committare decisioni su una task indovinata, e il costo non si paga nel turno ma a valle. La cascata `arg → $LOOM_TASK` esiste apposta — quando non risolve, la risposta corretta è invocare la skill nominando la task.
 
 **No subagent. `Read` diretto di `TASK_FILE`.**
 
@@ -63,7 +63,7 @@ Se la misura smentisce una premessa su cui poggia più di un DLV, **il preflight
 
 - **commit del solo task file** (§4, messaggio `task(${taskId}): preflight - premessa decaduta`), **nessuna promozione** — §3c non gira, la task non è pronta — poi **termina**.
 
-La ricostruzione delle premesse è dell'utente, in questa conversazione o in un'altra: per questo lo stato sta nel file e non solo in chat, e un preflight rilanciato dopo legge il blocco e riparte da qui, non dallo step 1. Il heading porta `— premessa decaduta` perché `start-task` e `run-task` lo distinguono per costruzione dal marker «nessuna ambiguità» (anche lui un blocco datato senza `D{N}`): senza la dicitura, una task fermata davanti a una premessa falsa risulterebbe pronta per `run-task`.
+La ricostruzione delle premesse è dell'utente, in questa conversazione o in un'altra: per questo lo stato sta nel file e non solo in chat, e un preflight rilanciato dopo legge il blocco e riparte da qui, non dallo step 1. Il heading porta `— premessa decaduta` perché `run-task` lo distingue per costruzione dal marker «nessuna ambiguità» (anche lui un blocco datato senza `D{N}`): senza la dicitura, una task fermata davanti a una premessa falsa risulterebbe pronta per `run-task`.
 
 ## 1. Analisi ambiguità — produce candidate, non domande
 
@@ -344,7 +344,7 @@ Quattro regole sulla scrittura del blocco:
 - _Nessuna ambiguità rilevata._ Task pronta per `run-task` senza decisioni da congelare.
 ```
 
-L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `start-task` legge come "preflight verificata, nessuna decisione" (distinto da "preflight mai eseguita" = blocco assente, e da «premessa decaduta» = heading con la dicitura, §0b). Un giro con zero domande e una o più proposte **non è** questo caso: le proposte sono decisioni, passano dal turno (§2) e si scrivono nel blocco come sopra.
+L'assenza di bullet `**D{N}**` sotto il blocco è il segnale che `run-task` legge come "preflight verificata, nessuna decisione" (distinto da "preflight mai eseguita" = blocco assente, e da «premessa decaduta» = heading con la dicitura, §0b). Un giro con zero domande e una o più proposte **non è** questo caso: le proposte sono decisioni, passano dal turno (§2) e si scrivono nel blocco come sopra.
 
 ## 3b. Le decisioni che producono una nozione documentale
 
@@ -405,7 +405,7 @@ Dopo commit+push, mostra all'utente:
 - **Non esegue codice**: preflight congela decisioni e cattura le nozioni che ne discendono (step 3b). Implementazione resta a `run-task`.
 - **Due sezioni, due mestieri.** `## Decisions` porta *cosa si è deciso* ed è cronaca datata: nessuno la legge a valle e resta sempre nel task file. `## Doc Impact` porta *cosa è diventato vero*, e dal primo trasloco in poi è solo il puntatore all'inbox della task. Scrivere la decisione in `## Doc Impact` è il modo tipico di sbagliare: quella riga arriverebbe nell'inbox della task come intenzione, cioè materiale che la doc non tiene.
 - **Idempotenza parziale**: ri-eseguire preflight su una task aggiunge un nuovo blocco datato. Lo storico delle decisioni resta intatto. Ogni giro produce il suo commit dedicato.
-- **Task piccole / nessuna ambiguità**: se l'analisi (step 1) non trova ambiguità reali, salta l'intero step 2 — **recap compreso** — ma **scrivi comunque il marker** in `## Decisions` (step 3, caso nessuna ambiguità) e committalo (step 4, messaggio `nessuna ambiguità`). Serve a `start-task` per distinguere "preflight già passata, niente da decidere" da "preflight mai eseguita". Mostra: `🛫 Nessuna ambiguità rilevata — marker registrato. Task pronta per run-task.`
+- **Task piccole / nessuna ambiguità**: se l'analisi (step 1) non trova ambiguità reali, salta l'intero step 2 — **recap compreso** — ma **scrivi comunque il marker** in `## Decisions` (step 3, caso nessuna ambiguità) e committalo (step 4, messaggio `nessuna ambiguità`). Serve a `run-task` per distinguere "preflight già passata, niente da decidere" da "preflight mai eseguita". Mostra: `🛫 Nessuna ambiguità rilevata — marker registrato. Task pronta per run-task.`
   Il recap esiste per rendere prendibile una decisione: senza domande non ha bersaglio e diventerebbe volume gratuito sul ramo di maggioranza. Chi vuole il quadro di una task senza decidere niente ha già `recap-status-task`.
 - **Lo stato che la sessione annuncia durante l'attesa è `done`, non `ask`** — conseguenza nota del porre le domande in chat, non un difetto da correggere qui. I due hook che alimentano il badge di compass sono macchina-personali (`~/.claude/settings.json`): `Notification` esegue `compass ask`, `Stop` esegue `compass done`. `AskUserQuestion` scatenava il primo perché sospendeva l'esecuzione; un blocco di domande scritto chiude il turno e scatena il secondo. Nel rollup `error > ask > done > running > idle` un preflight che aspetta pesa quindi quanto una sessione finita, e perde contro qualunque altra tab che stia chiedendo un permesso. Non è correggibile dentro il plugin — quegli hook stanno fuori dal perimetro di famiglia — ed è la ragione per cui il ping TTS dello step 2 resta obbligatorio.
 - **Commit + push automatici**: lo step 4 committa **solo** il task file (commit dedicato) e pusha, come le altre skill task-level. Decisioni tracciate separatamente dall'implementazione.

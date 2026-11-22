@@ -36,7 +36,7 @@ Da `$ARGUMENTS` estrai:
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
-Cascata `arg → $LOOM_TASK → symlink`. Exit non-zero = nessun binding: chiedi il task ID.
+Cascata `arg → $LOOM_TASK`. Exit non-zero = nessun binding: chiedi il task ID.
 
 `Read` di `TASK_FILE`. Estrai il campo `**Folder**:` corrente — se già popolato, avvisa l'utente e chiedi conferma prima di sovrascrivere.
 

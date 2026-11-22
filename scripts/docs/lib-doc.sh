@@ -212,7 +212,7 @@ doc_layer() {  # <rel-to-project-root> → inbox|online|offline|altro
 
 doc_excluded() {  # <rel-path> → 0 se fuori dal perimetro doc
     case "$1" in
-        */tasks/*|tasks/*|*/current-task.md|current-task.md) return 0 ;;
+        */tasks/*|tasks/*) return 0 ;;
         */adr/*|adr/*) return 0 ;;
         */triage/*|triage/*) return 0 ;;
     esac

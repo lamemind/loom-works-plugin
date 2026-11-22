@@ -143,7 +143,6 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "task cleanup do
 - **Dry-run di default**: sicuro da invocare per sola ispezione.
 - **Restore granulare**: ogni commit include file + folder + riga della stessa task → `git checkout <commit>~1 -- <path>`.
 - **Modo A ignora stato ed età**: rimuove anche task non-Done (con conferma) e non guarda la soglia giorni; il Modo B pota solo Done oltre `--days`.
-- **Active task**: se rimuovi la task attiva, lo script elimina il symlink `current-task.md` per non lasciarlo dangling.
 - **Righe orfane**: ID con riga in `tasks.md` ma file già assente → riconciliate con commit dedicato.
 - **Folder ignored/untracked**: `git rm` non tocca i file ignorati/untracked di una task folder → gate exit 2, decidi keep/purge (§3b). `--ignored-files` obbligatorio solo se ci sono superstiti.
 - **Folder condivisa**: due task che puntano alla stessa folder → la prima la rimuove, la seconda salta pulito (nessun doppio `git rm` che aborta il run).

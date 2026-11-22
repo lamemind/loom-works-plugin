@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # loom-works — inietta la task attiva nel CONTESTO del modello (hook SessionStart).
 #
-# Cascata di risoluzione (contratto famiglia, gemella della statusline):
-#   1. $LOOM_TASK  — binding di sessione (modello detached: N sessioni parallele, id distinto)
-#   2. symlink current-task.md — fallback linked mode (una sola task condivisa)
+# Fonte unica: $LOOM_TASK, il binding di sessione (N sessioni parallele nello stesso
+# worktree, una task ciascuna). Senza $LOOM_TASK non inietta niente: una sessione
+# aperta senza binding lavora sulla task che nomina per argomento, e nessun file del
+# worktree fa da ripiego.
 #
 # stdout -> additionalContext: SessionStart inietta lo stdout dell'hook nel prompt 1x
 # alla nascita della sessione. E' l'UNICO iniettore della task.
@@ -27,25 +28,13 @@ RESERVE=400    # quota del budget riservata al marcatore di omissione
 
 proj="${CLAUDE_PROJECT_DIR:-$PWD}"
 id="${LOOM_TASK:-}"
-src=""
+src="\$LOOM_TASK=${id}"
 f=""
 
 if [ -n "$id" ]; then
-  # env LOOM_TASK vince -> binding di sessione
   for root in runtime docs; do
     f="$(ls "$proj/$root"/tasks/"${id}"-*.md 2>/dev/null | head -1)"
     [ -n "$f" ] && break
-  done
-  src="\$LOOM_TASK=${id}"
-else
-  # fallback linked -> risolvi il symlink condiviso current-task.md
-  for c in "$proj/runtime/current-task.md" "$proj/docs/current-task.md"; do
-    if [ -L "$c" ]; then
-      f="$(dirname "$c")/$(readlink "$c")"
-      id="$(basename "$f" .md)"
-      src="symlink current-task.md"
-      break
-    fi
   done
 fi
 

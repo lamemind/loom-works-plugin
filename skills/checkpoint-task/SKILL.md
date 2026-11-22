@@ -29,13 +29,7 @@ Da `$ARGUMENTS` estrai un eventuale **taskId** (pattern `T\d+`), poi risolvi:
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
-Il `TASK_SRC` che lo script stampa **determina la modalità** — non la presenza dell'argomento:
-
-- `symlink` → **linked**. Binding di *worktree*: la task è una sola, tutto il movimento del repo le appartiene → analisi diff + `git add -A`.
-- `env` (`$LOOM_TASK`) → **detached**. Binding di *sessione*: N sessioni parallele nello stesso worktree, una task ciascuna. Un `git add -A` da qui rastrellerebbe nel commit i file su cui stanno lavorando le altre → la lista dei file la passi tu come pathspec.
-- `arg` → **detached**. Chi nomina una task esplicita non sta dichiarando di essere solo nel worktree.
-
-Detached = analisi diff saltata (i deliverables li deriva l'agente dal contesto della conversazione) + stage selettivo. Vedi `${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Detached.
+Il checkpoint è sempre **detached**: la task la lega la sessione (`$LOOM_TASK`) o l'argomento, mai il worktree, che ospita N sessioni parallele, una task ciascuna. Ne discendono due regole. Nessuna analisi del diff: il diff del worktree raccoglierebbe anche il lavoro delle altre sessioni, quindi i deliverables completati li ricavi dal contesto della conversazione. Nessun `git add -A`: rastrellerebbe nel commit i file su cui stanno lavorando le altre, quindi la lista dei file la passi tu come pathspec. Vedi `${CLAUDE_PLUGIN_ROOT}/docs/task-management.md` §Detached.
 
 Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argomento grezzo.
 
@@ -56,9 +50,7 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
 
 1. **Analisi modifiche**
 
-   **Linked**: esegui `${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-analyze.sh` — **senza** `--task`: lo script risolve dal symlink da sé, e passargli un id lo farebbe cadere nel ramo detached. Legge metadata, mostra commit/file modificati.
-
-   **Detached**: SKIP. Nessuno script di analisi. L'agente ricava dal contesto:
+   Nessuno script di analisi. Ricava dal contesto della conversazione:
    - quali deliverables della task corrente sono completati
    - quali file vanno committati (subset di `git status --porcelain`)
    - sintesi delle modifiche per il Progress Log
@@ -80,13 +72,12 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
       ### Avanzamento ${id_incrementale}
       - Descrizione: ${sintesi_delle_modifiche}
       ```
-      L'header `### Avanzamento N` non è cosmetico: è l'**ancora del baseline**. Il prossimo checkpoint deriva la finestra di diff dal commit che ha introdotto l'ultimo header di questa forma (`lw_task_baseline_sha`), quindi riscriverlo in altro formato allarga la finestra fino alla nascita della task.
+      Scrivi l'header `### Avanzamento N` in questa forma, la stessa di tutta la famiglia: su un perimetro (epica o mandato) `checkpoint-mandate` deriva la finestra di diff dal commit che ha introdotto l'ultimo header di questa forma (`lw_task_baseline_sha`), e un header in altro formato allarga la finestra fino alla nascita del file.
 
 4. **Task completata?**
    Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON conta):
    1. Imposta Progress a `✔️ Done` (nel file task)
-   2. Se il symlink `{docs_root}/current-task.md` risolve a **questo** task file, eliminalo (`rm`) — in linked come in detached. Se punta altrove, o non esiste, **non toccarlo**: è il binding di un'altra task.
-   3. **Se nel task file esiste il campo `**Parent Task**: T{N}`**:
+   2. **Se nel task file esiste il campo `**Parent Task**: T{N}`**:
       - Risolvi task parent: `{docs_root}/tasks/T{N}-*.md`
       - Flagga la riga della checkbox in `## Acceptance Criteria` del parent: `[ ]` → `[x]`. **Matcha sull'id, non sulla frase intera**. Riscrivi solo il box, lasciando maniglia e testo intatti.
       - Se nessuna riga porta l'id, log warning ma non bloccare.
@@ -97,17 +88,11 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
 
    **`tasks.md` non è ancora stato toccato** e non entra in questo commit: la sua Prog si scrive allo step 7.
 
-   **Linked**:
-   ```bash
-   ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh "checkpoint(${taskId}): ${descrizione}"
-   ```
-   Lo script: `git add -A` → split doc/codice sulla lista staged → commit(s) con pathspec → push.
-
-   **Detached** — passa la lista dei file **codice** della task come pathspec dopo `--`, nessuno stage a mano:
+   Passa la lista dei file **codice** della task come pathspec dopo `--`, nessuno stage a mano:
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} "checkpoint(${taskId}): ${descrizione}" -- <file1> <file2> ...
    ```
-   `--task` fissa il task file all'ID risolto; lo script lo aggiunge da sé alla pathspec. Con `TASK_SRC=env` e nessuna pathspec lo script esce in errore.
+   `--task` fissa il task file all'ID risolto; lo script lo aggiunge da sé alla pathspec. Senza pathspec lo script esce in errore e non committa niente.
 
    **Hook `deliverableDone`** — dopo il push riuscito, per ogni DLV spuntato allo step 3.1 di questo giro, in ordine di numero:
 
@@ -207,7 +192,7 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
    git status --porcelain -- "{docs_root}/tasks.md" "{docs_root}/tasks/" "{docs_root}/inbox/" "{docs_root}/reference/INDEX.md"
    ```
 
-   Output vuoto → salta lo step. Altrimenti pathspec esplicita, identica in linked e detached:
+   Output vuoto → salta lo step. Altrimenti pathspec esplicita:
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/scripts/task/checkpoint-task-commit.sh --task ${taskId} --doc-message "docs(${taskId}): trasloco in inbox" "checkpoint(${taskId}): Prog + riesame" -- "{docs_root}/tasks.md" "{docs_root}/inbox/<ogni file inbox toccato>.md" "{docs_root}/reference/INDEX.md"
    ```
@@ -217,7 +202,7 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
    Nessun file sotto `inbox/` toccato → pathspec col solo `tasks.md` e **ometti `--doc-message`**.
 
    - **la pathspec dopo `--`** è obbligatoria: il push della fase codice è già avvenuto e altre sessioni possono aver ripreso a lavorare — un `git add -A` qui rastrellerebbe lavoro non tuo.
-   - **`--task`** è obbligatorio anche in linked: se la task si è chiusa allo step 4 il symlink non c'è più.
+   - **`--task`** è obbligatorio: senza `$LOOM_TASK`, cioè con la task nominata per argomento, lo script non avrebbe altro modo di risolvere il task file.
 
    **Hook `taskDone`** — solo se lo step 4 di questo giro ha portato Progress a `✔️ Done`, dopo il push riuscito dello step 8:
 
@@ -360,11 +345,10 @@ Topic = argomento concreto della domanda. NO generici.
 
 ## Note
 
-- **Due script**: analyze per raccogliere info (solo linked), commit per eseguire.
+- **Uno script, di commit**: nessuno script di analisi, i deliverables chiusi si ricavano dalla conversazione.
 - **Due fasi di commit**: la fase codice (step 5) chiude e pusha il lavoro prima che la doc cominci; la seconda (step 8) porta `tasks.md` e l'eventuale trasloco con pathspec esplicita. Un fallimento della fase doc non porta con sé il codice.
 - **Due eventi, ognuno dopo il proprio push**: `deliverableDone` dopo lo step 5, solo per i DLV spuntati in questo giro; `taskDone` dopo lo step 8, solo nel giro che chiude. Un checkpoint che non spunta e non chiude non invoca niente.
 - **Riesame ≠ archivio**: il riesame (6.1) è il lavoro della fase doc anche quando nessun trasloco scatta — ed è il grosso del lavoro dopo il primo, perché da lì in avanti c'è solo lui. Un checkpoint che non riscrive mai niente sta saltando la fase, non risparmiandola. Sull'inbox vale di più che sul task file: rigiudica un file già pubblicato e indicizzato, letto da chi non ha la task in mano.
 - **Il file inbox è WIP finché la task è aperta**: l'owner è la task, e il corpo si appende, si riscrive e si pota a ogni checkpoint — le tre operazioni e la regola degli id stanno in `${CLAUDE_PLUGIN_ROOT}/docs/inbox-format.md`. Il congelamento arriva con `drainable` (6.4): da lì l'unica scrittura ammessa è la riga marker (lo sblocco di `pull-repos`).
-- **Baseline del diff**: derivato, mai storato — dal commit che ha introdotto l'ultimo `### Avanzamento` del Progress Log, letto da `HEAD`.
-- **Detached**: niente analyze script, niente symlink. Stage selettivo obbligatorio.
+- **Solo detached**: niente analisi del diff, stage selettivo obbligatorio — ogni commit porta la propria pathspec.
 - **Nessuna allerta sul numero di file**: l'accumulo degli inbox è libero — nessun cap, nessun tetto. L'unico conteggio è quello del 6.5, dentro un singolo file, e stampa un numero senza chiedere niente.

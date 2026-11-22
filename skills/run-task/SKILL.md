@@ -21,17 +21,15 @@ Da qui si leggono due cose, e due sole: l'**ID della task** (es. `T310`) e il **
 
 ## 0. Presenta la task
 
-Risolvi il task file con lo script, mai a mano — la cascata `arg → $LOOM_TASK → symlink` è una sola per tutta la famiglia:
+Risolvi il task file con lo script, mai a mano — la cascata `arg → $LOOM_TASK` è una sola per tutta la famiglia:
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 ```
 
-`${taskId}` = ID trovato nelle Note utente; ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` (assoluto) · `TASK_SRC` ∈ `arg|env|symlink`. Exit non-zero = nessun binding risolvibile: chiedi all'utente quale task eseguire, non tirare a indovinare.
+`${taskId}` = ID trovato nelle Note utente; ometti l'argomento se non c'è. Output: `TASK_ID` · `TASK_FILE` (assoluto) · `TASK_SRC` ∈ `arg|env`. Exit non-zero = nessun binding risolvibile: chiedi all'utente quale task eseguire, non tirare a indovinare.
 
 Fai **sempre** `Read` di `TASK_FILE`: in contesto può non esserci affatto (invocazione on-the-fly) o esserci troncato (budget dell'hook di iniezione).
-
-`TASK_SRC` decide il regime di commit e nient'altro: `symlink` → linked · `env`/`arg` → **detached**, e in detached ogni commit porta la propria pathspec (§6).
 
 ## 1. Gate `Size: Epic` e `Size: Mandate` — dichiara e fermati
 
@@ -123,9 +121,9 @@ Per ogni DLV del perimetro, **in ordine**:
      && git log -1 --format='DLV_SHA=%h' -- "${TASK_FILE}"
    ```
 
-   La pathspec è **obbligatoria** e la componi tu, elencando i file che hai toccato per quel deliverable: l'indice è una zona comune del worktree e un commit senza path rastrella anche ciò che altre sessioni hanno in stage. Vale in entrambi i regimi — in linked è comunque ciò che tiene un DLV separato dal successivo.
+   La pathspec è **obbligatoria** e la componi tu, elencando i file che hai toccato per quel deliverable: l'indice è una zona comune del worktree e un commit senza path rastrella anche ciò che altre sessioni hanno in stage. È anche ciò che tiene un DLV separato dal successivo.
 
-   `DLV_SHA` è il commit del DLV, letto come l'ultimo commit che tocca il task file e non come `HEAD`: in detached un'altra sessione può committare fra il tuo commit e la riga dopo. Compare solo se commit e push sono riusciti.
+   `DLV_SHA` è il commit del DLV, letto come l'ultimo commit che tocca il task file e non come `HEAD`: un'altra sessione sullo stesso worktree può committare fra il tuo commit e la riga dopo. Compare solo se commit e push sono riusciti.
 4. **Hook di progetto** — l'evento `deliverableDone`, solo se il passo 3 ha stampato `DLV_SHA`:
 
    ```bash

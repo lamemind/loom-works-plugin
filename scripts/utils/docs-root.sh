@@ -16,8 +16,8 @@
 #
 # Perche' esiste. La docs-root e' un fatto PER-PROGETTO (loom-works usa runtime/,
 # il default e' docs/) e le skill devono nominarla in path che non passano da uno
-# script: `{docs_root}/tasks.md`, `{docs_root}/reference/INDEX.md`, il symlink
-# current-task.md. Prima veniva interpolata da `${user_config.doc_folder_name}`,
+# script: `{docs_root}/tasks.md`, `{docs_root}/reference/INDEX.md`, `{docs_root}/inbox/`.
+# Prima veniva interpolata da `${user_config.doc_folder_name}`,
 # che e' una preferenza utente GLOBALE: su un progetto non-default risolveva al
 # valore di un altro progetto e la skill operava su una dir inesistente, in
 # silenzio. Un comando non ha quel difetto — legge il file del progetto in cui
