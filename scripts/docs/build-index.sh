@@ -26,8 +26,10 @@
 #     branch, quindi varia da voce a voce e un'intestazione collettiva direbbe
 #     che una condizione esiste senza dire quale ti riguarda.
 #   - `drainable` separa DUE SEMANTICHE, non due code. Un file drainable descrive
-#     un rilascio che la doc consolidata non ha assorbito: li' prevalere su
-#     reference/ e' corretto. Uno non-drainable descrive lavoro in corso, che il
+#     un rilascio chiuso, e l'inbox indicizzato e' il punto d'arrivo della
+#     nozione: li' prevalere su reference/ e' corretto. Il titolo della sezione
+#     resta «nozioni non ancora collocate» perche' il banco docs lo cerca per
+#     testo. Uno non-drainable descrive lavoro in corso, che il
 #     checkpoint successivo puo' smentire: la stessa etichetta gli darebbe
 #     un'affidabilita' che non ha. Va quindi in una sezione propria, dichiarato
 #     come inconsistenza e con accanto l'id della task che lo scrive.
@@ -233,7 +235,7 @@ fi
                 if [[ "$tipo" == "0" && -z "$branch" ]]; then
                     echo "## inbox — nozioni non ancora collocate"
                     echo ""
-                    echo "> Precedenza: in caso di contraddizione con un file di \`reference/\`, **prevale la voce inbox** — descrive un rilascio che la doc consolidata non ha ancora assorbito."
+                    echo "> Precedenza: in caso di contraddizione con un file di \`reference/\`, **prevale la voce inbox** — descrive un rilascio chiuso, e l'inbox indicizzato è il punto d'arrivo della nozione."
                 elif [[ "$tipo" == "0" ]]; then
                     echo "## inbox — branch \`${branch}\`"
                     echo ""
