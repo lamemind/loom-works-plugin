@@ -13,6 +13,8 @@
 #   inbox.sh registro --file <path> --attore router|writer   < envelope JSON
 # =============================================================================
 #
+# Stato e requisiti rinviati: factory · T25 §Custodia — un limite di queste tubature si segnala lì, non si apre una task qui.
+#
 # Quattro sottocomandi in un file solo: quattro script separati condividerebbero
 # comunque le stesse regex, e un path solo e' cio' che i prompt devono ricordare.
 # Grammatica: marker-formato-inbox-v2 (riga marker in riga 3, TLDR riga 4,

@@ -6,6 +6,8 @@
 #                       [--output <path>] [--title <title>] [--exclude <dir1,dir2>]
 # =============================================================================
 #
+# Stato e requisiti rinviati: factory · T25 §Custodia — un limite di queste tubature si segnala lì, non si apre una task qui.
+#
 # Scansiona ricorsivamente <dir> (default: {docs_root}/reference/) e per ogni
 # file .md estrae il TLDR di riga 3 (`> **TLDR**: <testo>`). Genera un INDEX.md
 # a sezioni (una per sottocartella) con liste `- \`file.md\` — <tldr>`.
