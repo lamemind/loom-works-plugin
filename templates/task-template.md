@@ -5,7 +5,6 @@
 - **Priority**: {{priorita_raccolta}}
 - **Estimated Time**: {{durata_standard}}
 - **Size**: {{size}}
-- **Lane**: {{lane}}
 - **Parent Task**:
 - **Branch**:
 - **Folder**:

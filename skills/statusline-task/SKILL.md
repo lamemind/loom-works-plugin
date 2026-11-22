@@ -1,10 +1,10 @@
 ---
 name: statusline-task
-description: Manage the loom-works active-task widget (📌 $LOOM_TASK → current-task symlink) in the user's global Claude Code statusLine script. Default mode patches it in; token `unpatch` removes it. Idempotent, marker-based, lane-aware.
+description: Manage the loom-works active-task widget (📌 $LOOM_TASK → current-task symlink) in the user's global Claude Code statusLine script. Default mode patches it in; token `unpatch` removes it. Idempotent, marker-based, worktree-aware.
 allowed-tools: Bash(*), Read, Edit, AskUserQuestion
 ---
 
-Gestisce sulla **statusline globale** il widget `📌 Tnn` che mostra la task attiva con cascata `$LOOM_TASK → symlink current-task.md`: se la sessione ha `LOOM_TASK` settata (binding per-sessione, es. spawn `deck-run`) vince quella; altrimenti fallback al symlink `current-task.md` del progetto corrente (lane-aware, perché legge `workspace.project_dir`).
+Gestisce sulla **statusline globale** il widget `📌 Tnn` che mostra la task attiva con cascata `$LOOM_TASK → symlink current-task.md`: se la sessione ha `LOOM_TASK` settata (binding per-sessione, es. spawn `deck-run`) vince quella; altrimenti fallback al symlink `current-task.md` del progetto corrente (segue il worktree della sessione, perché legge `workspace.project_dir`).
 
 Il widget è **self-contained inline** (non dipende da `${CLAUDE_PLUGIN_ROOT}`, che NON espande nel contesto statusLine) e delimitato da **sentinel markers** → patch idempotente, unpatch deterministico.
 
@@ -118,5 +118,5 @@ Conferma rimozione + esito test. Ricorda: ri-aggiungibile con `/loom-works:statu
 
 - **Globale**: lo script serve TUTTE le sessioni/progetti. In progetti senza symlink il widget degrada vuoto. Corretto.
 - **Idempotente**: patch re-invocata = strip + reinsert → nessuna duplicazione; unpatch su widget assente = no-op dichiarato.
-- **Lane-aware**: in worktree lane `workspace.project_dir` = root lane → mostra la task della lane.
+- **Worktree-aware**: in un worktree git secondario `workspace.project_dir` = root di quel worktree → mostra la task del suo symlink.
 - **Sicuro**: `strip.sh` rifiuta di editare se trova begin marker senza end marker (file corrotto) → nessun troncamento.

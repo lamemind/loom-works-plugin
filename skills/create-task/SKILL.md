@@ -51,11 +51,10 @@ Quando attiva, deduce automaticamente:
 - **Priorità**: Med (default)
 - **Size**: M (default). Valori: S (express), M (standard), L (full validation), Epic (task cappello, non eseguibile)
 - **Durata**: 1-2 ore (default)
-- **Lane**: nessuna (task spot)
 - **Dipendenze**: nessuna
 - **Acceptance criteria**: "- [ ] Implementare quanto descritto"
 - **Deliverables**: "- [ ] Codice funzionante"
-- **Campi di progetto**: solo i valori nominati dal contesto o ereditati dal parent, gli altri vuoti (§2d)
+- **Campi di progetto**: solo i valori nominati dal contesto o ereditati dal parent, gli altri vuoti (§2c)
 
 Esempio: `/loom-works:create-task yolo migliorare logging dei servizi`
 → Nome: `migliorare-logging-servizi`, Desc: "Migliorare logging dei servizi"
@@ -82,42 +81,7 @@ Output: ID completo pronto all'uso (es: T319, T320). Prefix `T` hardcoded.
 
 **Una cifra in un AC è contata, non stimata** — vale anche in YOLO. Se la soglia dipende da una misura — byte di un file, occorrenze, righe, tempo — la misura si fa prima di scrivere la riga, e la riga porta il punto di partenza accanto al bersaglio (`da 43.206 a ≤ 26.000`), oppure il bersaglio è relativo a quel punto (`sotto il 60% di oggi`). Una cifra tonda senza la misura accanto è una promessa che il preflight smonterà al primo `wc -c`.
 
-### 2b. Lane e dipendenze (AskUserQuestion)
-
-Dopo i dettagli base, due domande con AskUserQuestion. Prima di ognuna esegui il ping pre-domanda (vedi §Convenzione TTS):
-```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "domanda su <topic 3-7 parole specifiche>"
-```
-
-**Domanda 1 — Lane**:
-Leggi il grafo lane da `{docs_root}/tasks.md`. Se esiste, mostra le lane come opzioni selezionabili:
-```
-In quale lane inserire ${TASK_ID}?
-
-1) l1 (Core): ✔️T101 → ... → T105
-2) l2 (API): ✔️T106 → ... → T109
-3) l3 (Data): ✔️T110 → ... → T113
-4) l4 (UI): ✔️T114 → ... → T117
-5) Nuova lane (specificare nome)
-6) Nessuna (task spot)
-```
-L'utente clicca e basta. Se "Nuova lane" → chiedi nome. Se "Nessuna" → task spot, no grafo.
-
-**Domanda 2 — Dipendenze cross-lane**:
-Se assegnata a una lane, analizza le task dalla tabella `{docs_root}/tasks.md` e suggerisci dipendenze probabili.
-Usa euristiche: task che toccano stessi servizi/file, task nella stessa area funzionale, task che appaiono nel grafo come predecessori naturali.
-```
-Dipendenze cross-lane per ${TASK_ID}?
-
-Suggerite (in base all'analisi):
-  [x] T102 — Core - validazione input
-  [ ] T108 — API - meccanismo trigger worker
-
-Altre (ID separati da virgola): ___
-```
-L'utente conferma i suggerimenti e/o aggiunge altri. Se nessuna dipendenza → la task viene aggiunta in coda alla lane senza cross-deps.
-
-### 2c. Cattura Doc Impact (sempre, sia interattivo che YOLO)
+### 2b. Cattura Doc Impact (sempre, sia interattivo che YOLO)
 
 Analizza il contesto conversazionale immediatamente precedente all'invocazione di `create-task` — la discussione che ha generato l'esigenza della task. Questo è il momento più ricco per catturare nozioni documentali: problema esplicitato, decisioni emerse, vincoli scoperti, trade-off risolti, pattern individuati.
 
@@ -138,7 +102,7 @@ Se non emerge nulla di significativo, scrivi: `*Nessuna nozione documentale emer
 
 **YOLO**: anche in modalità YOLO questa cattura è sempre attiva. Si salta la domanda all'utente ma si legge lo stesso il contesto conversazionale.
 
-### 2d. Campi di progetto (sempre, sia interattivo che YOLO)
+### 2c. Campi di progetto (sempre, sia interattivo che YOLO)
 
 Un progetto può dichiarare in `.claude/loom-works.json` campi propri dell'header del task file (blocco `taskFields`, es. la user story Jira di riferimento). Il progetto dichiara le chiavi, non il template: i valori li raccogli tu, qui.
 
@@ -171,7 +135,7 @@ Un progetto può dichiarare in `.claude/loom-works.json` campi propri dell'heade
 ### 3. Creazione file task
 Crea `{docs_root}/tasks/${TASK_ID}-${taskName}.md` usando il template `${CLAUDE_PLUGIN_ROOT}/templates/task-template.md`.
 
-Il segnaposto `{{campi_progetto}}` dell'header diventa una riga per campo dello step 2d, nell'ordine di dichiarazione, **anche vuota**: `- **<key>**: <valore>`, oppure `- **<key>**:` senza valore. Progetto senza campi → la riga del segnaposto sparisce del tutto, senza lasciare una riga vuota: l'header resta quello di sempre, con `Progress` come ultima riga.
+Il segnaposto `{{campi_progetto}}` dell'header diventa una riga per campo dello step 2c, nell'ordine di dichiarazione, **anche vuota**: `- **<key>**: <valore>`, oppure `- **<key>**:` senza valore. Progetto senza campi → la riga del segnaposto sparisce del tutto, senza lasciare una riga vuota: l'header resta quello di sempre, con `Progress` come ultima riga.
 
 ### 3b. Task folder (condizionale)
 

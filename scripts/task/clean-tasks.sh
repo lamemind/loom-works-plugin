@@ -71,7 +71,7 @@ fi
 
 # Remove a task's Overview row from tasks.md — solo quella, confinata alla
 # sezione `## Tasks Overview`. L'Execution Plan e' design scritto a mano e nessuno
-# script lo pota: il token della task resta nelle catene di lane e nelle celle
+# script lo pota: il token della task resta nelle catene del grafo e nelle celle
 # Cross Deps finche' qualcuno lo toglie a mano. Un `sed "/\b<id>\b/d"` sul file
 # intero cancellerebbe anche la riga Overview di un'altra task il cui titolo
 # nomina l'id, lasciandone il task file senza riga.

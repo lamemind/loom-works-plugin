@@ -1,21 +1,16 @@
 # Task Management
 
-Sistema a Lane e Task con worktree Git isolati.
+Sistema di task tracciate in `docs/tasks.md`, eseguite nel worktree del progetto.
 
 ## Struttura
 
-```
-MAIN ({project}/)                ← branch base, home di docs/tasks.md, task spot ammesse
-  ├── LANE ({project}-{lane}/)   ← worktree lane (persistente, branch feat/{lane}), N task
-  ├── LANE ({project}-{lane2}/)
-  └── task spot                  ← direttamente su main, senza lane
-```
+Una task vive nel worktree principale del progetto: su main, oppure su un branch dichiarato nel campo `**Branch**:` del task file (§Doc Impact). loom-works non crea, non mergia e non rimuove worktree: un worktree git aperto a mano resta possibile, ma nessuna skill lo gestisce.
 
 ## Task List
 
 Una singola fonte di verità: `docs/tasks.md`. Contiene:
 - **Tasks Overview** (tabella): ID, Priority, Progress, descrizione
-- **Execution Plan** (grafo lane con cross-deps)
+- **Execution Plan** (grafo delle dipendenze con cross-deps)
 
 Task prefix `T` (hardcoded), counter unico, ID incrementali (T01, T02, …).
 
@@ -35,23 +30,15 @@ Implementata **una volta**: `lw_resolve_task` in `scripts/utils/lib.sh`, e per c
 
 `start-task` **rifiuta di girare** quando `$LOOM_TASK` è settata, anche sullo stesso ID: scriverebbe un symlink che la sessione corrente ignora (l'env lo batte), cioè lo stale che la cascata esiste per non produrre.
 
-## Lane
+## Grafo dipendenze
 
-Percorso di task sequenziali con worktree condiviso: creato una volta, riusato. Senza lane: worktree nuovo ad ogni task (npm install, build, setup) poi distrutto al merge.
-
-Le lane sono **design**, non emergono dagli script: si definiscono nel grafo di `docs/tasks.md` in pianificazione, in blocco o una alla volta (`create-task` chiede in quale lane). Task spot piccole vanno su main senza lane.
-
-- **Naming**: worktree `{project}-{lane}` (es. `myproject-l1-feature`) · branch `feat/{lane}`.
-- **Ciclo di vita**: ① `spawn-lane` crea worktree da main, avvia prima task → ② `start-task` → `run-task` → `checkpoint-task` nel worktree → ③ `merge-lane` mergia in main, aggiorna grafo, ricopia tasks nel worktree → ④ `spawn-lane` riusa worktree, crea solo nuovo branch task → ⑤ `merge-lane` chiede conferma rimozione worktree all'ultima task.
-- **Comandi** (da main): `/loom-works:spawn-lane {lane}` crea/riusa worktree e avvia task · `/loom-works:merge-lane {lane}` merge in main, aggiorna grafo.
-
-### Grafo dipendenze
+Le catene sono **design**, non emergono dagli script: si scrivono a mano nell'Execution Plan di `docs/tasks.md` in pianificazione, e nessuna skill ne aggiunge una. Ogni catena si intesta con un'etichetta libera seguita da `:` e almeno due spazi.
 
 ```
 Legend: 🟢 Ready  🟡 In Progress  ✔️ Done  🔒 Locked
 
-Lane 1 (nome):   ✔️T01 → ✔️T02 → 🟡T03 → T04 → T05
-Lane 2 (nome):   ✔️T06 → 🟡T07 → T08 → T09
+Epica T10 (nome):   ✔️T01 → ✔️T02 → 🟡T03 → T04 → T05
+Spot:               ✔️T06 → 🟡T07 → T08 → T09
 
 Cross-deps:
 | Task | Parent | Cross Deps |
@@ -62,18 +49,16 @@ Cross-deps:
 
 Ciclo di vita: `🔵 → 🟢 preflight fatto → 🟡 → ✔️`. Tabella e grafo restano due alfabeti: 🔒 è esclusivo del grafo, 🔵 della tabella — nel grafo l'assenza di emoji marca la task in attesa.
 
-**Aggiornamenti**: `preflight-task` → Prog 🟢 + emoji grafo, solo da 🔵 · `start-task` · `run-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella · `merge-lane` → su conflitto git invoca `/loom-works:reconcile-tasks`.
+**Aggiornamenti**: `preflight-task` → Prog 🟢 + emoji grafo, solo da 🔵 · `start-task` · `run-task` → Prog 🟡 + emoji grafo · `checkpoint-task` → Prog (🟡/✔️) + emoji grafo · `create-task` → aggiunge riga tabella.
 
 ## Task
 
-Le task si gestiscono dal worktree lane o direttamente da main (task spot). Comandi (main/lane):
-
-- `/loom-works:create-task {id} {name}` — crea task (può chiedere la lane)
+- `/loom-works:create-task {id} {name}` — crea task
 - `/loom-works:start-task {id} [detach]` — attiva task, inizia tracking (file task + docs/tasks.md)
 - `/loom-works:run-task [{id}] [perimetro]` — esegue i DLV (perimetro `1,3-5`; nudo = tutti gli aperti), promuove a 🟡, un commit leggero per DLV chiuso
 - `/loom-works:checkpoint-task [{id}]` — checkpoint, commit (file task + docs/tasks.md)
 
-Flusso: `spawn-lane → run-task ⇄ checkpoint-task → merge-lane → spawn-lane (next)`. Le lane lavorano in parallelo, ognuna nel proprio worktree.
+Flusso: `create-task → preflight-task → run-task ⇄ checkpoint-task`; il preflight è obbligatorio a Size L, alle altre Size serve quando emergono dubbi di design. Più task in parallelo nello stesso worktree: §Detached.
 
 **Parentela fra task**: il campo `**Parent Task**: T{N}` si scrive a mano nella figlia, e il parent porta `- [ ] T{N} (<maniglia>) chiusa` in Acceptance. Alla chiusura della figlia il suo `checkpoint-task` flagga indietro quella checkbox — matchando l'id, non la frase.
 

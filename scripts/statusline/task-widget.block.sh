@@ -1,6 +1,6 @@
 # >>> loom-works:task-widget >>>
 # Active loom-works task → status bar. Cascade: $LOOM_TASK (session binding) → current-task.md symlink.
-# Lane-aware, self-contained. Managed by /loom-works:statusline-task (patch default · unpatch token)
+# Worktree-aware, self-contained. Managed by /loom-works:statusline-task (patch default · unpatch token)
 LW_proj=$(printf '%s' "$data" | jq -r '.workspace.project_dir // .workspace.current_dir // .cwd // empty')
 LW_task=""
 LW_file=""

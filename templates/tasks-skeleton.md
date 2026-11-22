@@ -1,6 +1,6 @@
 # Tasks
 
-Lista task attiva del progetto. Unico file di riferimento per pianificazione, priorità, stato e grafo lane.
+Lista task attiva del progetto. Unico file di riferimento per pianificazione, priorità, stato e grafo delle dipendenze.
 
 ## Tasks Overview
 

@@ -165,4 +165,4 @@ Riepiloga cosa ha fatto lo script (file/dir creati vs skippati), lo stato di `CL
 ## Note
 
 - Lo script è sicuro da rilanciare: salta file già presenti
-- Le preferenze cross-project (`on_lane_spawned_hook`…) vivono in plugin settings.json; tutto ciò che è **per-progetto** — identità, surface e **docs-root** (`docsRoot`) — vive in `.claude/loom-works.json`, file **obbligatorio** e unico marker di project-root per `lib.sh`. Il discriminante è la portata, non il tipo di dato: un userConfig vale per ogni progetto insieme, quindi non può descriverne uno. Nessun fallback: il vecchio sentinel `.claude/loom-works.initialized` non vale più e va rimosso.
+- Il plugin non dichiara preferenze cross-project (`userConfig`); tutto ciò che è **per-progetto** — identità, surface e **docs-root** (`docsRoot`) — vive in `.claude/loom-works.json`, file **obbligatorio** e unico marker di project-root per `lib.sh`. Il discriminante è la portata, non il tipo di dato: un userConfig vale per ogni progetto insieme, quindi non può descriverne uno. Nessun fallback: il vecchio sentinel `.claude/loom-works.initialized` non vale più e va rimosso.

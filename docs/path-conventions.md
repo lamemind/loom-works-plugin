@@ -20,7 +20,7 @@ La doc di un progetto non ha una base sola: vi convivono link markdown relativi 
 `${...}` **solo** dove il valore arriva già sostituito:
 
 - `${CLAUDE_PLUGIN_ROOT}` — interpolato nei body delle skill;
-- `${taskId}`, `${TASK_ID}`, `${lane}`, `${N}` — narrazione interna della skill: valori che la skill ha già in mano, ricevuti nell'invocazione o calcolati un passo prima.
+- `${taskId}`, `${TASK_ID}`, `${N}` — narrazione interna della skill: valori che la skill ha già in mano, ricevuti nell'invocazione o calcolati un passo prima.
 
 `{...}` dove il valore è un **fatto di progetto** che qualcun altro deve risolvere: prosa, template d'esempio, blocchi-prompt destinati a un subagent.
 

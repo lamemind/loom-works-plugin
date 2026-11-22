@@ -69,7 +69,7 @@ Fai `Read` di `TASK_FILE` per intero, e poi di ogni task file membro.
 ${CLAUDE_PLUGIN_ROOT}/scripts/recap-git-status.sh
 ```
 
-Più `{docs_root}/tasks.md` per la Prog di ogni membro e per l'Execution Plan, se il perimetro sta su una lane.
+Più `{docs_root}/tasks.md` per la Prog di ogni membro e per l'Execution Plan, se il perimetro vi ha una catena.
 
 **Lo stato dei membri si legge da `tasks.md` e dai loro task file, mai dal file del perimetro.** Un'epica o un mandato che porta una colonna di stato o una cifra ricopiata da un membro viola il formato (`mandate-format.md` §Nessuna copia): la copia resta indietro alla prima modifica. Se ne trovi una, segnala la divergenza come incongruenza da correggere nel file, e scrivi il recap col dato vero.
 

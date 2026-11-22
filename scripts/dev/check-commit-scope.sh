@@ -98,8 +98,6 @@ cat > "$REPO/docs/tasks.md" <<'MD'
 | T03 | ⚡ | ✔️ | baz |
 | T02 | ⚡ | 🟡 | bar |
 
-## Lane attive
-
 ## Execution Plan
 
 ```

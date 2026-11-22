@@ -1,13 +1,12 @@
 # loom-works
 
-A Claude Code plugin that brings lane-based task management with a coupled documentation lifecycle to your projects.
+A Claude Code plugin that brings task management with a coupled documentation lifecycle to your projects.
 
 ## What it does
 
-loom-works organizes work into **tasks** and **lanes**:
+loom-works organizes work into **tasks**:
 
-- **Tasks** — atomic units of work tracked in `docs/tasks.md` with git-anchored progress
-- **Lanes** — persistent git worktrees (`feat/{lane}`) hosting sequences of related tasks, eliminating repeated setup overhead
+- **Tasks** — atomic units of work tracked in `docs/tasks.md` with git-anchored progress, run in the project's own worktree (on main, or on a branch the task file declares)
 - **Doc lifecycle** — tasks emit documentation fragments that are captured, indexed, and embedded as CLAUDE.md context
 
 ## Install
@@ -50,9 +49,6 @@ Then bootstrap the project structure:
 | `/loom-works:close-session` | Ask the project's running deck to close a live conversation that `spawn-task` opened — the `claude` process ends, the tab closes, the transcript stays resumable; one session per call, no questions |
 | `/loom-works:orchestrate-mandate` | Direct a scope semi-automatically — one id, an epic or a mandate (`Size: Mandate`): checks the written scope analysis at launch, recap, live sessions, session monitor; launches preflight, run and checkpoint of the members and the scope checkpoint at the end as headless turns with `loom-deck-headless`, no tab (a tab only when the user asks for one for a step), proposes answers and sends them only on the user's go-ahead (or by itself under a delegation the user declares) — never writes to the repos |
 | `/loom-works:prepare-mandate` | Build a direction scope before it starts: create a mandate (`Size: Mandate`) from task ids or a description, add or remove its members, or write the scope analysis into an epic — dependencies and collisions between members, mechanical half from `mandate.py tree` plus a model half; the user confirms before every commit, member task files are never touched |
-| `/loom-works:spawn-lane` | Create a persistent git worktree lane |
-| `/loom-works:merge-lane` | Merge lane into main, keep worktree |
-| `/loom-works:drop-lane` | Destroy a lane without merging |
 | `/loom-works:recap-status` | Recap dispatcher: resolves the active task and routes to one of the two below; with no task resolved it answers «nessuna task» |
 | `/loom-works:recap-status-task` | Single-task recap: open DLV/AC, material produced, one named next step |
 | `/loom-works:recap-status-epic` | Umbrella-task recap: children with DLV/AC figures, deps, two-level entry point |
@@ -60,27 +56,10 @@ Then bootstrap the project structure:
 | `/loom-works:statusline-task` | Manage the 📌 active-task widget in the global statusline (default patch, token `unpatch`) |
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |
 | `/loom-works:set-task-folder` | Attach a task folder to an existing task |
-| `/loom-works:reconcile-tasks` | Reconcile git conflicts in tasks.md during lane merge |
 
 ## Configuration
 
-All options are optional. Set in your project's `.claude/settings.json`:
-
-```json
-{
-  "pluginConfigs": {
-    "loom-works@lamemind": {
-      "options": {
-        "on_lane_spawned_hook": ""
-      }
-    }
-  }
-}
-```
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `on_lane_spawned_hook` | (empty) | Path relative to project root, executed once after `spawn-lane` |
+The plugin declares no user options (`userConfig`). Every setting is per-project and lives in the project file `.claude/loom-works.json`.
 
 ### Docs folder — not a user option
 

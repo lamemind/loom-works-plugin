@@ -104,7 +104,7 @@ Dopo i gate (§1, §3) e dopo il piano quando Size è L:
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/promote-wip.sh ${taskId}
 ```
 
-Aggiorna insieme cella `Prog`, nodo del grafo lane e campo `Progress` del task file, poi committa e pusha da sé. Promuove **solo da 🔵 e da 🟢**; da ✔️ o 🔒 dichiara il no-op e non tocca niente, così un id sbagliato non riapre una task chiusa.
+Aggiorna insieme cella `Prog`, nodo del grafo e campo `Progress` del task file, poi committa e pusha da sé. Promuove **solo da 🔵 e da 🟢**; da ✔️ o 🔒 dichiara il no-op e non tocca niente, così un id sbagliato non riapre una task chiusa.
 
 Il commit è dedicato e immediato perché `tasks.md` è condiviso: una promozione lasciata non committata viaggia sul commit della prima altra sessione che passa — contenuto giusto, attribuzione sbagliata.
 

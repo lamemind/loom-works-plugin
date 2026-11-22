@@ -30,7 +30,7 @@ git -C <submodule> pull --ff-only 2>&1 || echo "RED FLAG: <submodule>"
 
 ## 2. Sblocco — la presenza su main È la prova del merge
 
-Un inbox creato su un branch porta `branch:<nome>`: l'indice lo dà valido solo per chi lavora su quel branch, e il file non diventa `drainable`. Trovarlo adesso nel working tree di main significa che il merge è avvenuto — nessun confronto di liste di branch, nessuna domanda su chi ha mergiato. Funziona identico che il merge arrivi dal remoto o l'abbia fatto `merge-lane` in locale.
+Un inbox creato su un branch porta `branch:<nome>`: l'indice lo dà valido solo per chi lavora su quel branch, e il file non diventa `drainable`. Trovarlo adesso nel working tree di main significa che il merge è avvenuto — nessun confronto di liste di branch, nessuna domanda su chi ha mergiato. Funziona identico che il merge arrivi dal remoto o sia fatto in locale.
 
 Per ogni file di `{docs_root}/inbox/` il cui marker porta `branch:` (colonna BRANCH di `doc-metrics --inbox` non vuota):
 

@@ -4,7 +4,7 @@ Manuali, convenzioni e riferimenti tecnici del sistema che il plugin implementa.
 
 **Iniettato a `SessionStart`** — una hook entry per file, perché il cap di 10.000 char è per comando: un `cat A B C` unico condividerebbe il budget e affamerebbe gli ultimi in coda.
 
-- `task-management.md` — lane e task, ciclo di vita, grafo dipendenze, comandi
+- `task-management.md` — task, ciclo di vita, grafo dipendenze, comandi
 - `adr.md` — registro ADR: interroga prima di risollevare una segnalazione, registra lo scarto motivato. Non lo inietta un `cat`, ma `scripts/context/inject-adr.sh`: il testo porta un comando eseguibile, e `CLAUDE_PLUGIN_ROOT` non è nell'ambiente del tool Bash — il segnaposto `{PLUGIN_ROOT}` lo riempie l'emitter
 
 **Iniettato a `UserPromptSubmit`**: `restamp.md` — nocciolo dei contratti doc e task ri-timbrato a ogni turno contro il drift. Unica entry a costo moltiplicativo, tetto 4.500 char scritto nel file stesso. Le regole di scrittura non ci stanno: le porta l'output style, che regge il drift da sé.

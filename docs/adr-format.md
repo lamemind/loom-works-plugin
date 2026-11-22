@@ -12,7 +12,7 @@ Oggi il registro riceve **un solo tipo di record**: lo scarto motivato di una se
 
 Sta sotto la docs-root perché è stato di task, come `tasks/`, e perché la docs-root è per-progetto: un progetto che tiene la doc in `runtime/` ha il registro in `runtime/adr/`. Chi risolve il path non lo cabla — lo chiede a `lw_docs_root`.
 
-**Un file per record, mai un file unico.** In detached più sessioni committano nello stesso worktree: un file unico entrerebbe intero nel commit della prima sessione che lo tocca, record altrui compresi. `tasks.md` mostra ogni giorno cosa costa un file condiviso fra lane.
+**Un file per record, mai un file unico.** In detached più sessioni committano nello stesso worktree: un file unico entrerebbe intero nel commit della prima sessione che lo tocca, record altrui compresi. `tasks.md` mostra ogni giorno cosa costa un file condiviso fra sessioni.
 
 **Il nome del file è l'id del record**: `YYYY-MM-DD-HHMM-<slug>.md`. La data in testa fa ordinare `ls` in cronologia senza bisogno di un indice. Lo slug lo dà chi scrive (`--slug`, come `inbox.sh new`): uno slug derivato dal testo libero non sarebbe prevedibile per chi deve citarlo in `Supera`.
 
