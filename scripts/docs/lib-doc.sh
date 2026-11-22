@@ -1,56 +1,42 @@
 #!/usr/bin/env bash
 
 # =============================================================================
-# lib-doc.sh — grammatica e soglie del sistema doc v2
+# lib-doc.sh — grammatica e soglia del sistema doc v2
 # Usage: source "${SCRIPT_DIR}/lib-doc.sh"   (mai invocata direttamente)
 # =============================================================================
 #
 # Proprietario UNICO di:
-#   - le soglie del contratto doc (readonly, niente override da CLI): le quattro
-#     della topologia di reference/ piu' quella di avviso sulle nozioni di un inbox
-#   - il parser dell'override di test LOOM_DOC_THRESHOLDS_OVERRIDE
+#   - la soglia di avviso sulle nozioni di un inbox (readonly, niente override
+#     da CLI) e il parser dell'override di test LOOM_DOC_THRESHOLDS_OVERRIDE
 #   - la regex del TLDR (doc_tldr, doc_tldr_var), condivisa fra i layer: riga 3 per reference/,
 #     riga 4 per l'inbox — la riga e' un PARAMETRO, cosi' l'implementazione resta una
-#   - il conteggio dei caratteri contro cui si misurano le soglie (doc_chars_var,
-#     doc_file_chars_var): code point, indipendente dal locale della shell
+#   - il conteggio dei caratteri (doc_chars_var, doc_file_chars_var): code
+#     point, indipendente dal locale della shell
 #   - la precedenza di layer (doc_layer): inbox → online → offline → altro
 #   - le regex del formato inbox (usate SOLO da inbox.sh)
 #   - il perimetro escluso condiviso (doc_excluded): il runtime che non e' doc
-#   - la lista dei file di configurazione dentro reference/ (doc_config_file),
-#     condivisa fra doc-metrics.sh e tldr.sh
 #
 # Ogni regex del formato vive qui e in nessun altro posto. Una primitiva che ha
 # bisogno di leggere il formato inbox chiama `inbox.sh parse`, mai una propria
 # regex: doc-metrics e build-index sono CONSUMER di inbox.sh, non secondi parser.
 #
-# Soglie: niente override da CLI — in v1 un'invocazione con --split-threshold
-# diverso faceva misurare lo script contro un numero e giudicare l'agent contro
-# quello nel proprio prompt, senza che nessun passo lo rilevasse. Resta un solo
-# canale, per il banco di test: LOOM_DOC_THRESHOLDS_OVERRIDE
-# ("split=N,merge=N,tldr=N,regroup=N,inbox=N"). Quando e' settato, chi lo subisce
-# APRE l'output con la riga `# soglie: ... (OVERRIDE)`: un override dichiarato e'
-# una configurazione, uno silenzioso e' il difetto v1.
+# Soglia: niente override da CLI. Resta un solo canale, per il banco di test:
+# LOOM_DOC_THRESHOLDS_OVERRIDE ("inbox=N"). Una chiave diversa da `inbox` non
+# cambia niente e lo dice su stderr.
 # =============================================================================
 
-# ---- Soglie ------------------------------------------------------------------
+# ---- Soglia ------------------------------------------------------------------
+#
+# Governa un avviso di checkpoint su un file inbox: sopra soglia il checkpoint
+# stampa conteggio e soglia nella stessa riga, e prosegue.
 
-LW_DOC_SPLIT=15000
-LW_DOC_MERGE=3000
-LW_DOC_TLDR_CAP=500
-LW_DOC_REGROUP=60000
 LW_DOC_INBOX_NOZIONI=100
-LW_DOC_OVERRIDE=0
 
 if [[ -n "${LOOM_DOC_THRESHOLDS_OVERRIDE:-}" ]]; then
-    LW_DOC_OVERRIDE=1
     IFS=',' read -ra _lw_pairs <<< "$LOOM_DOC_THRESHOLDS_OVERRIDE"
     for _lw_pair in "${_lw_pairs[@]}"; do
         _lw_k="${_lw_pair%%=*}"; _lw_v="${_lw_pair#*=}"
         case "$_lw_k" in
-            split)   LW_DOC_SPLIT="$_lw_v" ;;
-            merge)   LW_DOC_MERGE="$_lw_v" ;;
-            tldr)    LW_DOC_TLDR_CAP="$_lw_v" ;;
-            regroup) LW_DOC_REGROUP="$_lw_v" ;;
             inbox)   LW_DOC_INBOX_NOZIONI="$_lw_v" ;;
             *) echo "[lib-doc] WARN override ignoto: ${_lw_k}" >&2 ;;
         esac
@@ -58,23 +44,7 @@ if [[ -n "${LOOM_DOC_THRESHOLDS_OVERRIDE:-}" ]]; then
     unset _lw_pairs _lw_pair _lw_k _lw_v
 fi
 
-readonly LW_DOC_SPLIT LW_DOC_MERGE LW_DOC_TLDR_CAP LW_DOC_REGROUP LW_DOC_OVERRIDE
 readonly LW_DOC_INBOX_NOZIONI
-
-# La riga che dichiara contro cosa e' stata presa una misura. Il modo testo la
-# stampa sempre; il TSV solo sotto override (e' il marchio dell'override, non
-# una cortesia di lettura).
-#
-# LW_DOC_INBOX_NOZIONI resta FUORI da questa riga: le quattro soglie sopra
-# governano la topologia dei file di reference/ e le misura doc-metrics, mentre
-# quella governa un avviso di checkpoint su un file inbox — un consumer diverso,
-# che dichiara da se' il numero contro cui ha misurato dentro il proprio avviso.
-doc_soglie_line() {
-    local suffix=""
-    (( LW_DOC_OVERRIDE )) && suffix=" (OVERRIDE)"
-    printf '# soglie: split=%s merge=%s tldr=%s regroup=%s%s\n' \
-        "$LW_DOC_SPLIT" "$LW_DOC_MERGE" "$LW_DOC_TLDR_CAP" "$LW_DOC_REGROUP" "$suffix"
-}
 
 # ---- TLDR --------------------------------------------------------------------
 #
@@ -143,7 +113,7 @@ doc_line() {  # <var> <file> <riga> → <var> = riga N del file, vuota se assent
 
 # ---- Conteggio dei caratteri -------------------------------------------------
 #
-# Ogni soglia del sistema doc e' in caratteri, e un carattere qui e' un code
+# Ogni misura del sistema doc e' in caratteri, e un carattere qui e' un code
 # point: il numero che `wc -m` da' su Linux con glibc in locale UTF-8. Ne' `${#v}`
 # di bash ne' `wc -m` lo danno ovunque, perche' dipendono dal locale della shell
 # che li esegue. In Git Bash su Windows con LANG, LC_CTYPE e LC_ALL vuote contano
@@ -229,13 +199,12 @@ doc_layer() {  # <rel-to-project-root> → inbox|online|offline|altro
 #
 # SOLO cio' che ogni chiamante esclude: il runtime che non e' doc. Un'esclusione
 # che vale per un chiamante solo e' una regola di quel chiamante e sta scritta
-# li' — INDEX.md lo esclude solo check-doc-links.
+# li' — INDEX.md lo esclude solo build-index.sh, che lo rigenera.
 #
 # adr/ e' il registro delle decisioni (docs/adr-format.md): sta sotto la docs-root
-# perche' e' stato di task, come tasks/, ma non e' doc — nessun layer, nessun
-# instradamento, nessuna soglia. Senza l'esclusione ogni record sotto
-# LW_DOC_MERGE prenderebbe MERGE? e il registro diventerebbe una coda di lavoro
-# per rebalance-doc su file che per contratto non si riscrivono.
+# perche' e' stato di task, come tasks/, ma non e' doc — nessun layer e nessuna
+# misura. Senza l'esclusione ogni record entrerebbe nelle misure di doc-metrics
+# come un file di doc, con un layer che non ha.
 #
 # triage/ e' il file degli scenari di triage (docs/triage-format.md): stessa
 # natura del registro ADR — record datati, citati alla lettera, append-only — e
@@ -248,35 +217,6 @@ doc_excluded() {  # <rel-path> → 0 se fuori dal perimetro doc
         */triage/*|triage/*) return 0 ;;
     esac
     return 1
-}
-
-# ---- File di configurazione dentro reference/ --------------------------------
-#
-# Un file che sta sotto reference/ ma NON e' prosa: un elenco di coppie
-# chiave-valore che altri attori del sistema doc leggono a un indirizzo fisso.
-# Sta qui e non in doc-metrics.sh perche' i consumer sono due, e la lista deve
-# essere una sola: doc-metrics ne sopprime SPLIT e MERGE? (una fusione per
-# topologia gli farebbe perdere l'indirizzo fisso), tldr.sh lo tiene fuori dal
-# produttore di TLDR.
-#
-# Il produttore lo esenta perche' e' vincolato all'estrazione letterale dal
-# corpo, e su un file senza prosa non ha da cosa estrarre: misurato su
-# assumed-knowledge.md, 2 candidati raccolti e una riga 3 di 38 caratteri —
-# l'unico heading del file ricopiato — al posto dei 314 della riga scritta a
-# mano, che dice cose che nel corpo non compaiono affatto (chi governa il
-# verdetto `noto` del router, le regole di glossa del writer). Nessun estrattore
-# vincolato al corpo puo' riprodurla: la sua riga 3 resta scritta a mano.
-#
-# Cio' che l'esenzione NON copre: i flag TLDR di doc-metrics (NOTLDR, TLDR>CAP)
-# restano calcolati anche qui. Sopprimerli renderebbe invisibile la sparizione
-# del TLDR proprio sul file che ogni giudizio apre.
-
-doc_config_file() {  # <path, assoluto o relativo> → 0 se e' configurazione
-    case "$1" in
-        */reference/*|reference/*) ;;
-        *) return 1 ;;
-    esac
-    [[ "${1##*/}" == "assumed-knowledge.md" ]]
 }
 
 # ---- Formato inbox (usate solo da inbox.sh) ----------------------------------

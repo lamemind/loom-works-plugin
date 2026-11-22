@@ -10,41 +10,23 @@
 # Famiglia MISURA: exit 0 sempre sull'esito della misura, anche a risultato
 # vuoto · exit 2 SOLO quando la misura non e' stata fatta perche' l'invocazione
 # era sbagliata — e in quel caso stdout resta VUOTO: e' il discriminante fra i
-# due sensi del 2. Le soglie vengono da lib-doc.sh (sede unica, niente override
-# da CLI; il canale di test LOOM_DOC_THRESHOLDS_OVERRIDE si dichiara da se'
-# nella riga `# soglie:`). Il modo testo apre SEMPRE con quella riga, cosi' chi
-# legge una misura sa contro cosa e' stata presa; il TSV solo sotto override.
+# due sensi del 2.
+#
+# Misura dimensione e layer, non giudica: nessuna soglia di topologia ne' di
+# TLDR, nessun file marcato come troppo grande, troppo piccolo o col TLDR
+# mancante. La colonna TLDR e' la lunghezza della riga 3, 0 se manca.
 #
 # I due modi sono mutuamente esclusivi: --inbox emette la coda ed esce.
 #
 # Modo principale — flag per file:
-#   SPLIT     char >= soglia split
-#   MERGE?    char <= pavimento merge — trigger di RIESAME, non ordine di fusione
-#   TLDR>CAP  TLDR oltre il cap (il numero sta nella riga # soglie:, non nel nome)
-#   NOTLDR    file sotto reference/ senza TLDR in riga 3 — NON si applica
-#             all'inbox: un nozioni con indexed senza TLDR e' legittimo
-#   TLDR-ORFANA  almeno un'ancora della riga 3 non compare nel corpo del file
-#             (grep -F, tolleranza backtick) — l'invariante che nessun altro
-#             passo del sistema doc misura. Si applica anche ai CONFIG, che
-#             restano esenti solo da SPLIT e MERGE?. Conteggio aggregato nel
-#             report testuale, mai nel nome del flag
 #   ONLINE    file @-importato da CLAUDE.md (si paga a ogni sessione)
-#   INBOX     nozione non ancora collocata — ne' SPLIT ne' MERGE?
+#   INBOX     nozione non ancora collocata
 #   GEN       INDEX.md — esclusivo, nessun altro flag calcolato
-#   REGROUP   (per CARTELLA, non per file) somma dei char oltre la soglia di
-#             regroup. Il modo principale emette DUE tabelle: quella dei file
-#             (PATH · CHAR · TLDR · FLAGS) e, in coda allo stesso stream, quella
-#             delle cartelle (DIR · FILES · CHAR · FLAGS, flag REGROUP o `-`).
-#             In TSV le separa una riga vuota e le distingue l'header. Un solo
-#             spawn misura entrambe: un consumer non somma i char per cartella
-#             ne' conosce la soglia, che vive solo in lib-doc.sh.
-#   CONFIG    file di configurazione dentro reference/ (lista in lib-doc.sh,
-#             doc_config_file) — sopprime SOLO SPLIT e MERGE?: il file e'
-#             configurazione, corto per natura, e una fusione per topologia gli
-#             farebbe perdere l'indirizzo fisso su cui il router conta. I flag
-#             di TLDR restano calcolati: sopprimerli renderebbe invisibile la
-#             sparizione del TLDR proprio sul file aperto a ogni giudizio.
-#             La stessa lista tiene il file fuori dal produttore di TLDR.
+# Un file senza flag porta `-`. Il modo principale emette DUE tabelle: quella
+# dei file (PATH · CHAR · TLDR · FLAGS) e, in coda allo stesso stream, quella
+# delle cartelle (DIR · FILES · CHAR · FLAGS, flag sempre `-`). In TSV le separa
+# una riga vuota e le distingue l'header. Le colonne restano quelle di sempre,
+# compresa FLAGS delle cartelle: un consumer che le legge non si rompe.
 #
 # Modo --inbox — la coda, ordine `created` crescente e niente altro:
 #   PATH · NATURA · INDEXED · DRAINABLE · BRANCH · NOZIONI · APERTE · CHAR ·
@@ -58,8 +40,8 @@
 # malformato sempre escluso dal filtro. CREATED dal commit che ha AGGIUNTO il
 # file, fallback stat per un file mai committato — mai l'mtime: un checkout lo
 # azzera su tutti i file insieme. CAPPELLO dal nome del file (provenienza
-# leggibile, non un dato su cui si decide). CHAR resta: e' il proxy del costo
-# del router che sta per aprire quel file.
+# leggibile, non un dato su cui si decide). CHAR e' il costo di chi apre il
+# file per leggerlo.
 #
 # --online: invariato e SENZA consumer automatico in v2 — nessun flusso lo
 # invoca. Resta come diagnostica on-demand: la domanda che risponde (quanto
@@ -125,27 +107,6 @@ cappello_of() {  # <var> <basename> → <var> = ID dal nome, vuoto se il nome no
     local _co_id=""
     [[ "$2" =~ ^([A-Za-z]+[0-9]+)- ]] && _co_id="${BASH_REMATCH[1]}"
     printf -v "$1" '%s' "$_co_id"
-}
-
-# Custode dell'invariante «ogni ancora della riga 3 compare nel corpo dello
-# stesso file»: nessun altro passo del sistema doc lo misura (ne' build-index.sh
-# ne' check-doc-links.sh confrontano il testo del TLDR col corpo), quindi un
-# produttore che scrive un'ancora assente fallisce in silenzio finche' nessuno
-# guarda qui. La riga 3 va esclusa dal corpo prima del confronto, o ogni ancora
-# risulterebbe trovata banalmente in se stessa — stessa esclusione di
-# `tldr.sh prepara`. Tolleranza SOLO backtick: dopo il gate di `tldr.sh` che
-# ri-ancora alla fonte le ancore sono byte del file, e una divergenza di case o
-# di spazi e' drift vero, non rumore da assorbire (coerente con `_chiave`/`_nudo`
-# di `tldr.sh`, che pero' tollerano anche quello per un motivo diverso: li' il
-# confronto e' contro cio' che un modello ha reso, qui contro il file stesso).
-# Sottostringa di bash e non `grep -qF`: un'ancora sta su una riga sola, quindi
-# trovarla nel corpo intero equivale a trovarla in una sua riga, e il confronto
-# gira una volta per ancora, cioe' decine di volte per file.
-tldr_ancora_viva() {  # <ancora> <corpo-senza-riga3> → 0 se trovata
-    local anc="$1" corpo="$2" nudo
-    [[ "$corpo" == *"$anc"* ]] && return 0
-    nudo="${anc#\`}"; nudo="${nudo%\`}"
-    [[ "$nudo" != "$anc" && "$corpo" == *"$nudo"* ]]
 }
 
 # --- Modo --inbox --------------------------------------------------------------
@@ -214,7 +175,6 @@ if [[ "$INBOX_ONLY" -eq 1 ]]; then
     # (nessun processo li consuma); --natura non li matcha mai
     if [[ "$FORMAT" == "tsv" ]]; then
         if [[ -s "$QTMP" ]]; then
-            (( LW_DOC_OVERRIDE )) && doc_soglie_line
             printf 'PATH\tNATURA\tINDEXED\tDRAINABLE\tBRANCH\tNOZIONI\tAPERTE\tCHAR\tCREATED\tAGE_DAYS\tCAPPELLO\n'
             sort -t$'\t' -k1,1n -k2,2 "$QTMP" | tr '\t' '\037' | while IFS=$'\x1f' read -r ts p nat idx dr br nn na ch cp; do
                 if [[ "$nat" == "malformato" ]]; then
@@ -248,8 +208,7 @@ doc_load_online "$PROJECT_ROOT"
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
-n_files=0; n_split=0; n_merge=0; n_overcap=0; n_notldr=0; total_char=0
-n_ancore_tot=0; n_ancore_orfane=0
+n_files=0; total_char=0
 n_online=0; n_offline=0; n_inbox=0; n_altro=0
 c_online=0; c_offline=0; c_inbox=0; c_altro=0
 declare -A DIR_CHAR=() DIR_FILES=()
@@ -274,45 +233,7 @@ while IFS= read -r -d '' file; do
     if [[ "$base" == "INDEX.md" ]]; then
         flags="GEN"    # esclusivo: artefatto generato, nessun altro flag
     else
-        is_config=0
-        doc_config_file "$rel" && is_config=1
-
-        if [[ "$layer" != "inbox" && $is_config -eq 0 ]]; then
-            if (( chars >= LW_DOC_SPLIT )); then
-                flags="SPLIT"; n_split=$((n_split+1))
-            elif (( chars <= LW_DOC_MERGE )); then
-                flags="MERGE?"; n_merge=$((n_merge+1))
-            fi
-        fi
-        if [[ "$layer" != "inbox" ]]; then
-            if [[ -n "$tldr" ]]; then
-                if (( tldr_len > LW_DOC_TLDR_CAP )); then
-                    flags="${flags:+$flags }TLDR>CAP"; n_overcap=$((n_overcap+1))
-                fi
-                # Invariante riga3 ⊂ corpo, per file: si applica anche ai CONFIG
-                # (A11) — un TLDR scritto a mano con un'ancora assente e' rotto
-                # quanto uno generato.
-                # Il file senza la riga 3, come `$(sed '3d' "$file")`: righe con
-                # newline, poi via i newline finali che la cattura toglierebbe.
-                mapfile -t righe < "$file"
-                printf -v corpo_senza_tldr '%s\n' "${righe[@]:0:2}" "${righe[@]:3}"
-                corpo_senza_tldr="${corpo_senza_tldr%"${corpo_senza_tldr##*[!$'\n']}"}"
-                orfane_qui=0
-                while IFS= read -r anc; do
-                    [[ -z "$anc" ]] && continue
-                    n_ancore_tot=$((n_ancore_tot+1))
-                    if ! tldr_ancora_viva "$anc" "$corpo_senza_tldr"; then
-                        orfane_qui=$((orfane_qui+1))
-                        n_ancore_orfane=$((n_ancore_orfane+1))
-                    fi
-                done <<< "${tldr//" · "/$'\n'}"
-                (( orfane_qui > 0 )) && flags="${flags:+$flags }TLDR-ORFANA"
-            elif [[ "$rel" == */reference/* ]]; then
-                flags="${flags:+$flags }NOTLDR"; n_notldr=$((n_notldr+1))
-            fi
-        fi
-        (( is_config )) && flags="${flags:+$flags }CONFIG"
-        [[ "$layer" == "inbox" ]] && flags="${flags:+$flags }INBOX"
+        [[ "$layer" == "inbox" ]] && flags="INBOX"
         [[ "$layer" == "online" ]] && flags="${flags:+$flags }ONLINE"
         # un file inbox @-importato resta inbox come layer, ma il costo online va detto
         [[ "$layer" == "inbox" ]] && doc_is_online "$rel" && flags="${flags:+$flags }ONLINE"
@@ -336,41 +257,31 @@ while IFS= read -r -d '' file; do
 done < <(find "$DIR" -type f -name '*.md' -print0 | sort -z)
 
 # Le righe della tabella CARTELLE — `DIR \t FILES \t CHAR \t FLAGS`, ordine char
-# decrescente, flag `REGROUP` o `-`. Una sola implementazione per i due formati:
-# il testo le incolonna con printf, il TSV le emette com'e'. Due copie
-# divergerebbero al primo flag di cartella aggiunto, e il consumer del TSV
-# leggerebbe una tabella che il report testuale non conferma.
+# decrescente, flag sempre `-`. Una sola implementazione per i due formati: il
+# testo le incolonna con printf, il TSV le emette com'e'.
 dir_rows() {
     local d ch
     for d in "${!DIR_CHAR[@]}"; do printf '%s\t%s\n' "${DIR_CHAR[$d]}" "$d"; done \
         | sort -t$'\t' -k1,1nr -k2,2 \
         | while IFS=$'\t' read -r ch d; do
-              if (( ch >= LW_DOC_REGROUP )); then
-                  printf '%s\t%s\t%s\tREGROUP\n' "$d" "${DIR_FILES[$d]}" "$ch"
-              else
-                  printf '%s\t%s\t%s\t-\n' "$d" "${DIR_FILES[$d]}" "$ch"
-              fi
+              printf '%s\t%s\t%s\t-\n' "$d" "${DIR_FILES[$d]}" "$ch"
           done
 }
 
 # --- Output ---------------------------------------------------------------------
 if [[ "$FORMAT" == "tsv" ]]; then
     if [[ -s "$TMP" ]]; then
-        (( LW_DOC_OVERRIDE )) && doc_soglie_line
         printf 'PATH\tCHAR\tTLDR\tFLAGS\n'
         sort -t$'\t' -k2,2nr "$TMP"
         # Seconda tabella nello STESSO stream, separata da una riga vuota: un solo
-        # spawn misura file e cartelle, e il flag di cartella arriva al consumer
-        # senza che sommi i char per cartella ne' conosca la soglia di regroup,
-        # che vive solo in lib-doc.sh. Il consumer riconosce la tabella
-        # dall'header `DIR`; uno che non la trova legge il TSV di prima e basta —
-        # la coda e' additiva, quindi un lettore vecchio non si rompe.
+        # spawn misura file e cartelle, e il consumer non somma i char per
+        # cartella. Il consumer riconosce la tabella dall'header `DIR`; uno che
+        # non la trova legge la prima tabella e basta.
         printf '\n'
         printf 'DIR\tFILES\tCHAR\tFLAGS\n'
         dir_rows
     fi
 else
-    doc_soglie_line
     echo "[doc-metrics] root: ${DIR#"$PROJECT_ROOT"/}"
     echo
     printf '%-56s %8s %6s  %s\n' "PATH" "CHAR" "TLDR" "FLAGS"
@@ -380,11 +291,6 @@ else
     echo
     echo "TOTALI"
     echo "- file: ${n_files}  ·  char: ${total_char}"
-    echo "- sopra soglia split: ${n_split}"
-    echo "- sotto pavimento merge, da riesaminare: ${n_merge}"
-    echo "- TLDR sopra cap: ${n_overcap}"
-    echo "- senza TLDR (fuori dall'INDEX): ${n_notldr}"
-    echo "- ancore riga 3: ${n_ancore_tot}  ·  orfane (assenti dal corpo): ${n_ancore_orfane}"
     echo
     echo "LAYER"
     printf '%-40s %6s %10s\n' "LAYER" "FILE" "CHAR"
@@ -396,16 +302,10 @@ else
     echo "- file inbox: ${n_inbox}"
     echo
     echo "CARTELLE"
-    printf '%-56s %6s %10s  %s\n' "DIR" "FILE" "CHAR" "FLAGS"
-    n_regroup=0
-    # Process substitution e non pipe: il contatore deve sopravvivere al loop, e
-    # dentro una pipe girerebbe in una subshell che lo butta via all'uscita.
-    while IFS=$'\t' read -r d nf ch fl; do
-        printf '%-56s %6s %10s  %s\n' "$d" "$nf" "$ch" "$fl"
-        [[ "$fl" == "REGROUP" ]] && n_regroup=$((n_regroup+1))
+    printf '%-56s %6s %10s\n' "DIR" "FILE" "CHAR"
+    while IFS=$'\t' read -r d nf ch _; do
+        printf '%-56s %6s %10s\n' "$d" "$nf" "$ch"
     done < <(dir_rows)
-    echo
-    echo "- cartelle oltre soglia regroup: ${n_regroup}"
 fi
 
 # --- Footprint per-sessione -----------------------------------------------------
