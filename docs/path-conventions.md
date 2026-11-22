@@ -24,19 +24,9 @@ La doc di un progetto non ha una base sola: vi convivono link markdown relativi 
 
 `{...}` dove il valore è un **fatto di progetto** che qualcun altro deve risolvere: prosa, template d'esempio, blocchi-prompt destinati a un subagent.
 
-**Il discriminante non è estetico.** Nei body degli agent `${...}` non risulta interpolato — il path glielo passa il chiamante nel prompt (dettaglio nel cappello, `runtime/project/plugin-dev.md` §Contratto vincolante per un subagent). Una forma shell-looking in un posto che non interpola **mente sulla propria natura**: chi la legge la crede risolta, e nessun errore lo smentisce.
+**Il discriminante non è estetico.** Una forma shell-looking in un posto che non interpola **mente sulla propria natura**: chi la legge la crede risolta, e nessun errore lo smentisce.
 
 `${DOCS_ROOT}` è il caso storico. Era l'erede testuale di `${user_config.doc_folder_name}`, che l'harness interpolava per davvero; il passaggio della docs-root su `.claude/loom-works.json` ha cambiato il nome e tenuto la forma. Sotto, il meccanismo si è ribaltato da interpolazione-harness a sostituzione-modello, e la grafia è sopravvissuta al proprio referente senza che niente si rompesse.
-
-## Il canale a due capi
-
-Una skill che passa la docs-root a un subagent la scrive nel blocco-prompt:
-
-```
-Docs root: {project_root}/{docs_root}
-```
-
-Il body dell'agent rilegge quel valore col proprio nome. Sono **due capi dello stesso canale in due file diversi**: cambiare la grafia da una parte sola lascia due nomi per lo stesso valore, e il guasto non si presenta come errore — l'agent riceve un segnaposto non risolto e improvvisa.
 
 ## Nessuno strumento presidia questo perimetro
 
