@@ -38,7 +38,7 @@
     },
     "launch": {
       "type": "array",
-      "description": "Voci LAUNCH custom: comandi shell arbitrari eseguiti con cwd = project root. Senza attributi una voce è un launcher fire-and-forget (apri l'app nel contesto del progetto, niente match finestra né stato); gli attributi opzionali la rendono una voce con esito (capture), lanciata all'avvio del deck (startup) o a scadenza (every), pinnata a una cifra (key), fuori dalla riga launch (header) o spenta (enabled). Un tipo solo per entrambe: la differenza fra launcher e script sta in cosa il consumer fa dopo lo spawn, non nella voce. Compass legge solo emoji, label e command dal registry e tratta ogni voce come launcher. Ogni voce ha emoji propria, label leggibile (opzionale, fallback = command) e un command shell.",
+      "description": "Voci LAUNCH custom: comandi shell arbitrari eseguiti con cwd = project root. Senza attributi una voce è un launcher fire-and-forget (apri l'app nel contesto del progetto, niente match finestra né stato); gli attributi opzionali la rendono una voce con esito (capture), lanciata all'avvio del deck (startup) o a scadenza (every), pinnata a una cifra (key), fuori dalla riga launch (header), spenta (enabled), o con gli exit code che non sono un esito (noOutcome). Un tipo solo per entrambe: la differenza fra launcher e script sta in cosa il consumer fa dopo lo spawn, non nella voce. Compass legge solo emoji, label e command dal registry e tratta ogni voce come launcher. Ogni voce ha emoji propria, label leggibile (opzionale, fallback = command) e un command shell.",
       "items": {
         "type": "object",
         "required": ["emoji", "command"],
@@ -60,7 +60,7 @@
           },
           "capture": {
             "type": "boolean",
-            "description": "Il deck cattura exit code e output della voce: stdout e stderr su .claude/loom/launch/<slug>.log, exit code e ora dell'ultimo giro in <slug>.json (macchina-locali, non gittati). Esito in testata (🔄 in corso, 🚨 ultimo exit non-zero), nella pagina launch (^L) e in una notifica desktop. Default false: fire-and-forget come oggi. Letto dal SOLO deck."
+            "description": "Il deck cattura exit code e output della voce: stdout e stderr su .claude/loom/launch/<slug>.log, exit code e ora dell'ultimo giro in <slug>.json (macchina-locali, non gittati). Esito in testata (🔄 in corso, 🚨 ultimo exit non-zero, uno solo per ogni codice), nella pagina launch (^L) e in una notifica desktop: a tasto sempre, all'avvio e a scadenza quando l'exit code cambia rispetto all'ultimo giro (0→1, 1→2, 2→0; non 1→1). Default false: fire-and-forget come oggi. Letto dal SOLO deck."
           },
           "startup": {
             "type": "boolean",
@@ -83,6 +83,13 @@
           "enabled": {
             "type": "boolean",
             "description": "Default true. Con false la voce è spenta: fuori dalla riga launch, nessun startup, nessuna scadenza, senza perdere il valore di every. Compass non lo vede e la mostra comunque. Letto dal SOLO deck."
+          },
+          "noOutcome": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "integer", "minimum": 1, "maximum": 255 },
+            "description": "Gli exit code che NON sono un esito, es. [3] per un comando che esce subito perché un altro suo giro è in corso. Un giro che esce con uno di questi codici vale come non avvenuto: non accende 🚨, non manda la notifica desktop e non sposta la scadenza di every — testata e scadenza restano quelle dell'ultimo giro vero, e una voce già dovuta riparte al tick successivo (30 s). Il tentativo si vede nella pagina launch (^L), accanto all'ultimo esito vero, e a tasto in una nota nella riga di stato. Lo 0 non entra: è il verde. Si scrive a mano: la pagina ^L non lo modifica e 'w' lo lascia dov'è. Fuori forma cade con un avviso del deck al mount; cfg_validate non lo controlla. Vale anche senza capture. Letto dal SOLO deck."
           }
         }
       }
