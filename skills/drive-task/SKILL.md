@@ -155,6 +155,79 @@ Il resto del recap non si ricopia: sta nella conversazione del passo, che l'uten
 
 Scrivi le domande in sospeso nello stato (`## Domande in sospeso`), e aggiorna la riga `turno:` del passo.
 
+Quando la risposta aspetta l'utente — il via, o una domanda che scala — avvisalo anche con `PushNotification`: una riga sotto i 200 caratteri, in testa ciò su cui agire («T66 (riordino factory): 2 domande del preflight aspettano te»). Il turno del passo dura minuti, e nel frattempo l'utente può essere altrove: la sola riga in chat non lo raggiunge.
+
+### Coperta o da scalare
+
+Una domanda è **coperta** quando la risposta sta in ciò che l'utente ha detto in questa conversazione, o in una decisione già congelata che questa conversazione cita. Se per rispondere dovresti indovinare una preferenza dell'utente, **scala**. Il preflight pone come domanda solo ciò che dipende da un dato che nel repo non c'è: l'unico posto dove quel dato può stare è la conversazione con l'utente, e una risposta inventata congela una scelta che nessuno ha preso.
+
+Una proposta `P{N}` del preflight la smentisci solo con le parole dell'utente in mano: senza, taci, e il silenzio la accetta.
+
+**Restano sempre all'utente, anche sotto delega:**
+
+- **l'approvazione di un permesso** — si dà in una tab, e nessun messaggio la sostituisce;
+- **un'azione negata dal classificatore di auto mode** — non riformuli per aggirarlo;
+- **un'azione distruttiva** — un dato cancellato, un file sovrascritto, un `push --force`, un branch distrutto: la proposta la dice per esteso, cosa sparisce e cosa resta, e aspetta il via.
+
+### Senza delega — proposta e via
+
+Il default. Scrivi in chat la risposta pronta da mandare, una riga per `D{N}`: la strada (`D2.B`, o una nuova in prosa) e il perché; le domande che scalano restano aperte, come domande all'utente. Poi aspetti. L'utente risponde in prosa:
+
+- «vai», «mandala» → la mandi così com'è;
+- «D2 → B» → la cambi come dice, poi la mandi;
+- risponde alle domande che scalavano → le sue parole entrano nella risposta, alla lettera, poi la mandi.
+
+Una risposta senza via resta in sospeso: non la mandi e non la ricordi a ogni turno.
+
+### La delega
+
+La delega accende l'invio senza via. Si accende in due modi, e vale **per il passo** fino a revoca:
+
+- **`con delega`** negli argomenti (§0): le parole della delega sono la riga di invocazione intera;
+- **a passo aperto, in questa chat**: «rispondi tu», «ti delego le risposte» — le parole della delega sono quella frase dell'utente, alla lettera. «Revoco la delega», «da qui le approvo io» la spengono.
+
+Scrivila nello stato (`## Delega`), con l'ora e le parole alla lettera, su una riga, e toglila alla revoca: dopo una compattazione del contesto la ritrovi solo lì. Sotto la forma breve la copertura resta la stessa: la delega non allarga ciò che le parole dell'utente coprono.
+
+**Sotto delega** prepari la risposta come sopra, la scrivi in chat col perché di ogni scelta — l'utente legge cosa è stato deciso a suo nome —, e:
+
+- nessuna domanda scala → la mandi subito;
+- una o più domande scalano → le porti all'utente, e **il passo aspetta**: nessun messaggio parte finché l'utente non ha risposto a quelle. Poi una risposta sola, con tutte le `D{N}`: il preflight congela le decisioni quando le ha tutte, e una risposta a metà lo lascerebbe a chiedere di nuovo.
+
+### Il messaggio
+
+Parte con `reply`, dopo aver riletto lo stato. Il testo passa da stdin:
+
+```bash
+loom-deck-headless reply <sessionId> - --root "<PROJECT_ROOT>" <<'MESSAGGIO'
+<il messaggio>
+MESSAGGIO
+```
+
+Un `reply` arriva al passo come un prompt del suo utente, senza involucro: la **prima riga** è l'unica fonte di chi parla, e dice il vero. Le forme:
+
+```
+Risposte al preflight di T<id> — approvate dall'utente, inviate dalla conversazione <SID corto> che guida il passo.
+
+D1 → D1.A: <testo> — perché: <le parole dell'utente o la ragione che ha approvato>
+D3 → <strada nuova, in prosa> — perché: <…>
+```
+
+```
+Risposte al preflight di T<id> — decise dalla conversazione <SID corto> che guida il passo, su delega dell'utente.
+<le parole della delega, intere>
+
+D1 → D1.A: <testo> — perché: su delega: <la ragione, con le parole dell'utente che la coprono>
+D2 → D2.B: <testo> — perché: risposta dell'utente: «<sue parole>»
+```
+
+- **La seconda forma vale appena una riga è decisa su delega**; quando tutte le risposte sono dell'utente — il via a ogni riga, anche a delega accesa — vale la prima.
+- **Ogni risposta porta il suo perché**, e il preflight lo scrive nel `Razionale` della decisione. Sotto delega il perché comincia con «su delega»: in `## Decisions` è ciò che distingue una risposta decisa su delega da una dell'utente. Una domanda che scalava e a cui ha risposto l'utente porta «risposta dell'utente» e le sue parole.
+- **Le parole della delega** si copiano intere dallo stato, su una riga, anche quando parlano di più cose di quelle a cui rispondi: non si ricostruiscono a memoria.
+- **Una `P{N}` smentita** dall'utente entra come riga sua: `P3 → smentita: <le parole dell'utente>`.
+- **La firma «approvate dall'utente» è vera solo dopo il via dato in questa chat**: mai su un testo che l'utente non ha visto. Il classificatore di auto mode blocca un messaggio che dichiara un'approvazione mai data, ed è giusto così.
+
+Uscita `0` → togli le domande mandate da `## Domande in sospeso`, scrivi la riga in `## Risposte mandate`, e riarma l'attesa (§4). Uscita `1` con un processo vivo nel motivo → l'utente ha ripreso il passo in una tab dal deck: il passo è suo, lì. Diglielo, e non mandare niente. Ogni altro rifiuto → riportalo, nessun ritento.
+
 ## 6. La fine del passo, e lasciarlo
 
 Il preflight è finito quando il testo finale dice che le decisioni sono congelate e committate, e non chiede altro. Rileggi il blocco nuovo di `## Decisions` nel task file e il suo commit (`git log -1 --format='%h %s' -- <task file>`), e di' all'utente in una riga: il commit, quante decisioni e quante proposte. Poi la testa dello stato diventa `Stato: chiuso · SID`. La conversazione del passo resta nel deck sotto la sua task: è headless, non c'è niente da chiudere.
