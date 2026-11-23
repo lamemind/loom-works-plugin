@@ -47,6 +47,7 @@ Then bootstrap the project structure:
 | `/loom-works:spawn-task` | Ask the project's running deck to open a task conversation (preflight, run with scope, recap, checkpoint) — one spawn per call, no questions |
 | `/loom-works:close-session` | Ask the project's running deck to close a live conversation that `spawn-task` opened — the `claude` process ends, the tab closes, the transcript stays resumable; one session per call, no questions |
 | `/loom-works:orchestrate-mandate` | Direct a scope semi-automatically — one id, an epic or a mandate (`Size: Mandate`): checks the written scope analysis at launch, recap, live sessions, session monitor; launches preflight, run and checkpoint of the members and the scope checkpoint at the end as headless turns with `loom-deck-headless`, no tab (a tab only when the user asks for one for a step), proposes answers and sends them only on the user's go-ahead (or by itself under a delegation the user declares) — never writes to the repos |
+| `/loom-works:drive-task` | Move one task forward by one step from the conversation that asks for it — launches a headless preflight (no tab) with the context the conversation built with the user, waits for the turn to end, brings the preflight's questions into the chat and sends the answers, on the user's go-ahead or by itself under a delegation (`con delega`); keeps who drives the step in `.claude/loom/drive/`, ignored by git |
 | `/loom-works:prepare-mandate` | Build a direction scope before it starts: create a mandate (`Size: Mandate`) from task ids or a description, add or remove its members, or write the scope analysis into an epic — dependencies and collisions between members, mechanical half from `mandate.py tree` plus a model half; the user confirms before every commit, member task files are never touched |
 | `/loom-works:recap-status` | Recap dispatcher: resolves the active task and routes to one of the two below; with no task resolved it answers «nessuna task» |
 | `/loom-works:recap-status-task` | Single-task recap: open DLV/AC, material produced, one named next step |
@@ -85,12 +86,13 @@ Skills read the blocks with `scripts/config/project-config.sh`. Contract — res
 
 ## Runtime dependencies
 
-Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception, Python with the standard library only. One skill, the regia, also needs a command from the deck package.
+Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception, Python with the standard library only. Two skills, the regia and `drive-task`, also need a command from the deck package.
 
 | Dependency | Required by | Without it |
 |---|---|---|
-| `python3` (or `python` on Windows) | `scripts/regia/watch_sessions.py`, `scripts/regia/sessions.py` — the monitor that follows the live sessions of a project, and `list`/`tail` on them | No monitor for the regia of an epic. Whoever launches it reports the missing interpreter. |
+| `python3` (or `python` on Windows) | `scripts/regia/watch_sessions.py`, `scripts/regia/sessions.py` — the monitor that follows the live sessions of a project, and `list`/`tail` on them; `scripts/regia/drive_state.py` — the entry checks of `drive-task` | No monitor for the regia of an epic, no `drive-task`. Whoever launches them reports the missing interpreter. |
 | `loom-deck-headless` (npm `@lamemind/loom-deck`) | `orchestrate-mandate` — opens and continues the members' conversations without a tab | The regia stops at launch: `mandate.py gate` prints `HEADLESS=assente` and closes the gate. |
+| `loom-deck-headless` ≥ 0.99.0, with `open --context` | `drive-task` — opens the step with the conversation's context in its user notes | `drive-task` stops at launch: `drive_state.py check` prints `HEADLESS_CONTEXT=no` (or `HEADLESS=assente`). |
 
 ## TTS support
 
