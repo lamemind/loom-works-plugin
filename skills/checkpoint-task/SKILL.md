@@ -284,7 +284,7 @@ L'umano risponde come vuole: in prosa, dettando a voce, in ordine sparso, su una
 SCENARIO
 ```
 
-Poi un commit solo per tutti, con lo snippet sopra.
+`--ancora` va solo con `--uscita scarto` e `ignora`, dove è obbligatoria: su `subito` e `task` lo script la rifiuta ed esce `1`. Poi un commit solo per tutti, con lo snippet sopra.
 
 - **Nessun default.** La segnalazione su cui l'umano non dice niente non produce niente: non la decidi tu e non la ripresenti. Il recupero delle segnalazioni rimaste senza risposta si fa a posteriori, fuori da questa conversazione.
 - **L'approfondimento è obbligatorio quando la risposta lo porta.** Sono le parole con cui l'umano accompagna l'uscita — il criterio con cui la sceglie, la forma dell'azione, il progetto dove eseguirla — e lo script le scrive alla lettera nel campo `Approfondimento` dello scenario: senza, due scenari `task` della stessa sessione restano indistinguibili. Il ritaglio di una `S{N}` è tutto ciò che l'umano dice su quella segnalazione, parola d'uscita compresa; restano fuori solo l'identificatore (`S1`, «la prima») e la punteggiatura che la separa dalle vicine. Non ritocchi niente, refusi compresi; parole dettate su più righe le unisci con uno spazio, perché il campo sta su una riga. Un'uscita nuda, una conferma o un rifiuto nudo («subito», «ok», «no») non hanno approfondimento: la seconda riga non si scrive. Una frase che vale per più segnalazioni entra nello scenario di ognuna, e i pezzi non contigui della stessa segnalazione si uniscono nell'ordine in cui compaiono con ` […] ` a segnare il salto: «S1 subito, S2 ignora ; AUTORIZZO» dà a S1 `subito […] AUTORIZZO`. Sullo scarto le parole dell'umano sono il perché e vanno nel record dello scarto; con `--chi agente` non c'è nessuna risposta da citare — in entrambi i casi lo script rifiuta il campo.
@@ -309,6 +309,8 @@ DELEGA
 <le parole della regia su quella segnalazione: il perché sullo scarto, l'approfondimento sulle altre uscite>
 SCENARIO
 ```
+
+`--ancora` va solo con `--uscita scarto` e `ignora`, dove è obbligatoria: su `subito` e `task` lo script la rifiuta ed esce `1`.
 
 - **Sotto delega valgono le regole dell'umano.** Le quattro uscite, le parole della regia come approfondimento o come perché sullo scarto, l'ancora sull'ignora e sullo scarto, «subito» e «task» operativi: le parole della regia stanno al posto di quelle dell'umano, e lo script le tratta allo stesso modo.
 - **Firma senza le parole della delega → nessuno scenario.** Non scrivi niente e lo dici nel testo finale: le parole mancano, e senza non c'è uno scenario `delega` da scrivere. Non ripieghi su `--chi umano`, che dichiarerebbe una risposta che l'umano non ha dato, né su `--chi agente`, che farebbe di uno scarto affidato uno scarto autonomo.
