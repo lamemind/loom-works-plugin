@@ -629,6 +629,50 @@ lw_safe_rmrf() {  # <path>
     rm -rf -- "$target"
 }
 
+# Shape of a task folder: `.YY-MM-DD-slug`, one single path component, inside
+# project root. The two purge scripts touch a folder only when its `Folder` field
+# has this shape: the field is free text in a task file, and without the guard
+# any existing directory would count as a folder — `Folder: .` resolves to the
+# project root and the apply would run `git rm -rf .`, `Folder: docs` would take
+# the doc away. <rel_folder> is already normalized (no leading `./`, no trailing `/`).
+lw_folder_shape_ok() {  # <rel_folder>
+    local re='^\.[0-9]{2}-[0-9]{2}-[0-9]{2}-[A-Za-z0-9][A-Za-z0-9._-]*$'
+    [[ "$1" =~ $re ]]
+}
+
+# Who declares which task folder: one line `<folder>\t<task file basename>` for
+# every task file in <tasks_dir> with a non-empty `Folder` field, minus the task
+# files passed after <tasks_dir> — the tasks leaving in the same invocation — so
+# the output names the tasks that keep a folder alive. Ordered by task id.
+# The read is the one of read_field in the two purge scripts (first
+# `- **Folder**:` line, first token of the value, so an annotation after the
+# path does not spoil it), plus the normalization the scripts apply to their own
+# field: leading `./` and one trailing `/` dropped, so `./.26-x/` and `.26-x` are
+# the same folder.
+# One awk pass over all files, not read_field per file: that is three processes
+# per file, and in Git Bash a process costs ~150 ms.
+lw_folder_declarers() {  # <tasks_dir> [<excluded task file>...]
+    local dir="$1" f skip=" "
+    shift
+    for f in "$@"; do skip+="${f##*/} "; done
+    local -a files=("$dir"/*.md)
+    [[ ${#files[@]} -gt 0 && -e "${files[0]}" ]] || return 0
+    awk -v skip="$skip" '
+        FNR == 1 { found = 0; base = FILENAME; sub(/.*\//, "", base) }
+        found { next }
+        /^- \*\*Folder\*\*:/ {
+            found = 1
+            v = $0; sub(/^[^:]*: */, "", v)
+            $0 = v
+            if (NF == 0) next
+            tok = $1
+            sub(/^\.\//, "", tok); sub(/\/$/, "", tok)
+            if (tok == "" || index(skip, " " base " ")) next
+            print tok "\t" base
+        }
+    ' "${files[@]}" | LC_ALL=C sort -t "$(printf '\t')" -k2,2V
+}
+
 # Removes from disk and index a task folder that leaves together with its task.
 # `git rm` runs with --ignore-unmatch: on a folder with no tracked file — empty,
 # or holding only untracked files under `--ignored-files purge` — a plain
@@ -648,6 +692,10 @@ lw_safe_rmrf() {  # <path>
 # (content git does not list: to be looked at by hand).
 lw_folder_purge() {  # <rel_folder>
     local rel="$1" root abs
+    if ! lw_folder_shape_ok "$rel"; then
+        echo "ERROR: lw_folder_purge: '${rel}' non ha la forma .YY-MM-DD-slug — rifiuto" >&2
+        return 1
+    fi
     root="$(lw_find_project_root)"
     abs="${root}/${rel}"
     # Explicit checks: a caller using `lw_folder_purge … || rc=$?` turns off

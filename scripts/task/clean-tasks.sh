@@ -13,6 +13,8 @@
 # ed emette una riga SUMMARY machine-readable.
 # Con --apply: elimina task file + folder dot-prefixed + riga tasks.md, un commit
 # per task. NON filtra per stato ne' per eta': pota qualunque ID indicato.
+# La folder resta, e il dry-run lo dice, se un'altra task fuori dall'invocazione
+# la dichiara o se il campo Folder non ha la forma .YY-MM-DD-slug.
 #
 # La POLICY di conferma (chiedere quando ci sono NON-Done) vive nella skill, non
 # qui. Per cleanup per ETA' (Done > N giorni) usa cleanup-done-tasks.sh.
@@ -143,27 +145,55 @@ done
 
 # ---- Resolve each requested ID -----------------------------------------------
 
-CANDIDATES=()   # id|status|task_file|folder_path
+CANDIDATES=()   # id|status|task_file|rel_folder (root-relative, vuoto = nessuna folder su disco)
 ORPHANS=()      # id  (riga presente, file assente)
 MISSING=()      # id  (nessun file, nessuna riga)
+declare -A FOLDER_STAYS=()   # id -> perche' la folder resta; assente = parte con la task
 
 for id in "${REQ_IDS[@]}"; do
     task_file=$(ls "${TASKS_DIR}/${id}-"*.md 2>/dev/null | head -1 || true)
     if [[ -n "$task_file" && -f "$task_file" ]]; then
         status=$(task_status "$task_file")
         folder_field=$(read_field "$task_file" "Folder")
-        folder_path=""
+        rel_folder=""
         if [[ -n "$folder_field" ]]; then
-            folder_path="${PROJECT_ROOT}/${folder_field#./}"
-            [[ -d "$folder_path" ]] || folder_path=""
+            # Stessa normalizzazione di lw_folder_declarers: via `./` e un `/` finale.
+            rel_folder="${folder_field#./}"; rel_folder="${rel_folder%/}"
+            if [[ ! -d "${PROJECT_ROOT}/${rel_folder}" ]]; then
+                rel_folder=""
+            elif ! lw_folder_shape_ok "$rel_folder"; then
+                # `Folder: .` sarebbe la project root: una folder fuori forma non si tocca.
+                rel_folder="$folder_field"
+                FOLDER_STAYS[$id]="non ha la forma .YY-MM-DD-slug"
+            fi
         fi
-        CANDIDATES+=("${id}|${status}|${task_file}|${folder_path}")
+        CANDIDATES+=("${id}|${status}|${task_file}|${rel_folder}")
     elif row_exists "$id"; then
         ORPHANS+=("$id")
     else
         MISSING+=("$id")
     fi
 done
+
+# ---- Folder condivise con una task che resta ---------------------------------
+# Una folder dichiarata anche da una task che resta fuori da questa invocazione
+# resta sul disco e in git: parte la task, non il materiale. Resta anche fuori dal
+# gate e da --ignored-files, che decidono dei file che una folder in partenza
+# lascerebbe: keep metterebbe in git i suoi ignorati, purge la cancellerebbe.
+# Una folder condivisa solo fra task che partono qui si toglie con la prima.
+if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
+    leaving=()
+    for c in "${CANDIDATES[@]}"; do rest="${c#*|}"; rest="${rest#*|}"; leaving+=("${rest%%|*}"); done
+    declare -A KEEPERS=()   # folder -> task che restano e la dichiarano
+    while IFS=$'\t' read -r kfolder kfile; do
+        KEEPERS[$kfolder]="${KEEPERS[$kfolder]:+${KEEPERS[$kfolder]}, }${kfile%%-*}"
+    done < <(lw_folder_declarers "$TASKS_DIR" "${leaving[@]}")
+    for c in "${CANDIDATES[@]}"; do
+        id="${c%%|*}"; rf="${c##*|}"
+        [[ -n "$rf" && -z "${FOLDER_STAYS[$id]:-}" && -n "${KEEPERS[$rf]:-}" ]] || continue
+        FOLDER_STAYS[$id]="condivisa con ${KEEPERS[$rf]}"
+    done
+fi
 
 # ---- Report ------------------------------------------------------------------
 
@@ -172,13 +202,15 @@ echo "Target on-demand:"
 
 if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
     for c in "${CANDIDATES[@]}"; do
-        id="${c%%|*}"; rest="${c#*|}"; st="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; fp="${rest#*|}"
+        id="${c%%|*}"; rest="${c#*|}"; st="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; rf="${rest#*|}"
         tag="[Done]"
         if [[ "$st" == "open" ]]; then tag="[NOT Done]"; non_done=$((non_done+1)); fi
         folder_info=""
-        if [[ -n "$fp" ]]; then
-            folder_info=" + folder $(basename "$fp")"
-            surv="$(lw_folder_survivors "$(realpath --relative-to="$PROJECT_ROOT" "$fp")")"
+        if [[ -n "${FOLDER_STAYS[$id]:-}" ]]; then
+            folder_info=" · folder ${rf} resta (${FOLDER_STAYS[$id]})"
+        elif [[ -n "$rf" ]]; then
+            folder_info=" + folder ${rf}"
+            surv="$(lw_folder_survivors "$rf")"
             if [[ -n "$surv" ]]; then
                 n=$(printf '%s\n' "$surv" | grep -c .)
                 folder_info="${folder_info} [⚠ ${n} ignored/untracked]"
@@ -219,17 +251,16 @@ fi
 if [[ -z "$IGNORED_MODE" ]]; then
     gate_hit=0
     for c in "${CANDIDATES[@]}"; do
-        fp="${c##*|}"
-        [[ -n "$fp" && -e "$fp" ]] || continue
-        rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
-        surv="$(lw_folder_survivors "$rel_fp")"
+        id="${c%%|*}"; rf="${c##*|}"
+        [[ -n "$rf" && -z "${FOLDER_STAYS[$id]:-}" && -e "${PROJECT_ROOT}/${rf}" ]] || continue
+        surv="$(lw_folder_survivors "$rf")"
         [[ -n "$surv" ]] || continue
         if [[ $gate_hit -eq 0 ]]; then
             echo "" >&2
             echo "ERROR: task folder con file che 'git rm' non rimuove (ignored/untracked):" >&2
             gate_hit=1
         fi
-        echo "  ${rel_fp}/" >&2
+        echo "  ${rf}/" >&2
         printf '%s\n' "$surv" | sed 's#^#    - #' >&2
     done
     if [[ $gate_hit -eq 1 ]]; then
@@ -253,8 +284,9 @@ if [[ ${#ORPHANS[@]} -gt 0 ]]; then
 fi
 
 for c in "${CANDIDATES[@]}"; do
-    id="${c%%|*}"; rest="${c#*|}"; st="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; fp="${rest#*|}"
+    id="${c%%|*}"; rest="${c#*|}"; st="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; rf="${rest#*|}"
     slug=$(basename "$tf" .md); slug="${slug#${id}-}"
+    stays="${FOLDER_STAYS[$id]:-}"
 
     echo ""
     echo "--- purge ${id} (${st}) ---"
@@ -263,13 +295,13 @@ for c in "${CANDIDATES[@]}"; do
     # sopravviverebbero al purge (ignored/untracked). Cosi' restano recuperabili da
     # quel commit; poi il purge sotto li elimina dal disco insieme al resto (ora
     # tracciati). A prescindere dalla scelta, i file NON restano in locale — keep
-    # li conserva solo in git history, purge li perde.
-    if [[ "$IGNORED_MODE" == "keep" && -n "$fp" && -e "$fp" ]]; then
-        rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
-        if [[ -n "$(lw_folder_survivors "$rel_fp")" ]]; then
-            git -C "$PROJECT_ROOT" add -f -- "$rel_fp"
-            git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): keep ignored files of %s before purge (%s)' "$id" "$rel_fp")" -- "$rel_fp"
-            echo "-> keep: snapshot file ignored/untracked in commit dedicato (${rel_fp}/)"
+    # li conserva solo in git history, purge li perde. Una folder che resta non
+    # parte, e non ha niente da snapshottare.
+    if [[ "$IGNORED_MODE" == "keep" && -n "$rf" && -z "$stays" && -e "${PROJECT_ROOT}/${rf}" ]]; then
+        if [[ -n "$(lw_folder_survivors "$rf")" ]]; then
+            git -C "$PROJECT_ROOT" add -f -- "$rf"
+            git -C "$PROJECT_ROOT" commit -m "$(printf 'chore(tasks): keep ignored files of %s before purge (%s)' "$id" "$rf")" -- "$rf"
+            echo "-> keep: snapshot file ignored/untracked in commit dedicato (${rf}/)"
         fi
     fi
 
@@ -278,26 +310,26 @@ for c in "${CANDIDATES[@]}"; do
     git -C "$PROJECT_ROOT" rm -f "$rel_tf"
     echo "-> rimosso: ${rel_tf}"
 
-    # Remove folder if present — solo se ancora su disco. Task che condividono la
-    # stessa Folder si portano dietro lo STESSO $fp (risolto in blocco a monte):
-    # la prima la rimuove, la seconda la trova gia' sparita → skip pulito (evita il
-    # doppio `git rm`, exit 128 sotto `set -e`, che abortirebbe il run a meta').
+    # Remove folder if present — solo se parte con la task e se e' ancora su disco.
+    # Task che condividono la stessa Folder partendo insieme si portano dietro lo
+    # STESSO path: la prima la rimuove, la seconda la trova gia' sparita.
     # Una folder senza file tracciati (vuota, o con soli non tracciati sotto
     # `purge`) non va a `git rm`: lw_folder_purge lo sa. I tracciati si leggono
     # prima, perche' decidono se la folder entra nel commit e nel suo body.
     folder_line=""
-    if [[ -n "$fp" && -e "$fp" ]]; then
-        rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
-        tracked="$(git -C "$PROJECT_ROOT" ls-files --cached -- "$rel_fp")"
-        rc=0; lw_folder_purge "$rel_fp" || rc=$?
+    if [[ -n "$stays" ]]; then
+        echo "-> folder resta: ${rf}/ (${stays})"
+    elif [[ -n "$rf" && -e "${PROJECT_ROOT}/${rf}" ]]; then
+        tracked="$(git -C "$PROJECT_ROOT" ls-files --cached -- "$rf")"
+        rc=0; lw_folder_purge "$rf" || rc=$?
         case $rc in
-            0) echo "-> rimossa folder: ${rel_fp}/" ;;
-            5) echo "-> ⚠ folder rimasta sul disco: ${rel_fp}/ — contiene file che git non elenca (es. una .git): guardala e toglila a mano" ;;
-            *) echo "ERROR: rimozione della folder fallita: ${rel_fp}/" >&2; exit 1 ;;
+            0) echo "-> rimossa folder: ${rf}/" ;;
+            5) echo "-> ⚠ folder rimasta sul disco: ${rf}/ — contiene file che git non elenca (es. una .git): guardala e toglila a mano" ;;
+            *) echo "ERROR: rimozione della folder fallita: ${rf}/" >&2; exit 1 ;;
         esac
-        [[ -n "$tracked" ]] && folder_line="  - ${rel_fp}/"
-    elif [[ -n "$fp" ]]; then
-        echo "-> folder gia' rimossa da una task che la condivide: $(basename "$fp")/"
+        [[ -n "$tracked" ]] && folder_line="  - ${rf}/"
+    elif [[ -n "$rf" ]]; then
+        echo "-> folder gia' rimossa da una task che la condivide: ${rf}/"
     fi
 
     # Remove the Overview row from tasks.md
@@ -321,11 +353,13 @@ Purged (restore: git checkout <this-commit>~1 -- <path>):
 ${folder_line}"
     msg="${msg}
 Status at purge: ${status_label}"
+    [[ -n "$stays" ]] && msg="${msg}
+Folder kept: ${rf}/ (${stays})"
 
     # Pathspec: task file, folder se rimossa, tasks.md. Un `git rm` stagia la
     # cancellazione, ma il commit la prende dal perimetro, non dall'indice intero.
     purge_paths=("$rel_tf" "$TASKS_FILE")
-    [[ -n "$folder_line" ]] && purge_paths+=("$rel_fp")
+    [[ -n "$folder_line" ]] && purge_paths+=("$rf")
     lw_git_add_n_commit "$msg" "${purge_paths[@]}"
     echo "-> commit: ${subject}"
 done

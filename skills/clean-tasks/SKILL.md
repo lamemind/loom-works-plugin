@@ -58,7 +58,7 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/cleanup-done-tasks.sh \
     --days ${DAYS}
 ```
 
-Mostra l'output. Lo script elenca i target con tag `[Done]` / `[NOT Done]` / `[orphan row]` / `[missing]`, e marca `[⚠ N ignored/untracked]` le folder che conterrebbero file non rimossi da `git rm` (vedi §3b). Il Modo A chiude con una riga riassuntiva:
+Mostra l'output. Lo script elenca i target con tag `[Done]` / `[NOT Done]` / `[orphan row]` / `[missing]`, e marca `[⚠ N ignored/untracked]` le folder che conterrebbero file non rimossi da `git rm` (vedi §3b). Una folder che **resta** sul disco e in git mentre la sua task parte si legge `· folder <nome> resta (<motivo>)` al posto di `+ folder <nome>` — i due motivi in §Note, «Folder che resta». Il Modo A chiude con una riga riassuntiva:
 
 ```
 SUMMARY candidates=A non_done=B orphans=C missing=D
@@ -109,7 +109,7 @@ ERROR: task folder con file che 'git rm' non rimuove (ignored/untracked):
     - .26-06-16-cat/notes.local.md
 ```
 
-Il dry-run le anticipa marcando il candidato con `[⚠ N ignored/untracked]`.
+Il dry-run le anticipa marcando il candidato con `[⚠ N ignored/untracked]`. Una folder che resta (§Note) è fuori dal gate e da `--ignored-files`: non parte, quindi non lascia niente sul disco da decidere.
 
 Quando l'apply esce con quel blocco `ERROR`, sei tu (chiamante) a decidere — **salvo token `yolo` senza `--ignored-files`**, dove riporti il blocco e chiudi non-zero. TTS ping + `AskUserQuestion`, elenca folder e file, chiedi **come gestirli**. In **entrambi** i casi la folder sparisce dal disco locale — la scelta riguarda solo se preservarli in git:
 
@@ -145,5 +145,9 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "task cleanup do
 - **Modo A ignora stato ed età**: rimuove anche task non-Done (con conferma) e non guarda la soglia giorni; il Modo B pota solo Done oltre `--days`.
 - **Righe orfane**: ID con riga in `tasks.md` ma file già assente → riconciliate con commit dedicato.
 - **Folder ignored/untracked**: `git rm` non tocca i file ignorati/untracked di una task folder → gate exit 2, decidi keep/purge (§3b). `--ignored-files` obbligatorio solo se ci sono superstiti.
-- **Folder condivisa**: due task che puntano alla stessa folder → la prima la rimuove, la seconda salta pulito (nessun doppio `git rm` che aborta il run).
+- **Folder condivisa fra task che partono insieme**: la prima la rimuove, le altre la trovano già sparita e saltano pulito.
+- **Folder che resta**: task file e riga partono, la folder resta sul disco e in git, e il commit lo scrive in `Folder kept:`. Due motivi:
+  - `condivisa con T…` — un'altra task, fuori da questa invocazione, dichiara la stessa folder nel campo `Folder`;
+  - `non ha la forma .YY-MM-DD-slug` — il campo `Folder` non nomina una task folder in project root (es. `Folder: .` sarebbe la project root intera).
+- **Folder senza file tracciati** (vuota, o con soli file non tracciati sotto `purge`): parte come le altre. Se dopo la rimozione restano file che git non elenca (il contenuto di una `.git`), la folder resta sul disco con un avviso `⚠ folder rimasta sul disco`: va guardata a mano.
 - **Push**: nessun push automatico; manuale o via `checkpoint-task`.
