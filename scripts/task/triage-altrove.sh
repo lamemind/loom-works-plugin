@@ -2,10 +2,11 @@
 
 # =============================================================================
 # triage-altrove.sh — un'uscita di triage eseguita in un altro progetto:
-#                     da quale cartella parte la sessione figlia, e il gate sul suo ritorno
+#                     da quale cartella parte la sessione figlia, il suo lancio, e il gate sul suo ritorno
 # Usage:
 #   triage-altrove.sh risolvi  <nome>
 #   triage-altrove.sh prima    --dest <dir> --atteso commit|task
+#   triage-altrove.sh lancia   --dest <dir> --prompt <file> --out <file>
 #   triage-altrove.sh verifica --dest <dir> --prima <sha> --atteso commit|task
 #                              [--hash <sha>]...
 # =============================================================================
@@ -16,8 +17,8 @@
 # la esegue e' una sessione figlia, `claude -p` lanciata nella cartella del
 # destinatario: carica CLAUDE.md, settings, skill e regole di commit del
 # destinatario, e scrive il progetto che possiede il confine invece del chiamante
-# che lo aggira da Bash. Il lancio sta nel body delle skill; questo script fa le
-# due cose deterministiche che lo circondano. Regola e formato:
+# che lo aggira da Bash. Lo script fa il lancio e le cose deterministiche che lo
+# circondano; le skill ne decidono l'ordine. Regola e formato:
 # ${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md §L'uscita eseguita in un altro progetto.
 #
 # RISOLVI — dal nome che porta la segnalazione (o che l'umano dice) alla cartella,
@@ -32,6 +33,13 @@
 # l'uscita lì possa partire: un commit vuole un repo git con almeno un commit, una
 # task vuole anche `{docs_root}/tasks.md` del destinatario, perche' senza lista
 # task non c'e' dove aprirla.
+#
+# LANCIA — entra nella cartella del destinatario, toglie all'ambiente le variabili
+# con cui la conversazione chiamante descrive se stessa (SESSION_ENV_DROP, sotto) e
+# lancia `claude -p --permission-mode auto --output-format text`, col prompt da
+# <file> su stdin e stdout+stderr del figlio in <file>. La lista sta qui e non nel
+# body delle skill perche' l'agente non ricopi a mano diciannove nomi, e perche' il
+# banco la misuri con un `claude` finto senza pagare un modello.
 #
 # VERIFICA — il ritorno del figlio e' self-report: prosa con un hash corto dentro.
 # Il gate non parte dal racconto, legge l'intervallo `<prima>..HEAD` del
@@ -53,6 +61,9 @@
 #   risolvi  0 una cartella, stampata · 2 nessuna o piu' d'una, o registrata ma
 #              assente — si chiede all'umano · 1 errore d'uso o registry assente
 #   prima    0 sha di HEAD stampato · 2 l'uscita lì non puo' partire · 1 errore d'uso
+#   lancia   l'exit code del figlio · prima del lancio 1 errore d'uso o `claude`
+#              assente, 2 destinazione non valida: il figlio non parte e <out>
+#              non si scrive, il motivo va su stderr
 #   verifica 0 verde · 2 rosso · 1 errore d'uso
 #
 # Env letto:
@@ -65,6 +76,36 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../config/lib-config.sh
 source "${SCRIPT_DIR}/../config/lib-config.sh"
+
+# Le variabili che il figlio non eredita. Copia di HEADLESS_DROP_ENV del deck
+# (`loom-deck/src/headless.ts`): INHERITED_SESSION_ENV di
+# `loom-deck/src/session-env.ts` piu' PTYXIS_PROFILE, LOOM_TASK e PROJECT_ROOT.
+# Il banco del cappello (`plugin-tests/triage/run.sh`) confronta le due liste:
+# il plugin non puo' importare un modulo del deck, che e' un client col suo runtime.
+#
+# Elenco chiuso e per nome, non un prefisso: CLAUDE_CONFIG_DIR e
+# CLAUDE_CODE_GIT_BASH_PATH sono configurazione dell'utente e passano.
+SESSION_ENV_DROP=(
+    CLAUDECODE
+    CLAUDE_CODE_CHILD_SESSION
+    CLAUDE_CODE_SESSION_ID
+    CLAUDE_PID
+    CLAUDE_EFFORT
+    CLAUDE_CODE_ENTRYPOINT
+    CLAUDE_CODE_EXECPATH
+    CLAUDE_CODE_SESSION_ATTENDED
+    CLAUDE_AFK_TIMEOUT_MS
+    CLAUDE_CODE_BRIDGE_SESSION_ID
+    CLAUDE_CODE_MESSAGING_SOCKET
+    CLAUDE_CODE_MESSAGING_TOKEN
+    CLAUDE_CODE_CHILD_NOTES_DIR
+    CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP
+    BUN_INSPECT
+    LOOM_REGIA
+    PTYXIS_PROFILE
+    LOOM_TASK
+    PROJECT_ROOT
+)
 
 fail() {  # <exit> <messaggio>
     local rc="$1"; shift
@@ -159,6 +200,39 @@ cmd_prima() {
 }
 
 # =============================================================================
+cmd_lancia() {
+    local dest="" prompt="" out=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dest)   dest="${2:-}"; shift 2 ;;
+            --prompt) prompt="${2:-}"; shift 2 ;;
+            --out)    out="${2:-}"; shift 2 ;;
+            *) fail 1 "argomento ignoto: $1" ;;
+        esac
+    done
+    [[ -n "$prompt" ]] || fail 1 "--prompt obbligatorio: il file col prompt del figlio"
+    [[ -n "$out" ]] || fail 1 "--out obbligatorio: il file dove finisce l'output del figlio"
+    [[ -f "$prompt" && -r "$prompt" ]] || fail 1 "prompt assente o illeggibile: ${prompt}"
+    [[ -d "$(dirname -- "$out")" ]] || fail 1 "la cartella di --out non esiste: $(dirname -- "$out")"
+    check_dest "$dest"
+    command -v claude >/dev/null 2>&1 || fail 1 "claude non e' sul PATH: il figlio non parte"
+
+    # I path del chiamante si leggono dalla sua cwd, prima del cd.
+    prompt="$(cd "$(dirname -- "$prompt")" && pwd)/$(basename -- "$prompt")"
+    out="$(cd "$(dirname -- "$out")" && pwd)/$(basename -- "$out")"
+    cd "$dest" || fail 2 "impossibile entrare in ${dest}"
+
+    # Il confronto ignora le maiuscole, come dropEnv del deck: su Windows l'env non
+    # le distingue, e una copia dell'ambiente puo' portare `Claude_Pid`.
+    local drop=" ${SESSION_ENV_DROP[*]^^} " nome
+    while IFS= read -r nome; do
+        [[ "$drop" == *" ${nome^^} "* ]] && unset "$nome"
+    done < <(compgen -e)
+
+    exec claude -p --permission-mode auto --output-format text < "$prompt" > "$out" 2>&1
+}
+
+# =============================================================================
 cmd_verifica() {
     local dest="" prima="" atteso=""
     local -a dichiarati=()
@@ -228,11 +302,12 @@ cmd_verifica() {
 }
 
 # =============================================================================
-[[ $# -gt 0 ]] || fail 1 "sottocomando richiesto: risolvi | prima | verifica"
+[[ $# -gt 0 ]] || fail 1 "sottocomando richiesto: risolvi | prima | lancia | verifica"
 SUB="$1"; shift
 case "$SUB" in
     risolvi)  cmd_risolvi "$@" ;;
     prima)    cmd_prima "$@" ;;
+    lancia)   cmd_lancia "$@" ;;
     verifica) cmd_verifica "$@" ;;
-    *) fail 1 "sottocomando ignoto: ${SUB} (attesi: risolvi, prima, verifica)" ;;
+    *) fail 1 "sottocomando ignoto: ${SUB} (attesi: risolvi, prima, lancia, verifica)" ;;
 esac

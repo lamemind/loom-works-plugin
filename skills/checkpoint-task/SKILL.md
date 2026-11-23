@@ -323,14 +323,7 @@ Un altro progetto non lo scrivi da questa sessione: può tenerti in sola lettura
 1. `"$A" risolvi <progetto>` stampa la cartella. Exit `2`: nessun progetto con quel nome, o più d'uno — chiedi la cartella all'umano e non lanciare. Se la cartella è quella di questa sessione, nessun figlio: esegui qui.
 2. `"$A" prima --dest <cartella> --atteso task|commit` stampa lo sha di `HEAD`, da passare al gate. `--atteso task` quando il figlio apre una task nuova, `commit` per «subito» e per ogni altra forma, come un DLV aggiunto a una task che c'è già. Exit `2`: l'uscita lì non parte (una task vuole la lista task del destinatario) — dillo all'umano.
 3. Scrivi il prompt del figlio in un file fuori dai due repo. Per una task nuova: `/loom-works:create-task yolo <la segnalazione, il contesto che serve a chi non ha questa conversazione, le parole dell'umano>`. Altrimenti: cosa fare, con la segnalazione e le parole dell'umano alla lettera, e la richiesta di committare con le regole del progetto e di chiudere dichiarando l'hash del commit.
-4. Lancia il figlio:
-
-   ```bash
-   cd <cartella> && env -u LOOM_TASK -u PROJECT_ROOT -u PTYXIS_PROFILE \
-     claude -p --permission-mode auto --output-format text < <prompt> > <out> 2>&1
-   ```
-
-   Le tre variabili arrivano al figlio, e nessuna deve attraversare il confine: `LOOM_TASK` è il binding di sessione, e gli id delle task valgono dentro un progetto — il figlio risolverebbe una task che lì non esiste, o un'altra; `PROJECT_ROOT` batte la cartella nella ricerca della root, e il figlio scriverebbe nel progetto di questa sessione; `PTYXIS_PROFILE` è la chiave con cui gli hook annunciano lo stato a compass, e il figlio porterebbe a `done` il badge di questo progetto mentre lavori ancora.
+4. `"$A" lancia --dest <cartella> --prompt <prompt> --out <out>` lancia il figlio: entra nella cartella, toglie all'ambiente le variabili con cui questa conversazione descrive sé stessa — `LOOM_TASK`, `PROJECT_ROOT`, `PTYXIS_PROFILE`, `LOOM_REGIA` e `CLAUDE_EFFORT` fra le altre —, e lancia `claude -p --permission-mode auto --output-format text` col prompt su stdin e l'output in `<out>`. Esce con l'exit code del figlio; prima del lancio, exit `1` o `2` col motivo su stderr, e il figlio non parte. La lista e cosa sposta ogni variabile: `${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md` §L'uscita eseguita in un altro progetto.
 5. `"$A" verifica --dest <cartella> --prima <sha> --atteso task|commit [--hash <l'hash che il figlio dichiara>]`. Il ritorno del figlio è self-report: il gate legge i commit nati nel destinatario dopo `prima`, e per una task vuole il task file aggiunto e la sua riga in `tasks.md`. Verde (exit `0`): riporta all'umano cosa è nato, id e hash. Rosso (exit `2`): nessun secondo lancio — riporta il motivo del gate e il path di `<out>`.
 
 Due figli sullo stesso destinatario girano in sequenza, perché condividono l'intervallo del gate e il contatore degli id; su destinatari diversi vanno in parallelo.
