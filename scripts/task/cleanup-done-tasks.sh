@@ -292,19 +292,21 @@ for c in "${CANDIDATES[@]}"; do
     # stessa Folder si portano dietro lo STESSO $fp (risolto in blocco a monte):
     # la prima la rimuove, la seconda la trova gia' sparita → skip pulito (evita il
     # doppio `git rm`, exit 128 sotto `set -e`, che abortirebbe il run a meta').
+    # Una folder senza file tracciati (vuota, o con soli non tracciati sotto
+    # `purge`) non va a `git rm`: lw_folder_purge lo sa. I tracciati si leggono
+    # prima, perche' decidono se la folder entra nel commit e nel suo body.
     folder_info_body=""
     if [[ -n "$fp" && -e "$fp" ]]; then
         rel_fp="$(realpath --relative-to="$PROJECT_ROOT" "$fp")"
-        git -C "$PROJECT_ROOT" rm -rf "$rel_fp"
-        echo "-> rimossa folder (tracked): ${rel_fp}/"
-        folder_info_body="  - ${rel_fp}/"
-        # git rm NON tocca i file ignored/untracked (ne' le dir rimaste vuote):
-        # rm secco guardato per farli sparire dal disco. In keep sono gia' stati
-        # snapshottati sopra; in purge vanno persi. In ogni caso: via dal locale.
-        if [[ -e "$fp" ]]; then
-            lw_safe_rmrf "$fp"
-            echo "-> rm secco residui su disco: ${rel_fp}/"
-        fi
+        tracked="$(git -C "$PROJECT_ROOT" ls-files --cached -- "$rel_fp")"
+        rc=0; lw_folder_purge "$rel_fp" || rc=$?
+        case $rc in
+            0) echo "-> rimossa folder: ${rel_fp}/" ;;
+            5) echo "-> ⚠ folder rimasta sul disco: ${rel_fp}/ — contiene file che git non elenca (es. una .git): guardala e toglila a mano" ;;
+            *) echo "ERROR: rimozione della folder fallita: ${rel_fp}/" >&2; exit 1 ;;
+        esac
+        [[ -n "$tracked" ]] && folder_info_body="  - ${rel_fp}/
+"
     elif [[ -n "$fp" ]]; then
         echo "-> folder gia' rimossa da una task che la condivide: $(basename "$fp")/"
     fi

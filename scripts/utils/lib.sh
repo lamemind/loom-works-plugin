@@ -629,6 +629,40 @@ lw_safe_rmrf() {  # <path>
     rm -rf -- "$target"
 }
 
+# Removes from disk and index a task folder that leaves together with its task.
+# `git rm` runs with --ignore-unmatch: on a folder with no tracked file — empty,
+# or holding only untracked files under `--ignored-files purge` — a plain
+# `git rm -rf` exits 128 ("non corrisponde ad alcun file"), and under `set -e`
+# it stops the purge half-way: task file already out of the index, tasks.md row
+# still there, no commit.
+# What is left after `git rm` goes away in one of two ways:
+#  - survivors listed by lw_folder_survivors (ignored, untracked): the gate has
+#    already shown them and the caller chose keep|purge → guarded rm secco;
+#  - no survivor: only the empty directories. Zero tracked and zero survivors
+#    does not mean an empty directory — the content of a `.git` shows up neither
+#    among tracked nor among untracked files — and an `rm -rf` would delete what
+#    no gate has shown.
+# <rel_folder> is repo-relative. The caller reads the tracked files BEFORE the
+# call, if it needs them for the commit: afterwards they are gone from the index.
+# Exit: 0 = folder gone from disk · 1 = error · 5 = folder still on disk
+# (content git does not list: to be looked at by hand).
+lw_folder_purge() {  # <rel_folder>
+    local rel="$1" root abs
+    root="$(lw_find_project_root)"
+    abs="${root}/${rel}"
+    # Explicit checks: a caller using `lw_folder_purge … || rc=$?` turns off
+    # `set -e` for the whole body, so a failing command would not stop here.
+    git -C "$root" rm -rf --ignore-unmatch -- "$rel" || return 1
+    [[ -e "$abs" ]] || return 0
+    if [[ -n "$(lw_folder_survivors "$rel")" ]]; then
+        lw_safe_rmrf "$abs" || return 1
+        return 0
+    fi
+    find "$abs" -depth -type d -empty -delete || return 1
+    [[ -e "$abs" ]] && return 5
+    return 0
+}
+
 # ---- Error helpers -----------------------------------------------------------
 
 die() {
