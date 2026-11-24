@@ -1,5 +1,5 @@
 """
-mandate — le letture dell'orchestrator sul mandato: gate, albero, cifre prima → dopo.
+mandate — le letture dell'orchestrator sul perimetro: gate, albero, cifre prima → dopo.
 
   gate    se l'orchestrator può partire: il permission mode della sessione che lo
           lancia, letto dal suo transcript, e quello del progetto, letto da
@@ -11,9 +11,6 @@ mandate — le letture dell'orchestrator sul mandato: gate, albero, cifre prima 
   tree    lo stato del perimetro dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
           `## Materiale`; poi le coppie di membri che non possono girare insieme
-  verify  l'analisi scritta nel task file del perimetro contro `tree` e
-          contro git: le differenze della metà meccanica, le righe della metà
-          del modello, il commit da cui vale e i membri cambiati dopo
   recap   le cifre di oggi accanto a quelle di partenza del giro, la riga `prima`
           che lo script del flusso scrive al primo avvio del giro
 
@@ -29,18 +26,16 @@ Il perimetro è un id solo, un'epica o un mandato (`Size: Mandate`). I suoi
 membri non li cerca questo script: le figlie di un'epica e la lista di un
 mandato le legge il lettore unico, `resolve-task.sh <id> --members`, e la skill
 le passa dopo `--children`. Una regola sola per contare i membri. `--children`
-è obbligatoria per `tree` e `verify`: senza, lo script non legge il perimetro
-come vuoto, esce 2 e rimanda al lettore.
+è obbligatoria per `tree`: senza, lo script non legge il perimetro come vuoto,
+esce 2 e rimanda al lettore.
 
 Uso:
   python -I mandate.py [--project-root <radice>] gate --own-session <session id>
   python -I mandate.py [--project-root <radice>] tree <perimetro> --children [T1 T2 …] [--save <file.json>]
-  python -I mandate.py [--project-root <radice>] verify <perimetro> --children [T1 T2 …]
   python -I mandate.py [--project-root <radice>] recap <perimetro>
 
-Exit: 0 ok · 1 id malformato o file mancante · 2 gate chiuso, analisi che non
-combacia o assente, e ogni errore di argparse — un'opzione ignota, `--children`
-mancante a `tree` e `verify`.
+Exit: 0 ok · 1 id malformato o file mancante · 2 gate chiuso, e ogni errore di
+argparse — un'opzione ignota, `--children` mancante a `tree`.
 """
 
 import argparse
@@ -58,7 +53,6 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import flow_log  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
-import perimeter_analysis  # noqa: E402
 import orchestrator_common  # noqa: E402
 
 TASK_ID_PATTERN = re.compile(r"^T\d+$")
@@ -281,7 +275,7 @@ def declared_dependencies(lines):
     indentata è prosa della voce sopra. Una voce che comincia con «Nessuna» non
     dichiara niente anche quando poi nomina una task («Nessuna. Non parte
     insieme a T211»): un vincolo «non insieme» è una collisione, e sta
-    nell'analisi del perimetro. Le voci con prosa prima dell'id restano lette:
+    nel piano del perimetro, come risorsa. Le voci con prosa prima dell'id restano lette:
     una dipendenza vera scritta in prosa e non letta farebbe partire una task
     prima della sua base, l'errore che costa di più.
     """
@@ -509,75 +503,6 @@ def command_tree(project_root, arguments):
     return 0
 
 
-
-def command_verify(project_root, arguments):
-    """L'analisi scritta nel task file del perimetro contro `tree` e contro git.
-
-    Stampa il perimetro, la presenza dell'analisi, il commit da cui vale, le
-    differenze della metà meccanica (`DIFF`), le righe della metà del modello
-    (`MODELLO`) e i membri aperti cambiati dopo il commit (`CAMBIATO`), che la
-    skill rilegge. `VERIFY=ok` combacia e nessun membro è cambiato,
-    `VERIFY=riesame` combacia ma ci sono membri da rileggere, `VERIFY=stop`
-    non combacia, o l'analisi manca o non è committata.
-    """
-    for task_id in [arguments.head] + arguments.children:
-        if not TASK_ID_PATTERN.match(task_id):
-            print(f"ERROR: id task malformato: '{task_id}' (atteso T<numero>)", file=sys.stderr)
-            return 1
-    state = snapshot(project_root, arguments.head, arguments.children)
-    head = state["tasks"][arguments.head]
-    if head["file"] is None:
-        print(f"ERROR: task file di {arguments.head} non trovato", file=sys.stderr)
-        return 1
-    head_path = os.path.join(project_root, head["file"])
-    with open(head_path, encoding="utf-8", errors="replace") as head_handle:
-        lines = head_handle.read().splitlines()
-    form = "mandato" if head["size"].lower().startswith("mandate") else "epica"
-    print(f"PERIMETRO={arguments.head}|{form}")
-    if perimeter_analysis.section_bounds(lines, perimeter_analysis.ANALYSIS_HEADING) is None:
-        print("ANALYSIS=assente")
-        print("VERIFY=stop")
-        return 2
-    rows = perimeter_analysis.parse_rows(lines)
-    print("ANALYSIS=presente")
-    print(f"ROWS={len(rows)}")
-
-    commit = None
-    top = perimeter_analysis.repository_top(project_root)
-    if top is None:
-        print("ANALYSIS_COMMIT=? (il progetto non è un repo git)")
-    else:
-        rel = perimeter_analysis.relative_to(top, head_path)
-        commit, source, reason = perimeter_analysis.analysis_commit(top, rel, lines)
-        if commit is None:
-            print(f"ANALYSIS_COMMIT=? ({reason})")
-        else:
-            print(f"ANALYSIS_COMMIT={commit[:12]}")
-            print(f"ANALYSIS_FROM={source}")
-
-    differences, model_rows = perimeter_analysis.compare(state, rows)
-    if commit and form == "mandato" and perimeter_analysis.members_section_changed(top, rel, commit, lines):
-        differences.append(("membri", "## Membri", "lista cambiata dopo il commit dell'analisi"))
-    for kind, pair, detail in differences:
-        print(f"DIFF|{kind}|{pair}|{detail}")
-    for first, second, what in model_rows:
-        print(f"MODELLO|{first}|{second}|{what}")
-
-    changed = {}
-    if commit:
-        open_members = {task_id for task_id in state["mandate"] if state["tasks"][task_id]["next"] != "chiusa"}
-        tasks_rel = perimeter_analysis.relative_to(
-            top, os.path.join(project_root, orchestrator_common.docs_root(project_root), "tasks"))
-        changed = perimeter_analysis.changed_members(top, tasks_rel, commit, open_members)
-        for task_id in state["mandate"]:
-            if task_id in changed:
-                print(f"CAMBIATO|{task_id}|{changed[task_id]}")
-
-    verdict = "stop" if commit is None or differences else ("riesame" if changed else "ok")
-    print(f"VERIFY={verdict}")
-    return 2 if verdict == "stop" else 0
-
-
 def command_recap(project_root, head):
     """Le cifre di oggi accanto a quelle di partenza del giro: la riga `prima`
     del flusso (`flow_log`), che lo script scrive al primo avvio del giro,
@@ -611,10 +536,8 @@ MEMBERS_HINT = ("i membri del perimetro li legge il lettore unico, "
 
 class SubcommandParser(argparse.ArgumentParser):
     """Il parser dei sottocomandi: a un `--children` mancante aggiunge dove si
-    leggono i membri. Senza i membri `tree` e `verify` vedrebbero un perimetro
-    vuoto — `verify` darebbe ogni riga dell'analisi come `fuori`, anche sui
-    membri aperti — e argparse da solo dice che manca l'opzione, non dove si
-    prendono i valori."""
+    leggono i membri. Senza i membri `tree` vedrebbe un perimetro vuoto, e
+    argparse da solo dice che manca l'opzione, non dove si prendono i valori."""
 
     def error(self, message):
         if "--children" in message:
@@ -634,10 +557,6 @@ def parse_arguments():
     tree_parser.add_argument("--children", nargs="*", required=True,
                              help="i membri, dal lettore unico resolve-task.sh --members")
     tree_parser.add_argument("--save", default="", help="file JSON delle cifre di partenza, in una cartella che git ignora")
-    verify_parser = subcommands.add_parser("verify")
-    verify_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
-    verify_parser.add_argument("--children", nargs="*", required=True,
-                               help="i membri, dal lettore unico resolve-task.sh --members")
     recap_parser = subcommands.add_parser("recap")
     recap_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
     return parser.parse_args()
@@ -652,8 +571,6 @@ def main():
         return command_gate(project_root, arguments.own_session)
     if arguments.command == "tree":
         return command_tree(project_root, arguments)
-    if arguments.command == "verify":
-        return command_verify(project_root, arguments)
     return command_recap(project_root, arguments.head)
 
 
