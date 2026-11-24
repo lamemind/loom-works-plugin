@@ -572,6 +572,30 @@ def load_task_bindings(project_root):
     return bindings
 
 
+def load_orchestrator_marks(project_root):
+    """sessionId → perimetro dell'orchestrator che ha aperto la conversazione,
+    dal campo `orchestrator` del sidecar: il deck lo scrive allo spawn di una
+    conversazione chiesta con `--orchestrator`, tab o headless. Last-wins come
+    il legame con la task; un record senza il campo non lo tocca."""
+    marks = {}
+    try:
+        with open(sidecar_path(project_root), encoding="utf-8", errors="replace") as sidecar_handle:
+            lines = sidecar_handle.readlines()
+    except OSError:
+        return marks
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(record, dict) or not isinstance(record.get("sessionId"), str):
+            continue
+        perimeter = record.get("orchestrator")
+        if isinstance(perimeter, str) and perimeter:
+            marks[record["sessionId"]] = perimeter
+    return marks
+
+
 def task_of_transcript(path, max_lines=400):
     """La task della frase `risolta via $LOOM_TASK=<id>` nei primi record del
     transcript, `None` se non c'è."""

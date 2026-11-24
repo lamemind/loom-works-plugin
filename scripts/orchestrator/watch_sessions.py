@@ -17,6 +17,11 @@ Con --filter le righe passano da whitelist e blacklist prima di uscire
 (watch_filter.py): il file si rilegge quando cambia, e le righe `monitor`
 escono sempre. Senza --filter escono tutte.
 
+Gli scanner servono anche allo script del flusso (`flow_engine.py`), che li
+chiama dal proprio processo: assegna `sink`, e ogni evento gli arriva come dict
+— genere, testo, task, sessioni — invece di uscire su stdout. Il filtro vale
+solo per stdout: il flusso sceglie da sé cosa tenere.
+
 Con --context-threshold il monitor misura anche il contesto della sessione che
 lo lancia, l'orchestrator, dal suo transcript (watch_context.py): una riga `orchestrator 🧠`
 al 20, 40, 60, 80, 100 e 120% della soglia, una volta per gradino. Come le righe
@@ -71,6 +76,11 @@ filter_source = None
 # `cwd`), o None: la scrive `scan_sessions`, la legge `scan_context`.
 own_live = None
 
+# Chi riceve gli eventi: None li stampa su stdout, una riga per evento, per il
+# tool Monitor; lo script del flusso assegna una funzione che riceve ogni
+# evento come dict (`deliver`).
+sink = None
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Segue le sessioni vive di un progetto loom-works")
@@ -92,17 +102,33 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def emit(line):
+def deliver(kind, text, tasks=(), session_ids=None, **extra):
+    """Un evento al `sink`: `genere` dice di che evento si tratta (`turno`,
+    `fine`, `task file`, `contesto`, …), `testo` è la riga che stdout
+    stamperebbe, `task` e `sessioni` i suoi attributi; `extra` i campi propri
+    del genere, come la sessione e la classe del processo di un evento di
+    sessione o il gradino del contesto."""
+    sink(dict(extra, genere=kind, testo=text, task=sorted(tasks), sessioni=list(session_ids or [])))
+
+
+def emit(line, kind="monitor", **extra):
     """Una riga `monitor`: esce sempre, il filtro non la vede. Un monitor rotto
     che tace per un filtro sembrerebbe un monitor zitto."""
-    print(line.replace("\n", " ")[:300], flush=True)
+    text = line.replace("\n", " ")[:300]
+    if sink is not None:
+        deliver(kind, text, **extra)
+        return
+    print(text, flush=True)
 
 
-def emit_event(line, tasks=(), session_ids=None):
+def emit_event(line, tasks=(), session_ids=None, kind="evento", **extra):
     """Un evento: esce se il filtro lo ammette. `tasks` le task dell'evento,
     `session_ids` i sessionId del processo per un evento di sessione, `None`
     per tutti gli altri. La regex del filtro guarda la riga come esce."""
     text = line.replace("\n", " ")[:300]
+    if sink is not None:
+        deliver(kind, text, tasks, session_ids, **extra)
+        return
     active = filter_source.active if filter_source is not None else None
     if active is not None and not active.admits(text, tasks, session_ids):
         return
@@ -122,8 +148,9 @@ def process_session_ids(process):
     return process.get("session_ids") or [process["session_id"]]
 
 
-def emit_session(process, line):
-    emit_event(line, process_tasks(process), process_session_ids(process))
+def emit_session(process, line, kind):
+    emit_event(line, process_tasks(process), process_session_ids(process), kind,
+               sessione=process["session_id"], headless=bool(process.get("headless")))
 
 
 def load_state(state_path):
@@ -153,11 +180,12 @@ def handle_transcript_record(record, process, label):
         if process.get("headless"):
             return
         summary = orchestrator_common.first_meaningful_line(process.get("last_text", ""))
-        emit_session(process, f"{label} ⏸ turno finito, aspetta l'utente: {summary[:160]}")
+        emit_session(process, f"{label} ⏸ turno finito, aspetta l'utente: {summary[:160]}", "turno")
         return
     prompt = orchestrator_common.user_prompt_text(record)
     if prompt is not None:
-        emit_session(process, f"{label} ✍ prompt utente: {orchestrator_common.describe_prompt(prompt)[:140]}")
+        emit_session(process, f"{label} ✍ prompt utente: {orchestrator_common.describe_prompt(prompt)[:140]}",
+                     "prompt")
         return
     content = (record.get("message") or {}).get("content")
     if record_type != "assistant" or record.get("isSidechain") or not isinstance(content, list):
@@ -173,10 +201,12 @@ def handle_transcript_record(record, process, label):
             tool_input = block.get("input") or {}
             process["last_tool"] = tool_name
             if tool_name == "Skill":
-                emit_session(process, f"{label} ▶ skill {tool_input.get('skill')} {str(tool_input.get('args') or '')[:80]}")
+                emit_session(process, f"{label} ▶ skill {tool_input.get('skill')} {str(tool_input.get('args') or '')[:80]}",
+                             "skill")
             elif tool_name == "AskUserQuestion":
                 questions = tool_input.get("questions") or [{}]
-                emit_session(process, f"{label} ❓ domanda all'utente: {questions[0].get('question', '')[:160]}")
+                emit_session(process, f"{label} ❓ domanda all'utente: {questions[0].get('question', '')[:160]}",
+                             "domanda")
 
 
 def read_new_records(process):
@@ -264,7 +294,7 @@ def check_status(process, session, settings, initialized, now):
     if (initialized and session.status == "waiting" and process.get("status") != "waiting"
             and process.get("last_tool") != "AskUserQuestion"):
         tool = process.get("last_tool")
-        emit_session(process, f"{label} ⏳ aspetta un permesso" + (f": {tool}" if tool else ""))
+        emit_session(process, f"{label} ⏳ aspetta un permesso" + (f": {tool}" if tool else ""), "permesso")
     process["status"] = session.status
     process["status_since"] = session.status_since
     moved = last_activity(process)
@@ -278,7 +308,7 @@ def check_status(process, session, settings, initialized, now):
             details += f", ultimo tool {process['last_tool']}"
         if session.alive is None:
             details += ", o processo morto"
-        emit_session(process, f"{label} 🧊 ferma da {int((now - moved) / 60)} min ({details})")
+        emit_session(process, f"{label} 🧊 ferma da {int((now - moved) / 60)} min ({details})", "ferma")
         process["stall_reported"] = True
 
 
@@ -323,12 +353,14 @@ def announce_label_change(process, old_label):
     # ammette una, così l'orchestrator vede entrare e uscire una sessione dal mandato.
     tasks = {label for label in (old_label, new_label) if not label.startswith("?")}
     session_ids = process_session_ids(process)
+    extra = {"sessione": process["session_id"], "headless": bool(process.get("headless"))}
     if old_label.startswith("?"):
-        emit_event(f"{new_label} 🏷 sessione {session} legata a {new_label}", tasks, session_ids)
+        emit_event(f"{new_label} 🏷 sessione {session} legata a {new_label}", tasks, session_ids, "legame", **extra)
     elif new_label.startswith("?"):
-        emit_event(f"{new_label} 🔀 sessione {session} staccata da {old_label}", tasks, session_ids)
+        emit_event(f"{new_label} 🔀 sessione {session} staccata da {old_label}", tasks, session_ids, "legame", **extra)
     else:
-        emit_event(f"{new_label} 🔀 sessione {session} riassegnata: {old_label} → {new_label}", tasks, session_ids)
+        emit_event(f"{new_label} 🔀 sessione {session} riassegnata: {old_label} → {new_label}", tasks, session_ids,
+                   "legame", **extra)
 
 
 def new_process(session, transcript, offset):
@@ -358,9 +390,9 @@ def announce_start(process):
     """
     session = short_id(process["session_id"])
     if process.get("headless"):
-        emit_session(process, f"{process['label']} ▶ turno headless partito {session}{process['where']}")
+        emit_session(process, f"{process['label']} ▶ turno headless partito {session}{process['where']}", "avvio")
     else:
-        emit_session(process, f"{process['label']} 🆕 nuova sessione {session}{process['where']}")
+        emit_session(process, f"{process['label']} 🆕 nuova sessione {session}{process['where']}", "avvio")
 
 
 def announce_end(process):
@@ -372,9 +404,9 @@ def announce_end(process):
     if process.get("headless"):
         summary = orchestrator_common.first_meaningful_line(process.get("last_text", ""))
         emit_session(process, f"{process['label']} ⏹ turno headless finito {session}"
-                     + (f": {summary[:160]}" if summary else ""))
+                     + (f": {summary[:160]}" if summary else ""), "fine")
     else:
-        emit_session(process, f"{process['label']} ✖ sessione chiusa {session}")
+        emit_session(process, f"{process['label']} ✖ sessione chiusa {session}", "fine")
 
 
 def is_own(session, state, settings):
@@ -432,7 +464,7 @@ def scan_sessions(state, settings):
             refresh_label(process)
             if initialized:
                 emit_session(process, f"{process['label']} 🔄 transcript nuovo {short_id(session.session_id)} "
-                                      f"(/clear o compattazione)")
+                                      f"(/clear o compattazione)", "clear")
         else:
             old_label = process["label"]
             process["transcript"] = transcript
@@ -464,10 +496,10 @@ def scan_context(state, settings):
     if settings.context_threshold <= 0 or own_live is None:
         return
     transcript = orchestrator_common.transcript_path(own_live["cwd"], own_live["session_id"])
-    state["context"], line = watch_context.measure(
+    state["context"], line, step = watch_context.measure(
         state.get("context"), own_live["session_id"], transcript, settings.context_threshold)
     if line:
-        emit(line)
+        emit(line, "contesto", gradino=step, sessione=own_live["session_id"])
 
 
 def relative_cwd(cwd, settings):
@@ -536,7 +568,7 @@ def scan_task_files(state, settings):
             deltas.append(f"Prog {summary['progress']}")
         changed_label = ", ".join(changed_sections) if changed_sections else "intestazione"
         emit_event(f"{task_id} 📝 task file: {changed_label}" + (f" · {' · '.join(deltas)}" if deltas else ""),
-                   {task_id})
+                   {task_id}, kind="task file")
 
 
 def overview_progress(text):
@@ -574,7 +606,7 @@ def scan_progress_table(state, settings):
         previous = state["progress"].get(task_id)
         state["progress"][task_id] = progress
         if previous is not None and previous != progress and state.get("initialized"):
-            emit_event(f"{task_id} 📊 tasks.md: Prog {previous} → {progress}", {task_id})
+            emit_event(f"{task_id} 📊 tasks.md: Prog {previous} → {progress}", {task_id}, kind="prog")
 
 
 def run_git(repo_path, *arguments):
@@ -604,7 +636,7 @@ def scan_git(state, settings):
             if ref_name.startswith("refs/remotes/"):
                 # Un push non ha task: con una whitelist passa solo se una
                 # regex lo ammette.
-                emit_event(f"git {repo_name} ⬆ {short_ref} → {sha[:7]}")
+                emit_event(f"git {repo_name} ⬆ {short_ref} → {sha[:7]}", kind="push")
                 continue
             if old_sha:
                 log_output = run_git(repo_path, "log", "--format=%h %s", "-n", "5", f"{old_sha}..{sha}")
@@ -613,7 +645,8 @@ def scan_git(state, settings):
             for commit_line in log_output.strip().splitlines():
                 subject = commit_line.partition(" ")[2]
                 emit_event(f"git {repo_name} ● {short_ref}: {commit_line[:160]}",
-                           watch_filter.commit_tasks(subject, lambda task_id: parent_task(settings, task_id)))
+                           watch_filter.commit_tasks(subject, lambda task_id: parent_task(settings, task_id)),
+                           kind="commit")
 
 
 def parent_task(settings, task_id):

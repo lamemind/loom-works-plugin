@@ -24,6 +24,15 @@
 # contesto, e un valore arbitrario non deve diventare una riga che il modello legge
 # come istruzione.
 #
+# DUE RIGHE FISSE per lo script del flusso (`scripts/orchestrator/flow_turns.py`):
+# a fine turno lo script legge il testo finale prima dell'orchestrator, e da'
+# un passo per chiuso solo sulle righe che riconosce. `❓ Domanda per
+# l'orchestrator` dice che il turno chiede qualcosa anche quando chiude con la
+# riga fissa di un report; `✅ Risposte registrate` chiude il turno che ha
+# scritto gli scenari delle risposte dell'orchestrator alle segnalazioni, che
+# nessuna skill chiude con una riga sua. Senza le due righe lo script
+# sveglierebbe l'orchestrator, che e' il ripiego e non un guasto.
+#
 # Entry PROPRIA e non una sezione di inject-task.sh: quella satura il budget sui
 # task file grandi (il cap e' per comando, non per sessione), e la riga deve
 # arrivare intera anche quando la task arriva troncata.
@@ -41,5 +50,7 @@ orchestrator="${LOOM_ORCHESTRATOR:-}"
 printf '%s\n' \
   "## Organigramma — conversazione aperta dall'orchestrator di ${orchestrator}" \
   "" \
-  "Questa conversazione è aperta dall'orchestrator di ${orchestrator}: le domande le scrivi in chat a fine turno, le legge l'orchestrator e ti risponde. Non usare \`AskUserQuestion\`: l'orchestrator non chiude una domanda aperta con quello strumento, e qui è negato."
+  "Questa conversazione è aperta dall'orchestrator di ${orchestrator}: le domande le scrivi in chat a fine turno, le legge l'orchestrator e ti risponde. Non usare \`AskUserQuestion\`: l'orchestrator non chiude una domanda aperta con quello strumento, e qui è negato." \
+  "" \
+  "Il testo finale di ogni turno lo legge prima uno script, che riconosce due righe fisse. Quando il turno chiude su una domanda, apri il testo finale con la riga \`❓ Domanda per l'orchestrator\`, anche se il turno chiude con il report di una skill. Quando il turno ha registrato le risposte dell'orchestrator alle segnalazioni — scenari scritti e committati — e non chiedi altro, chiudi il testo finale con la riga \`✅ Risposte registrate\`."
 exit 0

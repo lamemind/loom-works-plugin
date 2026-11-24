@@ -114,8 +114,8 @@ def step_line(step, tokens, threshold):
 
 
 def measure(entry, session_id, transcript, threshold):
-    """Una misura del contesto dell'orchestrator: l'entry dello stato aggiornata e la
-    riga da emettere, o `None`.
+    """Una misura del contesto dell'orchestrator: l'entry dello stato aggiornata, la
+    riga da emettere e il suo gradino, o `None` e `None`.
 
     L'entry vale per un `sessionId` e una soglia: con un `sessionId` diverso —
     l'orchestrator che riceve le consegne, un `/clear` — o con un'altra soglia si
@@ -127,6 +127,6 @@ def measure(entry, session_id, transcript, threshold):
     if tokens:
         entry["tokens"] = tokens
     if not entry["tokens"]:
-        return entry, None
+        return entry, None, None
     step, entry["said"] = next_step(entry["tokens"], threshold, entry["said"])
-    return entry, (step_line(step, entry["tokens"], threshold) if step else None)
+    return entry, (step_line(step, entry["tokens"], threshold) if step else None), step
