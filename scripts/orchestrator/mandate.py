@@ -14,7 +14,8 @@ mandate — le letture dell'orchestrator sul mandato: gate, albero, cifre prima 
   verify  l'analisi scritta nel task file del perimetro contro `tree` e
           contro git: le differenze della metà meccanica, le righe della metà
           del modello, il commit da cui vale e i membri cambiati dopo
-  recap   le cifre di oggi accanto a quelle salvate da `tree --save` all'armo
+  recap   le cifre di oggi accanto a quelle di partenza del giro, la riga `prima`
+          che lo script del flusso scrive al primo avvio del giro
 
 Solo letture: nessuno di questi comandi scrive nei repo. `tree --save` scrive il
 file che gli si indica: la skill lo tiene in `.claude/loom/orchestrator/`, ignorata da git.
@@ -35,7 +36,7 @@ Uso:
   python -I mandate.py [--project-root <radice>] gate --own-session <session id>
   python -I mandate.py [--project-root <radice>] tree <perimetro> --children [T1 T2 …] [--save <file.json>]
   python -I mandate.py [--project-root <radice>] verify <perimetro> --children [T1 T2 …]
-  python -I mandate.py [--project-root <radice>] recap --before <file.json>
+  python -I mandate.py [--project-root <radice>] recap <perimetro>
 
 Exit: 0 ok · 1 id malformato o file mancante · 2 gate chiuso, analisi che non
 combacia o assente, e ogni errore di argparse — un'opzione ignota, `--children`
@@ -56,7 +57,8 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import perimeter_analysis  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import flow_log  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import perimeter_analysis  # noqa: E402
 import orchestrator_common  # noqa: E402
 
 TASK_ID_PATTERN = re.compile(r"^T\d+$")
@@ -576,19 +578,25 @@ def command_verify(project_root, arguments):
     return 2 if verdict == "stop" else 0
 
 
-def command_recap(project_root, before_path):
-    try:
-        with open(before_path, encoding="utf-8") as before_handle:
-            before = json.load(before_handle)
-    except (OSError, ValueError) as error:
-        print(f"ERROR: cifre di partenza illeggibili: {before_path}: {error}", file=sys.stderr)
+def command_recap(project_root, head):
+    """Le cifre di oggi accanto a quelle di partenza del giro: la riga `prima`
+    del flusso (`flow_log`), che lo script scrive al primo avvio del giro,
+    con un piano valido. I membri sono quelli di quella riga: un membro
+    entrato dopo non ha un «prima»."""
+    if not TASK_ID_PATTERN.match(head):
+        print(f"ERROR: id task malformato: '{head}' (atteso T<numero>)", file=sys.stderr)
         return 1
-    # `epic` è la chiave delle cifre salvate prima del rename della skill: un
-    # orchestrator rilanciato nella stessa sessione rilegge il file che aveva scritto.
-    head = before.get("head") or before.get("epic")
-    state = snapshot(project_root, head, before["mandate"])
-    for task_id in [head] + before["mandate"]:
-        then = before["figures"].get(task_id, {"prog": "?", "dlv": [0, 0], "ac": [0, 0], "title": ""})
+    flow_path = flow_log.paths(project_root, head)["flow"]
+    state, _ = flow_log.replay(flow_path, head)
+    before = (state.before or {}).get("cifre")
+    if not isinstance(before, dict) or head not in before:
+        print(f"PRIMA=assente ({os.path.relpath(flow_path, project_root)}: nessuna riga prima, il giro non è partito)")
+        return 0
+    print(f"PRIMA={state.before.get('ts')}")
+    members = [task_id for task_id in before if task_id != head]
+    state = snapshot(project_root, head, members)
+    for task_id in [head] + members:
+        then = before[task_id]
         now = state["tasks"][task_id]
         print(f"RECAP|{task_id}|prog={then['prog']}→{now['prog']}"
               f"|dlv={then['dlv'][0]}/{then['dlv'][1]}→{now['dlv'][0]}/{now['dlv'][1]}"
@@ -631,7 +639,7 @@ def parse_arguments():
     verify_parser.add_argument("--children", nargs="*", required=True,
                                help="i membri, dal lettore unico resolve-task.sh --members")
     recap_parser = subcommands.add_parser("recap")
-    recap_parser.add_argument("--before", required=True)
+    recap_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
     return parser.parse_args()
 
 
@@ -646,7 +654,7 @@ def main():
         return command_tree(project_root, arguments)
     if arguments.command == "verify":
         return command_verify(project_root, arguments)
-    return command_recap(project_root, arguments.before)
+    return command_recap(project_root, arguments.head)
 
 
 if __name__ == "__main__":

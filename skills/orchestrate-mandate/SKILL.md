@@ -1,8 +1,8 @@
 ---
 name: orchestrate-mandate
-description: Fa da orchestrator su un perimetro loom-works — un id solo, un'epica (le sue figlie) o un mandato (`Size: Mandate`, la sua lista di membri) — e porta avanti i membri in modo semi-automatico. Al lancio verifica l'analisi del perimetro scritta nel task file e si ferma se non combacia; poi recap, sessioni vive, monitor delle sessioni armato e riarmato. Lancia da sé preflight, run e checkpoint quando le dipendenze lo permettono, come turni headless senza tab — una tab solo quando l'utente la chiede per un passo —, chiude le conversazioni a passo finito, e a fine giro lancia il checkpoint del perimetro; alle domande delle sessioni prepara una proposta di risposta motivata e la manda solo col via dell'utente, o da sé sotto una delega che l'utente dichiara. Tiene il suo stato in `.claude/loom/orchestrator/` del progetto, ignorata da git, e lo riprende al rilancio; oltre una soglia di contesto chiude il giro e passa le consegne a un orchestrator nuovo, che riprende dallo stato. Non scrive mai nei task file né in un file tracciato. Usa quando l'utente dice «fai da orchestrator su T21», «orchestra l'epica T197», «orchestra il mandato T214».
+description: Fa da orchestrator su un perimetro loom-works — un id solo, un'epica (le sue figlie) o un mandato (`Size: Mandate`, la sua lista di membri). Al lancio verifica il piano del perimetro, `schedule.md`, e si ferma se non vale; poi lancia staccato lo script del flusso (`flow.py`), che apre e chiude da sé preflight, run e checkpoint dei membri come turni headless secondo il piano, chiede i checkpoint dei run puliti e lancia il checkpoint del perimetro a fine giro. L'orchestrator aspetta con un Bash in background e si sveglia solo quando serve un giudizio — domande, segnalazioni, domande in prosa, esiti che lo script non sa leggere, un piano che non vale, la soglia di contesto, il keep-alive della cache —; legge il flusso dal punto in cui era, raccoglie i fatti del perimetro dai report, prepara le risposte e le manda col via dell'utente, o da sé sotto una delega che l'utente dichiara. Riscrive e committa il piano quando scopre una collisione; apre una tab solo quando l'utente la chiede per un passo. Tiene la sua memoria in `.claude/loom/orchestrator/` del progetto, ignorata da git; oltre una soglia di contesto passa le consegne a un orchestrator nuovo, che riprende da lì. Non scrive mai nei task file. Usa quando l'utente dice «fai da orchestrator su T21», «orchestra l'epica T197», «orchestra il mandato T214».
 argument-hint: "<epica|mandato> [--soglia <token>]"
-allowed-tools: Bash(*), Read, Write, Edit, Skill, Monitor, TaskStop, SendMessage, ListAgents, PushNotification
+allowed-tools: Bash(*), Read, Write, Edit, Skill, TaskStop, SendMessage, ListAgents, PushNotification
 ---
 
 Argomenti:
@@ -12,21 +12,22 @@ $ARGUMENTS
 
 ## Il ruolo
 
-I membri di un perimetro avanzano uno per conversazione, e nessuna conversazione vede le altre. L'**orchestrator** è la conversazione in più che le vede tutte: un monitor in background le segue, e a ogni evento l'orchestrator decide il passo successivo del perimetro e lo dice all'utente.
+I membri di un perimetro avanzano uno per conversazione, e nessuna conversazione vede le altre. Il flusso meccanico — aprire il passo successivo di un membro, leggere com'è finito, chiedere il checkpoint dopo un run pulito, aspettare chi va aspettato — lo porta uno **script del flusso** staccato, che esegue il **piano** del perimetro (`schedule.md`, contratto `${CLAUDE_PLUGIN_ROOT}/docs/schedule-format.md`). L'**orchestrator** è la conversazione che lo lancia e che si sveglia solo quando serve un giudizio: lo script scrive una riga di risveglio, e l'orchestrator legge, decide, risponde. Il contratto dello script — comandi, righe, motivi di risveglio, ordini — è `${CLAUDE_PLUGIN_ROOT}/docs/flow-format.md`: leggilo per intero al lancio.
 
-- **Lancia da sé** preflight, run e checkpoint quando le dipendenze lo permettono: l'utente ha dato il mandato invocando la skill, e un ok a ogni conversazione non serve.
-- **Non risponde da sé**, salvo delega. Alle domande delle sessioni — un preflight che chiede, le segnalazioni 🚦 di un report — prepara una proposta motivata e la manda solo col via dell'utente. L'unico messaggio che parte senza via è la richiesta di checkpoint dopo un run pulito (§2). Con una delega che l'utente dichiara nella chat dell'orchestrator, manda da sé anche le risposte, entro i limiti del §3.
-- **Non scrive mai nei task file né in un file tracciato.** Nessun `Edit`, `Write` o commit su un file che git segue. Agisce sulle conversazioni e basta: le apre e le porta avanti come turni headless con `loom-deck-headless` (§2); apre una tab con `spawn-task` solo quando l'utente la chiede per un passo; scrive a una tab viva con `SendMessage`, e chiude con `close-session` le tab che ha aperto, a passo finito. I soli file che scrive stanno in `.claude/loom/orchestrator/` del progetto, che git ignora: lo stato dell'orchestrator, le cifre di partenza, lo stato del monitor e il suo filtro (§0f, Lo stato su disco).
+**Perché così.** Ogni turno dell'orchestrator rilegge tutto il suo contesto dalla cache, centinaia di migliaia di token: un turno costa per la dimensione del contesto, non per il lavoro che fa. Un orchestrator che si sveglia a ogni evento spende quasi tutto in turni che non decidono niente. Per la stessa ragione la conversazione dell'orchestrator **non cambia modello**: la cache vale per un modello solo, e un turno su un altro modello riscrive tutto il contesto.
 
-Il giro dura ore, e ogni evento del monitor è un turno che rilegge tutto il contesto dell'orchestrator. Oltre una **soglia di contesto** l'orchestrator chiude il giro in modo morbido e passa le consegne a un orchestrator nuovo, a contesto vuoto, che riprende dallo stato su disco (§6).
+- **Lo script lancia, l'orchestrator giudica.** I passi li apre e li chiude lo script, secondo il piano: l'utente ha dato il mandato invocando la skill, e un ok a ogni passo non serve. L'unico messaggio che parte senza l'orchestrator è la richiesta di checkpoint dopo un run pulito, che manda lo script.
+- **Non risponde da sé**, salvo delega. Alle domande dei membri — un preflight che chiede, le segnalazioni 🚦 di un report, una domanda in prosa — l'orchestrator prepara una proposta motivata e la manda solo col via dell'utente. Con una delega che l'utente dichiara nella chat dell'orchestrator, manda da sé anche le risposte, entro i limiti del §3.
+- **Non scrive mai nei task file.** L'unico file tracciato che scrive è il piano, quando scopre una collisione o deve cambiare un ordine (§4), e lo committa da solo con la sua pathspec. La sua memoria sta in `.claude/loom/orchestrator/T<perimetro>.md` del progetto, che git ignora (§0h).
+- **Le conversazioni che l'orchestrator non ha aperto non lo svegliano mai.** Una sessione che l'utente apre a mano su un membro tiene ferma la sua task — lo script non apre passi su una task con una conversazione viva — e risponde al suo utente, non all'orchestrator.
 
-Il **perimetro** è un id solo negli argomenti: un'**epica** (`Size: Epic`), i cui membri sono le figlie, o un **mandato** (`Size: Mandate`), che elenca i membri nel proprio file (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). L'orchestrator li tratta allo stesso modo: i membri arrivano dal lettore unico, `resolve-task.sh <id> --members`, e il perimetro con tutti i suoi membri è ciò che l'orchestrator porta avanti. Un perimetro più largo — un'epica e qualche task in più, task di epiche diverse — si costruisce prima del lancio con `/loom-works:prepare-mandate`, mai negli argomenti. Nessun tetto alle conversazioni aperte.
+Il **perimetro** è un id solo negli argomenti: un'**epica** (`Size: Epic`), i cui membri sono le figlie, o un **mandato** (`Size: Mandate`), che elenca i membri nel proprio file (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). I membri arrivano dal lettore unico, `resolve-task.sh <id> --members`. Un perimetro più largo — un'epica e qualche task in più, task di epiche diverse — si costruisce prima del lancio con `/loom-works:prepare-mandate`, mai negli argomenti.
 
-Gli script dell'orchestrator stanno in `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/`, solo libreria standard di Python, Linux e Windows: `watch_sessions.py` (il monitor, col filtro di `watch_filter.py` e la misura del contesto di `watch_context.py`), `sessions.py` (`list` delle vive, `tail` di una sessione, `orchestrators` degli altri orchestrator vivi, `find` del sessionId intero di una viva), `mandate.py` (`gate`, `tree`, `verify`, `recap`), `orchestrator_state.py` (`check` dello stato su disco al lancio, passaggio di consegne compreso, `facts` per `checkpoint-mandate`). Nessuno scrive un file tracciato: scrivono solo sotto `.claude/loom/orchestrator/`.
+Gli script stanno in `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/`, solo libreria standard di Python, Linux e Windows: `flow.py` (lo script del flusso: `start`, `status`, `wait`, `recap`, `stop`, gli ordini), `schedule.py` (`verify` e `show` del piano), `mandate.py` (`gate`, `tree`, `recap`), `orchestrator_state.py` (`check` della memoria al lancio, passaggio di consegne compreso), `sessions.py` (`orchestrators` degli altri orchestrator vivi, `list`, `tail`, `find`).
 
 ## 0. Avvio
 
-In quest'ordine, e senza aprire nessuna conversazione finché i controlli d'ingresso (§0c, §0d, §0e, §0f) non sono passati.
+In quest'ordine, e senza lanciare lo script finché i controlli d'ingresso (§0c, §0d, §0e, §0f) non sono passati.
 
 ### 0a. Docs root, interprete, cartella degli script
 
@@ -35,15 +36,13 @@ In quest'ordine, e senza aprire nessuna conversazione finché i controlli d'ingr
 for candidate in python3 python; do "$candidate" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && { command -v "$candidate"; break; }; done
 ```
 
-L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo all'utente e fermati: senza Python il monitor non parte.
+L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo all'utente e fermati: senza Python lo script non parte.
 
-Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (lo chiamiamo `PY`) e la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator`. Ogni script si lancia con `"PY" -B -I "R/<script>"`: `-I` lo isola dalla cartella corrente, `-B` non scrive bytecode nella cache del plugin.
+Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (lo chiamiamo `PY`), la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator` e la radice del progetto. Ogni script si lancia con `"PY" -B -I "R/<script>"`: `-I` lo isola dalla cartella corrente, `-B` non scrive bytecode nella cache del plugin.
 
 ### 0b. Il tuo session id
 
-Il session id dell'orchestrator è la cartella sopra `scratchpad` nel path della tua scratchpad, quella che il system prompt ti indica (`…/<cartella del progetto>/<session id>/scratchpad`). Lo chiamiamo `SID`. Serve al gate, al monitor, che senza riporterebbe i turni dell'orchestrator stesso, e allo stato su disco, che lo porta nella riga di testa (§0i).
-
-La scratchpad non tiene niente dell'orchestrator: sta nella temp di sistema, e un reboot o una pulizia la svuotano a giro aperto. I file dell'orchestrator stanno nel progetto (§0f, Lo stato su disco).
+Il session id dell'orchestrator è la cartella sopra `scratchpad` nel path della tua scratchpad, quella che il system prompt ti indica (`…/<cartella del progetto>/<session id>/scratchpad`). Lo chiamiamo `SID`. Serve al gate, alla memoria su disco, che lo porta nella riga di testa (§0h), e allo script, che dalla testa sa chi è l'orchestrator.
 
 ### 0c. Gate di auto mode
 
@@ -51,90 +50,67 @@ La scratchpad non tiene niente dell'orchestrator: sta nella temp di sistema, e u
 "PY" -B -I "R/mandate.py" gate --own-session SID
 ```
 
-Exit `0` (`GATE=ok`) → avanti. Exit `2` → **fermati senza aprire niente** e di' all'utente quale controllo non passa, e cosa succede:
+Exit `0` (`GATE=ok`) → avanti. Exit `2` → **fermati senza lanciare niente** e di' all'utente quale controllo non passa, e cosa succede:
 
-- `HEADLESS=assente`: `loom-deck-headless`, il comando del pacchetto del deck con cui l'orchestrator apre e porta avanti i membri (§2), non è sul PATH. Senza, l'orchestrator scoprirebbe la mancanza al primo membro, a giro avviato. Rimedio: `npm install -g @lamemind/loom-deck@latest` e rilanciare la skill. `HEADLESS=<path>` dice quale comando l'orchestrator userà.
-- `HEADLESS_ORCHESTRATOR=no`: il `loom-deck-headless` installato è più vecchio di `--orchestrator`, l'opzione con cui l'orchestrator si dichiara a ogni apertura e a ogni risposta (§2, Aprire), e rifiuterebbe ogni comando dell'orchestrator con uscita `2`. Rimedio: lo stesso `npm install -g`, e rilanciare la skill.
-- `OWN_MODE` diverso da `auto` (o `?`, transcript non trovato): fuori da auto mode ogni comando `loom-deck-headless` e ogni `spawn-task` chiede conferma, e l'orchestrator smette di essere semi-automatico. Rimedio: passare la sessione in auto mode e rilanciare la skill.
-- `PROJECT_MODE` diverso da `auto`: le conversazioni nascono col `permissionMode` di `.claude/loom-works.json`, headless o in una tab. Un turno headless non ha nessuno che approva: in `manual` `loom-deck-headless open` rifiuta run e checkpoint, e in ogni modo diverso da `auto` il turno si vede negare ciò che il modo non concede da sé. Una tab con un modo diverso da quello dell'orchestrator tiene i suoi messaggi in attesa dell'approvazione del suo utente. Rimedio: `"permissionMode": "auto"` nel file del progetto.
+- `HEADLESS=assente`: `loom-deck-headless`, il comando del pacchetto del deck con cui lo script apre e porta avanti i membri, non è sul PATH. Rimedio: `npm install -g @lamemind/loom-deck@latest` e rilanciare la skill. `HEADLESS=<path>` dice quale comando si userà.
+- `HEADLESS_ORCHESTRATOR=no`: il `loom-deck-headless` installato è più vecchio di `--orchestrator`, l'opzione con cui ogni apertura e ogni risposta si dichiara dell'orchestrator, e rifiuterebbe ogni comando con uscita `2`. Rimedio: lo stesso `npm install -g`, e rilanciare la skill.
+- `OWN_MODE` diverso da `auto` (o `?`, transcript non trovato): fuori da auto mode ogni comando chiede conferma, e l'orchestrator smette di rispondere senza l'utente davanti. Rimedio: passare la sessione in auto mode e rilanciare la skill.
+- `PROJECT_MODE` diverso da `auto`: le conversazioni nascono col `permissionMode` di `.claude/loom-works.json`, e un turno headless non ha nessuno che approva — in `manual` `loom-deck-headless open` rifiuta run e checkpoint. Rimedio: `"permissionMode": "auto"` nel file del progetto.
 
-Il modo dell'orchestrator si legge dal suo transcript, perché il registro delle sessioni vive non lo porta.
-
-La riga `HANDOFF=sì|no` non chiude il gate: dice se `loom-deck-spawn` sa aprire l'orchestrator successore (kind `orchestrator`), che serve al passaggio di consegne (§6). Con `no` parti lo stesso e dillo in una riga: il deck installato è più vecchio del passaggio, e al 100% della soglia avviserai l'utente invece di passare le consegne. Rimedio: `npm install -g @lamemind/loom-deck@latest`.
+La riga `HANDOFF=sì|no` non chiude il gate: dice se `loom-deck-spawn` sa aprire l'orchestrator successore, che serve al passaggio di consegne (§8). Con `no` parti lo stesso e dillo in una riga: al 100% della soglia avviserai l'utente invece di passare le consegne. Rimedio: `npm install -g @lamemind/loom-deck@latest`.
 
 ### 0d. Il perimetro e i membri
 
-Gli argomenti portano **un id solo**, e al più la soglia di contesto (`--soglia <token>`, §La soglia sotto). Con un id dopo il primo fermati prima di aprire qualsiasi cosa, e di' all'utente che il perimetro è un id solo, un'epica o un mandato, e che per seguire insieme task in più si prepara un mandato con `/loom-works:prepare-mandate <id…>`. Non proseguire sul primo id: le conversazioni partirebbero su un perimetro diverso da quello che l'utente ha scritto.
+Gli argomenti portano **un id solo**, e al più la soglia di contesto (`--soglia <token>`, §La soglia sotto). Con un id dopo il primo fermati prima di lanciare qualsiasi cosa, e di' all'utente che il perimetro è un id solo, un'epica o un mandato, e che per seguire insieme task in più si prepara un mandato con `/loom-works:prepare-mandate <id…>`.
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro>
 "${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro> --members
 ```
 
-Il `Size` del task file del perimetro deve essere `Epic` o `Mandate`. Se non lo è, dillo e fermati: una task normale si esegue con `run-task`, e un elenco di task sciolte diventa un perimetro con `prepare-mandate`.
-
-Le righe `TASK_MEMBER=<id> <file>` sono i membri, nell'ordine del lettore: le figlie per un'epica (`TASK_MEMBERS_SRC=parent`), la lista `## Membri` per un mandato (`TASK_MEMBERS_SRC=list`). Una riga `TASK_MEMBER_MISSING=<id>` è un membro dichiarato senza task file: una riga all'utente, e resta fuori. `TASK_MEMBERS_COUNT=0` → dillo e fermati: non c'è niente da portare avanti.
-
-I membri si leggono **solo** dal lettore, mai a mano dal task file, e si rileggono a ogni quadro (§1).
+Il `Size` del task file del perimetro deve essere `Epic` o `Mandate`. Se non lo è, dillo e fermati: una task normale si esegue con `run-task`, e un elenco di task sciolte diventa un perimetro con `prepare-mandate`. Le righe `TASK_MEMBER=<id> <file>` sono i membri; `TASK_MEMBER_MISSING=<id>` un membro dichiarato senza task file, una riga all'utente; `TASK_MEMBERS_COUNT=0` → dillo e fermati: non c'è niente da portare avanti.
 
 #### La soglia
 
-La **soglia di contesto** è un numero di token assoluto: oltre, l'orchestrator chiude il giro e passa le consegne (§6). Il default è **400.000**. Si cambia solo con l'argomento `--soglia <token>`; nessun campo di progetto la porta. Va nello stato (§0i, riga `soglia di contesto:` di `## Perimetro`), e in una ripresa vale quella dello stato, salvo un `--soglia` negli argomenti: è così che il successore, lanciato senza argomenti, eredita la soglia dell'orchestrator che gli passa le consegne. In token assoluti perché la dimensione della finestra di contesto non sta nel transcript; deve stare sopra la partenza di un orchestrator, che su un progetto con molta doc iniettata occupa già più di 110.000 token, e sotto il punto in cui Claude Code compatta da sé.
+La **soglia di contesto** è un numero di token assoluto: oltre, il giro si chiude e l'orchestrator passa le consegne (§8). Il default è **400.000**. Si cambia solo con l'argomento `--soglia <token>`; nessun campo di progetto la porta. La misura la fa lo script, che la riceve al lancio (§0i), e va nella memoria (§0h): in una ripresa vale quella della memoria, salvo un `--soglia` negli argomenti. In token assoluti perché la dimensione della finestra di contesto non sta nel transcript; deve stare sopra la partenza di un orchestrator, che su un progetto con molta doc iniettata occupa già più di 110.000 token, e sotto il punto in cui Claude Code compatta da sé.
 
-### 0e. La verifica al lancio
-
-Il perimetro porta nel suo task file la sezione `## Analisi del perimetro`: quali coppie di membri non possono girare insieme, e su cosa (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). Prima della prima conversazione l'orchestrator controlla che l'analisi scritta valga ancora:
+### 0e. Il piano
 
 ```bash
-"PY" -B -I "R/mandate.py" verify <perimetro> --children <membri>
+"PY" -B -I "R/schedule.py" verify <perimetro>
 ```
 
-Le righe:
+Le righe e i controlli sono in `schedule-format.md` §`verify`.
 
-| Riga | Cosa dice |
-|---|---|
-| `PERIMETRO=<id>\|epica\|mandato` · `ANALYSIS=presente\|assente` · `ROWS=<n>` | il perimetro, e se la sezione c'è |
-| `ANALYSIS_COMMIT=<sha>` · `ANALYSIS_FROM=sezione\|avanzamento` | il commit da cui l'analisi vale: il più recente fra l'ultimo che ha cambiato le righe della sezione e l'ultimo `### Avanzamento` del perimetro, cioè l'ultimo giro di `checkpoint-mandate`, che riverifica l'analisi. `ANALYSIS_COMMIT=? (<motivo>)`: file o sezione non committati |
-| `DIFF\|<tipo>\|<coppia>\|<dettaglio>` | una differenza della metà meccanica: `manca` (una riga `CONFLICT` di `tree` senza la sua riga, o un path che la riga non cita), `in più` (una riga `dichiarata` o `materiale` che `tree` non calcola), `fuori` (una riga su una task che non è un membro aperto), `forma` (una riga fuori dal formato), `membri` (la lista di un mandato cambiata dopo l'analisi) |
-| `MODELLO\|<a>\|<b>\|<su cosa>` | una collisione della metà del modello fra due membri aperti |
-| `CAMBIATO\|<id>\|modificato\|nuovo` | un membro aperto il cui task file è cambiato dopo il commit dell'analisi, o è nato dopo |
-| `VERIFY=ok\|riesame\|stop` | il verdetto |
-
-Una riga che nomina un membro chiuso non è una differenza: `tree` tace sulle task chiuse, e la riga resta scritta.
-
-- **`VERIFY=stop`** (exit `2`) → **fermati senza aprire niente**. Di' all'utente perché, riga per riga — analisi assente, non committata, ogni `DIFF` —, e il rimedio: `/loom-works:prepare-mandate <perimetro>`, che riscrive l'analisi di un'epica o di un mandato. L'orchestrator non scrive nei task file e non può correggere da sé. Un'epica che non ha mai avuto l'analisi si ferma allo stesso modo.
-- **`VERIFY=riesame`** (exit `0`) → la metà meccanica combacia, e i membri `CAMBIATO` vanno riletti prima di partire: leggi il loro task file per intero e, col metodo di `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md` §La metà del modello, controlla due cose. Le righe `MODELLO` che li nominano reggono ancora: il task file nomina ancora quel file, quel simbolo, quel comportamento? E le loro coppie con gli altri membri aperti hanno una collisione nuova, che la tabella non porta? Un membro `nuovo` passa da zero: tutte le sue coppie. I membri non cambiati non si rileggono: le loro coppie le ha già viste chi ha scritto la sezione, ed è per questo che la verifica costa meno dell'analisi. Una riga che non regge o una collisione nuova → fermati come sullo stop, nominando membro, coppia e oggetto. Nessuna delle due → avanti.
+- **`VERIFY=stop`** (exit `2`) → **fermati senza lanciare niente**. Di' all'utente perché, riga per riga — piano assente, senza folder, non committato, ogni `ERRORE` e ogni `DIFF` —, e il rimedio: `/loom-works:prepare-mandate <perimetro>`, che scrive o rifà il piano. Al lancio l'orchestrator non corregge il piano da sé: un piano che non combacia coi file è un piano che l'utente non ha visto.
+- **`VERIFY=riesame`** (exit `0`) → il piano combacia coi file, e i membri `CAMBIATO` sono cambiati dopo il suo commit: leggi il loro task file per intero e, col metodo di `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md` §La metà del modello, controlla le loro coppie con gli altri membri aperti. Una collisione o una dipendenza nuova, che il piano non porta → il piano si riscrive (§4) prima di partire, e lo dici all'utente. Niente di nuovo → avanti. Un membro `nuovo` passa da zero: tutte le sue coppie.
 - **`VERIFY=ok`** (exit `0`) → avanti.
 
-Le righe `MODELLO` che hanno passato la verifica vanno nello stato, in `## Collisioni del modello` (§0i): su quelle coppie `tree` tace, e senza l'orchestrator le lancerebbe in parallelo (§1, Le regole di partenza). Si ricaricano rilanciando `verify` dopo un commit che cambia il file del perimetro durante il giro — l'evento `git` di un commit `task(T<perimetro>): …` o `checkpoint(T<perimetro>): …`: `verify` legge la storia, e un file cambiato ma non ancora committato non vale ancora. Uno stop a giro avviato non ferma l'orchestrator, ma va detto all'utente con il rimando a `prepare-mandate`, e le righe `MODELLO` nuove sostituiscono le vecchie.
+Le righe `AVVISO` non fermano niente: dille in una riga.
 
-### 0f. Lo stato su disco e gli altri orchestrator vivi
+### 0f. La memoria su disco e gli altri orchestrator vivi
 
-Prima lo stato su disco, poi gli altri orchestrator vivi. In un passaggio di consegne l'orchestrator vecchio smette di contare fra gli orchestrator vivi quando lancia il suo `recap`, e il successore sa che è successo leggendo `passata a` nello stato (§6): letto prima lo stato, la guardia sugli orchestrator vivi non lo ferma per l'orchestrator che gli ha passato le consegne.
-
-#### Lo stato su disco
-
-L'orchestrator tiene quattro file in `.claude/loom/orchestrator/` del progetto, col nome ricavato dall'id del perimetro: `T<perimetro>.md`, lo stato (§0i); `T<perimetro>-prima.json`, le cifre di partenza (§0g); `T<perimetro>-watch.json`, il punto da cui riparte il monitor (§0j); `T<perimetro>-filter.json`, whitelist e blacklist del monitor (§0j). Stanno nel progetto perché sopravvivano a un reboot, e sotto `.claude/loom/` perché git la ignora: nella task folder del perimetro, che è tracciata, il `git add -A` di un `checkpoint-task` linked committerebbe lo stato a metà giro. Nessuno li cancella: il giro dopo eredita i fatti del perimetro, e `checkpoint-mandate` li legge da lì.
+Prima la memoria su disco, poi gli altri orchestrator vivi: in un passaggio di consegne l'orchestrator vecchio smette di contare fra i vivi quando lancia il suo `recap`, e il successore sa che è successo leggendo `passata a` nella memoria (§8).
 
 ```bash
 "PY" -B -I "R/orchestrator_state.py" check <perimetro> --own-session SID --wait 300
 ```
 
-Con un timeout della chiamata Bash di 360000 ms: `--wait 300` aspetta fino a cinque minuti quando trovi un passaggio di consegne a metà (`in passaggio`, sotto), rileggendo lo stato ogni dieci secondi.
+Con un timeout della chiamata Bash di 360000 ms: `--wait 300` aspetta fino a cinque minuti un passaggio di consegne a metà (`in passaggio`, sotto), rileggendo la memoria ogni dieci secondi.
 
-`STATE_FILE`, `BEFORE_FILE`, `WATCH_FILE` e `FILTER_FILE` sono i quattro path: da qui in poi li scrivi per esteso, come `PY` e `R`. `CREATED_ON` è il `Created on` del task file del perimetro, che entra nella testa dello stato (§0i). Lo script crea la cartella.
+`STATE_FILE` è il path della memoria: da qui in poi lo scrivi per esteso. `CREATED_ON` è il `Created on` del task file del perimetro, che entra nella testa (§0h). Lo script crea la cartella.
 
-**`IGNORED=no`** (exit `2`, `CHECK=stop`) → **fermati senza aprire niente**: git non ignora `.claude/loom/`, e lo stato finirebbe nel commit del primo `checkpoint-task` linked. Di' all'utente la riga da aggiungere al `.gitignore` del progetto, quella di `IGNORE_RULE`, e di rilanciare l'orchestrator. `IGNORED=fuori da git` va avanti; `IGNORED=?` — git non risponde — va avanti con una riga all'utente.
+**`IGNORED=no`** (exit `2`, `CHECK=stop`) → **fermati senza lanciare niente**: git non ignora `.claude/loom/`, e i file dell'orchestrator e dello script finirebbero in un commit. Di' all'utente la riga da aggiungere al `.gitignore` del progetto, quella di `IGNORE_RULE`, e di rilanciare. `IGNORED=fuori da git` va avanti; `IGNORED=?` — git non risponde — va avanti con una riga all'utente.
 
 La riga `STATE=` dice cosa hai trovato:
 
 | `STATE` | Cosa trovi | Cosa fai |
 |---|---|---|
-| `assente` | nessuno stato | giro nuovo |
-| `altro` | lo stato di un perimetro passato con lo stesso id: il `Created on` non è quello del task file | giro nuovo, lo stato vecchio si sovrascrive |
-| `ferma` | lo stato di un orchestrator fermato allo stop (§5) | giro nuovo che eredita i soli fatti del perimetro |
+| `assente` | nessuna memoria | giro nuovo |
+| `altro` | la memoria di un perimetro passato con lo stesso id: il `Created on` non è quello del task file | giro nuovo, la memoria vecchia si sovrascrive |
+| `ferma` | la memoria di un orchestrator fermato allo stop (§7) | giro nuovo che eredita i soli fatti del perimetro |
 | `mia` | `attiva` o `in passaggio`, scritta da questa sessione | ripresa di tutto |
-| `consegne` | `passata a` questa sessione: un altro orchestrator ti ha passato le consegne | ripresa di tutto, delega compresa (§6, La ripresa del successore) |
+| `consegne` | `passata a` questa sessione: un altro orchestrator ti ha passato le consegne | ripresa di tutto, delega compresa (§8, La ripresa del successore) |
 | `morta` | `attiva`, `in passaggio` o `passata a` di una sessione che non è più viva: l'orchestrator si è chiuso senza stop | ripresa di tutto tranne la delega |
 | `viva` | `attiva` o `passata a` di un'altra sessione viva | fermati, exit `2` |
 | `in passaggio` | `in passaggio` di un'altra sessione viva, anche dopo l'attesa di `--wait` | fermati, exit `2` |
@@ -142,103 +118,70 @@ La riga `STATE=` dice cosa hai trovato:
 
 `STATE_KIND` è il tipo della testa (`attiva`, `in passaggio`, `passata`, `ferma`); `STATE_FROM` c'è solo su `passata a … · da …`, ed è l'orchestrator che ha passato le consegne.
 
-- **Giro nuovo** (`ROUND=nuovo`). Lo script ha già tolto lo stato del monitor (`WATCH=tolto`): riarmato su un file vecchio, il monitor darebbe come eventi tutto ciò che è cambiato dal giro prima. Ha tolto anche il filtro (`FILTER=tolto`): le conversazioni che l'utente ha escluso valgono per il giro, come la delega. Le cifre di partenza si riscrivono (§0g). Su `ferma` leggi lo stato vecchio con `Read` prima di riscriverlo, e porta nello stato nuovo la sezione `## Fatti del perimetro` intera, aperti e superati: lo stop non lancia il checkpoint del perimetro, e quei fatti possono stare solo lì. Li riesamini al primo quadro (§1): un fatto aperto che i membri hanno chiuso nel frattempo diventa superato. Conversazioni, proposte, rami fermi, collisioni e delega ripartono da zero.
-- **Ripresa** (`ROUND=ripresa`). Leggi lo stato con `Read` e riparti da lì. Lo stato del monitor resta, e il monitor riarmato riparte dal punto in cui era (§0j). Resta anche il filtro (`FILTER=resta`), su `mia`, `morta` e `consegne`: le conversazioni escluse restano escluse. Le cifre di partenza restano quelle salvate all'avvio del giro (`BEFORE=tieni`), e si riscrivono solo se il file manca (`BEFORE=scrivi`). Su `morta` l'orchestrator di prima si è chiuso senza stop — un crash, una tab chiusa, un reboot: adotti conversazioni, proposte in sospeso, rami fermi e fatti; le conversazioni `tab` della tabella che `sessions.py list` non dà più vive (§0h) diventano `abbandonata (non più viva alla ripresa)`, e un `## Checkpoint in corso` su una di loro si libera — tranne le righe `in coda`, che non hanno ancora un processo per costruzione: restano `in coda` fino all'ora della loro scadenza (§2, Aprire una tab); la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: conversazioni adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta, conversazioni escluse dal monitor.
-
-  **Una conversazione `headless` non diventa mai `abbandonata` solo perché non è viva**: fra due turni non ha processo per costruzione, e il suo transcript e i suoi file in `.claude/loom/headless/` sopravvivono all'orchestrator. In ogni ripresa, `mia`, `morta` o `consegne`, ogni riga `headless` in ciclo si rilegge con `loom-deck-headless status` (§2, L'esito di un turno headless): `in corso` aspetta la fine del turno; `turno chiuso` si legge, e il ciclo prosegue dal punto che il testo finale dice — un report da cui chiedere il checkpoint, una domanda da proporre, un checkpoint finito; `errore` e `permesso negato` fermano il ramo come sempre.
-- **`viva`** → **fermati senza aprire niente**: un altro orchestrator vivo tiene lo stato di questo perimetro, la sessione di `STATE_HOLDER`. Le strade sono quelle della guardia sugli altri orchestrator vivi, sotto: fermarlo nella sua chat, o chiuderne la conversazione.
-- **`consegne`** → la ripresa del successore (§6, La ripresa del successore): tutto come su `morta`, ma la delega resta, e l'orchestrator di `STATE_FROM` lo chiudi tu dopo l'armo del monitor.
-- **`in passaggio`** → **fermati senza aprire niente**: un altro orchestrator vivo, la sessione di `STATE_HOLDER`, ha cominciato a passare le consegne e non ha finito nei cinque minuti dell'attesa. Di' all'utente il path dello stato e l'orchestrator che lo tiene: la strada è guardare la sua chat.
-- **`illeggibile`** → **fermati senza aprire niente**, e di' all'utente il path: lo stato lo corregge o lo toglie lui. L'orchestrator non sovrascrive un file che non sa leggere, perché può portare i fatti di un giro.
+- **Giro nuovo** (`ROUND=nuovo`). `check` ha già tolto il punto di lettura degli scanner dello script (`WATCH=tolto`): ripartiti su un file vecchio, darebbero come eventi tutto ciò che è cambiato dal giro prima. Su `ferma` leggi la memoria vecchia con `Read` prima di riscriverla, e porta nella nuova la sezione `## Fatti del perimetro` intera, aperti e superati: lo stop non lancia il checkpoint del perimetro, e quei fatti possono stare solo lì. Li riesamini alla prima lettura del giro (§1): un fatto aperto che i membri hanno chiuso nel frattempo diventa superato. Tab, proposte, rami fermi e delega ripartono da zero.
+- **Ripresa** (`ROUND=ripresa`). Leggi la memoria con `Read` e riparti da lì: il flusso dello script tiene i passi, e la riga `Letto fino a` della memoria dice da dove rileggerlo. Su `morta` l'orchestrator di prima si è chiuso senza stop — un crash, una tab chiusa, un reboot: adotti fatti, proposte in sospeso, rami fermi e tab; una tab della memoria che `sessions.py list` non dà più viva diventa `abbandonata (non più viva alla ripresa)`, tranne una `in coda`, che resta tale fino all'ora della sua scadenza (§5); la **delega torna `no`**, perché vale solo nella chat dove l'utente l'ha data, e l'utente la ridichiara qui se la vuole. Scrivi in chat cosa hai trovato: tab adottate e abbandonate, proposte in sospeso, rami fermi, fatti aperti, delega tolta.
+- **`viva`** → **fermati senza lanciare niente**: un altro orchestrator vivo tiene questo perimetro, la sessione di `STATE_HOLDER`. Le strade sono quelle della guardia sotto: fermarlo nella sua chat, o chiuderne la conversazione.
+- **`consegne`** → la ripresa del successore (§8): tutto come su `morta`, ma la delega resta, e l'orchestrator di `STATE_FROM` lo chiudi tu dopo il primo `wait`.
+- **`in passaggio`** → **fermati senza lanciare niente**: un altro orchestrator vivo, la sessione di `STATE_HOLDER`, ha cominciato a passare le consegne e non ha finito nei cinque minuti dell'attesa. Di' all'utente il path della memoria e l'orchestrator che la tiene.
+- **`illeggibile`** → **fermati senza lanciare niente**, e di' all'utente il path: la memoria la corregge o la toglie lui. L'orchestrator non sovrascrive un file che non sa leggere, perché può portare i fatti di un giro.
 
 Exit `1` — task file del perimetro mancante, registro delle sessioni illeggibile → dillo e fermati.
 
 #### Gli altri orchestrator vivi
 
-Due orchestrator su due perimetri che hanno un membro aperto in comune lancerebbero tutti e due la stessa task: la regola «un passo alla volta» vede una sessione esterna solo quando è già viva, e la coda dei checkpoint vale dentro un orchestrator solo. Prima di aprire niente, e dopo lo stato su disco, controlla gli altri orchestrator vivi sul progetto:
+Due orchestrator su due perimetri con un membro aperto in comune lancerebbero tutti e due la stessa task: ognuno vede la conversazione dell'altro solo quando è già viva. Dopo la memoria, e prima di lanciare niente:
 
 ```bash
 "PY" -B -I "R/sessions.py" orchestrators --own-session SID
 ```
 
-Una riga `ORCHESTRATOR|<sessionId>|<perimetro>|<etichetta>` per ogni altra sessione viva che ha lanciato un orchestrator e non l'ha fermato, poi `ORCHESTRATORS=<n>`. Su `STATE=consegne` la riga col `sessionId` di `STATE_FROM` non conta: è l'orchestrator che ti ha passato le consegne, ed è fermo — ha lanciato il suo `recap` prima di scrivere `passata a` (§6), quindi di norma la riga non c'è nemmeno. Per ogni altra leggi i membri del suo perimetro col lettore unico:
+Una riga `ORCHESTRATOR|<sessionId>|<perimetro>|<etichetta>` per ogni altra sessione viva che ha lanciato un orchestrator e non l'ha fermato, poi `ORCHESTRATORS=<n>`. Su `STATE=consegne` la riga col `sessionId` di `STATE_FROM` non conta: è l'orchestrator che ti ha passato le consegne. Per ogni altra leggi i membri del suo perimetro col lettore unico, `resolve-task.sh <perimetro dell'altro> --members`.
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro dell'altro orchestrator> --members
-```
+Un membro è **in comune** se compare fra i tuoi membri aperti — le righe `TASK` di `"PY" -B -I "R/mandate.py" tree <perimetro> --children <membri>` con `next` diverso da `chiusa` ed `epica` — e fra i membri dell'altro orchestrator; lo è anche il tuo stesso perimetro, se l'altro porta avanti quello. Un membro in comune → **fermati senza lanciare niente**, e di' all'utente quale orchestrator (sessionId corto, perimetro con la maniglia), quali membri in comune, e le due strade: fermare l'altro orchestrator, o togliere i membri in comune da uno dei due perimetri con `prepare-mandate`. Nessun membro in comune → avanti.
 
-Un membro è **in comune** se compare fra i tuoi membri aperti — le righe `TASK` di `"PY" -B -I "R/mandate.py" tree <perimetro> --children <membri>` con `next` diverso da `chiusa` ed `epica` — e fra i membri dell'altro orchestrator; lo è anche il tuo stesso perimetro, se l'altro orchestrator porta avanti quello. Un membro in comune → **fermati senza aprire niente**, e di' all'utente quale orchestrator (sessionId corto, perimetro con la maniglia), quali membri in comune, e le due strade: fermare l'altro orchestrator — chiedergli lo stop nella sua chat, o chiuderne la conversazione —, o togliere i membri in comune da uno dei due perimetri con `prepare-mandate`. Nessun membro in comune → avanti.
-
-**Il controllo vede solo questa macchina.** Il registro delle sessioni vive e i transcript sono locali: un orchestrator lanciato da un'altra macchina sullo stesso repo — uno su Windows, uno su Linux — non compare, e nessun meccanismo lo vede, nemmeno un lock su file. Per quel caso vale una regola, a carico dell'utente: **non lanciare due orchestrator su perimetri con una task aperta in comune, su nessuna macchina.** Dillo all'utente in una riga a ogni avvio in cui il controllo passa.
+**Il controllo vede solo questa macchina.** Il registro delle sessioni vive e i transcript sono locali: un orchestrator lanciato da un'altra macchina sullo stesso repo non compare. Per quel caso vale una regola, a carico dell'utente: **non lanciare due orchestrator su perimetri con una task aperta in comune, su nessuna macchina.** Dillo all'utente in una riga a ogni avvio in cui il controllo passa.
 
 ### 0g. Il quadro di partenza
 
-1. Lancia `/loom-works:recap-status-epic <perimetro>` col tool `Skill`, che vale per un'epica e per un mandato: è il quadro che l'utente legge, con le cifre, le dipendenze e chi può andare in parallelo. Senza quel quadro un evento come «T23 DLV 7/18→8/18» non dice cosa sblocca.
-2. Con `BEFORE=scrivi` (§0f) salva le cifre di partenza, che il recap allo stop confronta con quelle finali:
+Lancia `/loom-works:recap-status-epic <perimetro>` col tool `Skill`, che vale per un'epica e per un mandato: è il quadro che l'utente legge, con le cifre, le dipendenze e il piano.
 
-   ```bash
-   "PY" -B -I "R/mandate.py" tree <perimetro> --children <membri> --save "<BEFORE_FILE>"
-   ```
+### 0h. La memoria dell'orchestrator
 
-   Con `BEFORE=tieni` restano quelle del giro che riprendi: il recap allo stop confronta con l'avvio del giro, non con la ripresa.
+Il giro dura ore e il contesto si compatta: la memoria non può vivere solo nella conversazione. Scrivila in `STATE_FILE` col tool `Write`, riscrivila intera a ogni cambio, e **rileggila dopo ogni compattazione del contesto**, prima di decidere qualunque cosa.
 
-### 0h. Le sessioni vive
+La memoria porta solo ciò che l'orchestrator giudica e che lo script non sa: i passi, gli esiti dei turni, le conversazioni headless e i checkpoint stanno nel flusso dello script, e si leggono con `flow.py recap`.
 
-```bash
-"PY" -B -I "R/sessions.py" list
-```
+Le due righe di testa stanno prima di ogni heading. `orchestrator_state.py check` le legge al lancio di un orchestrator dopo questo, e lo script le rilegge a ogni giro per sapere chi è l'orchestrator e se è fermo:
 
-più `ListAgents`. `list` dà ogni sessione viva del progetto con la sua task e il suo stato; `ListAgents` dà il nome con cui le scrivi. Una sessione già viva su un membro del perimetro, aperta da qualcun altro, è **esterna**: l'orchestrator la segue e le prepara proposte di risposta col via dell'utente, ma non le manda nessun messaggio di sua iniziativa, nemmeno il checkpoint. Finché è viva, l'orchestrator non apre un'altra conversazione sulla stessa task.
-
-Una sessione viva su una task fuori dal perimetro, o senza task, non è esterna: è fuori dal perimetro, e l'orchestrator la ignora (§1, Il riporto).
-
-### 0i. Lo stato dell'orchestrator
-
-Il giro dura ore e il contesto si compatta: lo stato non può vivere solo nella conversazione. Scrivilo in `STATE_FILE` (§0f) col tool `Write`, riscrivilo intero a ogni cambio, e **rileggilo dopo ogni compattazione del contesto**, prima di decidere il passo successivo, insieme a `FILTER_FILE`: le conversazioni escluse dal monitor stanno solo lì (§0j).
-
-Le due righe di testa stanno prima di ogni heading, e `orchestrator_state.py check` le legge al lancio di un orchestrator dopo questo:
-
-- **`Stato:`** — `Stato: attiva · SID` dalla prima scrittura del giro, anche in una ripresa; `Stato: ferma · SID` allo stop (§5). Nel passaggio di consegne (§6) due righe in più: `Stato: in passaggio · SID` da quando chiedi il successore a quando nasce, poi `Stato: passata a <sessionId del successore> · da SID`. La riga dice a chi rilancia l'orchestrator se trova un giro in corso, un giro chiuso, un passaggio a metà o le consegne di un altro orchestrator.
-- **`Perimetro:`** — `Perimetro: T<perimetro> · Created on <CREATED_ON>`, l'identità. L'id di un perimetro purgato può tornare a una task nuova, e uno stato con un altro `Created on` vale come assente.
+- **`Stato:`** — `Stato: attiva · SID` dalla prima scrittura del giro, anche in una ripresa; `Stato: ferma · SID` allo stop (§7). Nel passaggio di consegne (§8) due righe in più: `Stato: in passaggio · SID` da quando chiedi il successore a quando nasce, poi `Stato: passata a <sessionId del successore> · da SID`.
+- **`Perimetro:`** — `Perimetro: T<perimetro> · Created on <CREATED_ON>`, l'identità. L'id di un perimetro purgato può tornare a una task nuova, e una memoria con un altro `Created on` vale come assente.
 
 ```markdown
 Stato: attiva · <SID>
 Perimetro: T<perimetro> · Created on <CREATED_ON>
 
-# Orchestrator di T<perimetro> — stato
+# Orchestrator di T<perimetro> — memoria
 
 ## Perimetro
 - T<perimetro> · epica | mandato
 - membri: T.. T..
-- cifre di partenza: <BEFORE_FILE>
-- soglia di contesto: <token> · gradino: nessuno | <ultimo 🧠 ricevuto>%
-
-## Conversazioni dell'orchestrator
-| Task | Passo | Canale | sessionId | Nome | Stato |
-|------|-------|--------|-----------|------|-------|
-<!-- Canale: headless (loom-deck-headless open) · tab (spawn-task su richiesta dell'utente, o adottata) -->
-<!-- Stato: in coda (scade <ora>) · in ciclo · ferma su domande · segnalazioni in sospeso · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
+- piano: <path di schedule.md>
+- soglia di contesto: <token>
+- Letto fino a: <seq>
 
 ## Fatti del perimetro
 - T.. · <il fatto> · <dove l'ha detto: report del run, messaggio, preflight> [· superato: <cosa lo chiude>]
 
-## Collisioni del modello
-- T.. · T.. · <su cosa>   (righe MODELLO di verify, ricaricate a ogni commit del file del perimetro)
-
-## Sessioni esterne
-- T.. · <sessionId> · <nome>
-
 ## Proposte in sospeso
-- T.. · <sessione> · <di cosa> · in attesa del via dal <ora>
-
-## Checkpoint in corso
-- nessuno | T.. · <sessione> | T<perimetro> (perimetro) · <sessione>
-
-## Checkpoint del perimetro
-- cicli chiusi dall'ultimo: <n> · ultimo: mai | <ora> · <sessione>
+- T.. · <sessione> · <di cosa> · risveglio <seq> · in attesa del via dal <ora>
 
 ## Rami fermi
-- T.. · <motivo> · task che aspettano: T..
+- T.. · <motivo> · risveglio <seq> · task che aspettano: T..
+
+## Tab dell'orchestrator
+| Task | Passo | sessionId | Nome | Stato |
+|------|-------|-----------|------|-------|
+<!-- Stato: in coda (scade <ora>) · in ciclo · checkpoint chiesto · chiusa · abbandonata (<motivo>) -->
 
 ## Delega
 - no | sì dal <ora>: «<le parole dell'utente>»
@@ -247,360 +190,152 @@ Perimetro: T<perimetro> · Created on <CREATED_ON>
 - nessuno | successore <sessionId> · in coda (scade <ora>) · richiesta <n> | da <sessionId> alle <ora> · chiusa | abbandonata (<motivo>)
 ```
 
-### 0j. Il filtro, l'armo e il riarmo del monitor
+**`Letto fino a`** è l'ultimo `seq` del flusso che l'orchestrator ha letto e trattato. È il punto da cui rilegge al risveglio dopo (§1), e quello da cui riparte un orchestrator nuovo dopo un crash o un passaggio di consegne.
 
-Il monitor segue tutte le sessioni vive del progetto, e ogni sua riga ti arriva come notifica: anche per ignorarla spendi un turno. Il **filtro** toglie le righe fuori dal mandato prima che escano dal monitor.
+### 0i. Lo script del flusso
 
-**Il filtro, prima del primo armo del giro**, nuovo o ripreso. Scrivi `FILTER_FILE` (§0f) col tool `Write`:
+Scrivi la memoria **prima** di lanciare lo script: lo script legge dalla testa chi è l'orchestrator, e senza un orchestrator vivo non apre nessun passo.
 
-```json
-{"whitelist": ["task:T<perimetro>", "task:T<membro>", "task:T<membro>"], "blacklist": []}
-```
+- **Giro nuovo**:
 
-- **`whitelist`** — `task:` per il perimetro e per ogni membro dell'ultima lettura di `resolve-task.sh --members` (§0d), senza i `TASK_MEMBER_MISSING`. Le dipendenze esterne dei membri restano fuori.
-- **`blacklist`** — vuota in un giro nuovo. In una ripresa (`FILTER=resta`) leggi prima il file con `Read` e tieni la sua blacklist: sono le conversazioni che l'utente ha escluso (§1, Escludere una conversazione).
+  ```bash
+  "PY" -B -I "R/flow.py" --project-root "<radice>" start <perimetro> --nuovo --context-threshold <soglia>
+  ```
 
-Il file è l'unica sede delle liste. Il monitor lo rilegge da sé quando cambia, quindi il comando di armo non cambia mai: riscrivi il file intero, con le due chiavi, quando cambia la riga `membri:` dello stato (§1, I membri, a ogni quadro) e quando l'utente esclude o riammette una conversazione, e nessun riarmo. Un filtro è una stringa col tipo in testa: `task:T<n>`, `session:<sessionId>` o `re:<regex>`. La regex guarda la riga come esce dal monitor, e la scrivi solo se l'utente la chiede.
+  `--nuovo` archivia il flusso e gli ordini di un giro prima (`ARCHIVIATO=…`), e il giro riparte da zero. Exit `2` con `FLOW=vivo` → uno script di un giro prima è ancora vivo: `flow.py stop <perimetro>`, poi di nuovo `start --nuovo`.
+- **Ripresa**: prima lo stato dello script:
 
-Cosa passa:
+  ```bash
+  "PY" -B -I "R/flow.py" --project-root "<radice>" status <perimetro>
+  ```
 
-- un evento di **sessione** porta la task della sessione: una sessione `?` non passa finché un evento non la lega a un membro, e un cambio di legame passa se la task vecchia o la nuova è un membro;
-- un evento di **task file** o di **`tasks.md`** porta la sua task;
-- un **commit** porta l'id dello scope (`run(T23): …`), o senza scope ogni id del soggetto. Il commit di creazione `task(T<n>): create` porta anche il `Parent Task` della task nata: così passa la figlia nuova di un'epica, e la creazione di una task estranea no;
-- un **push** e un commit senza id non hanno task, e non passano: nessuna regola dell'orchestrator parte da loro;
-- le righe **`monitor`** e **`orchestrator 🧠`** passano sempre.
+  Exit `0` (`FLOW=vivo`) → lo script lavora già, e non ne lanci un altro: ti riattacchi col `wait` (§0j). Exit `3` → lo lanci senza `--nuovo`, e riparte dal suo flusso senza ripetere né perdere passi:
 
-**L'armo.** Lancia il tool `Monitor` con `timeout_ms: 1800000`, una `description` che nomina il perimetro e il progetto («orchestrator T197: sessioni di loom-works»), e questo comando:
+  ```bash
+  "PY" -B -I "R/flow.py" --project-root "<radice>" start <perimetro> --context-threshold <soglia>
+  ```
 
-```bash
-"PY" -u -B -I "R/watch_sessions.py" --project-root "<radice del progetto>" --own-session SID --state "<WATCH_FILE>" --filter "<FILTER_FILE>" --context-threshold <soglia> 2>&1
-```
+  In una ripresa con un `--soglia` diverso da quello della memoria, lo script vivo misura ancora la soglia vecchia: `flow.py stop`, poi `start` con la soglia nuova.
 
-`<soglia>` è la soglia di contesto (§0d, La soglia), in token, come sta nello stato.
+`FLOW=avviato` (exit `0`) porta `PID` e `SEQ`. Exit `1` (`FLOW=non partito`) → **fermati**, e di' all'utente le righe `LOG|` che lo script stampa: senza lo script nessun passo parte.
 
-Aggiungi `--repo nome=path-relativo` solo per un repo dove lavorano i membri che non sia la radice né un submodule di `.gitmodules`: quelli il monitor li guarda da sé. Aspetta la riga `monitor ✅ armato col filtro (sessioni fuori: N): …`: deve elencare ogni sessione viva del mandato che ti aspetti, con stato ed età, e `N` conta le sessioni vive che il filtro tiene fuori. Una sessione attesa che manca va cercata con `sessions.py list` prima di fidarti del silenzio.
+Lo script lavora da solo da qui: verifica il piano quando cambia, segue le sessioni, apre i passi, legge gli esiti. Cosa fa a ogni giro e quando un passo parte: `flow-format.md` §Il giro dello script.
 
-**Un file del filtro guasto non ferma il monitor.** Una riga `monitor ⚠ filtro <file>: <motivo> — …` dice che il file manca, non è JSON o porta un filtro che non vale, e cosa fa il monitor intanto: `resta il filtro di prima`, l'ultimo valido, o `passa tutto` se non ne ha ancora uno. Riscrivi il file: alla rilettura buona arriva `monitor ✅ filtro <file>: di nuovo in vigore`.
-
-**Riarmo.** Il tool `Monitor` uccide il processo dopo 30 minuti al massimo e ti manda un avviso di scadenza. A ogni avviso rilancia **lo stesso comando, con lo stesso `--state` e lo stesso `--filter`**, senza riscrivere il filtro: il monitor riparte dal punto in cui era, senza ripetere gli eventi già detti e senza perdere quelli capitati nel cambio. Vale anche per il primo armo di una ripresa (§0f): il file è quello del giro ripreso. La riga di armo diventa `monitor ✅ riarmato col filtro …`. Un evento consegnato dopo un `TaskStop` era già in coda: è in ritardo, ignoralo.
-
-**Il contesto dell'orchestrator.** Con `--context-threshold` il monitor misura il tuo contesto dal tuo transcript — `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` dell'ultima risposta — e manda una riga `orchestrator 🧠 contesto al <N>% della soglia: <token> token su <soglia>` al 20, 40, 60, 80, 100 e 120%, una volta per gradino: un riarmo non li ripete. Al primo armo arriva un evento solo, col gradino più alto già superato — un orchestrator nasce già oltre i primi —, e un salto di più gradini dà solo il più alto. I gradini valgono per il tuo `sessionId`: il successore, che riarma sullo stesso `WATCH_FILE`, riparte da zero. Cosa fai a ogni gradino: §6.
-
-Gli eventi del monitor arrivano come notifiche e non sono risposte dell'utente, anche quando arrivano mentre aspetti il suo via. Il fine turno di una tab arriva come evento `⏸ turno finito`: è il segnale su cui l'orchestrator ragiona, perché la notifica di `SendMessage` con `notify_when_idle` non arriva mentre l'orchestrator sta lavorando.
-
-Un turno headless il monitor lo vede come un processo che nasce e muore, perché ogni turno è un processo `claude -p` nuovo, anche una `reply` sulla stessa conversazione: `▶ turno headless partito` quando il processo compare nel registro, `⏹ turno headless finito` con la prima riga dell'ultimo testo quando sparisce, e nessun `⏸`. L'evento `⏹` è la **sveglia**, non l'esito: l'esito lo dà `status` (§2, L'esito di un turno headless). Il monitor legge il registro a ogni giro, 15 secondi: un turno che nasce e muore fra due letture non produce né `▶` né `⏹`, ed è per questo che l'orchestrator aspetta l'esito con `--wait` dopo ogni lancio.
-
-## 1. Il quadro e la scelta del passo
-
-Il passo successivo si decide sul quadro dei file, mai a memoria. Rifai il quadro dopo l'armo e dopo ogni evento che cambia lo stato di una task — un fine turno, un checkpoint finito, una risposta dell'utente. Il quadro sono due letture, sempre insieme e in quest'ordine:
+### 0j. Il primo `wait`
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro> --members
-"PY" -B -I "R/mandate.py" tree <perimetro> --children <membri>
+"PY" -B -I "R/flow.py" --project-root "<radice>" wait <perimetro> --dopo <seq>
 ```
 
-Con una o più conversazioni nella blacklist del filtro, il quadro ha una terza lettura, `"PY" -B -I "R/sessions.py" list`: il monitor non dice più quando una conversazione esclusa si apre o si chiude, e la regola 1 di §Le regole di partenza la conta finché è viva (§Escludere una conversazione).
+Lanciato col tool Bash e **`run_in_background: true`**: non ha scadenza, a differenza del tool `Monitor`, e alla sua fine la notifica ti sveglia. `<seq>` è il `SEQ` di `start` in un giro nuovo, la riga `Letto fino a` della memoria in una ripresa (`0` se manca). Scrivi `Letto fino a` nella memoria. Poi chiudi il turno: da qui ti sveglia lo script.
 
-### I membri, a ogni quadro
+## 1. Il giro: aspettare e leggere
 
-I membri si rileggono dal lettore unico a ogni quadro, e i `<membri>` di `tree` sono quelli di **questa** lettura, non quelli dell'avvio: un perimetro cambia durante il giro. In un'epica nasce una figlia nuova, che dichiara il `Parent Task`; in un mandato `prepare-mandate` aggiunge o toglie una riga di `## Membri`. Confronta la lettura con la riga `membri:` dello stato:
+**Un `wait` solo, sempre.** Lo lanci in tre momenti e in nessun altro: al lancio (§0j), alla notifica di fine di un `wait` che ha portato risvegli nuovi, e dopo aver rilanciato uno script morto. Un prompt dell'utente non tocca il `wait`, che è ancora in corso; una compattazione del contesto nemmeno.
 
-- **Un membro nuovo** entra nel mandato dell'orchestrator da questo quadro, e parte con le sole regole del quadro: le dipendenze e i path in comune che `tree` calcola. Una riga all'utente: `T70 (maniglia) entra nel perimetro: l'analisi scritta non lo copre, e le collisioni che nessun campo dichiara non le vedo — per coprirlo /loom-works:prepare-mandate <perimetro>`. L'orchestrator non si ferma: l'analisi non la può scrivere, e un ramo fermo in attesa di un'analisi resterebbe appeso all'utente.
-- **Un membro tolto** esce dal mandato dell'orchestrator: nessuna conversazione nuova su di lui. Un suo ciclo già aperto da questo orchestrator arriva al checkpoint come gli altri, poi la task si lascia andare. Una riga all'utente.
-- **Un `TASK_MEMBER_MISSING` nuovo** — un membro purgato da `clean-tasks` durante il giro — esce come un membro tolto.
+**Il risveglio.** Alla notifica di fine del `wait`, una lettura sola:
 
-Riscrivi la riga `membri:` dello stato a ogni cambio, e con lei la whitelist del filtro, blacklist intatta (§0j): un membro nuovo fuori dalla whitelist resterebbe muto per il monitor. Le cifre di partenza del recap (§5) restano quelle salvate all'avvio: un membro entrato dopo non ha un «prima», e il recap lo dice.
+```bash
+"PY" -B -I "R/flow.py" --project-root "<radice>" recap <perimetro> --dal <Letto fino a> --testi
+```
 
-Le righe che legge l'orchestrator:
+Le righe sono in `flow-format.md` §Le righe di `recap`: lo stato del giro, una riga `MEMBRO` per membro, le righe `RISVEGLIO` dopo `Letto fino a`, poi gli eventi, i passi e i turni raccolti per membro, ogni turno col suo testo finale.
 
-| Riga | Cosa dice |
-|---|---|
-| `TASK\|<id>\|prog=…\|size=…\|preflight=…\|dlv=a/b\|ac=a/b\|next=…\|blocked=…\|title=…` | stato della task e prossimo passo del suo ciclo |
-| `DEPS\|<id>\|T.. ✔ (deps) · T.. 🟡 (grafo)` | da chi dipende, con la Prog e la fonte: `## Dependencies` del task file o frecce e Cross-deps del grafo. Il perimetro non compare: si chiude dopo i membri, e un membro che lo nomina non lo aspetta |
-| `MATERIALE\|<id>\|<path> · …` | i path di `## Materiale`, `📁/` sciolto nella task folder; le voci 🎬, lo stato dell'orchestrator, non entrano |
-| `CONFLICT\|<id>\|<id>\|dipendenza` · `…\|materiale: <path>` | due task aperte che non possono girare insieme: una dipendenza fra loro, o un path in comune che almeno una delle due non dichiara come 📖 fonte (due letture non si scontrano) |
+- **Nessuna riga `RISVEGLIO` dopo `Letto fino a`** → era un `wait` doppio, uscito sullo stesso risveglio di un altro già letto: non rilanci niente, e chiudi il turno.
+- **Solo `keep-alive`** → il risveglio serve a tenere calda la cache (`flow-format.md` §Il keep-alive): rilanci il `wait` col `--dopo` uguale al `SEQ` della lettura, nessuna riga in chat, nessuna scrittura della memoria.
+- **Altri risvegli** → li tratti tutti (§2), nell'ordine in cui sono scritti, poi i fatti del perimetro (sotto), poi la memoria con `Letto fino a` = il `SEQ` della lettura, poi il `wait` col `--dopo` uguale a quel `SEQ`.
 
-Lo stato viene dalla cella Prog della tabella Tasks Overview e dal task file, **mai dai glifi del grafo**: fra la promozione e il checkpoint i glifi del grafo restano indietro. Il grafo dà solo le frecce.
+**Il `wait` che esce con `3`** → lo script è morto. `flow.py status <perimetro>` dice perché (`FINE=…`); un motivo diverso da uno stop tuo → lo rilanci con `start` senza `--nuovo` (§0i), che riparte dal flusso, e ti riattacchi col `wait`. Se muore di nuovo prima del risveglio successivo, non lo rilanci più: scali all'utente (§6) con le ultime righe di `.claude/loom/orchestrator/T<perimetro>-flow.log`.
 
-`next` vale:
+**In chat**, a ogni risveglio che non è un keep-alive: cosa è successo dall'ultima lettura, una riga per passo aperto o chiuso, e cosa vuol dire per il perimetro; poi i risvegli e cosa ne hai fatto. Ogni id porta la sua maniglia: `T32 (campione Naviga su dev)`. Un passo chiuso senza storia prende una riga; non riempire il silenzio. L'evento è un fatto, la deduzione si dice come tale.
 
-- `preflight` — nessun preflight valido su una task 🔵: manca il blocco datato in `## Decisions`; oppure, a ogni Prog, l'ultimo blocco è una «premessa decaduta». Una task 🟢 o 🟡 senza blocco è già partita senza preflight, che per una S o una M non è obbligatorio: va a `run` o a `checkpoint`. Una Size L senza blocco va a `preflight` a ogni Prog: `run-task` su una L senza preflight si rifiuta di partire. Il primo caso lo lanci; il secondo no: la ricostruzione delle premesse è dell'utente, e la task diventa un ramo fermo (§4).
-- `run` — preflight fatto, o task già partita, e DLV aperti.
-- `checkpoint` — tutti i DLV spuntati, Prog non ancora ✔️: il ciclo si è fermato prima del checkpoint. Non lo lanci in una conversazione nuova, che non avrebbe il contesto del run (§2). Se lo stato porta la conversazione del run di quella task ancora `in ciclo`, col suo `sessionId`, il checkpoint si chiede lì, sul suo canale (§2, Scrivere): una headless ferma lo riceve con `reply`. Senza, il ciclo è interrotto: scala all'utente.
-- `chiusa` — Prog ✔️, niente da fare.
-- `epica` — un'epica o un mandato fra i membri non si esegue: è un perimetro a sé, e si orchestra con un orchestrator a parte.
-- `assente` — nessun task file: scartala con una riga all'utente.
-
-### Le regole di partenza
-
-Una conversazione nuova parte solo se valgono tutte:
-
-0. **Il giro è aperto.** Dal gradino del 100% della soglia di contesto il giro è in chiusura (§6): nessuna conversazione nuova, nemmeno quella che le regole sotto lascerebbero partire. Fa eccezione solo il checkpoint del perimetro, a fine giro (§2), e un passo che un ciclo già aperto chiede nella sua conversazione — le risposte, il checkpoint del ciclo.
-1. **Un passo alla volta dentro una task.** Il ciclo è preflight → run → checkpoint, e l'orchestrator non apre una conversazione su una task che ne ha già una in ciclo — sua, esterna (§0h) o esclusa dal monitor e ancora viva (§Escludere una conversazione). Una tab `in coda` (§2, Aprire una tab) conta come in ciclo, qui e nel parallelo: nascerà al ritorno del focus, e lavorerebbe accanto a quella nuova.
-2. **Dipendenze soddisfatte**, per ogni passo, preflight compreso: le decisioni di una task poggiano su ciò che la dipendenza ha fatto davvero. Una dipendenza è soddisfatta quando è ✔️, oppure quando la sua voce in `## Dependencies` nomina dei DLV precisi («serve il DLV2 di T21») e quei DLV sono **chiusi a ciclo finito**. Le voci le leggi tu nel task file: `blocked=` conta solo le task, non i DLV.
-3. **Un DLV conta come chiuso solo a ciclo finito.** `run-task` spunta e committa ogni DLV appena chiuso, prima del checkpoint e prima delle risposte alle segnalazioni del suo report. Per l'orchestrator il DLV diventa una base solo dopo il checkpoint del suo ciclo e le risposte alle segnalazioni. Una task con segnalazioni in sospeso non fa da base a nessuna: si fermano le sue dipendenti, i rami indipendenti continuano.
-4. **Parallelo solo senza conflitti.** Due task vanno insieme solo se nessuna riga `CONFLICT` le accoppia — né una dipendenza fra loro, né un path in comune nei loro `## Materiale` che almeno una delle due scrive — e nessuna riga di `## Collisioni del modello` nello stato (§0e): una collisione che nessun campo dichiara ferma il parallelo come una `CONFLICT`. Vale per ogni passo, preflight compreso, e vale anche contro una sessione esterna in ciclo.
-5. **Un checkpoint alla volta in tutto il mandato.** Il checkpoint riscrive il task file e `tasks.md`, e due `checkpoint-task` insieme fanno race su `tasks.md` e su git. Prima di chiederne uno guarda `## Checkpoint in corso` nello stato: se è occupato, il ciclo aspetta in coda, e lo dici in una riga.
-
-Fra i membri pronti, parte prima quello che sblocca più membri: conta le righe `DEPS` che lo nominano.
-
-### Il perimetro del run
-
-Un ciclo di lavoro è una sola chiamata `run`. Prima del lancio guarda le voci `## Dependencies` degli altri membri: se una nomina un DLV preciso di questa task, il primo ciclo fa **solo quei DLV** (perimetro `2`, `1,3`), e il resto va in un ciclo successivo, in un'altra conversazione. Le dipendenze vivono spesso al livello del singolo DLV, e un run su tutti i DLV terrebbe ferma la dipendente fino alla fine. Senza DLV nominati, il perimetro è tutti i DLV aperti: `run` senza perimetro.
-
-### Il riporto
-
-Il monitor è armato col filtro del perimetro (§0j), e gli eventi che arrivano sono di norma del **mandato**: il perimetro e i suoi membri dell'ultima lettura (§I membri, a ogni quadro). Tre finestre ne lasciano arrivare altri: i 15 secondi fra un membro tolto e il filtro riscritto, una regex che l'utente ha chiesto, un file del filtro guasto (`monitor ⚠ filtro …`). Per questo guardi comunque l'etichetta in testa all'evento, che dice a quale task appartiene, e un evento fuori dal mandato lo ignori del tutto: nessuna riga in chat, nessuna proposta (§3), nessun messaggio, nessuna chiusura, nessuna scalata (§4), niente nello stato — anche quando dentro il mandato chiederebbe una mossa, come una domanda o `🧊 ferma da N min`. Quella sessione risponde al suo utente, non al mandato.
-
-- **Sessione senza task** — etichetta `?` più l'inizio del sessionId → fuori dal mandato, finché un evento non la lega a una task del mandato.
-- **Cambio di legame** — `🏷 legata a`, `🔀 staccata da`, `🔀 riassegnata` → conta se la task vecchia o la nuova è del mandato: una riga, e da lì la sessione è dentro o fuori secondo la nuova. Una conversazione dell'orchestrator in ciclo che esce dal mandato ha il ciclo interrotto: è un'anomalia (§4).
-- **Commit** → conta se il soggetto nomina una task del mandato (`run(T23): …`). Il commit di creazione `task(T<n>): create …` passa il filtro per il suo `Parent Task`: rifai il quadro prima di ignorarlo, perché è così che si presenta una figlia nuova dell'epica. Se il quadro non la porta fra i membri, l'evento resta ignorato.
-- **Eventi `monitor`** → si guardano sempre: parlano del monitor, non di una task.
-- **Eventi `orchestrator 🧠`** → si guardano sempre: parlano del tuo contesto (§6).
-
-A ogni evento del mandato scrivi all'utente cosa vuol dire per il mandato:
-
-| Evento | Riporto |
-|---|---|
-| ciclo chiuso che sblocca un'altra task | cosa si sblocca e cosa lanci adesso |
-| sessione ferma su domande o segnalazioni | chi aspetta, per cosa, e la proposta (§3) |
-| commit o fase doc di un checkpoint | una riga: cosa registra, «per il parallelo non cambia niente» |
-| sessione nuova (`🆕`, una tab) | quale task segue; se il suo `sessionId` è di una riga `in coda` dello stato, è la tab chiesta che nasce: la riga diventa `in ciclo` e prende il nome (§2, Aprire una tab), senza avvisi. Altrimenti, se la task ha già una conversazione in ciclo, l'avviso di non farle lavorare insieme |
-| `▶ turno headless partito` | una riga, o nessuna se il turno è dell'orchestrator e l'ha appena lanciato; di una conversazione che l'orchestrator non ha aperto, come una sessione nuova |
-| `⏹ turno headless finito` | nessuna riga sull'evento: è la sveglia. Rileggi l'esito con `status` (§2, L'esito di un turno headless) e riporta quello, come il fine turno di una tab |
-| `orchestrator 🧠` sotto il 100% | una riga: il gradino e i token, «nessun passo cambia». Scrivi il gradino nello stato (`## Perimetro`) |
-| `orchestrator 🧠` al 100% o al 120% | il giro si chiude: cosa resta aperto e quando passi le consegne (§6) |
-| risposta dell'utente in una tab che rischia un danno | cosa sparisce e cosa resta, per esteso |
-
-- Ogni id di task porta la sua maniglia, sempre: `T32 (campione Naviga su dev)`.
-- Un evento minore prende una riga; non riempire il silenzio.
-- L'evento è un fatto, la deduzione si dice come tale («molto probabilmente è il DLV3»).
-- Quando la notifica non basta, apri il transcript prima di scrivere: `"PY" -B -I "R/sessions.py" tail <prefisso del sessionId> --chars 6000`.
-- Il monitor etichetta una sessione con la sua task: due conversazioni sulla stessa task portano la stessa etichetta. Quale delle due ha parlato lo dice `sessions.py list`, con stato ed età di ognuna.
-
-### Escludere una conversazione
-
-L'utente può chiedere, nella chat dell'orchestrator, di togliere dal monitor una conversazione — di solito una sua tab su un membro, aperta per domande o verifiche: «escludi 0a1b2c3d». E di rimetterla: «riprendi a seguire 0a1b2c3d».
-
-**Escludere**, in quest'ordine:
-
-1. Sciogli l'id fra le sessioni vive del progetto: `"PY" -B -I "R/sessions.py" find <id>`. Exit `0` → una riga `SESSIONE|<sessionId intero>|<etichetta>|<stato>`. Exit `1`, nessuna, o `2`, più d'una con le loro righe → non scrivi niente e lo dici all'utente: un id che indica due conversazioni escluderebbe anche quella che non ha nominato.
-2. Se il sessionId è di una conversazione della tua tabella ancora in ciclo, rifiuta e di' perché: senza i suoi eventi non vedresti la fine del suo turno — il `⏸` di una tab, il `⏹` di una headless —, e il ciclo resterebbe appeso.
-3. Riscrivi `FILTER_FILE` con `session:<sessionId intero>` in più nella blacklist, whitelist intatta (§0j).
-4. Conferma in una riga: la conversazione, la sua task con la maniglia, e cosa passa ancora. Una conversazione in blacklist perde i soli eventi di sessione — turni, prompt, domande, permessi, apertura e chiusura —; il task file, la cella Prog e i commit della sua task passano, perché il monitor vede un file che cambia e non chi lo cambia. Per zittire anche quelli serve `task:T<n>` in blacklist, e lo chiede l'utente.
-
-**Riammettere.** Togli dalla blacklist le voci `session:` che cominciano con l'id che l'utente dice, e conferma in una riga. Nessuna voce corrisponde → dillo.
-
-**La conversazione esclusa tace, ma conta.** Nessun evento e nessuna proposta; però finché è viva la sua task non riceve un passo nuovo dall'orchestrator (§Le regole di partenza, regola 1), come per una sessione esterna: due cicli sugli stessi file, o due checkpoint in gara su `tasks.md`, sono guasti che nessuno vedrebbe. Il monitor non ti dice più quando si chiude: lo leggi da `sessions.py list` a ogni quadro (§1). Una tab esclusa lasciata aperta tiene ferma la sua task: quando un passo pronto aspetta solo lei, dillo all'utente in una riga, una volta.
-
-L'esclusione segue il processo: un `/clear` nella conversazione cambia il suo sessionId, e lei non ricompare. Vale per il giro: un giro nuovo riparte con la blacklist vuota, una ripresa la tiene (§0f).
+**Fuori da un risveglio** — un prompt dell'utente — leggi lo stato del giro con `flow.py recap <perimetro>`, senza `--dal`: i risvegli nuovi li consuma il `wait` che è ancora in corso, e `Letto fino a` non si sposta.
 
 ### I fatti del perimetro
 
-Un report o un messaggio di una sessione può portare un fatto che riguarda il perimetro intero o un altro membro, non il lavoro interno della task che lo scrive. La definizione è quella di `checkpoint-mandate` (`${CLAUDE_PLUGIN_ROOT}/skills/checkpoint-mandate/SKILL.md` §2, «Un fatto del perimetro»):
+Un report o un messaggio di un membro può portare un fatto che riguarda il perimetro intero o un altro membro, non il lavoro interno della task che lo scrive. La definizione è quella di `checkpoint-mandate` (`${CLAUDE_PLUGIN_ROOT}/skills/checkpoint-mandate/SKILL.md` §2, «Un fatto del perimetro»):
 
 - un **blocco** — il membro non può proseguire finché una task, dentro o fuori dal perimetro, non chiude;
 - una **collegata** — una task fuori dal perimetro da cui i membri dipendono, o che dipende da loro;
 - una **decisione aperta** che tocca più membri, o da prendere prima di un passo del perimetro; e la decisione presa che ne chiude una già scritta;
 - una **regola cambiata** — chi può girare in parallelo, in che ordine;
-- un **cambio di un membro** che smentisce ciò che l'orchestrator sa di lui: un DLV tolto, una dipendenza nuova, uno scopo spostato.
+- un **cambio di un membro** che smentisce ciò che il piano o l'orchestrator sanno di lui: un DLV tolto, una dipendenza nuova, uno scopo spostato.
 
 Non lo è il lavoro interno di un membro — DLV spuntati, misure, file toccati —: vive nel suo task file.
 
-Lo riconosci tu, leggendo: nessuna sessione lo etichetta. Scrivilo subito in `## Fatti del perimetro` dello stato (§0i), una riga per fatto col membro da cui viene e dove l'ha detto, e una riga all'utente nel riporto. Da lì il fatto pesa sulle decisioni dell'orchestrator: un blocco nuovo ferma il membro bloccato e le sue dipendenti, una regola d'ordine cambiata vale dal quadro successivo, una decisione aperta su un passo del perimetro si scala all'utente (§4). Un fatto superato — il blocco è caduto, la decisione è presa — resta nella sezione con la parola che lo chiude.
+**Li ricavi dai testi dei turni** che la lettura del risveglio stampa: tutti, anche quelli dei passi che lo script ha chiuso da sé. Un turno pulito non sveglia nessuno, e il suo report si legge al risveglio dopo: è il prezzo accettato del flusso meccanico. Se un fatto arrivato da un report pulito dice che un passo già partito non doveva partire — un blocco nuovo su un membro in corsa — fermalo lì: `flow.py tieni <membro>` sul membro bloccato e sulle sue dipendenti, una riga in `## Rami fermi`, e scala all'utente (§6).
 
-I fatti stanno nello stato perché la conversazione si compatta: rileggendo lo stato dopo una compattazione (§0i) l'orchestrator li ritrova, anche quelli che nessun membro ha scritto nel suo task file. Dallo stato arrivano al file del perimetro: `checkpoint-mandate` legge `## Fatti del perimetro` dal file su disco, al path che ricava dall'id del perimetro (`orchestrator_state.py facts`), e li porta nella prosa del perimetro, che è committata. Lo spawn non porta note, e il checkpoint si comporta uguale chiunque lo lanci: legge un file a un path noto, non un messaggio dell'orchestrator. Per questo un fatto si scrive per esteso, col membro e la fonte: chi lo porta nella prosa non ha questa conversazione. Il recap allo stop li elenca (§5), e il giro dopo sullo stesso perimetro li eredita (§0f).
+Scrivili subito in `## Fatti del perimetro` della memoria, una riga per fatto col membro da cui viene e dove l'ha detto, e una riga all'utente. Un fatto superato — il blocco è caduto, la decisione è presa — resta nella sezione con la parola che lo chiude. Un fatto che cambia l'ordine o le collisioni del giro cambia il piano (§4). Dalla memoria i fatti arrivano al file del perimetro: `checkpoint-mandate` legge `## Fatti del perimetro` dal file su disco (`orchestrator_state.py facts`) e li porta nella prosa del perimetro, che è committata. Per questo un fatto si scrive per esteso, col membro e la fonte: chi lo porta nella prosa non ha questa conversazione.
 
-## 2. Lanciare e scrivere alle conversazioni
+## 2. I risvegli
 
-Una conversazione fa **un solo passo**, poi si chiude: il contesto di una sessione riusata per più passi arriva al tetto, e la qualità cala a ogni passo.
-
-- **preflight** → una conversazione headless, kind `preflight`.
-- **ciclo di lavoro** → una conversazione headless, kind `run` e il perimetro di §1. Nella **stessa** conversazione, dopo il run, le risposte alle segnalazioni e poi il checkpoint, ognuno un turno nuovo (§Scrivere): in una sessione aperta dal deck `checkpoint-task` ricava i DLV fatti e i file da committare dal contesto della conversazione, e una conversazione nuova non lo avrebbe.
-- **checkpoint del perimetro** → una conversazione headless, kind `checkpoint`, sull'id del perimetro, a fine giro (§Il checkpoint del perimetro).
-
-Finito il passo l'orchestrator non scrive più a quella conversazione, e la chiude (§Chiudere).
-
-### Headless, e la tab solo su richiesta
-
-Ogni passo che l'orchestrator decide parte **headless**: un processo `claude -p` staccato, senza tab, che esegue un turno e finisce da solo. Un orchestrator lavora in momenti che l'utente non sceglie: una tab aperta da lui prende la tastiera dell'utente, e sul deck Linux lo spawn in una tab resta in coda ogni volta che la finestra in focus non è del progetto, finché l'utente non ne porta davanti una. Un turno headless non apre tab, non sposta il focus e non cambia desktop. La conversazione compare nel deck sotto la sua task, e l'utente la apre in una tab con ⏎ quando vuole guardarla.
-
-Una **tab** nasce solo quando l'utente la chiede per **quel** passo, nella chat dell'orchestrator: «apri il run di T23 in una tab». Si apre con `spawn-task` (§Aprire una tab), e la richiesta vale per quel passo soltanto: nessuna preferenza che dura, e nessun criterio con cui l'orchestrator sceglie la tab da sé.
-
-### Aprire
-
-Una chiamata Bash per conversazione:
+Una riga `RISVEGLIO|<seq>|<motivo>|<membro>|<sessione>|<dettaglio>` per ogni giudizio che lo script chiede. Il passo del membro resta fermo finché non lo muovi: rispondendo alla conversazione — un turno nuovo, che lo script legge come ogni altro — o con un **ordine**:
 
 ```bash
-loom-deck-headless open <TaskID> preflight --orchestrator T<perimetro> --root "<radice del progetto>"
-loom-deck-headless open <TaskID> run [perimetro] --orchestrator T<perimetro> --root "<radice del progetto>"
-loom-deck-headless open <perimetro> checkpoint --orchestrator T<perimetro> --root "<radice del progetto>"
+"PY" -B -I "R/flow.py" --project-root "<radice>" prosegui|abbandona|tieni <perimetro> <membro>
 ```
 
-`open` compone titolo, modello e binding come il tasto del deck, con gli override di progetto, e scrive il binding nel sidecar prima di lanciare il processo: la conversazione compare nel deck sotto la sua task. Toglie da sé l'ambiente di questa conversazione — `LOOM_TASK`, `PTYXIS_PROFILE`, le variabili di sessione di Claude Code —: nessun `env -u` davanti. Non serve il deck acceso.
+- **`prosegui`** — l'ultimo turno del passo vale come pulito: un run passa al checkpoint, che chiede lo script, un preflight o un checkpoint si chiudono. Su un membro fermo, lo libera, e il primo passo dopo scavalca il motivo che l'aveva fermato.
+- **`abbandona`** — lascia il passo aperto senza toccare la conversazione, e libera il membro: il passo dopo parte in una conversazione nuova.
+- **`tieni`** — ferma il membro: nessun passo nuovo finché un `prosegui` o un `abbandona` non lo liberano.
 
-**`--orchestrator T<perimetro>` a ogni apertura, anche per il checkpoint del perimetro.** È la posizione della conversazione nell'organigramma: nasce con `LOOM_ORCHESTRATOR`, e un hook all'avvio le dice che le domande vanno in chat a fine turno, dove l'orchestrator le legge e risponde (§3, Domanda in prosa). Il sidecar registra perimetro e sessione dell'orchestrator; la sessione la legge il comando dal tuo ambiente. Senza `--orchestrator` la conversazione non sa di essere orchestrata.
+Cosa fai per motivo:
 
-Con uscita `0` le righe portano `sessionId:` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: headless` e `Stato: in ciclo`, poi leggi l'esito del turno (§L'esito di un turno headless). Il **nome** della conversazione è la riga `titolo:`, il titolo che il deck le darebbe col tasto. Uscita `1` è un rifiuto, col motivo su stderr — task assente, DLV chiusi o fuori range, run su un mandato, `permissionMode` `manual` —; uscita `2` una riga composta male. Tutte e due sono un'anomalia (§4): non ritentare.
-
-### L'esito di un turno headless
-
-`open` e `reply` (§Scrivere) tornano subito, a turno appena lanciato. L'esito lo dà un comando solo, e lo stato su disco del turno ne è la fonte. Subito dopo ogni `open` e ogni `reply`:
-
-```bash
-loom-deck-headless status <sessionId> --wait 30 --root "<radice del progetto>"
-```
-
-Trenta secondi superano il giro del monitor, 15 (§0j), e lasciano due casi soli. Il turno finisce durante l'attesa: lo tratti subito, senza monitor, anche quando è finito così presto che il monitor non l'ha mai visto. Oppure è ancora `in corso`: allora il monitor lo ha già visto almeno una volta, e l'evento `⏹ turno headless finito` arriverà. A quell'evento rileggi l'esito, senza `--wait`. Un'attesa più lunga terrebbe fermo l'orchestrator mentre altre sessioni chiedono; una più corta del giro lascerebbe l'orchestrator ad aspettare un `⏹` che non arriva.
-
-| Uscita | Classe | Cosa fai |
-|---|---|---|
-| `3` | `in corso` | il turno lavora: nessun messaggio, aspetti l'evento `⏹` |
-| `0` | `turno chiuso` | leggi il **testo finale**, che `status` stampa per intero: è il report del passo, o una domanda (§3) |
-| `4` | `permesso negato` | ramo fermo, sotto |
-| `1` | `errore` | anomalia (§4): l'errore dell'API o la coda dello stderr, che `status` stampa in `motivo:` |
-| `2` | — | sessione ignota o riga sbagliata: anomalia (§4) |
-
-**`turno chiuso` non dice che il passo è finito.** In `claude -p` lo strumento `AskUserQuestion` non esiste: una skill che chiederebbe con lui scrive la domanda nel testo finale e chiude il turno, con l'esito di ogni altro turno. Il testo finale si legge sempre, prima di dare un passo per finito.
-
-**`permesso negato` ferma il ramo, anche se il testo finale dice che il lavoro è fatto.** Il turno ha ricevuto il rifiuto come risultato dello strumento ed è andato avanti: un lavoro chiuso dopo un rifiuto è passato per una via che nessuno ha approvato. L'orchestrator ferma la task e le sue dipendenti, scrive il motivo in `## Rami fermi` e scala all'utente (§4) con strumento e input di ogni chiamata negata, come li stampa `status`, e la via: riprendere la conversazione in una tab dal deck con ⏎, dove l'utente approva. Nessun `reply` che riformuli la richiesta, nemmeno sotto delega. Il ramo riparte quando l'utente lo dice.
-
-### Aprire una tab — su richiesta dell'utente
-
-Quando l'utente chiede una tab per un passo, una invocazione del tool `Skill`:
-
-```
-skill: loom-works:spawn-task
-args:  <TaskID> preflight --orchestrator T<perimetro>
-args:  <TaskID> run [perimetro] --orchestrator T<perimetro>
-args:  <perimetro> checkpoint --orchestrator T<perimetro>
-```
-
-`--orchestrator` come in `open` (§Aprire): la tab nasce con `LOOM_ORCHESTRATOR`, e lì `AskUserQuestion` è negato da un hook — le domande arrivano in chat a fine turno, dove le leggi. Una riga `⚠ LOOM_ORCHESTRATOR non impostata` vuol dire che il deck acceso è più vecchio: la tab è aperta senza, e va trattata come una tab senza `LOOM_ORCHESTRATOR` (§3); di' all'utente di riavviare il deck.
-
-Riporta l'esito come lo dà la skill. Con uscita `0` le righe portano `sessionId` e `titolo:`; scrivi subito la conversazione nello stato, con `Canale: tab` e `Stato: in ciclo`. Il **nome** con cui le scriverai è la riga `titolo:`: è il nome composto dal deck, con il segno della gemella quando un'altra conversazione viva ha lo stesso titolo. Un'uscita diversa da `0` e da `4` è un'anomalia (§4): non ritentare — un rifiuto per la finestra non in focus si risolve solo dall'utente, che porta davanti una finestra del progetto e richiede la tab.
-
-**Uscita `4` — la tab è in coda, non è un'anomalia.** La finestra in focus non era del progetto: il deck tiene la richiesta, compass mostra all'utente una notifica col bottone «Vai», e la tab nasce quando una finestra del progetto torna in focus, col `sessionId` della riga `sessionId:`. Scrivi subito la conversazione nello stato con `Canale: tab`, quel `sessionId`, `Nome` vuoto e `Stato: in coda (scade <ora della riga scade:>)`, e di' all'utente in una riga che la tab aspetta una finestra del progetto. Lo stesso esito arriva a schermo bloccato, e la prima riga lo dice — `schermo bloccato` —: compass è spento dal blocco, la richiesta aspetta lo sblocco e poi la stessa regola, con la stessa scadenza; la riga di stato non cambia, e all'utente dici che la tab aspetta lo sblocco. Non ritentare: una seconda richiesta aprirebbe una seconda conversazione sulla stessa task al ritorno del focus.
-
-- **Nasce** → arriva l'evento `🆕 nuova sessione` con quel `sessionId`: la riga diventa `in ciclo`, e il **nome** lo leggi allora da `"PY" -B -I "R/sessions.py" list` e da `ListAgents`, perché il titolo lo compone il deck quando la tab nasce.
-- **Scade** → passata l'ora di `scade:` senza l'evento — la guardi a ogni evento e a ogni quadro —, nessuna tab nascerà: il deck l'ha già detto all'utente con una notifica, e a te non arriva niente. La riga diventa `abbandonata (scaduta in coda)`, e scali all'utente (§4): il passo non è partito, e lo rilancia solo se l'utente lo chiede di nuovo.
-- **Conta come `in ciclo`** per la regola 1 e per il parallelo (§1, Le regole di partenza) e per il checkpoint del perimetro (§Il checkpoint del perimetro); non si chiude con `close-session`, che non ha ancora un processo da chiudere. Il passo resta in quella tab fino alla chiusura: messaggi con `SendMessage` finché è viva (§Scrivere), `close-session` a passo finito (§Chiudere).
-
-### Scrivere
-
-Il canale lo decide la conversazione **nel momento in cui le scrivi**, non il modo in cui è nata. Prima di ogni messaggio guarda se ha un processo vivo con `"PY" -B -I "R/sessions.py" list`, che porta la parola `headless` sui turni in corso:
-
-| La conversazione | Canale |
+| Motivo | Cosa fai |
 |---|---|
-| ferma, senza processo vivo — una headless fra due turni, una tab che l'utente ha chiuso | `loom-deck-headless reply` |
-| con un turno headless in corso | nessuno: aspetti la fine del turno |
-| viva in una tab — aperta con `spawn-task`, adottata da un orchestrator precedente, una headless che l'utente ha ripreso con ⏎ | `SendMessage` |
+| `domande` | un preflight chiude con delle `D{N}`: la proposta di risposta (§3), mandata col via o sotto delega |
+| `proposte` | un preflight chiude con sole `P{N}`: leggile. Se nessuna contraddice una decisione già congelata in un altro membro, il silenzio le accetta: `prosegui`. Se una la contraddice, la nomini all'utente con le due decisioni a confronto, e aspetti il via |
+| `segnalazioni` | un report chiude con delle `S{N}`: la proposta di risposta (§3). Mandata la risposta, il membro scrive gli scenari e chiude con `✅ Risposte registrate`: lo script legge quella riga e passa al checkpoint, o chiude il checkpoint |
+| `domanda` | un turno chiude con `❓ Domanda per l'orchestrator`: la proposta di risposta (§3) |
+| `dlv aperti` | un run chiude pulito ma lascia aperto un DLV del suo perimetro: leggi perché. Un DLV lasciato all'utente → `prosegui` per il checkpoint, poi `tieni`, una riga in `## Rami fermi` e la scalata (§6): senza il `tieni` lo script rilancerebbe un run sul DLV rimasto. Un DLV lasciato per un guasto → ramo fermo (sotto) |
+| `non classificato` | leggi il testo: un report chiuso con parole diverse dalla riga fissa → `prosegui`, per un run solo coi DLV del suo perimetro spuntati (`"${CLAUDE_PLUGIN_ROOT}/scripts/task/task-deliverables.sh" <membro>`); una domanda → come `domanda`; altro → ramo fermo |
+| `errore` · `permesso negato` | ramo fermo (sotto). Su un permesso negato nessuna risposta che riformuli la richiesta, nemmeno sotto delega: il lavoro è passato per una via che nessuno ha approvato. La scalata porta strumento e input di ogni chiamata negata, e la via: riprendere la conversazione in una tab dal deck con ⏎, dove l'utente approva |
+| `premessa decaduta` | il membro è fermo: la ricostruzione delle premesse è dell'utente. Scali; quando l'utente dice che le premesse sono ricostruite, `prosegui` |
+| `ciclo interrotto` · `non chiusa` | il membro ha i DLV tutti spuntati e la Prog non ✔️, e il checkpoint in una conversazione nuova non ha il contesto del run. Scali; con l'ok dell'utente, `prosegui`, e lo script apre il checkpoint |
+| `rifiuto` | il deck ha rifiutato `open` o `reply`: ramo fermo, col motivo |
+| `stallo` | il turno headless di un passo è fermo da dieci minuti: `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000`, poi ramo fermo |
+| `piano` | il piano non si legge o non combacia coi file, e i passi nuovi sono in pausa: il motivo sta nella riga `PIANO=` della lettura. Una relazione nuova che sai risolvere — un membro entrato, una dipendenza dichiarata dopo, un path in comune nuovo — → riscrivi il piano (§4). Un piano rotto o un cambio che non sai risolvere → scali, col rimando a `prepare-mandate` |
+| `tab` | un evento di una tab aperta da te: §5 |
+| `contesto` | la soglia di contesto: §8 |
+| `fermo` | niente da lanciare e membri che restano, con il perché di ognuno nel dettaglio: scali (§6). A giro in chiusura è il segnale per passare le consegne (§8) |
+| `fine giro` | i membri sono chiusi, e il checkpoint del perimetro, se serviva, è già passato: scali che il perimetro non ha più niente da lanciare. La chiusura di un mandato è dell'utente |
+| `keep-alive` | niente (§1) |
 
-Nessuna conversione: l'orchestrator non chiude una tab per continuarla headless. Aggiungerebbe una chiusura e una ripresa, e nell'intervallo l'utente può star scrivendo in quella tab.
+**Il ramo fermo.** Il membro resta col passo in attesa, e lo script non gli apre niente: scrivi il motivo in `## Rami fermi`, con le task che aspettano lui, e scali all'utente (§6). **Nessun ritento**: un secondo tentativo su una causa non capita ripete il guasto, e può ripetere anche quello che il primo ha già scritto. I rami indipendenti continuano. Il ramo riparte quando l'utente lo dice: `prosegui` se il passo è da dare per buono, `abbandona` se va rifatto in una conversazione nuova.
 
-**`reply`** apre un turno nuovo sulla stessa conversazione, con `--resume`: il messaggio è il prompt del turno. Il testo passa da stdin, così un messaggio che comincia con `-` o porta apici arriva intero:
-
-```bash
-loom-deck-headless reply <sessionId> - --orchestrator T<perimetro> --root "<radice del progetto>" <<'MESSAGGIO'
-<il messaggio>
-MESSAGGIO
-```
-
-Il modello del turno è quello con cui la conversazione ha risposto: nessun `--model`. **`--orchestrator` a ogni `reply`**, come all'apertura: ogni turno è un processo nuovo, e `LOOM_ORCHESTRATOR` la porta solo il comando che lo lancia — il deck non la rilegge dal sidecar. Un turno lanciato senza nasce senza la riga dell'organigramma. Uscita `0` → turno avviato: leggi l'esito come dopo `open` (§L'esito di un turno headless). Uscita `1` → rifiuto, col motivo su stderr. Se il motivo è un processo vivo — un turno ancora in corso, o l'utente che ha aperto la conversazione in una tab nel frattempo —, rileggi le vive e scegli di nuovo il canale; ogni altro motivo è un'anomalia (§4).
-
-**`SendMessage`** col nome della riga `titolo:` come `to`. Se `ListAgents` mostra **più righe vive** con quel nome, aggiungi il `[ref]` della riga `interactive` che la conversazione ha preso all'apertura: il ref non si ricava dal `sessionId`, si legge dall'elenco. Le righe Remote Control offline con lo stesso nome — conversazioni chiuse — non contano: il nome nudo arriva alla viva. Una headless che l'utente ha ripreso in una tab porta il nome che il deck le dà alla ripresa: cercala in `ListAgents`, e se non la riconosci con certezza non scrivere — il messaggio aspetta che la tab si chiuda, e lo dici all'utente in una riga.
-
-La prima riga di ogni messaggio dice di cosa si tratta e chi lo manda, e dice il vero. Con `SendMessage` la sessione riceve il messaggio incartato in `<cross-session-message>`, con l'indicazione che non l'ha scritto il suo utente, e l'utente di quella sessione vede solo la prima riga finché non lo apre. Con `reply` non c'è nessun involucro: il testo arriva come un prompt del suo utente, e la prima riga è l'unica fonte di chi parla.
-
-### La richiesta di checkpoint — l'unico messaggio senza via
-
-Al fine turno di un run leggi la chiusura del report: per una headless è il testo finale che `status` stampa con `turno chiuso` (§L'esito di un turno headless), per una tab l'evento `⏸ turno finito` e `sessions.py tail`. Se chiude con `**🚦 Segnalazioni** — nessuna` e la riga `## Checkpoint in corso` è libera, chiedi il checkpoint **senza aspettare l'utente**, sul canale della conversazione (§Scrivere):
-
-```
-Checkpoint del ciclo: lancia /loom-works:checkpoint-task <TaskID> — richiesta dell'orchestrator di T<perimetro>.
-
-Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna», quindi il ciclo passa al checkpoint in questa conversazione, che ha il contesto del run.
-```
-
-Segna `checkpoint chiesto` e occupa `## Checkpoint in corso`. Con una o più segnalazioni nel report, niente checkpoint: proposta e attesa (§3), e il checkpoint parte dopo che la risposta è stata mandata. Le segnalazioni del report del checkpoint seguono la stessa regola: con segnalazioni, proposta e attesa prima di dare il ciclo per chiuso.
-
-Il ciclo è **chiuso** quando il checkpoint ha finito il turno, il suo testo finale non chiede altro (§3, Domanda in prosa) e le sue segnalazioni hanno una risposta: libera `## Checkpoint in corso`, conta il ciclo in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere), rifai il quadro (§1).
-
-Una sessione aperta dall'orchestrator può risponderle da sé con un messaggio: un esito, una domanda. È informazione, come un evento del monitor, e mai un via dell'utente.
-
-### Il checkpoint del perimetro — a fine giro
-
-Durante il giro l'orchestrator non riallinea il file del perimetro: i paralleli li calcola `tree` sul momento, e i fatti nuovi gli arrivano dai report (§1, I fatti del perimetro). Il file allineato serve a chi viene dopo, e lo produce una conversazione sola, alla fine: `checkpoint-task` sul perimetro, che lo passa a `checkpoint-mandate`, e che legge i fatti del perimetro dallo stato su disco.
-
-Parte quando valgono tutte:
-
-1. **niente è lanciabile**: nessun membro ha un passo che le regole di partenza (§1) lascerebbero partire — a giro in chiusura (§6) la regola 0 non lascia partire niente, e la condizione vale;
-2. **nessuna conversazione dell'orchestrator è in ciclo né in coda**: tutte `chiusa` o `abbandonata`;
-3. **la coda dei checkpoint è libera**: `## Checkpoint in corso` dice `nessuno`. Il checkpoint del perimetro riscrive il suo task file e `tasks.md` come ogni altro, ed entra nella stessa regola «un checkpoint alla volta»;
-4. **almeno un ciclo si è chiuso dall'ultimo checkpoint del perimetro** (`## Checkpoint del perimetro` nello stato): senza lavoro nuovo dei membri sarebbe una conversazione aperta per niente.
-
-Si lancia come ogni altro passo, headless (§Aprire), e occupa `## Checkpoint in corso`:
-
-```bash
-loom-deck-headless open <perimetro> checkpoint --orchestrator T<perimetro> --root "<radice del progetto>"
-```
-
-Le sue segnalazioni seguono la via di tutte le altre: proposta, e risposta col via dell'utente (§3). Il checkpoint del perimetro è chiuso quando ha finito il turno e le segnalazioni hanno una risposta: libera `## Checkpoint in corso`, azzera i cicli in `## Checkpoint del perimetro`, chiudi la conversazione (§Chiudere). Il suo commit cambia il file del perimetro: rilancia `verify` e ricarica le righe `MODELLO` (§0e). Poi rifai il quadro: se resta qualcosa da lanciare il giro continua, altrimenti scala all'utente che il perimetro non ha più niente da lanciare (§4).
-
-Il checkpoint del perimetro **non chiude mai il perimetro**: l'orchestrator non passa la parola «chiudi», e la chiusura di un mandato è dell'utente.
-
-### Chiudere
-
-Una conversazione aperta dall'orchestrator si chiude quando il suo passo è finito, e non prima:
-
-- **preflight** — quando ha congelato le decisioni: il turno finito dopo le risposte mandate, senza domande aperte;
-- **ciclo di lavoro** — quando il ciclo è chiuso, cioè dopo il checkpoint e le risposte alle sue segnalazioni (§La richiesta di checkpoint);
-- **checkpoint del perimetro** — quando ha finito il turno e le sue segnalazioni hanno una risposta.
-
-**Una conversazione `headless`** non ha un processo da chiudere: a passo finito il suo ultimo turno è già terminato. Segnala `chiusa` nello stato, senza `close-session`, che chiude solo una tab viva nata dall'endpoint. Se l'utente l'ha ripresa in una tab con ⏎, quella tab è sua: l'orchestrator segna `chiusa` e non la tocca.
-
-**Una conversazione `tab`** si chiude con una invocazione del tool `Skill`, col `sessionId` che `spawn-task` ha restituito all'apertura e che sta nello stato:
-
-```
-skill: loom-works:close-session
-args:  <sessionId>
-```
-
-- **Uscita `0`** → segna la conversazione `chiusa` nello stato. L'evento `✖ sessione chiusa` che il monitor riporta subito dopo è l'effetto della chiusura, non un'anomalia: una riga nel riporto, o nessuna.
-- **Uscita diversa da `0`** → la conversazione resta aperta: segna `abbandonata` nello stato col motivo che la skill riporta (al lavoro, non nata dall'endpoint, deck spento, deck senza chiusura), una riga nel riporto, e **nessun ritento**: un secondo tentativo su un rifiuto ripete il rifiuto, e su un processo che non è finito in tempo può colpire una conversazione ripartita nel frattempo. Non è un'anomalia (§4): il mandato prosegue, e l'utente la chiude quando vuole.
-
-Una sessione esterna (§0h) non si chiude mai: non l'ha aperta l'orchestrator, e il deck la rifiuterebbe comunque se non è nata da una richiesta di spawn.
-
-**L'orchestrator che ti ha passato le consegne** si chiude allo stesso modo, una volta sola, dopo l'armo del monitor della ripresa (§6, La ripresa del successore): il deck lo accetta anche se l'utente l'ha aperto a mano, perché lo spawn del successore gli ha scritto la marca `origin: orchestrator`.
-
-### Le sessioni esterne
-
-A una sessione che l'orchestrator non ha aperto (§0h) non parte nessun messaggio di iniziativa dell'orchestrator, nemmeno il checkpoint: solo le risposte che l'utente ha approvato (§3). Quando il suo ciclo si chiude, la task torna libera per l'orchestrator, e il ciclo conta in `## Checkpoint del perimetro` come uno dell'orchestrator.
+Prima di proporre, o di decidere su un testo, leggi il turno per intero: il testo finale sta nella lettura del risveglio, e il transcript intero con `"PY" -B -I "R/sessions.py" tail <prefisso del sessionId> --chars 6000`.
 
 ## 3. Proposte di risposta
 
-Una sessione ferma su una domanda aspetta l'utente, non l'orchestrator. L'orchestrator accorcia l'attesa: legge cosa chiede, prepara la risposta col perché di ogni scelta, e la manda **solo col via dell'utente** — o da sé, se l'utente gli ha delegato le risposte (§La delega dell'utente).
-
-**Quando.** Un turno di una sessione del mandato che chiude su domande — il blocco finale di un preflight (`D{N}`), la sezione `🚦 Segnalazioni` di un report con almeno una `S{N}`, una domanda in prosa — oppure, in una tab, un evento `❓ domanda all'utente` o `⏳ aspetta un permesso`. Il fine turno di una conversazione aperta da te va letto sempre, anche quando nessun evento parla di domande: è lì che chiede. Di una headless il turno chiuso lo dice `status` (§2, L'esito di un turno headless), di una tab l'evento `⏸ turno finito` (§1, Il riporto). Leggi la sessione per intero prima di proporre: il testo finale di `status` per una headless, `"PY" -B -I "R/sessions.py" tail <prefisso> --chars 6000` per una tab.
+Un membro fermo su una domanda aspetta l'utente, non l'orchestrator. L'orchestrator accorcia l'attesa: legge cosa chiede, prepara la risposta col perché di ogni scelta, e la manda **solo col via dell'utente** — o da sé, se l'utente gli ha delegato le risposte (§La delega dell'utente).
 
 **Cosa proponi.**
 
-- **Preflight** — una risposta per ogni `D{N}`: la strada (`D2.B`, o una nuova in prosa) e il perché, ricavato dal quadro del mandato e dalle decisioni già congelate nelle altre task. Sulle proposte `P{N}` del preflight **taci**: il silenzio le accetta, e smentirle è dell'utente. Unica eccezione, una `P{N}` che contraddice una decisione già congelata in un'altra task del mandato: la nomini, con le due decisioni a confronto.
-- **Segnalazioni** — per ogni `S{N}` un'uscita, `subito` · `task` · `scarto` · `ignora`, col perché; per `scarto` anche il motivo che finirà nel registro ADR.
-- **Domanda in prosa** — la domanda libera: il testo finale di un turno che chiede qualcosa e non è un `D{N}` di preflight né un `S{N}` di segnalazione — una scelta, una conferma, un dato che manca. Nessun marcatore la annuncia: la riconosci leggendo la fine del turno, che leggi comunque a ogni passo. Vale per ogni conversazione aperta con `--orchestrator`. In un turno headless è il caso normale, perché in `claude -p` `AskUserQuestion` non esiste: la leggi nel testo finale di `status`, e la risposta parte con `reply`. In una tab con `LOOM_ORCHESTRATOR` l'hook nega `AskUserQuestion`, e la sessione scrive la domanda in chat: la leggi con `sessions.py tail` dopo l'evento `⏸ turno finito`, e la risposta parte con `SendMessage`. Una proposta come per le altre, col via dell'utente, o mandata da sé sotto delega (§La delega dell'utente) — coi limiti di sempre: un permesso, un'azione negata dal classificatore, un'azione distruttiva restano all'utente. Vale anche per il checkpoint, che chiede per esempio se accendere `drainable`: il ciclo si chiude solo quando il testo finale non chiede altro.
-- **`AskUserQuestion` in una tab senza `LOOM_ORCHESTRATOR`, e i permessi in ogni tab** — la proposta c'è, ma la risposta si dà **nella tab**: un messaggio di un'altra sessione non risponde a un `AskUserQuestion` aperto e non approva un permesso, per costruzione di Claude Code. Una tab senza `LOOM_ORCHESTRATOR` è una tab che non hai aperto tu con `--orchestrator`: esterna, adottata da un orchestrator precedente, ripresa dall'utente con ⏎, o aperta da un deck più vecchio. Di' all'utente quale tab aprire e cosa scegliere. Un permesso negato in un turno headless non ha una proposta: ferma il ramo (§2, L'esito di un turno headless).
+- **Preflight** — una risposta per ogni `D{N}`: la strada (`D2.B`, o una nuova in prosa) e il perché, ricavato dal piano, dai fatti del perimetro e dalle decisioni già congelate negli altri membri. Sulle `P{N}` taci, salvo una che contraddice una decisione congelata in un altro membro: la nomini, con le due decisioni a confronto.
+- **Segnalazioni** — per ogni `S{N}` un'uscita, `subito` · `task` · `scarto` · `ignora`, col perché; per `scarto` anche il motivo che finirà nel registro degli scarti.
+- **Domanda in prosa** — la domanda libera di un turno: una scelta, una conferma, un dato che manca. In `claude -p` `AskUserQuestion` non esiste, e la riga dell'organigramma chiede alle conversazioni dell'orchestrator di scrivere la domanda nel testo finale. Vale anche per il checkpoint, che chiede per esempio se accendere `drainable`.
 
-**Una proposta per sessione ferma**, scritta in chat come blocco pronto da mandare: nome della conversazione, cosa chiede, il testo del messaggio, il perché di ogni scelta. Con più sessioni ferme, **in testa quella che sblocca più task**. Una risposta che rischia un danno — un dato cancellato, un trigger spento, una tabella altrui — la dici per esteso: cosa sparisce e cosa resta. Scrivi la proposta in `## Proposte in sospeso` dello stato.
+**Una proposta per membro fermo**, scritta in chat come blocco pronto da mandare: membro, cosa chiede, il testo del messaggio, il perché di ogni scelta. Con più membri fermi, **in testa quello che sblocca più membri**. Una risposta che rischia un danno — un dato cancellato, un trigger spento, una tabella altrui — la dici per esteso: cosa sparisce e cosa resta. Scrivi la proposta in `## Proposte in sospeso` della memoria.
 
 **Il via.** L'utente risponde in prosa, nel turno dopo:
 
 - «mandale» → manda ogni proposta in sospeso così com'è;
 - «manda T32 con D2.B» → cambia la proposta come dice, poi la mandi;
-- risponde da sé nella tab, anche riprendendo con ⏎ una headless → la proposta si ritira: lo vedi dall'evento `✍ prompt utente` di quella sessione. Toglila dallo stato e non mandarla.
+- risponde da sé, riprendendo la conversazione con ⏎ dal deck → la proposta si ritira: lo vedi nella lettura dopo, dove il turno dell'utente compare come un turno del passo. Toglila dalla memoria e non mandarla.
 
-Una proposta senza via resta in sospeso: non la mandi, non la ricordi a ogni evento.
+Una proposta senza via resta in sospeso: non la mandi, non la ricordi a ogni risveglio.
 
-**Il messaggio** parte sul canale della conversazione (§2, Scrivere). Prima riga con la firma, poi le risposte:
+**Il messaggio** a una conversazione headless parte con `reply`, il testo da stdin:
+
+```bash
+loom-deck-headless reply <sessionId> - --orchestrator T<perimetro> --root "<radice>" <<'MESSAGGIO'
+<il messaggio>
+MESSAGGIO
+```
+
+`--orchestrator` a ogni `reply`: ogni turno è un processo nuovo, e la riga dell'organigramma la porta solo il comando che lo lancia. Nessun `--model`: il turno usa il modello della conversazione. Uscita `0` → turno avviato: lo segue lo script, e lo leggi al risveglio dopo. Uscita `1` → rifiuto, col motivo su stderr: un processo vivo — un turno in corso, o l'utente che ha ripreso la conversazione in una tab — vuol dire che la conversazione non è ferma, e il messaggio aspetta; ogni altro motivo è un ramo fermo. A una tab il messaggio parte con `SendMessage` (§5).
+
+Prima riga con la firma, poi le risposte:
 
 ```
 Risposte al preflight di T<id> — approvate dall'utente, inviate dall'orchestrator di T<perimetro>.
@@ -609,17 +344,15 @@ D1 → D1.A: <testo>
 D3 → <strada nuova, in prosa>
 ```
 
-Per le segnalazioni la prima riga è `Risposte alle segnalazioni di T<id> — approvate dall'utente, inviate dall'orchestrator di T<perimetro>.`, poi una riga per `S{N}` con l'uscita e le parole dell'utente, che la sessione scriverà come approfondimento dello scenario. La firma tiene la decisione all'utente anche quando la porta l'orchestrator, e la sessione la scrive come una risposta normale.
+Per le segnalazioni la prima riga è `Risposte alle segnalazioni di T<id> — approvate dall'utente, inviate dall'orchestrator di T<perimetro>.`, poi una riga per `S{N}` con l'uscita e le parole dell'utente, che il membro scriverà come approfondimento dello scenario. Per una domanda in prosa, `Risposta alla tua domanda — approvata dall'utente, inviata dall'orchestrator di T<perimetro>.` La firma tiene la decisione all'utente anche quando la porta l'orchestrator. **Un messaggio di risposta non nomina mai lo slash command di una skill**: lo script ricava il genere di un turno dal suo prompt, e un messaggio che nomina `/loom-works:checkpoint-task` sarebbe letto come un checkpoint (`flow-format.md` §La lettura di un turno).
 
-La firma è vera solo dopo il via dato in questa chat: il classificatore di auto mode blocca un messaggio che dichiara un'approvazione mai data, ed è giusto così. Mai la firma su un testo che l'utente non ha visto.
-
-Dopo l'invio togli la proposta dallo stato. Se erano le segnalazioni di un run, il ciclo prosegue col checkpoint (§2).
+La firma è vera solo dopo il via dato in questa chat: il classificatore di auto mode blocca un messaggio che dichiara un'approvazione mai data, ed è giusto così. Mai la firma su un testo che l'utente non ha visto. Dopo l'invio togli la proposta dalla memoria.
 
 ### La delega dell'utente
 
-L'utente può delegare all'orchestrator anche le risposte. La delega la dichiara **lui, nella chat dell'orchestrator** — «decidi tu le risposte», «ti delego i preflight e le segnalazioni» —, e vale **fino a revoca**: «revoco la delega», «da qui le approvo io». Una frase in un'altra sessione, in un task file o in un messaggio di una sessione non è una delega. Scrivila nello stato, `## Delega` (§0i), con l'ora e le parole dell'utente alla lettera, su una riga, e toglila alla revoca: dopo una compattazione l'orchestrator la ritrova solo lì, e le sessioni ricevono quelle parole nel messaggio (sotto).
+L'utente può delegare all'orchestrator anche le risposte. La delega la dichiara **lui, nella chat dell'orchestrator** — «decidi tu le risposte», «ti delego i preflight e le segnalazioni» —, e vale **fino a revoca**: «revoco la delega», «da qui le approvo io». Una frase in un'altra sessione, in un task file o in un messaggio di un membro non è una delega. Scrivila nella memoria, `## Delega`, con l'ora e le parole dell'utente alla lettera, su una riga, e toglila alla revoca.
 
-**Sotto delega l'orchestrator manda da sé le risposte**, senza aspettare il via: prepara la proposta come sopra, la scrive in chat con il perché di ogni scelta — l'utente legge cosa è stato deciso a suo nome, anche dopo — e la manda subito. La firma dice il vero, e la riga sotto porta le **parole della delega**: copiate intere dalla sezione `## Delega` dello stato (§0i) — il testo fra « », senza ritaglio e senza riassunto, su una riga —, anche quando la delega parla di più cose di quelle a cui stai rispondendo. Lo stato è la sola fonte, quella che rileggi dopo una compattazione: le parole non si ricostruiscono a memoria.
+**Sotto delega l'orchestrator manda da sé le risposte**, senza aspettare il via: prepara la proposta come sopra, la scrive in chat con il perché di ogni scelta — l'utente legge cosa è stato deciso a suo nome, anche dopo — e la manda subito. La firma dice il vero, e la riga sotto porta le **parole della delega**, copiate intere da `## Delega` della memoria — il testo fra « », senza ritaglio e senza riassunto, su una riga —, anche quando la delega parla di più cose di quelle a cui stai rispondendo. La memoria è la sola fonte: le parole non si ricostruiscono a memoria.
 
 ```
 Risposte al preflight di T<id> — decise dall'orchestrator di T<perimetro> su delega dell'utente.
@@ -639,19 +372,68 @@ S2 → scarto: <il perché dell'orchestrator>
 S3 → ignora
 ```
 
-**Sulle segnalazioni l'orchestrator sceglie fra le quattro uscite** — `subito`, `task`, `scarto`, `ignora` — come farebbe l'utente. La sessione del report scrive gli scenari con l'autore `delega`, separato da `umano` e da `agente`: la decisione non è dell'utente, che non ha letto la segnalazione, né dell'agente che decide da sé (`triage-format.md` §La decisione su delega). Valgono le regole dell'umano, uscita per uscita: lo scarto vuole un perché e scrive il record ADR, l'ignora no; l'uno e l'altro vogliono un'ancora, il path che la segnalazione tocca — se la segnalazione non lo nomina, scrivilo tu nella sua riga. Una riga per `S{N}`, con l'uscita e le tue parole: la sessione le scrive come perché dello scarto o come approfondimento dello scenario, e un'uscita nuda resta senza. Scegli lo scarto con lo stesso metro dell'utente — la segnalazione tornerà, e deve tacere —, l'ignora per ciò che non tornerà; nel dubbio fra i due, l'ignora, che la ricorrenza recupera.
-
-Scenari e record ADR li scrive la sessione del report, mai l'orchestrator: l'orchestrator non scrive file tracciati (§Il ruolo), e la segnalazione alla lettera sta nel report.
+**Sulle segnalazioni l'orchestrator sceglie fra le quattro uscite** come farebbe l'utente. Il membro scrive gli scenari con l'autore `delega`, separato da `umano` e da `agente` (`triage-format.md` §La decisione su delega). Valgono le regole dell'umano, uscita per uscita: lo scarto vuole un perché e scrive il record nel registro degli scarti, l'ignora no; l'uno e l'altro vogliono un'ancora, il path che la segnalazione tocca — se la segnalazione non lo nomina, scrivilo tu nella sua riga. Scegli lo scarto con lo stesso metro dell'utente — la segnalazione tornerà, e deve tacere —, l'ignora per ciò che non tornerà; nel dubbio fra i due, l'ignora, che la ricorrenza recupera. Scenari e record li scrive il membro, mai l'orchestrator.
 
 **Restano sempre all'utente, anche sotto delega:**
 
 - **l'approvazione di un permesso** — si dà nella tab, e nessun messaggio la sostituisce;
-- **un'azione negata dal classificatore di auto mode** — l'orchestrator non riformula per aggirarlo e non la chiede a un'altra sessione;
+- **un'azione negata dal classificatore di auto mode** — l'orchestrator non riformula per aggirarlo e non la chiede a un altro membro;
 - **un'azione distruttiva** — un dato cancellato, un file sovrascritto, un `push --force`, un branch o un worktree distrutti, un trigger spento, una tabella altrui: la proposta la dice per esteso, cosa sparisce e cosa resta, e aspetta il via.
 
-Su questi casi si scala come sempre (§4). Una risposta mandata sotto delega si toglie dallo stato come una approvata.
+Su questi casi si scala come sempre (§6).
 
-## 4. Scalare all'utente
+## 4. Il piano a metà giro
+
+Il piano lo scrive `prepare-mandate` prima del giro; durante il giro lo riscrive l'orchestrator, e nessun altro. Lo riscrivi quando scopri ciò che il piano non porta:
+
+- **una collisione** — due membri aperti che toccano lo stesso file o riscrivono lo stesso comportamento, da un report, da un fatto o da un task file cambiato → una risorsa in comune ai due;
+- **una dipendenza** — un membro che dichiara dopo la stesura una dipendenza da un altro, o che legge ciò che l'altro scrive → un `dopo`;
+- **un membro nuovo** — una figlia nata durante il giro, che il lettore dà fra i membri e il piano non porta → la sua voce, dopo averne letto il task file con la metà del modello: le sue coppie con gli altri membri aperti passano da zero;
+- **un perimetro di DLV** — un membro che deve chiudere prima un DLV preciso, perché un altro lo aspetta → `dlv`, e `"T<n>:<dlv>"` nel `dopo` dell'altro. Il campo si consuma da sé quando i suoi DLV sono chiusi.
+
+Il metodo è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md`: una riga di prosa con la fonte, e il campo che ne discende. Una preferenza d'ordine dell'utente la cambia solo l'utente. Poi, in quest'ordine:
+
+1. `Edit` di `schedule.md` — la prosa e il blocco insieme;
+2. il controllo: `"PY" -B -I "R/schedule.py" verify <perimetro> --bozza` → `VERIFY=ok`. Un `ERRORE` o un `DIFF` si correggono prima del commit;
+3. il commit del solo piano:
+
+   ```bash
+   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
+     && lw_git_add_n_commit "task(T<perimetro>): piano — <cosa cambia>" "<path di schedule.md>" \
+     && lw_git_push "$(lw_current_branch)"
+   ```
+
+4. una riga all'utente: cosa è cambiato e perché.
+
+Lo script rilegge il piano quando il file cambia: un passo già aperto finisce, i passi nuovi seguono il piano nuovo. Un piano che durante la scrittura non combacia mette in pausa i passi nuovi e sveglia l'orchestrator col motivo `piano`: il commit lo rimette in vigore.
+
+Una dipendenza vera trovata a metà giro appartiene anche a `## Dependencies` del membro, che l'orchestrator non scrive: dillo all'utente in una riga.
+
+## 5. Le tab, su richiesta dell'utente
+
+Ogni passo che lo script apre è headless: un processo `claude -p` staccato, senza tab, che non prende la tastiera dell'utente e non sposta il focus. La conversazione compare nel deck sotto la sua task, e l'utente la apre in una tab con ⏎ quando vuole guardarla: lo script lo vede e non la tocca finché la tab è viva.
+
+Una **tab** nasce solo quando l'utente la chiede per **quel** passo, nella chat dell'orchestrator: «apri il run di T23 in una tab». La richiesta vale per quel passo soltanto. Lo script non scrive alle tab: il passo è dell'orchestrator dall'apertura alla chiusura.
+
+1. **Ferma il membro e il perimetro per lo script**: `flow.py tieni <perimetro> <membro>`, poi `flow.py tieni <perimetro> <perimetro>`. Senza il primo, lo script potrebbe aprire un passo headless sulla stessa task prima che la tab nasca; senza il secondo, a fine giro lancerebbe il checkpoint del perimetro mentre la tab lavora, perché le tab non le conosce.
+2. **Apri la tab**, con il tool `Skill`:
+
+   ```
+   skill: loom-works:spawn-task
+   args:  <TaskID> preflight --orchestrator T<perimetro>
+   args:  <TaskID> run [perimetro] --orchestrator T<perimetro>
+   args:  <TaskID> checkpoint --orchestrator T<perimetro>
+   ```
+
+   La tab nasce con `LOOM_ORCHESTRATOR`: un hook vi nega `AskUserQuestion`, e le domande arrivano in chat a fine turno. Una riga `⚠ LOOM_ORCHESTRATOR non impostata` vuol dire che il deck acceso è più vecchio: la tab non riceve la riga dell'organigramma; di' all'utente di riavviare il deck. Uscita `0` → la riga `sessionId` e la riga `titolo:`, il **nome** con cui le scriverai: scrivi la tab in `## Tab dell'orchestrator` con `Stato: in ciclo`. **Uscita `4`** → la tab è in coda: la finestra in focus non era del progetto, o lo schermo è bloccato (la prima riga lo dice), e la tab nasce col `sessionId` della riga `sessionId:` quando torna una finestra del progetto. Scrivila con `Nome` vuoto e `Stato: in coda (scade <ora della riga scade:>)`, una riga all'utente, nessun ritento. Ogni altra uscita → rifiuto: `prosegui` sul membro e sul perimetro per liberarli, e una riga all'utente.
+3. **Gli eventi della tab** ti svegliano col motivo `tab`: fine turno, domanda, permesso, chiusura, stallo. Leggi la tab con `sessions.py tail <prefisso> --chars 6000`. Una tab `in coda` che nasce compare come sessione nuova nella lettura: la riga diventa `in ciclo`, e il nome lo leggi da `ListAgents`. Una tab `in coda` oltre l'ora di `scade:` non nascerà più: `abbandonata (scaduta in coda)`, `prosegui` sul membro e sul perimetro, e una riga all'utente.
+4. **Scrivere alla tab**: `SendMessage` col nome della riga `titolo:` come `to`. Se `ListAgents` mostra più righe vive con quel nome, aggiungi il `[ref]` della riga `interactive` della tab: il ref si legge dall'elenco. Prima riga di ogni messaggio: di cosa si tratta e chi lo manda. Il messaggio arriva incartato come messaggio di un'altra sessione.
+5. **Il ciclo della tab** lo porti tu: le domande e le segnalazioni con le proposte del §3; dopo un run chiuso con `🚦 Segnalazioni — nessuna`, la richiesta di checkpoint — `Checkpoint del ciclo: lancia /loom-works:checkpoint-task <TaskID> — richiesta dell'orchestrator di T<perimetro>.` —, che è l'unico messaggio senza via, con `Stato: checkpoint chiesto`. Lo script non conosce le tab: un checkpoint in una tab e un checkpoint di un passo headless possono girare insieme, quindi chiedi il checkpoint della tab solo quando la lettura del risveglio dice `CHECKPOINT=libero`, e altrimenti aspetti il risveglio dopo. Una risposta a un `AskUserQuestion` aperto o a un permesso si dà nella tab: un messaggio di un'altra sessione non risponde a uno strumento aperto, e lo dici all'utente.
+6. **A passo finito** — il preflight senza domande aperte, il checkpoint chiuso e le sue segnalazioni con una risposta — chiudi la tab con `skill: loom-works:close-session`, `args: <sessionId>`. Uscita `0` → `chiusa`; un'altra uscita → `abbandonata (<motivo>)` e nessun ritento: la chiude l'utente. Poi `flow.py prosegui <perimetro> <membro>` e `flow.py prosegui <perimetro> <perimetro>`: lo script riprende il membro dal passo che i file dicono.
+
+Una tab che si chiude a metà ciclo è un ramo fermo (§2). Un ciclo chiuso in una tab lo script non lo conta fra quelli che chiedono il checkpoint del perimetro: se il giro finisce senza altri cicli, a `fine giro` e allo stop di' all'utente che il file del perimetro non è allineato (`/loom-works:checkpoint-task <perimetro>`).
+
+## 6. Scalare all'utente
 
 Un orchestrator che aspetta l'utente chiude il turno, e compass lo mostra `done`, non `ask`: il badge non avvisa nessuno. Quando l'orchestrator ha bisogno dell'utente lo avvisa da sé, su **tre canali insieme**:
 
@@ -663,71 +445,59 @@ Un orchestrator che aspetta l'utente chiude il turno, e compass lo mostra `done`
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/say.sh" && say_auto "orchestrator $(say_id T<perimetro>) <argomento in 3-7 parole>"
    ```
 
-**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab (`AskUserQuestion`, permessi); un permesso negato in un turno headless (§2, L'esito di un turno headless); una task con preflight decaduto o col ciclo interrotto prima del checkpoint (§1); una tab `in coda` scaduta senza nascere (§2, Aprire una tab); un'anomalia; un perimetro che non ha più niente da lanciare, dopo il suo checkpoint o quando non ce n'è bisogno (§2, Il checkpoint del perimetro). Nel passaggio di consegne (§6): la soglia superata con un deck che non sa aprire il successore (`HANDOFF=no`), il successore rifiutato dal deck, la sua tab scaduta in coda la prima volta, la delega ereditata dal successore.
+**Si scala per**: proposte nuove in attesa di via (§3); una risposta da dare nella tab; un ramo fermo (§2), col motivo; una premessa decaduta, un ciclo interrotto, un DLV lasciato all'utente; un piano che non sai rimettere in vigore; un fatto che ferma un passo già partito; uno script che muore due volte; un perimetro fermo o finito (`fermo`, `fine giro`). Nel passaggio di consegne (§8): la soglia superata con un deck che non sa aprire il successore, il successore rifiutato dal deck, la sua tab scaduta in coda la prima volta, la delega ereditata dal successore.
 
-**Non si scala** per gli eventi di routine — commit, push, un DLV spuntato, un checkpoint andato liscio: bastano le righe del riporto. Una notifica che non serviva si somma alle altre e insegna a ignorarle.
+**Non si scala** per i passi che lo script porta da sé — un preflight chiuso, un run pulito, un checkpoint andato liscio, un commit: bastano le righe del riporto. Una notifica che non serviva si somma alle altre e insegna a ignorarle.
 
-### Le anomalie: ramo fermo, nessun ritento
+## 7. Stop
 
-- `loom-deck-headless open` esce con un codice diverso da `0`, `spawn-task` con un codice diverso da `0` e da `4` (in coda, §2, Aprire una tab), o `loom-deck-headless reply` rifiuta per un motivo che non è un processo vivo (§2, Scrivere);
-- un turno headless finisce in `errore` (§2, L'esito di un turno headless); un `permesso negato` ferma il ramo allo stesso modo, con strumento e input delle chiamate negate nella scalata;
-- una tab in ciclo si chiude a metà (`✖ sessione chiusa` prima del checkpoint);
-- un run chiude il turno senza aver chiuso nessun DLV del suo perimetro;
-- un evento `🧊 ferma da N min` su una conversazione in ciclo.
+L'orchestrator si ferma quando l'utente lo chiede. Il passaggio di consegne (§8) non è uno stop: lo script resta vivo e segue il successore. Prima di fermarti, se un passo è aperto — un turno in corso, un checkpoint chiesto —, dillo: il turno finisce da sé, ma nessuno ne leggerà l'esito, e un orchestrator lanciato dopo comincia un giro nuovo. Allo stop il checkpoint del perimetro **non parte**.
 
-L'orchestrator ferma la task e le sue dipendenti, scrive il motivo in `## Rami fermi`, scala all'utente e **non rilancia**: un secondo tentativo su una causa non capita ripete il guasto, e può ripetere anche quello che il primo ha già scritto. I rami indipendenti continuano. Il ramo riparte quando l'utente lo dice.
-
-## 5. Stop
-
-L'orchestrator si ferma quando l'utente lo chiede. Il passaggio di consegne (§6) non è uno stop: l'orchestrator vecchio lancia il `recap` e ferma il monitor come qui, ma scrive `passata a` invece di `ferma`, e il successore riprende tutto. Prima di fermarti, se una richiesta di checkpoint è in corso o un turno headless dell'orchestrator lavora ancora, dillo: il turno finisce da sé, ma nessuno ne leggerà l'esito. Allo stop chiesto dall'utente il checkpoint del perimetro **non parte**: l'orchestrator non seguirebbe una conversazione dopo aver fermato il monitor.
-
-1. **`TaskStop` sul monitor.** Un evento che arriva dopo è in ritardo: ignoralo.
-2. **La riga di testa dello stato** diventa `Stato: ferma · SID`, e il resto del file resta com'è. Un orchestrator lanciato dopo sullo stesso perimetro trova un giro chiuso, e ne eredita i soli fatti (§0f).
-3. **Le cifre finali**, accanto a quelle salvate all'avvio del giro:
+1. **`TaskStop` sul `wait`**, se ne hai l'id; altrimenti esce da sé quando lo script muore, e la sua notifica arriva in ritardo: ignorala.
+2. **La testa della memoria** diventa `Stato: ferma · SID`, e il resto del file resta com'è. Un orchestrator lanciato dopo sullo stesso perimetro trova un giro chiuso, e ne eredita i soli fatti (§0f).
+3. **Lo script**: `"PY" -B -I "R/flow.py" --project-root "<radice>" stop <perimetro>`. Lo legge anche dalla testa `ferma`, al suo giro dopo; lo stop esplicito non aspetta quel giro.
+4. **Le cifre finali**, accanto a quelle di partenza del giro, che lo script ha scritto al suo primo avvio:
 
    ```bash
-   "PY" -B -I "R/mandate.py" recap --before "<BEFORE_FILE>"
+   "PY" -B -I "R/mandate.py" recap <perimetro>
    ```
 
-   Una riga `RECAP|<id>|prog=prima→dopo|dlv=a/b→c/d|ac=a/b→c/d|title=…` per il perimetro e per ogni membro letto all'avvio. Un membro entrato durante il giro non ha una riga: le sue cifre di oggi stanno nell'ultimo quadro. Questo `recap` è anche il segno con cui gli altri orchestrator sanno che questo è fermo (§0f): un orchestrator fermato senza lanciarlo resta vivo per loro finché la sua conversazione è aperta.
-4. **Il recap**, in chat:
-   - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia; i membri entrati o usciti durante il giro, con una parola che lo dice;
-   - i progressi in lista, una riga per ciclo chiuso;
-   - le **conversazioni rimaste aperte**, dalla tabella dello stato — quelle `abbandonata`, col motivo, e quelle ancora in ciclo o in coda: task, passo, canale, nome, `sessionId`. Una tab `in coda` nasce ancora al ritorno del focus fino all'ora della sua scadenza, anche a orchestrator fermo. Una `tab` l'utente la chiude quando vuole; una `headless` non ha niente da chiudere, e l'utente la riprende in una tab dal deck con ⏎ — l'orchestrator del giro dopo non la adotta, perché da uno stato `ferma` eredita i soli fatti (§0f). Le `chiusa` non si elencano;
-   - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, task che aspettano una dipendenza;
-   - se `## Checkpoint del perimetro` conta cicli chiusi dall'ultimo, la riga `il file del perimetro non è allineato ai membri: /loom-works:checkpoint-task <perimetro>`;
-   - i **fatti del perimetro** dello stato, aperti e superati, col membro da cui vengono: sono quelli che chi legge il file del perimetro dopo deve trovare, e alcuni nessun membro li ha scritti nel suo task file. Il prossimo `checkpoint-task` sul perimetro li porta nel file, chiunque lo lanci.
+   Una riga `RECAP|<id>|prog=prima→dopo|dlv=a/b→c/d|ac=a/b→c/d|title=…` per il perimetro e per ogni membro della partenza; `PRIMA=assente` se il giro non ha mai avuto un piano valido. Questo `recap` è anche il segno con cui gli altri orchestrator sanno che questo è fermo (§0f): un orchestrator fermato senza lanciarlo resta vivo per loro finché la sua conversazione è aperta.
+5. **Il recap**, in chat, dalla lettura `flow.py recap <perimetro>` e dalla memoria:
+   - la tabella delle task con le cifre prima → dopo: Prog, DLV, AC, ogni id con la sua maniglia; i membri entrati durante il giro, che non hanno un «prima»;
+   - i cicli chiusi nel giro, una riga per ciclo;
+   - le **conversazioni rimaste aperte**: i passi aperti delle righe `MEMBRO` — membro, passo, fase, sessione — e le tab della memoria in ciclo o in coda. Una headless non ha niente da chiudere, e l'utente la riprende in una tab dal deck con ⏎; una tab la chiude l'utente; una tab `in coda` nasce ancora al ritorno del focus fino all'ora della sua scadenza;
+   - quello che resta in sospeso: proposte senza via, rami fermi col loro motivo, membri fermi o in attesa con le righe `MEMBRO`;
+   - se la riga `CICLI=` conta cicli chiusi dall'ultimo checkpoint del perimetro, la riga `il file del perimetro non è allineato ai membri: /loom-works:checkpoint-task <perimetro>`;
+   - i **fatti del perimetro** della memoria, aperti e superati, col membro da cui vengono: il prossimo `checkpoint-task` sul perimetro li porta nel file, chiunque lo lanci.
 
-Lo stato non si cancella, né allo stop né dopo: i fatti servono al giro dopo sullo stesso perimetro (§0f) e a un `checkpoint-mandate` lanciato a mano. I quattro file restano in `.claude/loom/orchestrator/`, fuori da git.
+La memoria e il flusso non si cancellano, né allo stop né dopo: i fatti servono al giro dopo e a un `checkpoint-mandate` lanciato a mano, il flusso a chi misura il giro. Restano in `.claude/loom/orchestrator/`, fuori da git; il giro dopo archivia il flusso col nome che porta l'ora (`flow.py start --nuovo`).
 
-## 6. Il passaggio di consegne
+## 8. Il passaggio di consegne
 
-Oltre la soglia di contesto (§0d, La soglia) l'orchestrator chiude il giro in modo morbido e passa le consegne a un orchestrator nuovo, il **successore**: una tab aperta dal deck sullo stesso perimetro, a contesto vuoto, che riprende dallo stato su disco. La compattazione automatica di Claude Code perde dettaglio, e ogni evento rilegge tutto il contesto: il passaggio tiene l'orchestrator sotto un tetto.
+Oltre la soglia di contesto (§0d, La soglia) il giro si chiude in modo morbido e l'orchestrator passa le consegne a un orchestrator nuovo, il **successore**: una tab aperta dal deck sullo stesso perimetro, a contesto vuoto, che riprende dalla memoria e dal flusso. La compattazione automatica di Claude Code perde dettaglio, e ogni risveglio rilegge tutto il contesto: il passaggio tiene l'orchestrator sotto un tetto.
 
 ### I gradini
 
-| Evento | Cosa fai |
-|---|---|
-| `orchestrator 🧠` al 20, 40, 60 o 80% | una riga nel riporto e il gradino nello stato. Nessun passo cambia |
-| `orchestrator 🧠` al 100% | **il giro si chiude**: dalla regola 0 (§1, Le regole di partenza) nessuna conversazione nuova. I cicli aperti arrivano al checkpoint e alle risposte come sempre, e le proposte in sospeso aspettano il via come sempre. Una riga all'utente: quali cicli restano aperti, e che passerai le consegne a giro chiuso |
-| `orchestrator 🧠` al 120% | **secondo tetto**: passi le consegne subito, anche coi cicli aperti (§Quando passi) |
+Lo script misura il contesto dell'orchestrator dal suo transcript e scrive nel flusso un evento a ogni gradino della soglia: 20, 40, 60, 80, 100 e 120%. Solo gli ultimi due svegliano, col motivo `contesto`.
 
-Con `HANDOFF=no` al gate (§0c) non puoi passare le consegne: al 100% il giro si chiude lo stesso, e scali all'utente (§4) che la soglia è superata e il deck installato non sa aprire il successore. Le strade sono sue: lo stop (§5), o il deck aggiornato e riavviato — `npm install -g @lamemind/loom-deck@latest` —, dopo il quale te lo dice in chat, rilanci il gate e con `HANDOFF=sì` passi le consegne.
+| Gradino | Cosa succede |
+|---|---|
+| sotto il 100% | un evento nel flusso, nessun risveglio |
+| 100% | **il giro si chiude**: lo script non apre passi nuovi, i cicli aperti arrivano al checkpoint, e il checkpoint del perimetro parte a fine giro. Una riga all'utente: quali cicli restano aperti, e che passerai le consegne a giro chiuso |
+| 120% | **secondo tetto**: passi le consegne subito, anche coi cicli aperti |
+
+Con `HANDOFF=no` al gate (§0c) non puoi passare le consegne: al 100% il giro si chiude lo stesso, e scali all'utente (§6) che la soglia è superata e il deck installato non sa aprire il successore. Le strade sono sue: lo stop (§7), o il deck aggiornato e riavviato — `npm install -g @lamemind/loom-deck@latest` —, dopo il quale te lo dice in chat, rilanci il gate e con `HANDOFF=sì` passi le consegne.
 
 ### Quando passi
 
-A giro in chiusura passi le consegne appena:
-
-1. nessuna conversazione dell'orchestrator è `in ciclo` né `in coda`, e `## Checkpoint in corso` dice `nessuno`;
-2. il checkpoint del perimetro è chiuso, o non serve. Lo lanci come a fine giro (§2, Il checkpoint del perimetro), con le sue condizioni, e le sue segnalazioni seguono la via di sempre.
-
-Un ciclo può tenere aperto il giro a lungo: una proposta che aspetta il via dell'utente per ore. Al gradino del **120%** passi senza aspettare: coi cicli aperti, con le proposte in sospeso, e senza il checkpoint del perimetro, che vuole tutte le conversazioni chiuse. Il successore li adotta dallo stato, come la ripresa di un orchestrator morto.
+A giro in chiusura passi le consegne al primo risveglio `fermo` o `fine giro`: lo script lo scrive quando nessun passo è aperto e niente è lanciabile, cioè dopo i cicli aperti, le loro risposte e il checkpoint del perimetro. Un ciclo può tenere aperto il giro a lungo, per esempio una proposta che aspetta il via per ore: al **120%** passi senza aspettare, coi passi aperti e le proposte in sospeso, che il successore adotta dalla memoria e dal flusso.
 
 ### La sequenza
 
 In quest'ordine, un passo alla volta:
 
-1. **Lo stato in passaggio.** Riscrivi `STATE_FILE` con la testa `Stato: in passaggio · SID` e il resto intero: conversazioni, fatti, collisioni, proposte, rami fermi, delega, soglia. Da qui un successore che legge lo stato aspetta te (§0f, `check --wait`).
+1. **La memoria in passaggio.** Riscrivi `STATE_FILE` con la testa `Stato: in passaggio · SID` e il resto intero, `Letto fino a` compreso. Da qui un successore che legge la memoria aspetta te (§0f, `check --wait`).
 2. **Il successore.** Una invocazione del tool `Skill`:
 
    ```
@@ -735,30 +505,36 @@ In quest'ordine, un passo alla volta:
    args:  <perimetro> orchestrator
    ```
 
-   Nessun `--orchestrator`: la conversazione che si apre è un orchestrator, non un membro. Il deck apre una tab con `orchestrate-mandate <perimetro>`, senza argomenti, e scrive su di te la marca `origin: orchestrator`: la riga `consegne:` lo conferma. È la marca che permette al successore di chiuderti, anche se l'utente ti ha aperto a mano.
+   Nessun `--orchestrator`: la conversazione che si apre è un orchestrator, non un membro. Il deck apre una tab con `orchestrate-mandate <perimetro>`, senza argomenti, e scrive su di te la marca `origin: orchestrator`: la riga `consegne:` lo conferma. È la marca che permette al successore di chiuderti.
    - **Uscita `0`** → la tab è nata, e la riga `sessionId:` è il successore. Avanti al passo 3.
    - **Uscita `4`** → la tab è in coda (§Il successore in coda).
-   - **Ogni altra uscita** → il successore non c'è. Riscrivi la testa `Stato: attiva · SID`, niente recap, e scala all'utente (§4) col motivo che riporta la skill: il giro resta chiuso, e l'utente sceglie fra lo stop (§5) e un rimedio — il deck acceso, aggiornato, riavviato —, dopo il quale te lo dice e riparti dal passo 1. Nessun ritento da te.
-3. **Il recap.** `"PY" -B -I "R/mandate.py" recap --before "<BEFORE_FILE>"`, e le sue righe in chat come allo stop (§5, punto 4), in breve. Il `recap` è il segno con cui gli altri orchestrator, e la guardia del successore (§0f, Gli altri orchestrator vivi), sanno che sei fermo. Viene dopo lo spawn: un orchestrator che lo ha lanciato resta fermo per la guardia, e con uno spawn fallito continueresti a lavorare invisibile agli altri orchestrator.
-4. **Il monitor.** `TaskStop` sul monitor: il successore riarma sullo stesso `WATCH_FILE`, e due monitor lo scriverebbero insieme.
-5. **Lo stato passato.** Riscrivi la testa `Stato: passata a <sessionId del successore> · da SID`, e in `## Passaggio di consegne` la riga `successore <sessionId> · nato alle <ora>`; il resto intero. Poi l'ultima riga in chat — a chi hai passato le consegne, e che il successore chiuderà questa conversazione — e chiudi il turno. Nessun altro tool e nessun altro messaggio: un evento che arriva dopo è in ritardo, e se l'utente ti scrive gli rispondi che l'orchestrator è passato al successore.
+   - **Ogni altra uscita** → il successore non c'è. Riscrivi la testa `Stato: attiva · SID`, niente recap, e scala all'utente (§6) col motivo che riporta la skill: il giro resta chiuso, e l'utente sceglie fra lo stop (§7) e un rimedio, dopo il quale te lo dice e riparti dal passo 1. Nessun ritento da te.
+3. **Il recap.** `"PY" -B -I "R/mandate.py" recap <perimetro>`, e le sue righe in chat in breve. È il segno con cui gli altri orchestrator, e la guardia del successore (§0f), sanno che sei fermo. Viene dopo lo spawn: con uno spawn fallito continueresti a lavorare invisibile agli altri orchestrator.
+4. **Il `wait`.** `TaskStop` sul tuo `wait`, se ne hai l'id: il successore si riattacca col suo. **Lo script non si ferma**: segue la testa della memoria, e dal passo 5 riconosce il successore come orchestrator.
+5. **La memoria passata.** Riscrivi la testa `Stato: passata a <sessionId del successore> · da SID`, e in `## Passaggio di consegne` la riga `successore <sessionId> · nato alle <ora>`; il resto intero. Poi l'ultima riga in chat — a chi hai passato le consegne, e che il successore chiuderà questa conversazione — e chiudi il turno. Nessun altro tool e nessun altro messaggio: una notifica che arriva dopo è in ritardo, e se l'utente ti scrive gli rispondi che l'orchestrator è passato al successore.
 
 ### Il successore in coda
 
 Il successore è una tab, e su Linux la sua richiesta passa dal controllo della finestra in focus: con la finestra di un altro progetto davanti, o a schermo bloccato, va in coda e scade dopo trenta minuti (`spawn-task`, uscita `4`). Su Windows il controllo non c'è, e la tab nasce subito.
 
 - Scrivi in `## Passaggio di consegne` la riga `successore <sessionId> · in coda (scade <ora della riga scade:>) · richiesta <n>`. La testa resta `in passaggio · SID`.
-- Aspetti **a giro chiuso**: monitor armato e riarmato, nessuna conversazione nuova, i cicli aperti e le proposte come sempre. Tu resti l'orchestrator.
-- **Nasce** → arriva l'evento `🆕 nuova sessione` col suo `sessionId`, con l'etichetta del perimetro: passi 3, 4 e 5.
-- **Scade** → passata l'ora di `scade:` senza l'evento — la guardi a ogni evento, riarmo del monitor compreso —, richiedi tu il successore, dal passo 2, e scrivi il numero della richiesta. Una richiesta scaduta non apre più nessuna tab, quindi richiederla non fa nascere due successori. Alla **prima** scadenza scali all'utente (§4): il successore aspetta una finestra del progetto in focus, o lo sblocco dello schermo. Alle successive basta una riga in chat.
+- Aspetti **a giro chiuso**, col tuo `wait`: tu resti l'orchestrator, e lo script ti riconosce dalla testa.
+- **La nascita la aspetti con un secondo Bash in background**, perché lo script non ti sveglia per una sessione nuova, e il successore, appena nato, ti aspetta solo cinque minuti (§0f, `check --wait`). Con `run_in_background: true` e `<secondi>` = i secondi da adesso all'ora di `scade:`:
+
+  ```bash
+  timeout <secondi> bash -c 'until "PY" -B -I "R/sessions.py" find <sessionId del successore> >/dev/null 2>&1; do sleep 10; done'
+  ```
+
+- **Nasce** → il Bash esce con `0`: passi 3, 4 e 5.
+- **Scade** → il Bash esce con `124`: nessuna tab nascerà, e richiedi tu il successore, dal passo 2, col suo Bash nuovo, e scrivi il numero della richiesta. Una richiesta scaduta non apre più nessuna tab, quindi richiederla non fa nascere due successori. Alla **prima** scadenza scali all'utente (§6): il successore aspetta una finestra del progetto in focus, o lo sblocco dello schermo. Alle successive basta una riga in chat.
 
 ### La ripresa del successore
 
-`STATE=consegne` al controllo dello stato (§0f): sei il successore. Rileggi lo stato con `Read` e riparti da lì come in ogni ripresa (§0f, Ripresa), con queste differenze:
+`STATE=consegne` al controllo della memoria (§0f): sei il successore. Rileggi la memoria con `Read` e riparti da lì come in ogni ripresa, con queste differenze:
 
-- **La delega resta.** Il passaggio è la continuazione pianificata dello stesso giro, deciso dall'orchestrator che teneva la delega; la ripresa di un orchestrator morto la toglie perché nessuno sa perché si è chiuso. Se `## Delega` dice `sì`, scrivilo in chat e manda all'utente una `PushNotification`: «orchestrator T<perimetro>: delega ereditata dall'orchestrator di prima, revocala se non vale più». La revoca resta sua (§3, La delega dell'utente).
-- **La soglia** è quella dello stato, salvo un `--soglia` negli argomenti (§0d, La soglia). Il gradino scritto nello stato è dell'orchestrator vecchio: il tuo arriva col primo `🧠` del tuo armo.
-- **I cicli aperti** li adotti come la ripresa di un orchestrator morto: le headless rilette con `status`, le tab vive col loro canale (§2, Scrivere), le `in coda` fino alla loro scadenza, le tab che non sono più vive `abbandonata (non più viva alla ripresa)`.
-- **L'orchestrator vecchio lo chiudi tu**, una volta sola, dopo l'armo del monitor (§0j): a quel punto ha chiuso il suo turno, e `close-session` non lo trova al lavoro. Una invocazione del tool `Skill`, `skill: loom-works:close-session`, `args: <STATE_FROM>`. Uscita `0` → in `## Passaggio di consegne` la riga diventa `da <STATE_FROM> alle <ora> · chiusa`. Un'altra uscita → `abbandonata (<motivo>)`, una riga all'utente, nessun ritento: quella tab la chiude l'utente. Senza `STATE_FROM` — uno stato scritto da un orchestrator più vecchio del passaggio — non chiudi niente, e lo dici in una riga.
+- **La delega resta.** Il passaggio è la continuazione pianificata dello stesso giro, deciso dall'orchestrator che teneva la delega; la ripresa di un orchestrator morto la toglie perché nessuno sa perché si è chiuso. Se `## Delega` dice `sì`, scrivilo in chat e manda all'utente una `PushNotification`: «orchestrator T<perimetro>: delega ereditata dall'orchestrator di prima, revocala se non vale più».
+- **La soglia** è quella della memoria, salvo un `--soglia` negli argomenti (§0i).
+- **Lo script** è vivo: `flow.py status` lo conferma, e ti riattacchi col `wait` da `Letto fino a` (§0j). I risvegli scritti durante il passaggio sono lì.
+- **L'orchestrator vecchio lo chiudi tu**, una volta sola, dopo il primo `wait`: a quel punto ha chiuso il suo turno, e `close-session` non lo trova al lavoro. Una invocazione del tool `Skill`, `skill: loom-works:close-session`, `args: <STATE_FROM>`. Uscita `0` → in `## Passaggio di consegne` la riga diventa `da <STATE_FROM> alle <ora> · chiusa`. Un'altra uscita → `abbandonata (<motivo>)`, una riga all'utente, nessun ritento. Senza `STATE_FROM` non chiudi niente, e lo dici in una riga.
 
-La testa diventa `Stato: attiva · SID` alla prima scrittura dello stato (§0i), come in ogni ripresa.
+La testa diventa `Stato: attiva · SID` alla prima scrittura della memoria, come in ogni ripresa.

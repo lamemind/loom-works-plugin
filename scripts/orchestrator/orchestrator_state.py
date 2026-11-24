@@ -1,21 +1,22 @@
 """
 orchestrator_state — lo stato su disco dell'orchestrator di un perimetro: dove sta, di chi è.
 
-  check   al lancio dell'orchestrator: i tre path, la cartella creata, il controllo
+  check   al lancio dell'orchestrator: i path, la cartella creata, il controllo
           che git la ignori, e il verdetto su ciò che l'orchestrator trova — un giro
           nuovo, una ripresa, o una ragione per fermarsi
   facts   per `checkpoint-mandate`: la sezione `## Fatti del perimetro` dello
           stato, se lo stato è di questo perimetro
 
-I quattro file stanno in `<radice>/.claude/loom/orchestrator/`, col nome ricavato
-dall'id del perimetro:
+I file stanno in `<radice>/.claude/loom/orchestrator/`, col nome ricavato
+dall'id del perimetro. Due li tocca questo script:
 
   T<id>.md           lo stato dell'orchestrator, scritto dall'orchestrator col tool `Write`
-  T<id>-prima.json   le cifre di partenza, scritte da `mandate.py tree --save`
-  T<id>-watch.json   il punto da cui riparte il monitor, scritto da
-                     `watch_sessions.py --state`
-  T<id>-filter.json  whitelist e blacklist del monitor, scritte dall'orchestrator col
-                     tool `Write` e lette da `watch_sessions.py --filter`
+  T<id>-watch.json   il punto di lettura degli scanner del monitor, scritto
+                     dallo script del flusso
+
+Gli altri — il flusso del giro, gli ordini, il lock e il log dello script del
+flusso — sono di `flow_log.py`, e il giro nuovo li archivia con `flow.py start
+--nuovo`.
 
 Non nella scratchpad della conversazione: sta nella temp di sistema, e un
 reboot o una pulizia la svuotano a giro aperto. Non nella task folder del
@@ -71,11 +72,9 @@ Con --wait <secondi>, su `in passaggio` di un'altra sessione viva `check`
 rilegge lo stato ogni WAIT_POLL_S secondi, fino al tetto: è l'attesa del
 successore mentre l'orchestrator vecchio chiude il passaggio.
 
-Un giro nuovo toglie `-watch.json` (il monitor darebbe come eventi tutto ciò
-che è cambiato dallo stop precedente) e `-filter.json` (le conversazioni che
-l'utente ha escluso valgono per il giro, come la delega), e chiede di
-riscrivere `-prima.json`; una ripresa li tiene, e riscrive le cifre solo se
-mancano.
+Un giro nuovo toglie `-watch.json`: gli scanner ripartiti su un file vecchio
+darebbero come eventi tutto ciò che è cambiato dallo stop precedente. Una
+ripresa lo tiene, e gli scanner ripartono dal punto in cui erano.
 
 Uso:
   python -I orchestrator_state.py [--project-root <radice>] check <perimetro> --own-session <session id> [--wait <secondi>]
@@ -122,9 +121,7 @@ def state_paths(project_root, perimeter):
     directory = os.path.join(project_root, STATE_DIR)
     return {"dir": directory,
             "state": os.path.join(directory, f"{perimeter}.md"),
-            "before": os.path.join(directory, f"{perimeter}-prima.json"),
-            "watch": os.path.join(directory, f"{perimeter}-watch.json"),
-            "filter": os.path.join(directory, f"{perimeter}-filter.json")}
+            "watch": os.path.join(directory, f"{perimeter}-watch.json")}
 
 
 def perimeter_created_on(project_root, perimeter):
@@ -229,9 +226,7 @@ def command_check(project_root, perimeter, own_session, wait_seconds=0):
     paths = state_paths(project_root, perimeter)
     print(f"STATE_DIR={paths['dir']}")
     print(f"STATE_FILE={paths['state']}")
-    print(f"BEFORE_FILE={paths['before']}")
     print(f"WATCH_FILE={paths['watch']}")
-    print(f"FILTER_FILE={paths['filter']}")
     print(f"CREATED_ON={created_on}")
 
     ignored = gitignore_state(project_root, paths["state"])
@@ -265,18 +260,14 @@ def command_check(project_root, perimeter, own_session, wait_seconds=0):
         print(f"STATE_CREATED_ON={head['created_on']}")
 
     if verdict in NEW_ROUND:
-        for key, word in (("watch", "WATCH"), ("filter", "FILTER")):
-            if os.path.exists(paths[key]):
-                os.remove(paths[key])
-                print(f"{word}=tolto")
-            else:
-                print(f"{word}=assente")
-        print("BEFORE=scrivi")
+        if os.path.exists(paths["watch"]):
+            os.remove(paths["watch"])
+            print("WATCH=tolto")
+        else:
+            print("WATCH=assente")
         print("ROUND=nuovo")
     elif VERDICT_EXIT[verdict] == GO:
         print(f"WATCH={'resta' if os.path.exists(paths['watch']) else 'assente'}")
-        print(f"FILTER={'resta' if os.path.exists(paths['filter']) else 'assente'}")
-        print(f"BEFORE={'tieni' if os.path.exists(paths['before']) else 'scrivi'}")
         print("ROUND=ripresa")
     print(f"CHECK={'ok' if VERDICT_EXIT[verdict] == GO else 'stop'}")
     return VERDICT_EXIT[verdict]

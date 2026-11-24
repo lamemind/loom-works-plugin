@@ -62,7 +62,7 @@ Le dipendenze vere non stanno nemmeno nel piano: stanno in `## Dependencies` dei
 
 ### La voce 🎬
 
-Il glifo 🎬, **stato dell'orchestrator**, marca in `## Materiale` di un perimetro — mandato o epica — la voce che punta al file in cui l'orchestrator tiene il suo giro: `.claude/loom/orchestrator/T<id>.md`, sotto la project root, ignorato da git. Il file porta conversazioni, fatti del perimetro e proposte in sospeso, e `checkpoint-mandate` ne porta i fatti nella prosa del perimetro.
+Il glifo 🎬, **stato dell'orchestrator**, marca in `## Materiale` di un perimetro — mandato o epica — la voce che punta al file in cui l'orchestrator tiene la sua memoria del giro: `.claude/loom/orchestrator/T<id>.md`, sotto la project root, ignorato da git. Il file porta fatti del perimetro, proposte in sospeso, rami fermi e delega, e `checkpoint-mandate` ne porta i fatti nella prosa del perimetro. I passi e le conversazioni del giro stanno nel flusso dello script, accanto (`flow-format.md`).
 
 - La scrive `prepare-mandate`, una volta sola; l'orchestrator non scrive nei task file.
 - È un puntatore per chi legge il task file. L'orchestrator e `checkpoint-mandate` ricavano il path dall'id del perimetro, quindi un perimetro senza la voce viene seguito lo stesso.
