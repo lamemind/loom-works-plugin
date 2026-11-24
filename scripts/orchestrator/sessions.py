@@ -12,8 +12,8 @@ sessions — legge le altre sessioni Claude Code di un progetto loom-works.
          gli altri orchestrator vivi sul progetto, su questa macchina, col perimetro
          che ognuno porta avanti: la guardia al lancio di un orchestrator
   find   le sessioni vive il cui sessionId comincia col prefisso, col sessionId
-         intero: l'orchestrator scioglie così l'id che l'utente chiede di escludere
-         dal monitor, prima di scriverlo nella blacklist del filtro
+         intero: l'orchestrator sa così se una sessione che aspetta — il
+         successore di un passaggio di consegne — è nata
 
 Stesse fonti del monitor (watch_sessions.py), lette da orchestrator_common.
 
@@ -272,9 +272,8 @@ def command_find(project_root, session_prefix):
     una riga `SESSIONE|<sessionId intero>|<etichetta>|<stato>` ciascuna, poi
     `TROVATE=<n>`. Exit 0 con una sola, 1 con nessuna, 2 con più d'una.
 
-    Solo fra le vive, a differenza di `tail`: la blacklist del filtro esclude
-    una conversazione aperta, e un id che indica due sessioni non si scrive,
-    perché escluderebbe anche quella che l'utente non ha nominato.
+    Solo fra le vive, a differenza di `tail`: chi chiede vuole sapere se la
+    sessione c'è adesso, e un id che indica due sessioni non ne dice nessuna.
     """
     registry = orchestrator_common.read_registry(project_root)
     if not registry.readable:

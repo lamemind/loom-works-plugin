@@ -14,8 +14,7 @@ mandate — le letture dell'orchestrator sul perimetro: gate, albero, cifre prim
   recap   le cifre di oggi accanto a quelle di partenza del giro, la riga `prima`
           che lo script del flusso scrive al primo avvio del giro
 
-Solo letture: nessuno di questi comandi scrive nei repo. `tree --save` scrive il
-file che gli si indica: la skill lo tiene in `.claude/loom/orchestrator/`, ignorata da git.
+Solo letture: nessuno di questi comandi scrive un file.
 
 Lo stato di una task si legge dalla cella Prog della tabella Tasks Overview e
 dal task file, mai dai glifi del grafo: fra la promozione e il checkpoint i
@@ -31,7 +30,7 @@ esce 2 e rimanda al lettore.
 
 Uso:
   python -I mandate.py [--project-root <radice>] gate --own-session <session id>
-  python -I mandate.py [--project-root <radice>] tree <perimetro> --children [T1 T2 …] [--save <file.json>]
+  python -I mandate.py [--project-root <radice>] tree <perimetro> --children [T1 T2 …]
   python -I mandate.py [--project-root <radice>] recap <perimetro>
 
 Exit: 0 ok · 1 id malformato o file mancante · 2 gate chiuso, e ogni errore di
@@ -492,14 +491,6 @@ def command_tree(project_root, arguments):
         print(f"ERROR: task file di {arguments.head} non trovato", file=sys.stderr)
         return 1
     print_tree(state)
-    if arguments.save:
-        temporary_path = arguments.save + ".tmp"
-        with open(temporary_path, "w", encoding="utf-8") as save_handle:
-            json.dump({"head": state["head"], "mandate": state["mandate"],
-                       "figures": {task_id: {key: state["tasks"][task_id][key] for key in ("prog", "dlv", "ac", "title")}
-                                   for task_id in [state["head"]] + state["mandate"]}},
-                      save_handle, ensure_ascii=False)
-        os.replace(temporary_path, arguments.save)
     return 0
 
 
@@ -556,7 +547,6 @@ def parse_arguments():
     tree_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
     tree_parser.add_argument("--children", nargs="*", required=True,
                              help="i membri, dal lettore unico resolve-task.sh --members")
-    tree_parser.add_argument("--save", default="", help="file JSON delle cifre di partenza, in una cartella che git ignora")
     recap_parser = subcommands.add_parser("recap")
     recap_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
     return parser.parse_args()

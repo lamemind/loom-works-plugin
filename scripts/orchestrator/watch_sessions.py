@@ -13,14 +13,10 @@ Ogni riga su stdout è un evento per il tool Monitor di Claude Code:
   - da git: commit locali nuovi e push su origin, per ogni repo guardato: la
     radice, ogni submodule di .gitmodules e i --repo in più
 
-Con --filter le righe passano da whitelist e blacklist prima di uscire
-(watch_filter.py): il file si rilegge quando cambia, e le righe `monitor`
-escono sempre. Senza --filter escono tutte.
-
-Gli scanner servono anche allo script del flusso (`flow_engine.py`), che li
-chiama dal proprio processo: assegna `sink`, e ogni evento gli arriva come dict
-— genere, testo, task, sessioni — invece di uscire su stdout. Il filtro vale
-solo per stdout: il flusso sceglie da sé cosa tenere.
+Gli scanner servono soprattutto allo script del flusso (`flow_engine.py`), che
+li chiama dal proprio processo: assegna `sink`, e ogni evento gli arriva come
+dict — genere, testo, task, sessioni — invece di uscire su stdout. Il flusso
+sceglie da sé quali eventi tenere: quelli del perimetro e dei suoi membri.
 
 Con --context-threshold il monitor misura anche il contesto della sessione che
 lo lancia, l'orchestrator, dal suo transcript (watch_context.py): una riga `orchestrator 🧠`
@@ -37,11 +33,10 @@ non ripete gli eventi già detti e non perde quelli capitati nel cambio. Il prim
 giro registra lo stato attuale e non emette niente sul passato, tranne il
 contesto dell'orchestrator: l'orchestrator deve sapere subito se è già oltre un gradino.
 
-Uso (lo lancia la skill dell'orchestrator, dalla cache del plugin):
+Uso da solo, una riga per evento su stdout (dalla cache del plugin):
   python -u -I watch_sessions.py --project-root <radice del progetto> \\
-      --own-session <id della sessione che lancia il monitor> \\
-      --state <radice>/.claude/loom/orchestrator/T<perimetro>-watch.json \\
-      [--filter <radice>/.claude/loom/orchestrator/T<perimetro>-filter.json] \\
+      --own-session <id della sessione da saltare> \\
+      --state <file JSON di stato, in una cartella che git ignora> \\
       [--context-threshold <token>] \\
       [--repo nome=path-relativo-alla-radice]...
 """
@@ -64,13 +59,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import orchestrator_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
 import watch_context  # noqa: E402
-import watch_filter  # noqa: E402
 
 CHECKBOX_PATTERN = re.compile(r"^- \[([ x])\]")
-
-# Il file del filtro (watch_filter.FilterSource), o None senza --filter. Lo
-# assegna `main`; lo legge `emit_event`, il punto da cui esce ogni evento.
-filter_source = None
+TASK_IN_TEXT_PATTERN = re.compile(r"\bT\d+\b")
+# Lo scope di un commit: `run(T23): …`, `orchestrator (T220 DLV5): …`. Il nome davanti
+# alla parentesi non conta, conta che la parentesi chiuda prima dei due punti.
+COMMIT_SCOPE_PATTERN = re.compile(r"^[\w-]+\s*\(([^)]*)\)\s*:")
+CREATE_SUBJECT_PATTERN = re.compile(r"^task\((T\d+)\):\s*create\b")
 
 # La sessione dell'orchestrator vista nell'ultimo giro del registro (`sessionId`,
 # `cwd`), o None: la scrive `scan_sessions`, la legge `scan_context`.
@@ -88,8 +83,6 @@ def parse_arguments():
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     parser.add_argument("--own-session", default="", help="session id da saltare: quello che lancia il monitor")
     parser.add_argument("--state", required=True, help="file JSON di stato, in una cartella che git ignora")
-    parser.add_argument("--filter", default="",
-                        help="file JSON con whitelist e blacklist, riletto quando cambia")
     parser.add_argument("--repo", action="append", default=[],
                         help="nome=path relativo alla radice, oltre a radice e submodule; ripetibile")
     parser.add_argument("--poll-seconds", type=int, default=15)
@@ -112,8 +105,7 @@ def deliver(kind, text, tasks=(), session_ids=None, **extra):
 
 
 def emit(line, kind="monitor", **extra):
-    """Una riga `monitor`: esce sempre, il filtro non la vede. Un monitor rotto
-    che tace per un filtro sembrerebbe un monitor zitto."""
+    """Una riga `monitor`: parla del monitor, non di una task."""
     text = line.replace("\n", " ")[:300]
     if sink is not None:
         deliver(kind, text, **extra)
@@ -122,15 +114,11 @@ def emit(line, kind="monitor", **extra):
 
 
 def emit_event(line, tasks=(), session_ids=None, kind="evento", **extra):
-    """Un evento: esce se il filtro lo ammette. `tasks` le task dell'evento,
-    `session_ids` i sessionId del processo per un evento di sessione, `None`
-    per tutti gli altri. La regex del filtro guarda la riga come esce."""
+    """Un evento: `tasks` le task dell'evento, `session_ids` i sessionId del
+    processo per un evento di sessione, `None` per tutti gli altri."""
     text = line.replace("\n", " ")[:300]
     if sink is not None:
         deliver(kind, text, tasks, session_ids, **extra)
-        return
-    active = filter_source.active if filter_source is not None else None
-    if active is not None and not active.admits(text, tasks, session_ids):
         return
     print(text, flush=True)
 
@@ -142,9 +130,8 @@ def process_tasks(process):
 
 
 def process_session_ids(process):
-    """Ogni sessionId che il processo ha avuto, l'attuale compreso: un filtro
-    `session:` segue il processo, e un /clear non fa ricomparire una
-    conversazione esclusa."""
+    """Ogni sessionId che il processo ha avuto, l'attuale compreso: chi riceve
+    l'evento segue il processo anche dopo un /clear."""
     return process.get("session_ids") or [process["session_id"]]
 
 
@@ -349,8 +336,8 @@ def announce_label_change(process, old_label):
     if new_label == old_label:
         return
     session = short_id(process["session_id"])
-    # L'evento porta la task vecchia e la nuova: passa una whitelist che ne
-    # ammette una, così l'orchestrator vede entrare e uscire una sessione dal mandato.
+    # L'evento porta la task vecchia e la nuova: il flusso di un perimetro che
+    # ne contiene una vede entrare e uscire la sessione dai suoi membri.
     tasks = {label for label in (old_label, new_label) if not label.startswith("?")}
     session_ids = process_session_ids(process)
     extra = {"sessione": process["session_id"], "headless": bool(process.get("headless"))}
@@ -634,8 +621,7 @@ def scan_git(state, settings):
                 continue
             short_ref = ref_name.replace("refs/heads/", "").replace("refs/remotes/", "")
             if ref_name.startswith("refs/remotes/"):
-                # Un push non ha task: con una whitelist passa solo se una
-                # regex lo ammette.
+                # Un push non ha task: nessun flusso lo tiene.
                 emit_event(f"git {repo_name} ⬆ {short_ref} → {sha[:7]}", kind="push")
                 continue
             if old_sha:
@@ -645,8 +631,30 @@ def scan_git(state, settings):
             for commit_line in log_output.strip().splitlines():
                 subject = commit_line.partition(" ")[2]
                 emit_event(f"git {repo_name} ● {short_ref}: {commit_line[:160]}",
-                           watch_filter.commit_tasks(subject, lambda task_id: parent_task(settings, task_id)),
+                           commit_tasks(subject, lambda task_id: parent_task(settings, task_id)),
                            kind="commit")
+
+
+def commit_tasks(subject, parent_of):
+    """Le task di un commit, dal suo soggetto.
+
+    L'id dello scope (`run(T23): …`, `orchestrator (T220 DLV5): …`); senza un id nello
+    scope, ogni id del soggetto. Il commit di creazione `task(T<n>): create`
+    prende anche la task del campo `Parent Task` del file appena nato
+    (`parent_of`): è così che la figlia nuova di un'epica arriva al flusso del
+    suo perimetro, e la creazione di una task estranea no. Un commit senza id
+    non ha task.
+    """
+    scope = COMMIT_SCOPE_PATTERN.match(subject)
+    tasks = set(TASK_IN_TEXT_PATTERN.findall(scope.group(1))) if scope else set()
+    if not tasks:
+        tasks = set(TASK_IN_TEXT_PATTERN.findall(subject))
+    created = CREATE_SUBJECT_PATTERN.match(subject)
+    if created:
+        parent = parent_of(created.group(1))
+        if parent:
+            tasks.add(parent)
+    return tasks
 
 
 def parent_task(settings, task_id):
@@ -695,48 +703,20 @@ def build_settings(arguments):
 
 
 def arm_line(word, state):
-    """La riga di armo: ogni sessione seguita con stato ed età. Col filtro
-    elenca le sole sessioni che passano e conta quelle fuori, così un silenzio
-    si spiega; la regex del filtro guarda il pezzo della sessione
-    (`T31 waiting 4 min [loom-deck]`)."""
+    """La riga di armo: ogni sessione seguita con stato ed età."""
     now = time.time()
-    entries = [(describe_status(process, now), process) for process in state["processes"].values()]
-    active = filter_source.active if filter_source is not None else None
-    if active is None:
-        sessions = sorted(text for text, _ in entries)
-        return f"monitor ✅ {word}: {', '.join(sessions) or 'nessuna sessione viva'}"
-    sessions = sorted(text for text, process in entries
-                      if active.admits(text, process_tasks(process), process_session_ids(process)))
-    outside = len(entries) - len(sessions)
-    return (f"monitor ✅ {word} col filtro (sessioni fuori: {outside}): "
-            f"{', '.join(sessions) or 'nessuna sessione viva nel filtro'}")
-
-
-def refresh_filter(state):
-    """Rilegge il file del filtro se è cambiato, e salva nello stato l'ultimo
-    filtro valido e se il file è guasto: un riarmo li ritrova lì."""
-    if filter_source is None:
-        return
-    line = filter_source.refresh()
-    if line:
-        emit(line)
-    if filter_source.active is not None:
-        state["filter"] = filter_source.active.rules
-    state["filter_broken"] = filter_source.broken
+    sessions = sorted(describe_status(process, now) for process in state["processes"].values())
+    return f"monitor ✅ {word}: {', '.join(sessions) or 'nessuna sessione viva'}"
 
 
 def main():
-    global filter_source
     orchestrator_common.setup_stdout()
     settings = build_settings(parse_arguments())
     state = load_state(settings.state)
-    if settings.filter:
-        filter_source = watch_filter.FilterSource(settings.filter, state.get("filter"), state.get("filter_broken", False))
     scanners = (scan_sessions, scan_context, scan_task_files, scan_progress_table, scan_git)
     first_scan = True
     while True:
         scan_started = time.time()
-        refresh_filter(state)
         for scanner in scanners:
             try:
                 scanner(state, settings)
