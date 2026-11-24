@@ -55,6 +55,8 @@ Non riscrivere la lettura a mano: il word boundary sull'id e le regole della lis
 
 Fai `Read` di `TASK_FILE` per intero, e poi di ogni task file membro.
 
+**Il piano del perimetro**: `schedule.md` nella task folder del perimetro, il campo `**Folder**` del suo task file (`${CLAUDE_PLUGIN_ROOT}/docs/schedule-format.md`). Se c'è, `Read` per intero: la prosa porta l'analisi delle relazioni fra i membri e le preferenze d'ordine del giro, il blocco JSON le decisioni che lo script del flusso esegue. Un perimetro senza folder, o con la folder senza piano, non ha un piano: lo dici dove pesa (§3b).
+
 **Casi fuori competenza — dichiara e procedi**, non fallire:
 
 - `TASK_MEMBERS_SRC=parent` e `TASK_MEMBERS_COUNT=0` → nessuna figlia. Può essere un'epica appena aperta, oppure una task normale su cui questa skill è stata invocata a mano. Dillo in una riga, indica `/loom-works:recap-status-task ${TASK_ID}`, e fai comunque il recap del solo file risolto.
@@ -88,7 +90,11 @@ Distingui lo **stato del perimetro** da quello dei membri: i DLV e gli AC propri
 **3b. La catena delle fasi — o, per un mandato, il perimetro dichiarato.**
 
 - **Epica**: le figlie in ordine, con la loro Prog, come catena leggibile — non una tabella di id nudi.
-- **Mandato**: al posto della catena, tre blocchi dal file del mandato. I **membri**, nell'ordine della lista, ognuno con la sua maniglia, la sua Prog da `tasks.md` e l'epica a cui appartiene (`Parent Task`) o «orfana». Le **preferenze d'ordine** (`## Preferenze d'ordine`), dette come valgono: solo per questo perimetro. L'**analisi del perimetro** (`## Analisi del perimetro`), riga per riga, con la sua `Fonte`: le righe `modello` vengono da una lettura dei DLV, e se un membro è cambiato dopo possono essere vecchie. Una sezione assente si dichiara in una riga.
+- **Mandato**: al posto della catena, i **membri** dal file del mandato, nell'ordine della lista, ognuno con la sua maniglia, la sua Prog da `tasks.md` e l'epica a cui appartiene (`Parent Task`) o «orfana».
+
+Poi, per l'una e per l'altro, il **piano** (`schedule.md`), in due blocchi. L'**analisi**: le relazioni fra i membri della prosa, riga per riga, con la loro fonte — le collisioni che nessun campo dichiara vengono da una lettura dei task file, e se un membro è cambiato dopo possono essere vecchie. L'**ordine del giro**: le preferenze e le risorse della prosa, e dal blocco JSON i membri che segue l'utente (`umano`), quelli che aspettano tutti gli altri (`"*"`) e i perimetri di DLV (`dlv`), detti come valgono — solo per questo perimetro, e solo per lo script del flusso. Un piano assente si dichiara in una riga: l'orchestrator non parte senza, e lo scrive `/loom-works:prepare-mandate <perimetro>`.
+
+Un perimetro preparato prima del piano può portare nel task file le sezioni `## Analisi del perimetro` e `## Preferenze d'ordine`. Riportale come stanno, e di' che sono fuori formato: il loro posto è il piano, e `prepare-mandate` le sposta.
 
 **3c. I membri, uno per uno, con una cifra.** «In corso» da solo non dice se un membro è a un passo dalla chiusura o appena aperto. Per ognuno:
 
@@ -97,8 +103,8 @@ Distingui lo **stato del perimetro** da quello dei membri: i DLV e gli AC propri
 
 Il preflight fatto è un investimento già pagato, ed è il discriminante che più pesa sulla scelta di dove ripartire.
 
-**3d. Interdipendenze.** Fra i membri: chi blocca chi, cosa è già sbloccato, cosa resta appeso a una fase non chiusa. Fonte: `## Dependencies` dei membri, l'Execution Plan di `tasks.md`, e ciò che il testo del cappello dichiara sull'ordine delle fasi; per un mandato anche `## Analisi del perimetro` e `## Preferenze d'ordine`, che però valgono meno delle dipendenze dichiarate dai membri quando le contraddicono. Senza questo blocco il punto d'ingresso è indistinguibile da una scelta arbitraria fra i membri percorribili.
+**3d. Interdipendenze.** Fra i membri: chi blocca chi, cosa è già sbloccato, cosa resta appeso a una fase non chiusa. Fonte: `## Dependencies` dei membri, l'Execution Plan di `tasks.md`, e ciò che il testo del cappello dichiara sull'ordine delle fasi; poi il piano, che però vale meno delle dipendenze dichiarate dai membri quando le contraddicono — una dipendenza dichiarata dopo la stesura del piano, che il suo `dopo` non porta, la dici come tale: l'orchestrator non parte finché il piano non la ripete. Senza questo blocco il punto d'ingresso è indistinguibile da una scelta arbitraria fra i membri percorribili.
 
-**3e. Il punto d'ingresso — blocco terminale, due livelli.** Chiudi nella forma «**riprendi da T{N}** *(maniglia)*, e lì fai il **DLV {X}**»: prima quale membro, poi quale voce dentro quel membro. Non è leggibile da nessun campo — si ricava incrociando la Prog dei membri, l'ordine delle fasi (o le preferenze d'ordine del mandato) e le dipendenze appena scritte, e la ragione dell'incrocio va detta in una riga.
+**3e. Il punto d'ingresso — blocco terminale, due livelli.** Chiudi nella forma «**riprendi da T{N}** *(maniglia)*, e lì fai il **DLV {X}**»: prima quale membro, poi quale voce dentro quel membro. Non è leggibile da nessun campo — si ricava incrociando la Prog dei membri, l'ordine delle fasi (o l'ordine del giro del piano) e le dipendenze appena scritte, e la ragione dell'incrocio va detta in una riga.
 
 Resta una proposta, non un verdetto: se due membri sono percorribili in parallelo dillo, ma indica comunque da quale conviene entrare.

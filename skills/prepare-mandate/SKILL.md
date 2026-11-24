@@ -1,6 +1,6 @@
 ---
 name: prepare-mandate
-description: Prepara il perimetro di un orchestrator prima che parta — crea un mandato (task `Size: Mandate`) da una lista di id o da una descrizione, lo modifica aggiungendo o togliendo membri, oppure scrive l'analisi del perimetro dentro un'epica. L'analisi delle dipendenze e delle collisioni fra i membri ha una metà meccanica (`mandate.py tree`) e una del modello, che legge i task file dei membri. Presidiata — lista e analisi le conferma l'utente prima del commit — e non tocca mai i task file dei membri. Usa quando l'utente dice «prepara un mandato con T52, T61 e T64», «fammi un mandato con tutte le task di front-end», «aggiungi T70 al mandato T230, togli T52», «scrivi l'analisi del perimetro di T40».
+description: Prepara il perimetro di un orchestrator prima che parta — crea un mandato (task `Size: Mandate`) da una lista di id o da una descrizione, lo modifica aggiungendo o togliendo membri, oppure prepara un'epica — e ne scrive il piano, `schedule.md` nella task folder del perimetro, assegnata se manca. Il piano porta l'analisi delle dipendenze e delle collisioni fra i membri, con una metà meccanica (`mandate.py tree`) e una del modello, che legge i task file dei membri, e le decisioni d'ordine per lo script del flusso — chi aspetta chi, chi non gira insieme a chi, i membri che segue l'utente. Presidiata — lista e piano li conferma l'utente prima del commit — e non tocca mai i task file dei membri. Usa quando l'utente dice «prepara un mandato con T52, T61 e T64», «fammi un mandato con tutte le task di front-end», «aggiungi T70 al mandato T230, togli T52», «scrivi il piano di T40», «rifai il piano di T256».
 argument-hint: "<Txx Tyy …> | <descrizione> | <mandato> [aggiungi Txx] [togli Tyy] | <epica>"
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, AskUserQuestion
 ---
@@ -20,23 +20,24 @@ $ARGUMENTS
 
 ## Il ruolo
 
-Un **perimetro** è l'insieme di task che un orchestrator porta avanti insieme: le figlie di un'epica, oppure i membri di un **mandato**, cioè una task `Size: Mandate` che elenca nel proprio file task di epiche diverse e orfane. Il formato del task file è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`: leggilo per intero prima di scrivere qualunque file.
+Un **perimetro** è l'insieme di task che un orchestrator porta avanti insieme: le figlie di un'epica, oppure i membri di un **mandato**, cioè una task `Size: Mandate` che elenca nel proprio file task di epiche diverse e orfane. Il formato del task file è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`, quello del piano `${CLAUDE_PLUGIN_ROOT}/docs/schedule-format.md`: leggili per intero prima di scrivere qualunque file.
 
-Questa skill costruisce il perimetro **prima** che l'orchestrator parta, e ne scrive l'analisi: quali coppie di membri non possono girare insieme, e su cosa. Tre modi:
+Questa skill costruisce il perimetro **prima** che l'orchestrator parta, e ne scrive il **piano**: `schedule.md` nella task folder del perimetro, con l'analisi delle relazioni fra i membri in prosa e le decisioni d'ordine in un blocco JSON, che lo script del flusso esegue. Senza un piano valido e committato l'orchestrator non parte. Tre modi:
 
 | Modo | Cosa scrive | Chi committa |
 |---|---|---|
-| creazione (§2) | un task file nuovo `Size: Mandate`, e la sua riga in `tasks.md` | `create-task.sh` |
-| modifica (§4) | `## Membri`, `## Preferenze d'ordine` e `## Analisi del perimetro` di un mandato che esiste, la Description se chiesta, la voce 🎬 se manca | la skill, il solo file del mandato |
-| epica (§5) | `## Analisi del perimetro` di un'epica, e la voce 🎬 se manca | la skill, il solo file dell'epica |
+| creazione (§2) | un task file nuovo `Size: Mandate` con la sua task folder, la sua riga in `tasks.md`, e il piano | `create-task.sh` il task file; la skill il piano |
+| modifica (§4) | `## Membri` di un mandato che esiste, la Description se chiesta, e il piano riscritto | la skill, il file del mandato e il piano insieme |
+| epica (§5) | il piano di un'epica | la skill, il piano e il file dell'epica se cambia |
 
-In tutti e tre i modi il perimetro porta in `## Materiale` la voce 🎬, il puntatore allo stato dell'orchestrator (§7).
+In ogni modo la skill porta anche il task file del perimetro in regola col formato: la task folder se manca (§7), le due voci di `## Materiale` (§7), e via le sezioni `## Analisi del perimetro` e `## Preferenze d'ordine` di un perimetro preparato prima del piano, che passano nel piano (`mandate-analysis.md` §La rianalisi).
 
 Confini, in ogni modo:
 
 - **I task file dei membri non si toccano mai**, nemmeno per correggere un difetto che l'analisi trova — una dipendenza non dichiarata, un `## Materiale` incompleto. Il difetto si dice all'utente alla conferma, e lo corregge chi lavora su quel membro.
 - **Nessun commit senza la conferma dell'utente**, chiesta con `AskUserQuestion` (§3). Una conferma chiesta in chat è testo: niente fermerebbe il commit prima della risposta, mentre il tool sospende l'esecuzione finché l'utente non sceglie.
-- **Nessuna copia di stato o di cifre** nel file del perimetro (`mandate-format.md` §Nessuna copia): niente Prog dei membri, niente DLV contati, niente stime sommate. Tutto questo vive altrove e resterebbe indietro alla prima modifica.
+- **Nessuna copia di stato o di cifre**, né nel file del perimetro né nel piano (`mandate-format.md` §Nessuna copia): niente Prog dei membri, niente DLV contati, niente stime sommate. Tutto questo vive altrove e resterebbe indietro alla prima modifica.
+- **Un piano, un orchestrator.** Durante il giro il piano lo riscrive l'orchestrator del perimetro: con un orchestrator vivo sul perimetro la skill non scrive (§0).
 
 ## 0. Avvio
 
@@ -45,9 +46,17 @@ Confini, in ogni modo:
 for candidate in python3 python; do "$candidate" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null && { command -v "$candidate"; break; }; done
 ```
 
-L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo all'utente e fermati: senza Python la metà meccanica dell'analisi non si calcola.
+L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo all'utente e fermati: senza Python l'analisi e il controllo del piano non girano.
 
 Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (lo chiamiamo `PY`) e la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator`. Ogni script si lancia con `"PY" -B -I "R/<script>"`: `-I` lo isola dalla cartella corrente, `-B` non scrive bytecode nella cache del plugin.
+
+**Gli orchestrator vivi**, nei modi modifica ed epica, prima di scrivere qualunque file:
+
+```bash
+"PY" -B -I "R/sessions.py" orchestrators
+```
+
+Una riga `ORCHESTRATOR|<sessionId>|<perimetro>|…` con il perimetro di questa invocazione → fermati senza scrivere: quell'orchestrator riscrive il piano durante il giro, e due scrittori sullo stesso file si rubano le modifiche al commit. Di' all'utente quale sessione, e le due strade: fermare l'orchestrator nella sua chat e rilanciare la skill, o chiedere a lui la modifica.
 
 ## 1. Il modo
 
@@ -71,12 +80,14 @@ Il modo lo decidono il primo id e quello che lo segue:
 /loom-works:prepare-mandate T52 T61 T64              crea un mandato da una lista di id
 /loom-works:prepare-mandate le task di front-end     crea un mandato da una descrizione
 /loom-works:prepare-mandate T230 aggiungi T70        modifica il mandato T230 (anche: togli T52)
-/loom-works:prepare-mandate T40                      scrive l'analisi del perimetro nell'epica T40
+/loom-works:prepare-mandate T40                      scrive il piano dell'epica T40
 ```
 
-**Lettura dubbia** → dichiara il modo che hai letto e chiedilo con `AskUserQuestion` prima di scrivere qualunque file. Tre casi tipici: «le figlie di T40» da solo (l'analisi nell'epica T40, oppure un mandato nuovo con le sue figlie aperte?); un mandato seguito da altri id senza verbi (aggiungerli al mandato, oppure un mandato nuovo che lo contiene come riga sola?); un mandato seguito da parole che non sono verbi sulla lista.
+**Lettura dubbia** → dichiara il modo che hai letto e chiedilo con `AskUserQuestion` prima di scrivere qualunque file. Tre casi tipici: «le figlie di T40» da solo (il piano dell'epica T40, oppure un mandato nuovo con le sue figlie aperte?); un mandato seguito da altri id senza verbi (aggiungerli al mandato, oppure un mandato nuovo che lo contiene come riga sola?); un mandato seguito da parole che non sono verbi sulla lista né preferenze d'ordine.
 
 Prima di proseguire dichiara il modo in una riga: `🧭 Modo: creazione da lista — 3 id`.
+
+**Le preferenze d'ordine** stanno nelle stesse Note utente, in ogni modo: «prima le convention», «T255 per ultima», «T245 lo seguo io». Valgono per questo giro e vanno nel piano (`mandate-analysis.md` §Le preferenze dell'utente), mai nel task file.
 
 ## 2. Creazione
 
@@ -89,13 +100,13 @@ Per ogni id nominato, nell'ordine in cui l'utente lo nomina:
 - **`Size: Epic` o `Size: Mandate`** → entra come riga sola (`mandate-format.md` §Membri: il lettore non la espande). La conferma dice che l'orchestrator non lancerà i suoi membri: la tratterà come un perimetro da orchestrare a parte.
 - **«le figlie di T40»** → le leggi da `resolve-task.sh T40 --members` e scrivi le aperte (Prog diversa da ✔️) una per una, nell'ordine del lettore. Una figlia nata dopo non entra da sola: lo dici alla conferma.
 
-Da una lista di id non c'è una fermata qui: la lista la conferma l'utente insieme alla bozza e all'analisi, in una fermata sola (§3).
+Da una lista di id non c'è una fermata qui: la lista la conferma l'utente insieme alla bozza e al piano, in una fermata sola (§3).
 
 ### 2b. La lista — da una descrizione
 
 La proposta si costruisce in due passi:
 
-1. **I titoli delle aperte.** Le righe della tabella Tasks Overview di `{docs_root}/tasks.md` con Prog 🔵, 🟢 o 🟡 — solo quella tabella: le tabelle che la seguono (lane attive, cross-deps) hanno righe della stessa forma. Dai titoli scegli i candidati e i dubbi.
+1. **I titoli delle aperte.** Le righe della tabella Tasks Overview di `{docs_root}/tasks.md` con Prog 🔵, 🟢 o 🟡 — solo quella tabella: le tabelle che la seguono (cross-deps) hanno righe della stessa forma. Dai titoli scegli i candidati e i dubbi.
 2. **I task file dei candidati e dei dubbi**, letti per Description, Deliverables e `## Materiale`. Il titolo da solo non basta: è troncato a 100 caratteri, e dà falsi positivi.
 
 Le task ✔️ non entrano nella proposta. Un id nominato dall'utente accanto alla descrizione entra con le regole del §2a.
@@ -112,9 +123,9 @@ La proposta in chat porta una ragione per membro e l'elenco corto dei vicini esc
 
 Poi la **prima fermata**: `AskUserQuestion` con la domanda «Confermi i membri del mandato?» e tre opzioni — confermo · correggo (scrivi cosa aggiungere o togliere) · annulla. Una correzione rifà la proposta e la richiede; annulla chiude la skill senza scrivere niente.
 
-### 2c. Il file su disco, prima dell'analisi
+### 2c. Il file su disco, prima del piano
 
-Il task file del mandato si scrive **prima** dell'analisi e **non si committa** fino alla conferma. Due ragioni: `mandate.py tree` vuole in testa un id il cui task file esiste su disco, e senza esce 1; e `get-next-task-id.sh` conta i file oltre alle righe di `tasks.md`, quindi il file non committato riserva l'id contro una sessione parallela che crea una task durante l'attesa della conferma.
+Il task file del mandato si scrive **prima** del piano e **non si committa** fino alla conferma. Tre ragioni: `mandate.py tree` vuole in testa un id il cui task file esiste su disco, e senza esce 1; il piano sta nella task folder che il campo `**Folder**` del file dichiara, e `verify` legge i membri dalla `## Membri` del file; e `get-next-task-id.sh` conta i file oltre alle righe di `tasks.md`, quindi il file non committato riserva l'id contro una sessione parallela che crea una task durante l'attesa della conferma.
 
 1. L'id:
 
@@ -140,7 +151,6 @@ Il task file del mandato si scrive **prima** dell'analisi e **non si committa** 
    - **Priority**: Med
    - **Estimated Time**:
    - **Size**: Mandate
-   - **Lane**: nessuna (task spot)
    - **Parent Task**:
    - **Branch**:
    - **Folder**:
@@ -155,67 +165,75 @@ Il task file del mandato si scrive **prima** dell'analisi e **non si committa** 
    - T52 (lettore delle convention del deck)
    - T61 (gate del deck sulle convention)
 
-   ## Preferenze d'ordine
-
-   - In questo giro prima le convention: T52 prima di T61.
-
-   ## Analisi del perimetro
-
-   <scritta al §2d>
-
    ## Materiale
    *📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato dell'orchestrator; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
 
-   - 🎬 `.claude/loom/orchestrator/<id>.md` — seguire il giro dell'orchestrator: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
+   - 🔬 `📁/schedule.md` — eseguire il giro: analisi del perimetro e piano dello script
+   - 🎬 `.claude/loom/orchestrator/<id>.md` — seguire il giro dell'orchestrator: fatti del perimetro, proposte in sospeso, delega (fuori da git)
    ```
+
+4. La task folder (§7):
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh" <id>
+   ```
+
+   Lo script scrive il campo `**Folder**` e mette il file in stage: resta tuo, e non è ancora committato.
 
 Le regole del file:
 
 - **Titolo** «Mandato: <tema>», col tema dalle parole dell'utente; da soli id, il tema che i membri hanno in comune. **Slug**: il tema in kebab-case, senza accenti, con il prefisso `mandato-`.
 - **Priority** Med se l'utente non la dice (High, Med, Low).
 - **Estimated Time** vuoto: la stima di un mandato sarebbe la somma dei membri, cioè una copia.
-- **Description**: dalle parole dell'utente. Da soli id, un paragrafo corto sul tema comune, che l'utente corregge alla conferma. Niente sullo stato dei membri.
+- **Description**: dalle parole dell'utente. Da soli id, un paragrafo corto sul tema comune, che l'utente corregge alla conferma. Niente sullo stato dei membri, niente ordine del giro: l'ordine sta nel piano.
 - **Membri**: `- T<id> (maniglia)`, con la maniglia verbo+oggetto ricavata dal titolo del membro. Niente Prog, niente checkbox, niente epica di provenienza: la parentela vive nel `Parent Task` del membro.
-- **Preferenze d'ordine**: solo se l'utente ha detto un ordine per questo giro; altrimenti la sezione non c'è. Una dipendenza vera non è una preferenza: se l'utente dice «T61 ha bisogno del formato di T52», quella va in `## Dependencies` di T61, che questa skill non scrive — lo dici alla conferma.
-- **Materiale**: la sola voce 🎬 (§7).
+- **Materiale**: le due voci del §7, e nient'altro.
 - Niente `## Acceptance Criteria` e niente `## Deliverables Checklist`: un mandato non ha lavoro proprio (`mandate-format.md` §Acceptance e Deliverables).
 
-### 2d. L'analisi
+### 2d. Il piano
 
-Scrivi `## Analisi del perimetro` nel file su disco col metodo del §6, con l'id del mandato in testa e i membri della lista. Poi la conferma (§3).
+Scrivi `schedule.md` nella task folder col metodo del §6, con l'id del mandato in testa, i membri della lista e le preferenze delle Note utente. Poi la conferma (§3).
 
 ## 3. La conferma e il commit della creazione
 
 In chat, prima della domanda:
 
-- la **bozza** del file intero;
-- le **note** che l'utente deve leggere prima di dire sì: gli id rimasti fuori senza task file, i membri ✔️, i membri epica o mandato, le dipendenze aperte verso task fuori dal perimetro con l'offerta di aggiungerle (§6), i punti ciechi dell'analisi (§6), le dipendenze non dichiarate che l'analisi ha trovato.
+- la **bozza** del task file intero, e il **piano** intero;
+- le **note** che l'utente deve leggere prima di dire sì: gli id rimasti fuori senza task file, i membri ✔️, i membri epica o mandato, le dipendenze aperte verso task fuori dal perimetro con l'offerta di aggiungerle (§6), le dipendenze non dichiarate che l'analisi ha trovato e che il piano ripete nel `dopo`, i cicli di dipendenze, i punti ciechi dell'analisi (§6).
 
-Poi la fermata: `AskUserQuestion` con la domanda «Scrivo il mandato <id>?» e tre opzioni — scrivi · correggo (lista, descrizione, preferenze) · annulla. Le preferenze d'ordine l'utente le aggiunge qui, nella risposta.
+Poi la fermata: `AskUserQuestion` con la domanda «Scrivo il mandato <id>?» e tre opzioni — scrivi · correggo (lista, descrizione, ordine) · annulla. Le preferenze d'ordine l'utente le aggiunge qui, nella risposta.
 
-- **Scrivi** → se la risposta porta delle preferenze, scrivile in `## Preferenze d'ordine`. Poi:
+- **Scrivi** → se la risposta porta delle preferenze, portale nel piano col metodo del §6 e rilancia `verify --bozza`. Poi i due commit, nell'ordine:
 
   ```bash
   "${CLAUDE_PLUGIN_ROOT}/scripts/task/create-task.sh" <id> mandato-<slug> "Mandato: <tema>" <Priority>
   ```
 
-  Lo script aggiunge la riga a `tasks.md`, committa il task file e `tasks.md` con una pathspec esplicita, e pusha.
-- **Correggo** → applica la correzione. Se cambia la lista dei membri, rifai l'analisi (§2d). Mostra di nuovo bozza e note, e richiedi.
-- **Annulla** → cancella il file: `git status --short -- <file>` deve stampare `??`, cioè un file mai committato, che è il tuo. L'id torna libero. Se stampa altro, il file non è più solo tuo: non cancellarlo, e dillo.
+  Lo script aggiunge la riga a `tasks.md`, committa il task file e `tasks.md` con una pathspec esplicita, e pusha. Poi il piano:
 
-Chiudi con il path del file, l'id, il numero di membri e le righe dell'analisi per fonte.
+  ```bash
+  source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
+    && lw_git_add_n_commit "task(<id>): piano del perimetro" "<path del piano>" \
+    && lw_git_push "$(lw_current_branch)"
+  ```
+
+  E il controllo finale (§8).
+- **Correggo** → applica la correzione. Se cambia la lista dei membri, riscrivi `## Membri` e rifai il piano (§2d). Mostra di nuovo bozza, piano e note, e richiedi.
+- **Annulla** → cancella quello che hai scritto: `git status --short -- <task file>` deve stampare `A ` o `??`, cioè un file mai committato, che è il tuo — togli lo stage con `git rm -q --cached -- <task file>`, poi cancella il task file, il piano e la task folder se resta vuota. L'id torna libero. Se `git status` stampa altro, il file non è più solo tuo: non cancellarlo, e dillo.
+
+Chiudi con il path del task file e del piano, l'id, il numero di membri, le relazioni del piano per fonte e il verdetto del controllo finale.
 
 ## 4. Modifica di un mandato
 
-Un mandato che esiste si rilancia per aggiungere o togliere membri, cambiare descrizione o preferenze d'ordine, o solo per rifare l'analisi. L'analisi si rifà **intera** a ogni rilancio, anche quando la lista non cambia.
+Un mandato che esiste si rilancia per aggiungere o togliere membri, cambiare descrizione o ordine, o solo per rifare il piano. Il piano si rifà **intero** a ogni rilancio, anche quando la lista non cambia.
 
-### 4a. Il file è pulito
+### 4a. I file sono puliti
 
 ```bash
-git status --short -- <file del mandato>
+git status --short -- <file del mandato> <path del piano, se il campo Folder c'è>
 ```
 
-Output vuoto → avanti. Altrimenti fermati e dillo: il file ha modifiche non committate, e il commit di questa skill le porterebbe con sé. Chi le ha scritte le committa o le scarta, poi si rilancia.
+Output vuoto → avanti. Altrimenti fermati e dillo: un file ha modifiche non committate, e il commit di questa skill le porterebbe con sé. Chi le ha scritte le committa o le scarta, poi si rilancia.
 
 ### 4b. La lista nuova
 
@@ -230,92 +248,130 @@ Poi si applicano le parole dell'utente:
 - **«aggiungi T64»** → una riga nuova in fondo a `## Membri`, o nel punto che l'utente dice, con le regole del §2a: task file assente → fuori, ✔️ → avviso, epica o mandato → riga sola. Il mandato non aggiunge sé stesso, e un id già in lista non si ripete.
 - **«togli T52»** → la riga di T52 sparisce. Un id che non è in lista si dice alla conferma, senza toccare niente.
 - **«le figlie di T40»** → come al §2a, le aperte una per una.
-- **descrizione, preferenze d'ordine, una maniglia** → si riscrive quello che le parole dicono, e nient'altro.
-- **nessun verbo** → la lista resta com'è, e si rifà la sola analisi.
+- **descrizione, una maniglia** → si riscrive quello che le parole dicono, e nient'altro.
+- **preferenze d'ordine** → vanno nel piano, non nel file.
+- **nessun verbo** → la lista resta com'è, e si rifà il solo piano.
 
 Un `TASK_MEMBER_MISSING=<id>` — un membro senza task file, per esempio una task chiusa e purgata — resta in lista finché l'utente non dice di toglierlo: lo mostri alla conferma come tale.
 
-### 4c. La rianalisi
+### 4c. Il file e il piano, su disco
 
-Col metodo del §6, §La rianalisi: `tree` con l'id del mandato in testa e la **lista nuova** dopo `--children`, le righe `dichiarata` e `materiale` ricalcolate, ogni riga `modello` vecchia confermata, riscritta o tolta con la ragione, le coppie dei membri aggiunti analizzate da zero. Il file su disco non cambia ancora: `tree` riceve i membri dagli argomenti, e la sezione `## Membri` del file non la legge.
+Il file del mandato si scrive **prima** della conferma, perché `verify` legge i membri dalla sua `## Membri`; i file erano puliti (§4a), quindi un annulla li riporta al commit. Col tool `Edit`:
+
+- `## Membri` con la lista nuova; la Description se l'utente l'ha chiesto;
+- la task folder, se il campo `**Folder**` è vuoto (§7);
+- via `## Analisi del perimetro` e `## Preferenze d'ordine`, se ci sono: il loro contenuto è l'ingresso della rianalisi (`mandate-analysis.md` §La rianalisi);
+- le voci di `## Materiale` che mancano (§7).
+
+Poi il piano col metodo del §6, §La rianalisi: il piano vecchio, o le sezioni tolte, in ingresso; `tree` con l'id del mandato in testa e la **lista nuova** dopo `--children`; le relazioni meccaniche ricalcolate; ogni collisione del modello vecchia confermata, riscritta o tolta con la ragione; le coppie dei membri aggiunti analizzate da zero.
 
 ### 4d. La conferma e il commit
 
 In chat, prima della domanda:
 
 - la differenza di `## Membri`: `+ T64 (maniglia)`, `− T52 (maniglia)`;
-- le preferenze d'ordine e la descrizione nuove, se cambiano;
-- la differenza dell'analisi riga per riga (`=` `+` `-` `~`, §6);
-- la voce 🎬, se il mandato non la porta (§7);
-- le note del §3: avvisi sui membri, dipendenze aperte fuori dal perimetro, dipendenze non dichiarate, punti ciechi.
+- la descrizione nuova, se cambia;
+- la differenza del piano riga per riga (`=` `+` `-` `~`, §6), o il piano intero se prima non c'era;
+- le sezioni tolte dal task file, la task folder assegnata e le voci di `## Materiale` aggiunte, se ci sono;
+- le note del §3: avvisi sui membri, dipendenze aperte fuori dal perimetro, dipendenze non dichiarate, cicli, punti ciechi.
 
 Poi la fermata: `AskUserQuestion` con la domanda «Aggiorno il mandato <id>?» e tre opzioni — aggiorna · correggo · annulla.
 
-- **Aggiorna** → scrivi col tool `Edit` le sole sezioni che cambiano: `## Membri`, `## Preferenze d'ordine` (creata se prima non c'era, tolta se l'utente la svuota), `## Analisi del perimetro` sostituita intera, la Description se l'utente l'ha chiesto, e la voce 🎬 se manca (§7). Poi il commit del **solo** file del mandato:
+- **Aggiorna** → il commit del file del mandato e del piano, insieme:
 
   ```bash
   source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
-    && lw_git_add_n_commit "task(<id>): mandato — <+T64 −T52 | analisi rifatta>" "<file del mandato>" \
+    && lw_git_add_n_commit "task(<id>): mandato — <+T64 −T52 | piano rifatto>" "<file del mandato>" "<path del piano>" \
     && lw_git_push "$(lw_current_branch)"
   ```
 
-  `tasks.md` non si tocca: la riga del mandato non cambia.
-- **Correggo** → applica, rifai la rianalisi se cambia la lista, mostra e richiedi.
-- **Annulla** → niente da cancellare: il file non è cambiato.
+  `tasks.md` non si tocca: la riga del mandato non cambia. Poi il controllo finale (§8).
+- **Correggo** → applica, rifai il piano se cambia la lista, mostra e richiedi.
+- **Annulla** → riporta il file del mandato al commit (`git restore --staged --worktree -- <file del mandato>`) e il piano al suo commit, o cancellalo se non era tracciato.
 
-## 5. L'analisi in un'epica
+## 5. Il piano di un'epica
 
-Un'epica ha già i suoi membri — le figlie, che dichiarano `**Parent Task**` — e non ha una lista da costruire. Le manca, finché nessuno la scrive, l'analisi: la stessa sezione di un mandato, con lo stesso nome e la stessa forma, così chi la cerca la cerca con un nome solo. In questo modo la skill scrive **solo** quella sezione e la voce 🎬 (§7): le figlie, la loro checkbox nell'Acceptance dell'epica, la Prog e `tasks.md` non si toccano.
+Un'epica ha già i suoi membri — le figlie, che dichiarano `**Parent Task**` — e non ha una lista da costruire. Le manca, finché nessuno lo scrive, il piano: lo stesso file di un mandato, con la stessa forma. In questo modo la skill scrive **solo** il piano e, nel file dell'epica, la task folder, le voci di `## Materiale` e la rimozione di `## Analisi del perimetro` (§7): le figlie, la loro checkbox nell'Acceptance dell'epica, la Prog e `tasks.md` non si toccano.
 
-1. **Il file è pulito** — la guardia del §4a, sul file dell'epica.
+1. **I file sono puliti** — la guardia del §4a, sul file dell'epica e sul piano.
 2. **Le figlie** — dal lettore unico:
 
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <epica> --members
    ```
 
-   `TASK_MEMBERS_COUNT=0` → dillo e fermati: un'epica senza figlie non ha coppie da analizzare.
-3. **L'analisi** — col metodo del §6, con l'epica in testa e le figlie dopo `--children`, nell'ordine del lettore. Se `## Analisi del perimetro` esiste già, è una rianalisi, con la tabella vecchia in ingresso; altrimenti si parte da zero.
-4. **La conferma** — in chat la sezione nuova, o la differenza riga per riga se c'era, la voce 🎬 se l'epica non la porta (§7), e le note del §3. Una dipendenza aperta verso una task che non è figlia non si può aggiungere ai membri da qui, perché le figlie le decide il `Parent Task` della figlia: la nota dice che per seguirla insieme all'epica serve un mandato. Poi `AskUserQuestion` con la domanda «Scrivo l'analisi del perimetro nell'epica <id>?» e tre opzioni — scrivi · correggo · annulla.
-5. **La scrittura** — col tool `Edit`. Se la sezione esiste, si sostituisce intera dove sta. Se non esiste, entra subito dopo `## Description`, prima del primo heading `## ` che la segue: nel mandato la sezione sta nello stesso punto, dopo la Description e le sezioni proprie. Poi la voce 🎬, se manca (§7).
-6. **Il commit** — il solo file dell'epica:
+   `TASK_MEMBERS_COUNT=0` → dillo e fermati: un'epica senza figlie non ha un giro da pianificare.
+3. **Il file dell'epica** — la task folder se manca, via `## Analisi del perimetro` se c'è, le voci di `## Materiale` che mancano (§7).
+4. **Il piano** — col metodo del §6, con l'epica in testa e le figlie dopo `--children`, nell'ordine del lettore, e le preferenze delle Note utente. Un piano o un'analisi che c'erano già sono l'ingresso della rianalisi.
+5. **La conferma** — in chat il piano nuovo, o la differenza riga per riga se c'era, le modifiche al file dell'epica, e le note del §3. Una dipendenza aperta verso una task che non è figlia non si può aggiungere ai membri da qui, perché le figlie le decide il `Parent Task` della figlia: la nota dice che per seguirla insieme all'epica serve un mandato. Poi `AskUserQuestion` con la domanda «Scrivo il piano dell'epica <id>?» e tre opzioni — scrivi · correggo · annulla. L'annulla riporta i file al commit, come al §4d.
+6. **Il commit** — il piano, e il file dell'epica se è cambiato:
 
    ```bash
    source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" \
-     && lw_git_add_n_commit "task(<epica>): analisi del perimetro" "<file dell'epica>" \
+     && lw_git_add_n_commit "task(<epica>): piano del perimetro" "<path del piano>" ["<file dell'epica>"] \
      && lw_git_push "$(lw_current_branch)"
    ```
 
-## 6. L'analisi del perimetro
+   Poi il controllo finale (§8).
 
-Il metodo è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md`: leggilo per intero prima della prima analisi della conversazione. Vale per i tre modi, ed è lo stesso che usa chi riscrive un'analisi smentita da un membro.
+## 6. Il piano
 
-In breve, le due metà:
+Il metodo è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-analysis.md`: leggilo per intero prima del primo piano della conversazione. Vale per i tre modi, ed è lo stesso che usa l'orchestrator quando riscrive il piano a metà giro.
 
-1. **Meccanica** — `tree` con la testa e i membri, e la trascrizione delle sue righe `CONFLICT`:
+In breve:
+
+1. **Le relazioni, metà meccanica** — `tree` con la testa e i membri, e la trascrizione delle sue righe `CONFLICT` in prosa e in campi del blocco:
 
    ```bash
    "PY" -B -I "R/mandate.py" tree <testa> --children <membri…>
    ```
 
-   La testa è il mandato o l'epica: il suo task file deve esistere su disco, ed è per questo che la creazione lo scrive prima (§2c). I membri si passano nell'ordine della lista: è l'ordine delle coppie in tabella. `tree` legge e basta, nessun file del repo cambia.
-2. **Del modello** — il task file intero di ogni membro aperto, e `git grep` sui soli path e simboli che due membri nominano, per sapere se cadono sullo stesso file.
+   La testa è il mandato o l'epica: il suo task file deve esistere su disco, ed è per questo che la creazione lo scrive prima (§2c). I membri si passano nell'ordine della lista. `tree` legge e basta, nessun file del repo cambia.
+2. **Le relazioni, metà del modello** — il task file intero di ogni membro aperto, e `git grep` sui soli path e simboli che due membri nominano, per sapere se cadono sullo stesso file.
+3. **Le risorse del ciclo di lavoro** — un publish del plugin, una release o una build del deck, dai DLV dei membri.
+4. **Le preferenze dell'utente** — ordine, membri che segue lui, perimetri di DLV, passi di partenza.
+5. **Il file** — `schedule.md` nella task folder, col tool `Write`, poi il controllo:
 
-Le note che l'analisi produce oltre alla tabella vanno alla conferma, mai nel file: le dipendenze aperte verso task fuori dal perimetro, le dipendenze non dichiarate, i punti ciechi.
+   ```bash
+   "PY" -B -I "R/schedule.py" verify <testa> --bozza
+   ```
 
-## 7. La voce 🎬 — il puntatore allo stato dell'orchestrator
+   `VERIFY=ok` → la conferma. Un `ERRORE` o un `DIFF` → correggi il piano e rilancia, prima di mostrarlo: un `DIFF` è una relazione che non è diventata un campo. Un `AVVISO` su un `passo` → togli il campo.
 
-L'orchestrator di un perimetro tiene il suo stato in `.claude/loom/orchestrator/<id>.md` del progetto, ignorata da git: conversazioni, fatti del perimetro, proposte in sospeso (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-mandate/SKILL.md` §0f). Il perimetro lo punta da `## Materiale` con una voce sola:
+Le note che l'analisi produce oltre al piano vanno alla conferma, mai nel file: le dipendenze aperte verso task fuori dal perimetro, le dipendenze non dichiarate, i cicli, i punti ciechi.
 
-```markdown
-- 🎬 `.claude/loom/orchestrator/<id>.md` — seguire il giro dell'orchestrator: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
+## 7. La task folder e le voci di `## Materiale`
+
+**La task folder.** Il piano ci sta dentro, e un perimetro senza folder non ha piano. Se il campo `**Folder**` del perimetro è vuoto la assegna lo script, che sceglie il nome canonico `.YY-MM-DD-<slug>` in project root e mette il task file in stage:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/set-task-folder.sh" <id>
 ```
 
-- **È un puntatore per chi legge il task file**, e nient'altro. L'orchestrator e `checkpoint-mandate` ricavano il path dall'id del perimetro e non leggono la voce: un perimetro preparato prima che la voce esistesse viene seguito lo stesso. Il file può non esserci ancora — l'orchestrator lo crea al primo lancio — e la voce resta valida.
-- **La scrive questa skill**, l'unica che prepara il perimetro: l'orchestrator non scrive nei task file.
-- **Una sola volta.** Una voce 🎬 già presente in `## Materiale` non si riscrive e non si ripete.
-- **Dove.** In un mandato nuovo la sezione `## Materiale` sta in coda, dopo `## Analisi del perimetro` (§2c). In un file che la sezione non la porta — un mandato preparato prima, un'epica senza `## Materiale` — la crei con la legenda del template, prima del primo heading fra `## Decisions`, `## Implementation Notes`, `## Testing Notes`, `## Doc Impact`, `## Prod Validation` e `## Progress Log`; in coda se il file non ne porta nessuno. È il punto in cui il task template mette `## Materiale`.
-- **Non è una collisione.** `mandate.py tree` salta le voci 🎬: nessun membro scrive lo stato dell'orchestrator.
+La cartella nasce col piano, che il tool `Write` crea con le cartelle intermedie. Un campo già popolato non si riscrive.
+
+**Le due voci.** Il perimetro porta in `## Materiale` una voce per il piano e una per lo stato dell'orchestrator:
+
+```markdown
+- 🔬 `📁/schedule.md` — eseguire il giro: analisi del perimetro e piano dello script
+- 🎬 `.claude/loom/orchestrator/<id>.md` — seguire il giro dell'orchestrator: fatti del perimetro, proposte in sospeso, delega (fuori da git)
+```
+
+- **Sono puntatori per chi legge il task file**, e nient'altro. Lo script del flusso, `verify` e `checkpoint-mandate` ricavano i path dal campo `**Folder**` e dall'id del perimetro, e non leggono le voci. Lo stato dell'orchestrator può non esserci ancora — l'orchestrator lo crea al primo lancio — e la voce resta valida.
+- **Le scrive questa skill**, l'unica che prepara il perimetro: l'orchestrator non scrive nei task file.
+- **Una sola volta.** Una voce già presente non si riscrive e non si ripete; una voce 🎬 con una maniglia di prima resta com'è.
+- **Dove.** In un mandato nuovo `## Materiale` sta in coda, dopo `## Membri` (§2c). In un file che la sezione non la porta — un mandato preparato prima, un'epica senza `## Materiale` — la crei con la legenda del template, prima del primo heading fra `## Decisions`, `## Implementation Notes`, `## Testing Notes`, `## Doc Impact`, `## Prod Validation` e `## Progress Log`; in coda se il file non ne porta nessuno. È il punto in cui il task template mette `## Materiale`.
+- **Non sono collisioni.** `mandate.py tree` salta le voci 🎬, e il piano sta nella folder del perimetro, che nessun membro scrive.
+
+## 8. Il controllo finale
+
+Dopo il commit, sul piano committato:
+
+```bash
+"PY" -B -I "R/schedule.py" verify <testa>
+```
+
+`VERIFY=ok` → il piano è pronto per l'orchestrator, e lo dici nella chiusura. `VERIFY=riesame` → un membro è cambiato fra la lettura e il commit, perché un'altra sessione ci lavora: dillo, con i membri `CAMBIATO`, e l'orchestrator li rileggerà al lancio. `VERIFY=stop` dopo un `--bozza` verde vuol dire che il commit non ha preso il piano o il task file: dillo con le righe dello script, senza correggere da qui.
 
 ## Convenzione TTS
 

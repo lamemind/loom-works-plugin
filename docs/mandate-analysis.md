@@ -1,17 +1,20 @@
-# L'analisi del perimetro — il metodo
+# L'analisi del perimetro e il piano — il metodo
 
-Metodo per chi **scrive** la sezione `## Analisi del perimetro` di un mandato o di un'epica: `prepare-mandate` la scrive da zero, e chi la riscrive quando un membro l'ha smentita usa lo stesso metodo. Forma della tabella, colonne e domini: `mandate-format.md` §`## Analisi del perimetro`.
+Metodo per chi **scrive** `schedule.md`, il piano di un perimetro: `prepare-mandate` lo scrive prima del giro, da zero o rifacendo un piano che c'è già, e l'orchestrator lo riscrive durante il giro quando entra un membro o scopre una collisione. Forma del file, campi del blocco JSON e controlli di `verify`: `schedule-format.md`.
 
-L'analisi ha due metà, e servono entrambe:
+Il lavoro ha due tempi. Prima le **relazioni** fra i membri — chi dipende da chi, chi tocca gli stessi file —, che vanno nella prosa con la loro fonte. Poi le **decisioni** che ne discendono, che vanno nel blocco JSON: lo script del flusso legge solo il blocco, e una relazione che non diventa un campo per lo script non esiste.
+
+Le relazioni hanno due metà, e servono entrambe:
 
 - la **metà meccanica** viene da `mandate.py tree`, che legge i campi dichiarati dei membri: le dipendenze di `## Dependencies` e del grafo di `tasks.md`, e i path in comune nei `## Materiale`. Di `## Dependencies` conta il primo id di ogni voce a colonna zero, e una voce che comincia con «Nessuna» non dichiara niente anche se poi nomina una task («Nessuna. Non parte insieme a T211»): un vincolo «non insieme» è una collisione, e lo trova la metà del modello;
-- la **metà del modello** trova le collisioni che nessun campo dichiara, per esempio due task spot che toccano lo stesso codice senza scriverlo nel `## Materiale`. Su quelle `tree` tace, e un orchestrator lancerebbe le due task in parallelo.
+- la **metà del modello** trova le collisioni che nessun campo dichiara, per esempio due task spot che toccano lo stesso codice senza scriverlo nel `## Materiale`. Su quelle `tree` tace, e senza una risorsa nel piano lo script lancerebbe le due task in parallelo.
 
 ## L'ingresso
 
-- **la testa** — l'id del perimetro, mandato o epica. Il suo task file deve esistere su disco: `tree` senza esce 1 (`ERROR: task file di T<n> non trovato`). Non serve che sia committato.
-- **i membri** — per un mandato la lista che si sta scrivendo, che può non essere ancora quella su disco; per un'epica le figlie, da `resolve-task.sh <epica> --members`.
-- **la tabella vecchia**, quando la sezione esiste già (§La rianalisi).
+- **la testa** — l'id del perimetro, mandato o epica. Il suo task file deve esistere su disco, col campo `**Folder**`: `tree` senza file esce 1 (`ERROR: task file di T<n> non trovato`), e `verify` senza folder non trova il piano. Non serve che sia committato.
+- **i membri** — quelli del lettore unico, `resolve-task.sh <testa> --members`: per un mandato la lista di `## Membri` già scritta sul disco, per un'epica le figlie. `verify` confronta il piano con quella lettura, quindi la lista va scritta nel task file prima del controllo.
+- **le parole dell'utente** per questo giro: un ordine, un membro che segue lui, un perimetro di DLV (§Le preferenze dell'utente).
+- **il piano vecchio**, quando c'è; oppure, in un perimetro preparato prima del piano, le sezioni `## Analisi del perimetro` e `## Preferenze d'ordine` del suo task file (§La rianalisi).
 
 ## La metà meccanica — da `mandate.py tree`
 
@@ -23,22 +26,20 @@ L'analisi ha due metà, e servono entrambe:
 
 | Riga | Cosa dà all'analisi |
 |---|---|
-| `TASK\|<id>\|…\|next=…\|blocked=…\|…` | `next=chiusa` → membro chiuso, fuori dalla tabella. `blocked=` → le dipendenze aperte del membro, dentro e fuori dal perimetro |
+| `TASK\|<id>\|…\|next=…\|blocked=…\|…` | `next=chiusa` → membro chiuso. `blocked=` → le dipendenze aperte del membro, dentro e fuori dal perimetro |
 | `DEPS\|<id>\|T52 🟢 (deps) · T40 ✔ (grafo)` | il verso di ogni dipendenza, e da dove viene |
-| `CONFLICT\|<a>\|<b>\|dipendenza` | una riga `dipende`, fonte `dichiarata` |
-| `CONFLICT\|<a>\|<b>\|materiale: <path>, …` | una riga `collide`, fonte `materiale` |
+| `CONFLICT\|<a>\|<b>\|dipendenza` | una dipendenza fra due membri aperti |
+| `CONFLICT\|<a>\|<b>\|materiale: <path>, …` | un path in comune fra due membri aperti, che almeno uno dei due scrive |
 
 `tree` stampa una riga `CONFLICT` solo fra due membri ancora aperti: una task chiusa non riparte, e un suo conflitto non ferma nessuno.
 
-**Regole di trascrizione:**
+**Ogni riga `CONFLICT` diventa una riga di prosa e un campo del blocco.** È la proprietà che `verify` controlla: ricalcola le stesse righe dai file e stampa un `DIFF` per ognuna che il blocco non copre.
 
-- **Ogni riga `CONFLICT` diventa una riga della tabella, e nessuna riga `dichiarata` o `materiale` esiste senza la sua `CONFLICT`.** È la proprietà che rende la metà meccanica verificabile con un confronto, alla partenza dell'orchestrator: le stesse righe si ricalcolano dai file, e `mandate.py verify <testa> --children <membri…>` stampa ogni differenza (`DIFF`), le righe `modello` (`MODELLO`) e i membri aperti cambiati dopo il commit dell'analisi (`CAMBIATO`).
-- **`dipendenza`** → il verso viene da `DEPS`: `A → B` se le `DEPS` di A nominano B. Se si nominano a vicenda, due righe. `Su cosa` è la prosa della voce di `## Dependencies` di A che nomina B, accorciata; per una freccia che viene solo dal grafo, «grafo di `tasks.md`».
-- **`materiale: <path>`** → `A · B`, coi membri nell'ordine della lista. `Su cosa` porta i path fra backtick. Se tutti e due dichiarano il path come 📖 fonte, cioè lo leggono e basta, `tree` non stampa la riga: due letture non si scontrano. Se lo dichiara 📖 uno solo, `Su cosa` lo dice — la riga resta, perché `tree` la calcola e il confronto la conta.
-- **Una dipendenza verso una task chiusa** non entra in tabella.
-- **Una dipendenza aperta verso una task fuori dal perimetro** — un id in `blocked=` che non è fra i membri — non entra in tabella: si mostra alla conferma, con l'offerta di aggiungere la task ai membri. In un'epica l'offerta non c'è, perché le figlie le decide il `Parent Task` della figlia: alla conferma si dice che per seguirla insieme serve un mandato.
-
-Ne discende una conseguenza per chi confronta: quando un membro chiude, le sue righe restano scritte nella tabella e `tree` smette di stamparle. Una riga il cui membro è ✔️ non è una divergenza.
+- **`dipendenza`** → il verso viene da `DEPS`: A dipende da B se le `DEPS` di A nominano B. La prosa: `- T61 dipende da T52: <la voce di ## Dependencies di T61, accorciata> (## Dependencies di T61)`, o `(grafo di tasks.md)` per una freccia che viene solo dal grafo. Il blocco: `"dopo": ["T52"]` in T61. Se la voce nomina dei DLV precisi di B («serve il DLV2 di T52»), il `dopo` è `"T52:2"`, e B prende `"dlv": "2"`: il suo primo ciclo fa solo quei DLV, e A parte prima della fine di B.
+- **Due membri che si dichiarano a vicenda** sono un ciclo, e nessun piano lo scioglie: `verify` vuole i due `dopo`, e lo script terrebbe fermi tutti e due. La prosa lo scrive, e alla conferma è un difetto dei due task file da correggere prima del giro.
+- **`materiale: <path>`** → la prosa: ``- T52 e T64 scrivono `scripts/utils/lib.sh` (## Materiale dei due)``; se uno dei due dichiara il path come 📖 fonte, la riga lo dice. Il blocco: una risorsa in comune, col nome del path, nei due membri. Un `dopo` fra i due già scritto, per una dipendenza o una preferenza, basta da solo: due membri in fila non girano mai insieme.
+- **Una dipendenza verso una task chiusa** non scrive niente.
+- **Una dipendenza aperta verso una task fuori dal perimetro** — un id in `blocked=` che non è fra i membri — scrive una riga di prosa, `- T61 aspetta T70, fuori dal perimetro (## Dependencies di T61)`, e niente nel blocco: lo script la legge da `tree` e ferma il membro finché T70 non chiude. Se la voce nomina dei DLV di T70, il `dopo` può portare `"T70:2"`, e il membro parte quando quei DLV sono spuntati. Alla conferma si offre di aggiungere T70 ai membri; in un'epica l'offerta non c'è, perché le figlie le decide il `Parent Task` della figlia, e si dice che per seguirla insieme serve un mandato.
 
 ## La metà del modello — le collisioni non dichiarate
 
@@ -60,38 +61,99 @@ La ricerca nel repo si fa **solo sui path e sui simboli che due membri nominano*
 
 **Lo stesso file basta, anche su righe lontane.** Due sessioni nello stesso worktree che toccano lo stesso file si rubano le modifiche al commit: la pathspec del commit prende il file intero, e chi committa per primo porta con sé il lavoro a metà dell'altra.
 
-**Cosa entra in tabella**: una riga `A · B | collide | <su cosa> | modello` solo quando
+**Cosa entra nel piano**: una collisione solo quando l'oggetto è concreto — un file, un simbolo, un comportamento che tutti e due nominano. «Potrebbero interferire» non è una collisione. Se la metà meccanica dice già la stessa cosa per quella coppia — lo stesso path, o una dipendenza dichiarata — non si ripete.
 
-- l'oggetto è concreto: un file, un simbolo, un comportamento che tutti e due nominano. «Potrebbero interferire» non è una riga;
-- la metà meccanica non dice già la stessa cosa per quella coppia: lo stesso path in una riga `materiale`, o una dipendenza già dichiarata.
+- **Una collisione** → la prosa: `- T61 e T70 riscrivono il poll del deck: nessun campo lo dichiara`. Il blocco: una risorsa in comune, col nome dell'oggetto (`"poll del deck"`, o il path del file).
+- **Una dipendenza non dichiarata** — A legge ciò che B scrive, e A non dichiara B → la prosa: `- T61 legge il formato che scrive T52: dipendenza non dichiarata`. Il blocco: `"dopo": ["T52"]` in T61, subito, perché lo script legge l'ordine solo dal piano. La dipendenza vera appartiene a `## Dependencies` di T61, che chi scrive il piano non tocca: alla conferma si chiede a chi lavora su T61 di dichiararla.
 
-**Una dipendenza non dichiarata** — A legge ciò che B scrive, e A non dichiara B — entra come `collide`, con il verso detto in `Su cosa`: «T61 legge il formato che scrive T52, dipendenza non dichiarata». La dipendenza vera appartiene a `## Dependencies` di A, che l'analisi non scrive: alla conferma si dice a chi lavora su A di dichiararla.
+## Le risorse del ciclo di lavoro
 
-**I punti ciechi**, detti alla conferma e mai scritti in tabella:
+Oltre ai file, un ciclo di lavoro occupa ciò che il suo run fa fuori dal codice. Si leggono dai DLV e dalla Description dei membri aperti, e prendono un nome fisso, perché la risorsa vale solo se due membri la scrivono uguale:
 
-- i membri aperti che non nominano nessun file: una loro collisione resta invisibile anche dopo l'analisi;
-- i membri epica o mandato: le collisioni dei loro membri non sono analizzate qui.
+| Risorsa | Quando un membro la prende | Perché due cicli non la condividono |
+|---|---|---|
+| `publish-plugin` | un DLV pubblica il plugin (`publish-plugin.sh`, un bump) | il publish committa tutto il working tree del plugin: un rilascio porterebbe fuori il lavoro a metà dell'altro run |
+| `release-deck` | un DLV rilascia il deck (publish npm, tag) | stessa ragione, sul repo del deck |
+| `build-deck` | un DLV builda o collauda il deck (`npm test`, gate pty) | i gate pty avviano il deck dalla build: una build dell'altro run cambia il codice sotto un collaudo in corso |
 
-## La sezione scritta
+Una riga di prosa in `## Ordine` dice perché ogni risorsa c'è: `- T52 e T64 pubblicano il plugin: risorsa publish-plugin`. Un nome fuori da questa tabella è ammesso — un comportamento, un servizio condiviso — se due membri lo scrivono uguale.
 
-- **Ordine delle righe**: prima `dichiarata`, poi `materiale`, poi `modello`; dentro ogni fonte, per posizione nella lista del primo membro della coppia.
-- **Nessuna relazione** → la sezione porta una riga sola: `Nessuna relazione fra i membri aperti.`
-- **Niente sha, niente data, niente Prog**: la sezione descrive relazioni fra membri, non il loro stato.
-- **Si sostituisce intera** a ogni riscrittura.
+## Le preferenze dell'utente
+
+Le preferenze d'ordine valgono **solo per questo giro** e le dice l'utente. Ognuna diventa una riga di prosa in `## Ordine`, con le sue parole nella sostanza, e un campo del blocco:
+
+| L'utente dice | Il blocco |
+|---|---|
+| «prima T52, poi T64» | `"dopo": ["T52"]` in T64 |
+| «T255 per ultima» | `"dopo": ["*"]` in T255 |
+| «T245 la seguo io» | `"umano": true` in T245 |
+| «di T21 in questo giro solo il DLV2» | `"dlv": "2"` in T21 |
+| «T64 parte dal run, senza preflight» | `"passo": "run"` in T64 — solo su una S o una M: `run-task` rifiuta il run su una L senza preflight, e `verify` lo ferma |
+| «T21 riparte dal checkpoint» | `"passo": "checkpoint"` in T21 |
+
+**L'ordine dei membri nel blocco** è la preferenza a parità di condizioni: fra due membri pronti lo script lancia prima quello che sblocca più membri, poi il primo nel blocco. Senza parole dell'utente vale l'ordine del lettore.
+
+**Una dipendenza vera non è una preferenza.** Se l'utente dice «T61 ha bisogno del formato di T52», la dipendenza va in `## Dependencies` di T61: entra nel `dopo` come una dipendenza non dichiarata (§La metà del modello), e la conferma lo dice.
+
+## Il file scritto
+
+````markdown
+# Piano di T<testa> — <tema>
+
+## Analisi del perimetro
+
+- <una relazione per riga, con la fonte fra parentesi>
+
+## Ordine
+
+- <una preferenza o una risorsa per riga, col perché>
+
+## Piano
+
+```json
+{"perimetro": "T<testa>", "membri": [ … ]}
+```
+````
+
+- **La prosa dell'analisi**, in quest'ordine: le dipendenze dichiarate, i path in comune, le collisioni del modello, le dipendenze aperte fuori dal perimetro; dentro ogni gruppo, per posizione nella lista del primo membro nominato. Nessuna relazione → una riga sola: `Nessuna relazione fra i membri aperti.`
+- **`## Ordine`** c'è solo se c'è una preferenza o una risorsa da spiegare.
+- **Il blocco** porta una voce per ogni membro del lettore, nell'ordine scelto: i membri chiusi, i membri epica o mandato e i `TASK_MEMBER_MISSING` compresi, con il solo `id`. `verify` li conta, e lo script non lancia niente su di loro.
+- **Niente sha, niente data, niente Prog, niente cifre**: il piano descrive relazioni e decisioni, non lo stato dei membri.
+- **Si riscrive intero** a ogni rianalisi.
+
+Scritto il file, il controllo:
+
+```bash
+"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/schedule.py" verify <testa> --bozza
+```
+
+`VERIFY=ok` → il piano copre ogni relazione meccanica. Un `ERRORE` è un blocco scritto male; un `DIFF` è una relazione che non è diventata un campo: si corregge il piano e si rilancia, prima di mostrarlo a nessuno. Un `AVVISO` su un `passo` vuol dire che i file lo hanno già superato: il campo si toglie.
 
 ## La rianalisi
 
-Quando la sezione esiste già, l'analisi si rifà **intera**, con la tabella vecchia in ingresso:
+Quando un piano c'è già, il piano si rifà **intero**, col vecchio in ingresso:
 
-- le righe `dichiarata` e `materiale` si ricalcolano da `tree`: quelle vecchie non contano;
-- ogni riga `modello` vecchia viene **confermata** (stesso testo), **riscritta** (testo nuovo, con la ragione) o **tolta** (con la ragione: membro chiuso, membro tolto, il task file non nomina più quel file). Nessuna sparisce in silenzio;
+- le relazioni meccaniche si ricalcolano da `tree`: quelle vecchie non contano;
+- ogni collisione del modello vecchia viene **confermata** (stesso testo), **riscritta** (testo nuovo, con la ragione) o **tolta** (con la ragione: membro chiuso, membro tolto, il task file non nomina più quel file). Nessuna sparisce in silenzio;
+- le preferenze dell'utente restano, salvo che l'utente le cambi o che nominino un membro tolto;
+- un `dlv` resta se i suoi DLV sono ancora aperti; un `passo` resta se `verify --bozza` non lo dà superato;
 - le coppie nuove, quelle di un membro aggiunto, passano dalla metà del modello da zero.
 
-Alla conferma la differenza si mostra riga per riga:
+**Un perimetro preparato prima del piano** porta nel task file la tabella `## Analisi del perimetro` e, in un mandato, `## Preferenze d'ordine`. Le righe con fonte `modello` della tabella sono le collisioni del modello vecchie da confermare, riscrivere o togliere; quelle `dichiarata` e `materiale` si ricalcolano; ogni voce delle preferenze diventa una preferenza. Le due sezioni escono dal task file nello stesso commit che scrive il piano: due copie resterebbero disallineate alla prima modifica.
+
+Alla conferma la differenza si mostra riga per riga, sulla prosa e sul blocco:
 
 ```
-= T52 · T64 | collide | `scripts/utils/lib.sh` | materiale
-+ T61 · T70 | collide | entrambe riscrivono il poll del deck | modello
-- T52 · T58 | collide | `docs/tasks.md` | modello — T58 tolta dai membri
-~ T61 · T64 | collide | `src/hooks.ts` | modello — T64 non nomina più `src/sessions.ts`
+= T52 e T64 scrivono `scripts/utils/lib.sh` (## Materiale dei due)
++ T61 e T70 riscrivono il poll del deck: nessun campo lo dichiara
+- T52 e T58 scrivono `docs/tasks.md` — T58 tolta dai membri
+~ T61 e T64 scrivono `src/hooks.ts` — T64 non nomina più `src/sessions.ts`
+~ T64 dopo=T52 → dopo=T52,T61 · risorse=publish-plugin → publish-plugin,poll del deck
 ```
+
+## I punti ciechi
+
+Si dicono alla conferma, mai nel piano:
+
+- i membri aperti che non nominano nessun file: una loro collisione resta invisibile anche dopo l'analisi;
+- i membri epica o mandato: le collisioni dei loro membri non sono analizzate qui.

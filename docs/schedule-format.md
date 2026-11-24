@@ -101,7 +101,7 @@ Il membro lo segue l'umano: lo script non apre passi su di lui, i suoi eventi no
 
 - **Nessuno stato e nessuna cifra dei membri**: la Prog sta in `tasks.md`, i DLV nel task file del membro. Lo stato del giro sta nel flusso dello script, fuori da git.
 - **Nessun sessionId**: il piano descrive i membri, non le conversazioni. Un membro che l'orchestrator non deve toccare si marca `umano`.
-- **Nessuna dipendenza che il piano solo conosce**: una dipendenza vera va in `## Dependencies` del membro, dove la vede anche chi lavora sulla task fuori dal perimetro. Il `dopo` la ripete per lo script, e `verify` controlla che la ripeta.
+- **Nessuna dipendenza che il piano solo conosce**: una dipendenza vera va in `## Dependencies` del membro, dove la vede anche chi lavora sulla task fuori dal perimetro. Il `dopo` la ripete per lo script, e `verify` controlla che la ripeta. Una dipendenza che l'analisi trova e che il membro non dichiara entra subito nel `dopo`, perché lo script legge l'ordine solo dal piano; la prosa la dice non dichiarata, e chi scrive il piano chiede a chi lavora sul membro di dichiararla.
 
 ## `verify` — il piano contro i file
 
@@ -133,6 +133,8 @@ Le righe:
 | `VERIFY=ok\|riesame\|stop` | `stop` con un `ERRORE`, un `DIFF` o un piano non committato; `riesame` con un `CAMBIATO`; `ok` altrimenti |
 
 Exit `0` su `ok` e `riesame`, `2` su `stop`, `1` su un id malformato, un task file del perimetro mancante o un lettore dei membri che non risponde.
+
+**`verify <perimetro> --bozza`** è il controllo di chi ha appena scritto il piano e non l'ha ancora committato: `prepare-mandate` prima della conferma, l'orchestrator prima del commit di una riscrittura. Fa i controlli da 1 a 7 sui file come sono sul disco — il task file del perimetro compreso, anche non committato — e salta l'8: niente `PLAN_COMMIT` e niente `CAMBIATO`. `VERIFY=ok` senza `ERRORE` e senza `DIFF`, `stop` altrimenti.
 
 **A giro avviato lo script rilancia lo stesso controllo** quando cambia il piano o il task file di un membro, senza la storia: i membri cambiano di continuo, e il piano lo committa l'orchestrator. Un `ERRORE` o un `DIFF` mettono in pausa i passi nuovi e svegliano l'orchestrator; i passi già aperti finiscono.
 

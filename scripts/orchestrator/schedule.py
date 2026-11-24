@@ -5,7 +5,9 @@ schedule — il piano di un perimetro: `schedule.md` nella task folder del perim
           i membri uguali a quelli del lettore unico, ogni dipendenza dichiarata
           fra membri aperti nel «Dopo», ogni path in comune fra due membri aperti
           coperto da una risorsa o da un «Dopo», i perimetri di DLV dentro il
-          numero dei DLV; poi il commit del piano e i membri cambiati dopo
+          numero dei DLV; poi il commit del piano e i membri cambiati dopo.
+          Con `--bozza` i soli controlli sui file, senza il commit: è la
+          verifica di chi scrive il piano prima di committarlo
   show    il piano letto e normalizzato, una riga per membro
 
 Il contratto del file — dove sta, la prosa, il blocco JSON, i campi e il loro
@@ -14,8 +16,9 @@ eseguibile: una chiave ignota, un tipo sbagliato o un valore fuori dominio sono
 un errore, mai un default. Un campo letto col significato sbagliato non dà
 errore: lascia partire un membro troppo presto, e nessuno lo vede.
 
-Il modulo serve due lettori. La skill dell'orchestrator lancia `verify` prima di
-partire, e lo stop la ferma. Lo script del flusso (`flow.py`) importa il parser e
+Il modulo serve tre lettori. La skill dell'orchestrator lancia `verify` prima di
+partire, e lo stop la ferma. `prepare-mandate` lancia `verify --bozza` sul piano
+appena scritto, prima della conferma e del commit. Lo script del flusso (`flow.py`) importa il parser e
 `check`, e rilancia il controllo quando un task file di un membro cambia: lì
 conta la sola parte strutturale (`Result.blocking`), perché a giro avviato i
 membri cambiano di continuo e il commit del piano lo scrive l'orchestrator.
@@ -25,7 +28,7 @@ una regola sola per contare i membri, anche quando chi chiede è un processo
 Python staccato che nessuna skill imbocca.
 
 Uso:
-  python -I schedule.py [--project-root <radice>] verify <perimetro>
+  python -I schedule.py [--project-root <radice>] verify <perimetro> [--bozza]
   python -I schedule.py [--project-root <radice>] show <perimetro>
 
 Exit: 0 ok · 1 id malformato, task file del perimetro mancante, lettore dei
@@ -508,9 +511,12 @@ def relative(project_root, path):
     return os.path.relpath(path, project_root).replace(os.sep, "/")
 
 
-def command_verify(project_root, head):
+def command_verify(project_root, head, draft=False):
+    """`draft`: il piano appena scritto, non ancora committato. I controlli sui
+    file restano tutti; il commit e i membri cambiati dopo non si guardano, e
+    il verdetto è `ok` o `stop` sui soli `ERRORE` e `DIFF`."""
     try:
-        result = check(project_root, head)
+        result = check(project_root, head, history=not draft)
     except PlanError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
@@ -524,7 +530,7 @@ def command_verify(project_root, head):
     print(f"MEMBRI={len(result.members)}" + (f" (senza task file: {', '.join(result.missing)})" if result.missing else ""))
     for error in result.errors:
         print(f"ERRORE|{error}")
-    if result.plan is not None:
+    if result.plan is not None and not draft:
         print(f"PLAN_COMMIT={result.commit[:12] if result.commit else f'? ({result.commit_reason})'}")
     for kind, who, detail in result.diffs:
         print(f"DIFF|{kind}|{who}|{detail}")
@@ -533,7 +539,7 @@ def command_verify(project_root, head):
     for task_id in result.members:
         if task_id in result.changed:
             print(f"CAMBIATO|{task_id}|{result.changed[task_id]}")
-    if result.blocking or result.commit is None:
+    if result.blocking or (result.commit is None and not draft):
         verdict = "stop"
     else:
         verdict = "riesame" if result.changed else "ok"
@@ -562,8 +568,11 @@ def parse_arguments():
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     subcommands = parser.add_subparsers(dest="command", required=True)
-    for name in ("verify", "show"):
-        subcommands.add_parser(name).add_argument("head", help="il perimetro: un'epica o un mandato")
+    verify_parser = subcommands.add_parser("verify")
+    verify_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
+    verify_parser.add_argument("--bozza", action="store_true",
+                               help="il piano non ancora committato: i soli controlli sui file, senza il commit")
+    subcommands.add_parser("show").add_argument("head", help="il perimetro: un'epica o un mandato")
     return parser.parse_args()
 
 
@@ -580,7 +589,7 @@ def main():
         print(f"ERROR: task file di {arguments.head} non trovato", file=sys.stderr)
         return 1
     if arguments.command == "verify":
-        return command_verify(project_root, arguments.head)
+        return command_verify(project_root, arguments.head, arguments.bozza)
     return command_show(project_root, arguments.head)
 
 
