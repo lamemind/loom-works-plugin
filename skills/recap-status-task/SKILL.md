@@ -62,7 +62,7 @@ Poi, se il campo `**Folder**:` è popolato, lista la task folder (`ls -la`) — 
 
 Il materiale prodotto è **parte dello stato della task**, non un allegato: su una task di progettazione le sole checkbox misurano zero avanzamento mentre il lavoro prodotto è tutto testo.
 
-**Se `## Materiale` è popolata**, è la fonte: onora i glifi (`📖` fonte · `🔬` analisi · `📤` prodotto · `🎬` stato della regia, in un perimetro) e risolvi la radice `📁/` contro il campo `**Folder**:`. Riporta le voci con la loro maniglia, non i path nudi.
+**Se `## Materiale` è popolata**, è la fonte: onora i glifi (`📖` fonte · `🔬` analisi · `📤` prodotto · `🎬` stato dell'orchestrator, in un perimetro) e risolvi la radice `📁/` contro il campo `**Folder**:`. Riporta le voci con la loro maniglia, non i path nudi.
 
 **Se manca o è vuota**, ricostruisci l'insieme da due sedi:
 

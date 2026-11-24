@@ -1,8 +1,8 @@
 """
-watch_filter — il filtro a monte del monitor della regia: whitelist e blacklist.
+watch_filter — il filtro a monte del monitor dell'orchestrator: whitelist e blacklist.
 
-Ogni riga che il monitor scrive arriva alla regia come notifica del tool
-Monitor, e la regia spende un turno del modello anche per decidere di
+Ogni riga che il monitor scrive arriva all'orchestrator come notifica del tool
+Monitor, e l'orchestrator spende un turno del modello anche per decidere di
 ignorarla. Il filtro toglie le righe prima che escano, dentro il processo del
 monitor: è l'unico punto in cui una riga scartata non costa niente.
 
@@ -54,7 +54,7 @@ import re
 TASK_ID_PATTERN = re.compile(r"^T\d+$")
 SESSION_PREFIX_PATTERN = re.compile(r"^[0-9A-Za-z-]+$")
 TASK_IN_TEXT_PATTERN = re.compile(r"\bT\d+\b")
-# Lo scope di un commit: `run(T23): …`, `regia (T220 DLV5): …`. Il nome davanti
+# Lo scope di un commit: `run(T23): …`, `orchestrator (T220 DLV5): …`. Il nome davanti
 # alla parentesi non conta, conta che la parentesi chiuda prima dei due punti.
 COMMIT_SCOPE_PATTERN = re.compile(r"^[\w-]+\s*\(([^)]*)\)\s*:")
 CREATE_SUBJECT_PATTERN = re.compile(r"^task\((T\d+)\):\s*create\b")
@@ -190,7 +190,7 @@ class FilterSource:
 def commit_tasks(subject, parent_of):
     """Le task di un commit, dal suo soggetto.
 
-    L'id dello scope (`run(T23): …`, `regia (T220 DLV5): …`); senza un id nello
+    L'id dello scope (`run(T23): …`, `orchestrator (T220 DLV5): …`); senza un id nello
     scope, ogni id del soggetto. Il commit di creazione `task(T<n>): create`
     prende anche la task del campo `Parent Task` del file appena nato
     (`parent_of`): è così che la figlia nuova di un'epica passa una whitelist

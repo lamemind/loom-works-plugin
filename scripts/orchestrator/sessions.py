@@ -8,18 +8,19 @@ sessions — legge le altre sessioni Claude Code di un progetto loom-works.
          la sessione sta chiedendo, per decidere cosa risponderle. Cerca il
          prefisso fra le vive, poi fra i transcript del progetto: una sessione
          chiusa si rilegge anche dopo il suo ciclo
-  regie  le altre regie vive sul progetto, su questa macchina, col perimetro
-         che ognuna porta avanti: la guardia al lancio di una regia
+  orchestrators
+         gli altri orchestrator vivi sul progetto, su questa macchina, col perimetro
+         che ognuno porta avanti: la guardia al lancio di un orchestrator
   find   le sessioni vive il cui sessionId comincia col prefisso, col sessionId
-         intero: la regia scioglie così l'id che l'utente chiede di escludere
+         intero: l'orchestrator scioglie così l'id che l'utente chiede di escludere
          dal monitor, prima di scriverlo nella blacklist del filtro
 
-Stesse fonti del monitor (watch_sessions.py), lette da regia_common.
+Stesse fonti del monitor (watch_sessions.py), lette da orchestrator_common.
 
 Uso:
   python -I sessions.py [--project-root <radice>] list
   python -I sessions.py [--project-root <radice>] tail <prefisso del session id> [--chars 4000] [--prompts 5]
-  python -I sessions.py [--project-root <radice>] regie --own-session <session id>
+  python -I sessions.py [--project-root <radice>] orchestrators --own-session <session id>
   python -I sessions.py [--project-root <radice>] find <prefisso del session id>
 """
 
@@ -37,15 +38,15 @@ import time
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import orchestrator_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
 
 
 def first_prompt(path):
     try:
-        for record in regia_common.read_records(path):
-            prompt = regia_common.user_prompt_text(record)
+        for record in orchestrator_common.read_records(path):
+            prompt = orchestrator_common.user_prompt_text(record)
             if prompt is not None:
-                return regia_common.describe_prompt(prompt)
+                return orchestrator_common.describe_prompt(prompt)
     except OSError:
         pass
     return ""
@@ -64,17 +65,17 @@ def status_with_age(session, now):
 
 def command_list(project_root):
     now = time.time()
-    registry = regia_common.read_registry(project_root)
+    registry = orchestrator_common.read_registry(project_root)
     if not registry.readable:
         print("registro delle sessioni illeggibile: ~/.claude/sessions")
         sys.exit(1)
-    bindings = regia_common.load_task_bindings(project_root)
+    bindings = orchestrator_common.load_task_bindings(project_root)
     sessions = sorted(registry.sessions, key=lambda session: session.status_since or 0, reverse=True)
     for session in sessions:
-        path = regia_common.transcript_path(session.cwd, session.session_id)
-        label = regia_common.session_label(
-            session.session_id, bindings.get(session.session_id), regia_common.task_of_transcript(path))
-        location = regia_common.relative_location(session.cwd, project_root)
+        path = orchestrator_common.transcript_path(session.cwd, session.session_id)
+        label = orchestrator_common.session_label(
+            session.session_id, bindings.get(session.session_id), orchestrator_common.task_of_transcript(path))
+        location = orchestrator_common.relative_location(session.cwd, project_root)
         where = f"[{location}]  " if location else ""
         unverified = " (pid non verificato)" if session.alive is None else ""
         print(f"{session.session_id[:8]}  {label:7}  {status_with_age(session, now):14}  "
@@ -89,9 +90,9 @@ def project_transcript_dirs(project_root):
     con quello della radice. La codifica perde informazione (`/` e `-`
     diventano entrambi `-`), quindi il nome dice solo «può essere»: decide il
     `cwd` scritto nei record."""
-    projects_dir = os.path.join(regia_common.claude_home(), "projects")
-    encoded_root = regia_common.encode_project_dir(project_root)
-    if regia_common.IS_WINDOWS:
+    projects_dir = os.path.join(orchestrator_common.claude_home(), "projects")
+    encoded_root = orchestrator_common.encode_project_dir(project_root)
+    if orchestrator_common.IS_WINDOWS:
         encoded_root = encoded_root.lower()
     try:
         names = os.listdir(projects_dir)
@@ -99,7 +100,7 @@ def project_transcript_dirs(project_root):
         return []
     directories = []
     for name in names:
-        comparable = name.lower() if regia_common.IS_WINDOWS else name
+        comparable = name.lower() if orchestrator_common.IS_WINDOWS else name
         if comparable == encoded_root or comparable.startswith(encoded_root + "-"):
             directories.append(os.path.join(projects_dir, name))
     return directories
@@ -108,7 +109,7 @@ def project_transcript_dirs(project_root):
 def transcript_cwd(path):
     """Il `cwd` del primo record che lo porta."""
     try:
-        for record in regia_common.read_records(path):
+        for record in orchestrator_common.read_records(path):
             if isinstance(record.get("cwd"), str):
                 return record["cwd"]
     except OSError:
@@ -120,15 +121,15 @@ def find_transcript(project_root, session_prefix):
     """I transcript del progetto il cui sessionId comincia col prefisso: prima
     fra le sessioni vive, poi fra i transcript su disco delle cartelle del
     progetto, tenendo quelli col `cwd` dentro la radice."""
-    registry = regia_common.read_registry(project_root)
+    registry = orchestrator_common.read_registry(project_root)
     live = [session for session in registry.sessions if session.session_id.startswith(session_prefix)]
     if live:
-        return [(regia_common.transcript_path(session.cwd, session.session_id), session) for session in live]
+        return [(orchestrator_common.transcript_path(session.cwd, session.session_id), session) for session in live]
     matches = []
     for directory in project_transcript_dirs(project_root):
         for path in glob.glob(os.path.join(glob.escape(directory), glob.escape(session_prefix) + "*.jsonl")):
             cwd = transcript_cwd(path)
-            if cwd is None or regia_common.is_within(cwd, project_root):
+            if cwd is None or orchestrator_common.is_within(cwd, project_root):
                 matches.append((path, None))
     return matches
 
@@ -148,60 +149,60 @@ def command_tail(project_root, session_prefix, chars, prompt_count):
         print(f"prefisso {session_prefix}: {len(matches)} transcript trovati, ne serve uno")
         sys.exit(1)
     path, live_session = matches[0]
-    records = list(regia_common.read_records(path))
+    records = list(orchestrator_common.read_records(path))
     session_id = os.path.basename(path)[:-len(".jsonl")]
-    bindings = regia_common.load_task_bindings(project_root)
-    label = regia_common.session_label(session_id, bindings.get(session_id), regia_common.task_of_transcript(path))
+    bindings = orchestrator_common.load_task_bindings(project_root)
+    label = orchestrator_common.session_label(session_id, bindings.get(session_id), orchestrator_common.task_of_transcript(path))
     state = f"viva, {status_with_age(live_session, time.time())}" if live_session else "chiusa"
     print(f"=== SESSIONE {session_id} · {label} · {state} ===")
     print("=== ULTIMO TESTO DELLA SESSIONE ===")
     print("\n".join(assistant_texts(records))[-chars:])
     print("=== ULTIMI PROMPT DELL'UTENTE ===")
-    prompts = [(record.get("timestamp", ""), regia_common.user_prompt_text(record)) for record in records]
+    prompts = [(record.get("timestamp", ""), orchestrator_common.user_prompt_text(record)) for record in records]
     for timestamp, content in [prompt for prompt in prompts if prompt[1] is not None][-prompt_count:]:
         print(f"{timestamp} {content[:600]}")
 
 
-# Una regia si riconosce dal suo transcript: l'invocazione della skill — uno
+# Un orchestrator si riconosce dal suo transcript: l'invocazione della skill — uno
 # slash command dell'utente, o una chiamata al tool Skill del modello — col
 # perimetro come primo id degli argomenti.
-REGIA_SKILL = re.compile(r"(?:^|[/:])orchestrate-mandate$")
+ORCHESTRATOR_SKILL = re.compile(r"(?:^|[/:])orchestrate-mandate$")
 TASK_ID = re.compile(r"\bT\d+\b")
-# Il passo 2 dello stop della regia, e nessun altro passo usa `recap`.
+# Il passo 2 dello stop dell'orchestrator, e nessun altro passo usa `recap`.
 RECAP_COMMAND = re.compile(r"mandate\.py[\"']?\s+(?:--project-root\s+\S+\s+)?recap\b")
 COMMAND_NAME = re.compile(r"<command-name>(.*?)</command-name>")
 COMMAND_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.S)
 
 
-def regia_invocation(prompt):
-    """Il perimetro di uno slash command della regia scritto in un prompt, o
+def orchestrator_invocation(prompt):
+    """Il perimetro di uno slash command dell'orchestrator scritto in un prompt, o
     `None`. Il comando arriva incartato nei tag `<command-name>`; un turno
     `claude -p` può portarlo nudo, `/loom-works:orchestrate-mandate T214`."""
     name = COMMAND_NAME.search(prompt)
     if name:
-        if not REGIA_SKILL.search(name.group(1).strip()):
+        if not ORCHESTRATOR_SKILL.search(name.group(1).strip()):
             return None
         args = COMMAND_ARGS.search(prompt)
         ids = TASK_ID.findall(args.group(1) if args else "")
         return ids[0] if ids else None
     words = prompt.strip().split()
-    if words and words[0].startswith("/") and REGIA_SKILL.search(words[0]):
+    if words and words[0].startswith("/") and ORCHESTRATOR_SKILL.search(words[0]):
         ids = TASK_ID.findall(" ".join(words[1:]))
         return ids[0] if ids else None
     return None
 
 
-def regia_of_transcript(path):
-    """`(perimetro, ferma)` dell'ultima regia lanciata nel transcript,
+def orchestrator_of_transcript(path):
+    """`(perimetro, ferma)` dell'ultimo orchestrator lanciato nel transcript,
     `(None, False)` se il transcript non ne lancia nessuna.
 
-    Una regia è ferma quando, dopo la sua invocazione, la sessione ha lanciato
+    Un orchestrator è fermo quando, dopo la sua invocazione, la sessione ha lanciato
     `mandate.py recap`: è il passo 2 dello stop. Una compattazione del
     contesto non cambia transcript, quindi l'invocazione resta leggibile; un
-    `/clear` apre un transcript nuovo, e la sessione da lì non è più una regia.
+    `/clear` apre un transcript nuovo, e la sessione da lì non è più un orchestrator.
 
-    Il filtro sul testo della riga viene prima del parse: il transcript di una
-    regia dura ore, e solo poche righe nominano la skill o lo script.
+    Il filtro sul testo della riga viene prima del parse: il transcript di un
+    orchestrator dura ore, e solo poche righe nominano la skill o lo script.
     """
     head, stopped = None, False
     try:
@@ -215,9 +216,9 @@ def regia_of_transcript(path):
                     continue
                 if not isinstance(record, dict):
                     continue
-                prompt = regia_common.user_prompt_text(record)
+                prompt = orchestrator_common.user_prompt_text(record)
                 if prompt is not None:
-                    perimeter = regia_invocation(prompt)
+                    perimeter = orchestrator_invocation(prompt)
                     if perimeter:
                         head, stopped = perimeter, False
                     continue
@@ -228,7 +229,7 @@ def regia_of_transcript(path):
                     if not isinstance(block, dict) or block.get("type") != "tool_use":
                         continue
                     tool_input = block.get("input") if isinstance(block.get("input"), dict) else {}
-                    if block.get("name") == "Skill" and REGIA_SKILL.search(str(tool_input.get("skill", ""))):
+                    if block.get("name") == "Skill" and ORCHESTRATOR_SKILL.search(str(tool_input.get("skill", ""))):
                         ids = TASK_ID.findall(str(tool_input.get("args", "")))
                         if ids:
                             head, stopped = ids[0], False
@@ -239,31 +240,31 @@ def regia_of_transcript(path):
     return head, stopped
 
 
-def command_regie(project_root, own_session):
-    """Le altre regie vive sul progetto, su questa macchina: una riga per
-    sessione viva il cui transcript lancia una regia non ancora fermata.
+def command_orchestrators(project_root, own_session):
+    """Gli altri orchestrator vivi sul progetto, su questa macchina: una riga per
+    sessione viva il cui transcript lancia un orchestrator non ancora fermato.
 
     Il registro delle sessioni vive e i transcript sono locali alla macchina:
-    una regia lanciata da un'altra macchina sullo stesso repo qui non c'è.
+    un orchestrator lanciato da un'altra macchina sullo stesso repo qui non c'è.
     """
-    registry = regia_common.read_registry(project_root)
+    registry = orchestrator_common.read_registry(project_root)
     if not registry.readable:
         print("registro delle sessioni illeggibile: ~/.claude/sessions")
         sys.exit(1)
-    bindings = regia_common.load_task_bindings(project_root)
+    bindings = orchestrator_common.load_task_bindings(project_root)
     found = 0
     for session in sorted(registry.sessions, key=lambda live: live.session_id):
         if own_session and session.session_id.startswith(own_session):
             continue
-        path = regia_common.transcript_path(session.cwd, session.session_id)
-        head, stopped = regia_of_transcript(path)
+        path = orchestrator_common.transcript_path(session.cwd, session.session_id)
+        head, stopped = orchestrator_of_transcript(path)
         if head is None or stopped:
             continue
-        label = regia_common.session_label(
-            session.session_id, bindings.get(session.session_id), regia_common.task_of_transcript(path))
-        print(f"REGIA|{session.session_id}|{head}|{label}")
+        label = orchestrator_common.session_label(
+            session.session_id, bindings.get(session.session_id), orchestrator_common.task_of_transcript(path))
+        print(f"ORCHESTRATOR|{session.session_id}|{head}|{label}")
         found += 1
-    print(f"REGIE={found}")
+    print(f"ORCHESTRATORS={found}")
 
 
 def command_find(project_root, session_prefix):
@@ -275,25 +276,25 @@ def command_find(project_root, session_prefix):
     una conversazione aperta, e un id che indica due sessioni non si scrive,
     perché escluderebbe anche quella che l'utente non ha nominato.
     """
-    registry = regia_common.read_registry(project_root)
+    registry = orchestrator_common.read_registry(project_root)
     if not registry.readable:
         print("registro delle sessioni illeggibile: ~/.claude/sessions")
         sys.exit(1)
-    bindings = regia_common.load_task_bindings(project_root)
+    bindings = orchestrator_common.load_task_bindings(project_root)
     now = time.time()
     matches = sorted((session for session in registry.sessions if session.session_id.startswith(session_prefix)),
                      key=lambda live: live.session_id)
     for session in matches:
-        path = regia_common.transcript_path(session.cwd, session.session_id)
-        label = regia_common.session_label(
-            session.session_id, bindings.get(session.session_id), regia_common.task_of_transcript(path))
+        path = orchestrator_common.transcript_path(session.cwd, session.session_id)
+        label = orchestrator_common.session_label(
+            session.session_id, bindings.get(session.session_id), orchestrator_common.task_of_transcript(path))
         print(f"SESSIONE|{session.session_id}|{label}|{status_with_age(session, now)}")
     print(f"TROVATE={len(matches)}")
     sys.exit(0 if len(matches) == 1 else 1 if not matches else 2)
 
 
 def main():
-    regia_common.setup_stdout()
+    orchestrator_common.setup_stdout()
     parser = argparse.ArgumentParser(description="Legge le altre sessioni di un progetto loom-works")
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
@@ -303,16 +304,16 @@ def main():
     tail_parser.add_argument("session_prefix")
     tail_parser.add_argument("--chars", type=int, default=4000)
     tail_parser.add_argument("--prompts", type=int, default=5)
-    regie_parser = subcommands.add_parser("regie")
-    regie_parser.add_argument("--own-session", default="", help="session id della regia che chiede: fuori dall'elenco")
+    orchestrators_parser = subcommands.add_parser("orchestrators")
+    orchestrators_parser.add_argument("--own-session", default="", help="session id dell'orchestrator che chiede: fuori dall'elenco")
     find_parser = subcommands.add_parser("find")
     find_parser.add_argument("session_prefix")
     arguments = parser.parse_args()
-    project_root = os.path.abspath(arguments.project_root or regia_common.find_project_root(os.getcwd()))
+    project_root = os.path.abspath(arguments.project_root or orchestrator_common.find_project_root(os.getcwd()))
     if arguments.command == "list":
         command_list(project_root)
-    elif arguments.command == "regie":
-        command_regie(project_root, arguments.own_session)
+    elif arguments.command == "orchestrators":
+        command_orchestrators(project_root, arguments.own_session)
     elif arguments.command == "find":
         command_find(project_root, arguments.session_prefix)
     else:

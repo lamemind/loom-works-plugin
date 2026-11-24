@@ -18,7 +18,7 @@ Una conversazione che ha ragionato con l'utente su un tema ha in mano un contest
 - **Non risponde da sé**, salvo delega: prepara la risposta e la manda col via dell'utente (§5). Con la delega manda da sé le risposte che le parole dell'utente coprono, e scala le altre.
 - **Non scrive mai nei task file né in un file tracciato.** Il preflight scrive le decisioni nel task file e committa; questa conversazione scrive solo il proprio stato, in `.claude/loom/drive/T<id>.md`, ignorata da git (§Lo stato su disco).
 
-Le regole su firma, delega e azioni che restano all'utente sono quelle della regia (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-mandate/SKILL.md` §3), applicate a un passo solo: niente monitor, niente perimetro, niente checkpoint.
+Le regole su firma, delega e azioni che restano all'utente sono quelle dell'orchestrator (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-mandate/SKILL.md` §3), applicate a un passo solo: niente monitor, niente perimetro, niente checkpoint.
 
 ## 0. Gli argomenti
 
@@ -40,7 +40,7 @@ for candidate in python3 python; do "$candidate" -c 'import sys; sys.exit(sys.ve
 Nessuno dei due → dillo e fermati. Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (`PY`). Poi, dalla root del progetto:
 
 ```bash
-"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/regia/drive_state.py" check <TaskID>
+"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/drive_state.py" check <TaskID>
 ```
 
 Il `sessionId` di questa conversazione lo legge lo script da `CLAUDE_CODE_SESSION_ID`. Le righe:
@@ -54,8 +54,8 @@ Il `sessionId` di questa conversazione lo legge lo script da `CLAUDE_CODE_SESSIO
 | `STATE_FILE=` · `CREATED_ON=` · `IGNORED=` | lo stato su disco del passo e la sua identità, e se git lo ignora |
 | `STATE=` · `STATE_HOLDER=` · `STEP_SESSION=` · `STEP_KIND=` · `STEP_LIVE=` | il verdetto sullo stato (§Lo stato su disco) e, in una ripresa, il passo aperto |
 | `VIVA\|<sessionId>\|tab\|headless\|<stato>` | un'altra conversazione viva sulla task |
-| `REGIA_PASSO\|<sessionId>\|<perimetro>\|<stato>` | un turno headless su questa task aperto da una regia che non è ferma |
-| `REGIA\|<sessionId>\|<perimetro>\|<etichetta>` | un'altra regia viva sul progetto, da confrontare coi membri (sotto) |
+| `ORCHESTRATOR_PASSO\|<sessionId>\|<perimetro>\|<stato>` | un turno headless su questa task aperto da un orchestrator che non è fermo |
+| `ORCHESTRATOR\|<sessionId>\|<perimetro>\|<etichetta>` | un altro orchestrator vivo sul progetto, da confrontare coi membri (sotto) |
 | `ROUND=nuovo\|ripresa` · `STOP\|<motivo>` · `CHECK=ok\|stop` | il giro, una riga per ogni ragione di fermarsi, il verdetto |
 
 **`CHECK=stop`** (exit `2`) → **fermati senza lanciare niente**, e di' all'utente ogni riga `STOP` col suo rimedio:
@@ -67,17 +67,17 @@ Il `sessionId` di questa conversazione lo legge lo script da `CLAUDE_CODE_SESSIO
 - stato illeggibile → il path: lo corregge o lo toglie l'utente;
 - conversazione viva sulla task (`VIVA`) → nominala: due conversazioni sulla stessa task lavorano sugli stessi file. Si rilancia quando è chiusa;
 - passo aperto in una tab (`STEP_LIVE=tab`) → l'utente ha ripreso il passo dal deck: si risponde in quella tab, e la skill si rilancia quando la tab è chiusa;
-- turno aperto da una regia (`REGIA_PASSO`) → nomina la regia e la conversazione: la task è in mano a quella regia finché non è ferma. Si sblocca fermando la regia, nella sua chat. Una regia morta e mai fermata tiene la task finché non viene rilanciata e fermata, o finché lo stato headless del suo turno (`.claude/loom/headless/<sessionId>.json`) non viene tolto: lo dici con queste parole.
+- turno aperto da un orchestrator (`ORCHESTRATOR_PASSO`) → nomina l'orchestrator e la conversazione: la task è in mano a quell'orchestrator finché non è fermo. Si sblocca fermando l'orchestrator, nella sua chat. Un orchestrator morto e mai fermato tiene la task finché non viene rilanciato e fermato, o finché lo stato headless del suo turno (`.claude/loom/headless/<sessionId>.json`) non viene tolto: lo dici con queste parole.
 
 Exit `1` → il motivo da stderr (task file mancante, registro delle sessioni illeggibile), e fermati.
 
-**Le regie vive.** Con `CHECK=ok`, per ogni riga `REGIA` leggi i membri del suo perimetro col lettore unico:
+**Gli orchestrator vivi.** Con `CHECK=ok`, per ogni riga `ORCHESTRATOR` leggi i membri del suo perimetro col lettore unico:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro> --members
 ```
 
-Se la task è fra le righe `TASK_MEMBER=` o è il perimetro stesso, **fermati**: la regia `<sessionId corto>` di `<perimetro>` la porterebbe avanti accanto a te. Si sblocca fermando quella regia.
+Se la task è fra le righe `TASK_MEMBER=` o è il perimetro stesso, **fermati**: l'orchestrator `<sessionId corto>` di `<perimetro>` la porterebbe avanti accanto a te. Si sblocca fermando quell'orchestrator.
 
 **Avvisi, non rifiuti.** Il passo lo chiede l'utente, per nome: quello che segue si dice in una riga e si lancia lo stesso.
 

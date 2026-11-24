@@ -1,12 +1,12 @@
 """
-mandate — le letture della regia sul mandato: gate, albero, cifre prima → dopo.
+mandate — le letture dell'orchestrator sul mandato: gate, albero, cifre prima → dopo.
 
-  gate    se la regia può partire: il permission mode della sessione che la
+  gate    se l'orchestrator può partire: il permission mode della sessione che lo
           lancia, letto dal suo transcript, e quello del progetto, letto da
           `.claude/loom-works.json`, entrambi `auto`; e `loom-deck-headless`
-          sul PATH, il comando con cui la regia apre e porta avanti i membri,
-          in una versione che conosce `--regia`. Dice anche, senza chiudere
-          il gate, se `loom-deck-spawn` sa aprire la regia successora di un
+          sul PATH, il comando con cui l'orchestrator apre e porta avanti i membri,
+          in una versione che conosce `--orchestrator`. Dice anche, senza chiudere
+          il gate, se `loom-deck-spawn` sa aprire l'orchestrator successore di un
           passaggio di consegne (`HANDOFF`)
   tree    lo stato del perimetro dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
@@ -17,7 +17,7 @@ mandate — le letture della regia sul mandato: gate, albero, cifre prima → do
   recap   le cifre di oggi accanto a quelle salvate da `tree --save` all'armo
 
 Solo letture: nessuno di questi comandi scrive nei repo. `tree --save` scrive il
-file che gli si indica: la skill lo tiene in `.claude/loom/regia/`, ignorata da git.
+file che gli si indica: la skill lo tiene in `.claude/loom/orchestrator/`, ignorata da git.
 
 Lo stato di una task si legge dalla cella Prog della tabella Tasks Overview e
 dal task file, mai dai glifi del grafo: fra la promozione e il checkpoint i
@@ -57,7 +57,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import perimeter_analysis  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
-import regia_common  # noqa: E402
+import orchestrator_common  # noqa: E402
 
 TASK_ID_PATTERN = re.compile(r"^T\d+$")
 # Un id di task nella prosa: `T23`, `✔️T23`, `🟡T23`. Fuori `ks·T22`, l'id di
@@ -67,8 +67,8 @@ CHECKBOX = re.compile(r"^- \[([ xX])\]")
 DATED_HEADING = re.compile(r"^###\s.*\d{4}-\d{2}-\d{2}")
 BACKTICKED = re.compile(r"`([^`]+)`")
 VARIATION_SELECTOR = "️"
-# Il glifo della voce di `## Materiale` che punta allo stato della regia.
-REGIA_STATE_GLYPH = "🎬"
+# Il glifo della voce di `## Materiale` che punta allo stato dell'orchestrator.
+ORCHESTRATOR_STATE_GLYPH = "🎬"
 
 # ---------------------------------------------------------------------------
 # gate
@@ -79,13 +79,13 @@ PERMISSION_MODE_FIELD = re.compile(r'"permissionMode"\s*:\s*"([A-Za-z]+)"')
 # headless. Su Windows npm lo installa come `.cmd`: `shutil.which` lo trova
 # lo stesso, perché prova le estensioni di PATHEXT.
 HEADLESS_COMMAND = "loom-deck-headless"
-# L'opzione con cui la regia dichiara sé stessa a ogni apertura e a ogni
-# risposta: la conversazione nasce con `LOOM_REGIA`. Un `loom-deck-headless`
-# più vecchio la rifiuta con uscita 2, e la regia lo scoprirebbe al primo membro.
-HEADLESS_REGIA_FLAG = "--regia"
+# L'opzione con cui l'orchestrator dichiara sé stesso a ogni apertura e a ogni
+# risposta: la conversazione nasce con `LOOM_ORCHESTRATOR`. Un `loom-deck-headless`
+# più vecchio la rifiuta con uscita 2, e l'orchestrator lo scoprirebbe al primo membro.
+HEADLESS_ORCHESTRATOR_FLAG = "--orchestrator"
 HEADLESS_HELP_TIMEOUT_S = 20
-# Il client dell'endpoint del deck, con cui la regia apre la successora quando
-# passa le consegne (kind `regia`).
+# Il client dell'endpoint del deck, con cui l'orchestrator apre il successore quando
+# passa le consegne (kind `orchestrator`).
 SPAWN_COMMAND = "loom-deck-spawn"
 USAGE_KIND_LINE = re.compile(r"^\s*<kind>\s+(.*)$", re.M)
 
@@ -108,25 +108,25 @@ def command_usage(command):
     return result.stdout
 
 
-def spawn_knows_regia(spawn):
-    """`True` se la riga `<kind>` dell'uso di `loom-deck-spawn` elenca `regia`.
+def spawn_knows_orchestrator(spawn):
+    """`True` se la riga `<kind>` dell'uso di `loom-deck-spawn` elenca `orchestrator`.
 
-    La riga dei kind, e non l'uso intero: l'uso nomina la regia anche per
-    `--regia`, che c'è da prima del passaggio di consegne. La riga nasce dalla
+    La riga dei kind, e non l'uso intero: l'uso nomina l'orchestrator anche per
+    `--orchestrator`, che c'è da prima del passaggio di consegne. La riga nasce dalla
     stessa tabella con cui il deck rifiuta un kind, quindi un kind elencato è un
     kind che il deck accetta."""
     match = USAGE_KIND_LINE.search(command_usage(spawn))
-    return bool(match) and "regia" in [kind.strip() for kind in match.group(1).split("|")]
+    return bool(match) and "orchestrator" in [kind.strip() for kind in match.group(1).split("|")]
 
 
-def headless_knows_regia(headless):
-    """`True` se l'uso di `loom-deck-headless` nomina `--regia`.
+def headless_knows_orchestrator(headless):
+    """`True` se l'uso di `loom-deck-headless` nomina `--orchestrator`.
 
     L'uso è la sola fonte che il comando offre senza fare niente: `--help` esce
     0 e non apre nessun turno. Un comando che non parte, che non risponde in
     tempo o che non nomina l'opzione vale `False`, e il gate si chiude.
     """
-    return HEADLESS_REGIA_FLAG in command_usage(headless)
+    return HEADLESS_ORCHESTRATOR_FLAG in command_usage(headless)
 
 
 def last_permission_mode(transcript):
@@ -151,7 +151,7 @@ def project_permission_mode(project_root):
     """Il campo `permissionMode` di `.claude/loom-works.json`; assente o
     illeggibile vale `manual`, il default con cui il deck apre le tab."""
     try:
-        with open(os.path.join(project_root, regia_common.PROJECT_CONFIG), encoding="utf-8") as config_handle:
+        with open(os.path.join(project_root, orchestrator_common.PROJECT_CONFIG), encoding="utf-8") as config_handle:
             value = json.load(config_handle).get("permissionMode")
     except (OSError, ValueError, AttributeError):
         return "manual"
@@ -159,29 +159,29 @@ def project_permission_mode(project_root):
 
 
 def command_gate(project_root, own_session):
-    transcript = regia_common.transcript_path(project_root, own_session)
+    transcript = orchestrator_common.transcript_path(project_root, own_session)
     own_mode = last_permission_mode(transcript) if os.path.exists(transcript) else None
     project_mode = project_permission_mode(project_root)
     print(f"PROJECT_ROOT={project_root}")
-    print(f"DOCS_ROOT={regia_common.docs_root(project_root)}")
+    print(f"DOCS_ROOT={orchestrator_common.docs_root(project_root)}")
     print(f"OWN_SESSION={own_session}")
     print(f"OWN_TRANSCRIPT={transcript if os.path.exists(transcript) else '(non trovato)'}")
     print(f"OWN_MODE={own_mode or '?'}")
     print(f"PROJECT_MODE={project_mode}")
-    # Senza il comando la regia scoprirebbe la mancanza al primo membro, a giro
+    # Senza il comando l'orchestrator scoprirebbe la mancanza al primo membro, a giro
     # avviato, come un'anomalia: il gate la scopre prima di aprire niente.
     headless = shutil.which(HEADLESS_COMMAND)
     print(f"HEADLESS={headless or 'assente'}")
-    # Un deck installato da prima di `--regia` apre i membri senza `LOOM_REGIA`
-    # solo se la regia non lo passa; la regia lo passa sempre, e quel deck
+    # Un deck installato da prima di `--orchestrator` apre i membri senza `LOOM_ORCHESTRATOR`
+    # solo se l'orchestrator non lo passa; l'orchestrator lo passa sempre, e quel deck
     # rifiuterebbe ogni apertura: anche questo si scopre qui, non al primo membro.
-    knows_regia = headless is not None and headless_knows_regia(headless)
-    print(f"HEADLESS_REGIA={'sì' if knows_regia else ('no' if headless else '-')}")
+    knows_orchestrator = headless is not None and headless_knows_orchestrator(headless)
+    print(f"HEADLESS_ORCHESTRATOR={'sì' if knows_orchestrator else ('no' if headless else '-')}")
     # Il passaggio di consegne serve solo ai giri lunghi: un deck che non sa
-    # aprire la successora non ferma il lancio, e la regia lo dice in una riga.
+    # aprire il successore non ferma il lancio, e l'orchestrator lo dice in una riga.
     spawn = shutil.which(SPAWN_COMMAND)
-    print(f"HANDOFF={'sì' if spawn is not None and spawn_knows_regia(spawn) else 'no'}")
-    open_gate = own_mode == "auto" and project_mode == "auto" and knows_regia
+    print(f"HANDOFF={'sì' if spawn is not None and spawn_knows_orchestrator(spawn) else 'no'}")
+    open_gate = own_mode == "auto" and project_mode == "auto" and knows_orchestrator
     print(f"GATE={'ok' if open_gate else 'stop'}")
     return 0 if open_gate else 2
 
@@ -302,8 +302,8 @@ def materiale_paths(lines, folder):
     solo come 📖 fonte, cioè legge e basta: un path nominato anche con un altro
     glifo non ci entra.
 
-    Una voce 🎬 non è un path della task: punta allo stato della regia del
-    perimetro, in `.claude/loom/regia/`, che scrive solo la regia. Non entra
+    Una voce 🎬 non è un path della task: punta allo stato dell'orchestrator del
+    perimetro, in `.claude/loom/orchestrator/`, che scrive solo l'orchestrator. Non entra
     nella lista, e non si confronta con nessun membro."""
     # Solo il prefisso `./`: la folder stessa comincia con un punto
     # (`./.26-11-16-slug`), e uno strip dei caratteri lo mangerebbe.
@@ -319,7 +319,7 @@ def materiale_paths(lines, folder):
         match = BACKTICKED.search(line)
         if not match:
             continue
-        if REGIA_STATE_GLYPH in line[:match.start()]:
+        if ORCHESTRATOR_STATE_GLYPH in line[:match.start()]:
             continue
         source_only = "📖" in line[:match.start()]
         path = match.group(1).strip()
@@ -341,7 +341,7 @@ def read_task(project_root, docs, task_id, overview):
     task = {"id": task_id, "prog": normalize_glyph(progress) or "?", "title": title,
             "file": None, "size": "?", "preflight": "none",
             "dlv": [0, 0], "ac": [0, 0], "deps": [], "materiale": [], "read_only": set()}
-    path = regia_common.find_task_file(project_root, docs, task_id)
+    path = orchestrator_common.find_task_file(project_root, docs, task_id)
     if path is None:
         return task
     with open(path, encoding="utf-8", errors="replace") as task_handle:
@@ -349,19 +349,19 @@ def read_task(project_root, docs, task_id, overview):
     task["file"] = os.path.relpath(path, project_root)
     if not task["title"] and lines and lines[0].startswith("# Task:"):
         task["title"] = lines[0][len("# Task:"):].strip()
-    task["size"] = regia_common.header_field(lines, "Size") or "?"
+    task["size"] = orchestrator_common.header_field(lines, "Size") or "?"
     task["preflight"] = preflight_state(lines)
     task["dlv"] = list(count_checkboxes(section_lines(lines, "Deliverables Checklist")))
     task["ac"] = list(count_checkboxes(section_lines(lines, "Acceptance Criteria")))
     task["deps"] = declared_dependencies(lines)
-    task["materiale"], task["read_only"] = materiale_paths(lines, regia_common.header_field(lines, "Folder"))
+    task["materiale"], task["read_only"] = materiale_paths(lines, orchestrator_common.header_field(lines, "Folder"))
     return task
 
 
 def next_step(task):
     """Il prossimo passo del ciclo di una task, dai soli file: preflight se
     manca, poi run finché c'è un DLV aperto, poi checkpoint. Lane e branch
-    non entrano: dove e quando lanciare lo decide la regia, non un campo
+    non entrano: dove e quando lanciare lo decide l'orchestrator, non un campo
     dell'header.
 
     Un preflight mancante manda a `preflight` una task 🔵 (o senza riga in
@@ -407,7 +407,7 @@ def paths_overlap(first, second):
 
 
 def snapshot(project_root, head, members):
-    docs = regia_common.docs_root(project_root)
+    docs = orchestrator_common.docs_root(project_root)
     tasks_md = os.path.join(project_root, docs, "tasks.md")
     try:
         with open(tasks_md, encoding="utf-8", errors="replace") as tasks_handle:
@@ -565,7 +565,7 @@ def command_verify(project_root, arguments):
     if commit:
         open_members = {task_id for task_id in state["mandate"] if state["tasks"][task_id]["next"] != "chiusa"}
         tasks_rel = perimeter_analysis.relative_to(
-            top, os.path.join(project_root, regia_common.docs_root(project_root), "tasks"))
+            top, os.path.join(project_root, orchestrator_common.docs_root(project_root), "tasks"))
         changed = perimeter_analysis.changed_members(top, tasks_rel, commit, open_members)
         for task_id in state["mandate"]:
             if task_id in changed:
@@ -583,8 +583,8 @@ def command_recap(project_root, before_path):
     except (OSError, ValueError) as error:
         print(f"ERROR: cifre di partenza illeggibili: {before_path}: {error}", file=sys.stderr)
         return 1
-    # `epic` è la chiave delle cifre salvate prima del rename della skill: una
-    # regia rilanciata nella stessa sessione rilegge il file che aveva scritto.
+    # `epic` è la chiave delle cifre salvate prima del rename della skill: un
+    # orchestrator rilanciato nella stessa sessione rilegge il file che aveva scritto.
     head = before.get("head") or before.get("epic")
     state = snapshot(project_root, head, before["mandate"])
     for task_id in [head] + before["mandate"]:
@@ -615,12 +615,12 @@ class SubcommandParser(argparse.ArgumentParser):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Letture della regia sul mandato")
+    parser = argparse.ArgumentParser(description="Letture dell'orchestrator sul mandato")
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     subcommands = parser.add_subparsers(dest="command", required=True, parser_class=SubcommandParser)
     gate_parser = subcommands.add_parser("gate")
-    gate_parser.add_argument("--own-session", required=True, help="session id della sessione della regia")
+    gate_parser.add_argument("--own-session", required=True, help="session id della sessione dell'orchestrator")
     tree_parser = subcommands.add_parser("tree")
     tree_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
     tree_parser.add_argument("--children", nargs="*", required=True,
@@ -636,10 +636,10 @@ def parse_arguments():
 
 
 def main():
-    regia_common.setup_stdout()
+    orchestrator_common.setup_stdout()
     arguments = parse_arguments()
     project_root = os.path.abspath(arguments.project_root) if arguments.project_root \
-        else regia_common.find_project_root(os.getcwd())
+        else orchestrator_common.find_project_root(os.getcwd())
     if arguments.command == "gate":
         return command_gate(project_root, arguments.own_session)
     if arguments.command == "tree":

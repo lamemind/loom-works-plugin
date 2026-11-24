@@ -17,7 +17,7 @@
           },
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context/inject-regia.sh\""
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context/inject-orchestrator.sh\""
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context/deny-ask-regia.sh\""
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context/deny-ask-orchestrator.sh\""
           }
         ]
       }

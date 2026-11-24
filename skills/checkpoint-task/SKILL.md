@@ -296,7 +296,7 @@ SCENARIO
 - **La conferma e il ribaltamento valgono uguale.** Sulla segnalazione che avevi marcato `☑ subito (agente)`, «ok» è uno scenario `subito` e «fanne una task» uno scenario `task`, entrambi `--chi umano`, accanto al tuo: non si riscrive niente, i due record sono il dato.
 - **Detta a posteriori, la stessa parola è un esito e non un'azione.** Chi rilegge il report da un'altra sessione registra con `--momento posteriori` e non esegue niente.
 
-**Una risposta firmata «su delega» è della regia, non dell'umano.** Un messaggio che apre con `Risposte alle segnalazioni di T<id> — decise dalla regia di T<perimetro> su delega dell'utente.` arriva dalla regia del perimetro, che decide al posto dell'umano perché l'umano gliel'ha delegato; la riga sotto la firma porta le parole con cui l'ha delegato, alla lettera. Ogni scenario di quella risposta si scrive con `--chi delega` e quelle parole intere in `--delega`, senza ritaglio: le legge prima una variabile da un heredoc fra apici, così backtick e apostrofi restano testo.
+**Una risposta firmata «su delega» è dell'orchestrator, non dell'umano.** Un messaggio che apre con `Risposte alle segnalazioni di T<id> — decise dall'orchestrator di T<perimetro> su delega dell'utente.` arriva dall'orchestrator del perimetro, che decide al posto dell'umano perché l'umano gliel'ha delegato; la riga sotto la firma porta le parole con cui l'ha delegato, alla lettera. Ogni scenario di quella risposta si scrive con `--chi delega` e quelle parole intere in `--delega`, senza ritaglio: le legge prima una variabile da un heredoc fra apici, così backtick e apostrofi restano testo.
 
 ```bash
 DELEGA="$(cat <<'DELEGA'
@@ -306,15 +306,15 @@ DELEGA
 "${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto|ignora --chi delega \
   --delega "$DELEGA" --momento flusso --skill checkpoint-task [--ancora <path>]... --no-commit <<'SCENARIO'
 <la segnalazione, identica al testo della riga S{N}>
-<le parole della regia su quella segnalazione: il perché sullo scarto, l'approfondimento sulle altre uscite>
+<le parole dell'orchestrator su quella segnalazione: il perché sullo scarto, l'approfondimento sulle altre uscite>
 SCENARIO
 ```
 
 `--ancora` va solo con `--uscita scarto` e `ignora`, dove è obbligatoria: su `subito` e `task` lo script la rifiuta ed esce `1`.
 
-- **Sotto delega valgono le regole dell'umano.** Le quattro uscite, le parole della regia come approfondimento o come perché sullo scarto, l'ancora sull'ignora e sullo scarto, «subito» e «task» operativi: le parole della regia stanno al posto di quelle dell'umano, e lo script le tratta allo stesso modo.
+- **Sotto delega valgono le regole dell'umano.** Le quattro uscite, le parole dell'orchestrator come approfondimento o come perché sullo scarto, l'ancora sull'ignora e sullo scarto, «subito» e «task» operativi: le parole dell'orchestrator stanno al posto di quelle dell'umano, e lo script le tratta allo stesso modo.
 - **Firma senza le parole della delega → nessuno scenario.** Non scrivi niente e lo dici nel testo finale: le parole mancano, e senza non c'è uno scenario `delega` da scrivere. Non ripieghi su `--chi umano`, che dichiarerebbe una risposta che l'umano non ha dato, né su `--chi agente`, che farebbe di uno scarto affidato uno scarto autonomo.
-- **Una risposta firmata «approvate dall'utente» resta `--chi umano`**: l'ha decisa l'umano, la regia l'ha solo portata.
+- **Una risposta firmata «approvate dall'utente» resta `--chi umano`**: l'ha decisa l'umano, l'orchestrator l'ha solo portata.
 
 ### L'uscita che riguarda un altro progetto
 
@@ -325,7 +325,7 @@ Un altro progetto non lo scrivi da questa sessione: può tenerti in sola lettura
 1. `"$A" risolvi <progetto>` stampa la cartella. Exit `2`: nessun progetto con quel nome, o più d'uno — chiedi la cartella all'umano e non lanciare. Se la cartella è quella di questa sessione, nessun figlio: esegui qui.
 2. `"$A" prima --dest <cartella> --atteso task|commit` stampa lo sha di `HEAD`, da passare al gate. `--atteso task` quando il figlio apre una task nuova, `commit` per «subito» e per ogni altra forma, come un DLV aggiunto a una task che c'è già. Exit `2`: l'uscita lì non parte (una task vuole la lista task del destinatario) — dillo all'umano.
 3. Scrivi il prompt del figlio in un file fuori dai due repo. Per una task nuova: `/loom-works:create-task yolo <la segnalazione, il contesto che serve a chi non ha questa conversazione, le parole dell'umano>`. Altrimenti: cosa fare, con la segnalazione e le parole dell'umano alla lettera, e la richiesta di committare con le regole del progetto e di chiudere dichiarando l'hash del commit.
-4. `"$A" lancia --dest <cartella> --prompt <prompt> --out <out>` lancia il figlio: entra nella cartella, toglie all'ambiente le variabili con cui questa conversazione descrive sé stessa — `LOOM_TASK`, `PROJECT_ROOT`, `PTYXIS_PROFILE`, `LOOM_REGIA` e `CLAUDE_EFFORT` fra le altre —, e lancia `claude -p --permission-mode auto --output-format text` col prompt su stdin e l'output in `<out>`. Esce con l'exit code del figlio; prima del lancio, exit `1` o `2` col motivo su stderr, e il figlio non parte. La lista e cosa sposta ogni variabile: `${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md` §L'uscita eseguita in un altro progetto.
+4. `"$A" lancia --dest <cartella> --prompt <prompt> --out <out>` lancia il figlio: entra nella cartella, toglie all'ambiente le variabili con cui questa conversazione descrive sé stessa — `LOOM_TASK`, `PROJECT_ROOT`, `PTYXIS_PROFILE`, `LOOM_ORCHESTRATOR` e `CLAUDE_EFFORT` fra le altre —, e lancia `claude -p --permission-mode auto --output-format text` col prompt su stdin e l'output in `<out>`. Esce con l'exit code del figlio; prima del lancio, exit `1` o `2` col motivo su stderr, e il figlio non parte. La lista e cosa sposta ogni variabile: `${CLAUDE_PLUGIN_ROOT}/docs/triage-format.md` §L'uscita eseguita in un altro progetto.
 5. `"$A" verifica --dest <cartella> --prima <sha> --atteso task|commit [--hash <l'hash che il figlio dichiara>]`. Il ritorno del figlio è self-report: il gate legge i commit nati nel destinatario dopo `prima`, e per una task vuole il task file aggiunto e la sua riga in `tasks.md`. Verde (exit `0`): riporta all'umano cosa è nato, id e hash. Rosso (exit `2`): nessun secondo lancio — riporta il motivo del gate e il path di `<out>`.
 
 Due figli sullo stesso destinatario girano in sequenza, perché condividono l'intervallo del gate e il contatore degli id; su destinatari diversi vanno in parallelo.

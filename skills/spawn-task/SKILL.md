@@ -1,7 +1,7 @@
 ---
 name: spawn-task
-description: Chiede al deck acceso sul progetto di aprire una conversazione nuova su una task — preflight, run di tutti i DLV o di un perimetro, recap, checkpoint, la regia successora di un passaggio di consegne — come se l'utente premesse il tasto nel deck. Una task per invocazione, nessuna domanda e nessuna conferma. Usa quando una conversazione ha un piano già approvato da lanciare, per esempio quella di un'epica: «lancia il preflight di T12», «apri il run dei DLV 1-3 di T14».
-argument-hint: "<TaskID> <kind> [perimetro] [--model <alias>] [--note <testo>] [--regia <perimetro>]"
+description: Chiede al deck acceso sul progetto di aprire una conversazione nuova su una task — preflight, run di tutti i DLV o di un perimetro, recap, checkpoint, l'orchestrator successore di un passaggio di consegne — come se l'utente premesse il tasto nel deck. Una task per invocazione, nessuna domanda e nessuna conferma. Usa quando una conversazione ha un piano già approvato da lanciare, per esempio quella di un'epica: «lancia il preflight di T12», «apri il run dei DLV 1-3 di T14».
+argument-hint: "<TaskID> <kind> [perimetro] [--model <alias>] [--note <testo>] [--orchestrator <perimetro>]"
 ---
 
 Argomenti:
@@ -20,35 +20,35 @@ Lo spawn resta del **deck**: la skill è un client. Il deck acceso sul progetto 
 Dagli argomenti ricavi, nell'ordine:
 
 - **`<TaskID>`** — `T` più il numero.
-- **`<kind>`** — uno di `preflight` · `run` · `recap` · `recap-task` · `recap-epic` · `checkpoint` · `none` (`none` apre la task senza prompt) · `regia`, solo per il passaggio di consegne (§Il kind `regia`).
+- **`<kind>`** — uno di `preflight` · `run` · `recap` · `recap-task` · `recap-epic` · `checkpoint` · `none` (`none` apre la task senza prompt) · `orchestrator`, solo per il passaggio di consegne (§Il kind `orchestrator`).
 - **`[perimetro]`** — solo con `run`: i DLV nella grammatica di `run-task`, **un token solo** senza spazi (`2`, `1,3-5`). Assente = tutti i DLV aperti. «DLV da 1 a 3» diventa `1-3`.
 - **`--model <alias>`** — `fable` · `opus` · `sonnet` · `haiku`, solo se l'utente lo nomina. Assente = il modello che il deck userebbe col tasto.
 - **`--note <testo>`** — la nota del titolo della tab, solo se l'utente la detta. Assente = il titolo dell'azione.
-- **`--regia <perimetro>`** — l'id dell'epica o del mandato della regia che chiede lo spawn, solo quando chi invoca è una regia (`orchestrate-mandate`) e lo dichiara. Assente = nessuna regia. Mai col kind `regia`: la conversazione che si apre è a sua volta una regia, e il deck scarterebbe la dichiarazione.
+- **`--orchestrator <perimetro>`** — l'id dell'epica o del mandato dell'orchestrator che chiede lo spawn, solo quando chi invoca è un orchestrator (`orchestrate-mandate`) e lo dichiara. Assente = nessun orchestrator. Mai col kind `orchestrator`: la conversazione che si apre è a sua volta un orchestrator, e il deck scarterebbe la dichiarazione.
 
 Argomenti che non si traducono in questa forma (un kind fuori elenco, un perimetro con un kind diverso da `run`, un prompt libero) → riporta cosa manca ed esci, senza invocare niente: la skill non ha un prompt libero, e un'interpretazione tua aprirebbe una conversazione diversa da quella chiesta.
 
-### Il kind `regia`
+### Il kind `orchestrator`
 
-Apre una **regia nuova** sul perimetro — un'epica o un mandato — come il tasto `direct` del deck: la tab lancia `orchestrate-mandate <perimetro>` col modello dell'azione `regia` del catalogo. Lo chiede solo una regia che passa le consegne alla successora (`orchestrate-mandate`, §Il passaggio di consegne), dalla propria conversazione:
+Apre un **orchestrator nuovo** sul perimetro — un'epica o un mandato — come il tasto `direct` del deck: la tab lancia `orchestrate-mandate <perimetro>` col modello dell'azione `orchestrator` del catalogo. Lo chiede solo un orchestrator che passa le consegne al successore (`orchestrate-mandate`, §Il passaggio di consegne), dalla propria conversazione:
 
 ```bash
-loom-deck-spawn <perimetro> regia
+loom-deck-spawn <perimetro> orchestrator
 ```
 
-Nessun perimetro di DLV, nessun `--regia`. La richiesta porta il `sessionId` della conversazione che chiede, che `loom-deck-spawn` legge dal proprio ambiente (`CLAUDE_CODE_SESSION_ID`) e non si passa: il deck, a successora annunciata, scrive su quel `sessionId` la marca `origin: regia` nel suo sidecar. È la marca che rende la regia che chiede chiudibile con `close-session` dalla successora, anche se l'utente l'aveva aperta a mano: una conversazione marca solo sé stessa. Il deck rifiuta il kind su una task che non è un perimetro, e una richiesta senza il `sessionId` di chi chiede; `loom-deck-spawn` esce `2` se l'ambiente non lo porta.
+Nessun perimetro di DLV, nessun `--orchestrator`. La richiesta porta il `sessionId` della conversazione che chiede, che `loom-deck-spawn` legge dal proprio ambiente (`CLAUDE_CODE_SESSION_ID`) e non si passa: il deck, a successore annunciato, scrive su quel `sessionId` la marca `origin: orchestrator` nel suo sidecar. È la marca che rende l'orchestrator che chiede chiudibile con `close-session` dal successore, anche se l'utente l'aveva aperto a mano: una conversazione marca solo sé stessa. Il deck rifiuta il kind su una task che non è un perimetro, e una richiesta senza il `sessionId` di chi chiede; `loom-deck-spawn` esce `2` se l'ambiente non lo porta.
 
 ## 2. Chiedi lo spawn
 
 Dalla project root, una chiamata sola:
 
 ```bash
-loom-deck-spawn <TaskID> <kind> [perimetro] [--model <alias>] [--note '<testo>'] [--regia <perimetro>]
+loom-deck-spawn <TaskID> <kind> [perimetro] [--model <alias>] [--note '<testo>'] [--orchestrator <perimetro>]
 ```
 
 La nota fra apici singoli.
 
-**`--regia`** dà alla conversazione la sua posizione nell'organigramma: nasce con `LOOM_REGIA=<perimetro>` nell'ambiente, l'hook `SessionStart` le dice che le domande vanno in chat a fine turno, dove la regia le legge, e un hook `PreToolUse` le nega `AskUserQuestion`, che la regia non può chiudere. Il sidecar del deck registra il perimetro e la sessione della regia: la sessione la legge `loom-deck-spawn` dal proprio ambiente, non si passa. Il deck rifiuta una regia che non è un'epica né un mandato del progetto. Nessuna regola di permesso accompagna il comando: fuori da auto mode Claude Code chiede conferma a ogni spawn, ed è voluto — lo spawn apre una sessione col `permissionMode` del progetto e col prompt del catalogo, `run` compreso.
+**`--orchestrator`** dà alla conversazione la sua posizione nell'organigramma: nasce con `LOOM_ORCHESTRATOR=<perimetro>` nell'ambiente, l'hook `SessionStart` le dice che le domande vanno in chat a fine turno, dove l'orchestrator le legge, e un hook `PreToolUse` le nega `AskUserQuestion`, che l'orchestrator non può chiudere. Il sidecar del deck registra il perimetro e la sessione dell'orchestrator: la sessione la legge `loom-deck-spawn` dal proprio ambiente, non si passa. Il deck rifiuta un orchestrator che non è un'epica né un mandato del progetto. Nessuna regola di permesso accompagna il comando: fuori da auto mode Claude Code chiede conferma a ogni spawn, ed è voluto — lo spawn apre una sessione col `permissionMode` del progetto e col prompt del catalogo, `run` compreso.
 
 ## 3. Riporta l'esito
 
@@ -56,14 +56,14 @@ Secondo l'uscita del comando, senza ritentare:
 
 | Uscita | Esito | Cosa scrivi |
 |---|---|---|
-| `0` | tab aperta | le righe di stdout così come sono: `sessionId`, task, kind e modello, prompt, titolo, comando in-tab, la riga `regia:` quando la regia è impostata, la riga `consegne:` col kind `regia`, e le righe `⚠` quando ci sono |
+| `0` | tab aperta | le righe di stdout così come sono: `sessionId`, task, kind e modello, prompt, titolo, comando in-tab, la riga `orchestrator:` quando l'orchestrator è impostato, la riga `consegne:` col kind `orchestrator`, e le righe `⚠` quando ci sono |
 | `1` | il deck ha rifiutato o non ha risposto | il motivo da stderr così com'è (task assente, DLV chiusi o fuori range, spawn spento sulla piattaforma, finestra del progetto non in focus con un compass senza la coda) |
 | `2` | errore d'uso | il messaggio da stderr: la riga composta al passo 1 era sbagliata |
 | `3` | nessun deck in ascolto sul progetto | che serve il deck acceso sul progetto, o aggiornato: l'endpoint c'è da `loom-deck` 0.87.0 |
-| `4` | in coda: la tab non c'è ancora | le righe di stdout così come sono: `⏳ in coda`, `sessionId`, task, kind e modello, prompt, la riga `regia:` quando la regia è impostata, `scade:`. La conversazione nascerà con quel `sessionId`; col kind `regia` la marca `origin: regia` si scrive allora, allo spawn vero |
+| `4` | in coda: la tab non c'è ancora | le righe di stdout così come sono: `⏳ in coda`, `sessionId`, task, kind e modello, prompt, la riga `orchestrator:` quando l'orchestrator è impostato, `scade:`. La conversazione nascerà con quel `sessionId`; col kind `orchestrator` la marca `origin: orchestrator` si scrive allora, allo spawn vero |
 | `127` | `loom-deck-spawn` non trovato | che il deck installato è più vecchio dell'endpoint: `npm install -g @lamemind/loom-deck@latest` |
 
-**`consegne: <sessionId> marcata origin regia`** (kind `regia`, uscita `0`) dice che il deck ha scritto la marca sulla regia che chiede: la successora la potrà chiudere. Un deck acceso più vecchio del kind `regia` lo rifiuta con uscita `1`, e nessuna marca si scrive.
+**`consegne: <sessionId> marcata origin orchestrator`** (kind `orchestrator`, uscita `0`) dice che il deck ha scritto la marca sull'orchestrator che chiede: il successore lo potrà chiudere. Un deck acceso più vecchio del kind `orchestrator` lo rifiuta con uscita `1`, e nessuna marca si scrive.
 
 Una riga `⚠ spawn inerte` in testa allo stdout vuol dire che il deck gira col freno dei test (`LOOM_DECK_NO_SPAWN`): il binding è scritto, la tab no. Riportalo com'è.
 
@@ -73,7 +73,7 @@ Una riga `⚠ spawn inerte` in testa allo stdout vuol dire che il deck gira col 
 
 **Finestra del progetto non in focus — rifiuto** (Linux, uscita `1`). Con un compass che ha il controllo della finestra ma non la coda, il deck rifiuta come prima della coda: il motivo porta l'istruzione per l'utente — portare davanti una finestra del progetto e richiedere lo spawn — e il motivo `compass senza AwaitProjectFocus, da aggiornare`. Riportalo e non ritentare, perché solo l'utente può cambiare la finestra in focus.
 
-**`⚠ LOOM_REGIA non impostata`** in stdout vuol dire che la richiesta dichiarava la regia e il deck acceso è più vecchio: l'ha ignorata, e la tab è aperta senza `LOOM_REGIA` — lì `AskUserQuestion` funziona, e una domanda posta così resta ferma nella tab finché l'utente non ci va. L'uscita è `0` perché la tab esiste già. Riportalo com'è: il rimedio è riavviare il deck.
+**`⚠ LOOM_ORCHESTRATOR non impostata`** in stdout vuol dire che la richiesta dichiarava l'orchestrator e il deck acceso è più vecchio: l'ha ignorata, e la tab è aperta senza `LOOM_ORCHESTRATOR` — lì `AskUserQuestion` funziona, e una domanda posta così resta ferma nella tab finché l'utente non ci va. L'uscita è `0` perché la tab esiste già. Riportalo com'è: il rimedio è riavviare il deck.
 
 **`⚠ finestra non verificata`** in stdout vuol dire che il deck non ha potuto chiedere — compass assente, più vecchio del controllo, o che non conosce il progetto — e ha aperto comunque: la tab è nata nella finestra di terminale attiva, che può essere di un altro progetto. Riportalo com'è.
 

@@ -1,30 +1,30 @@
 """
-watch_context — la misura del contesto della regia, per il monitor.
+watch_context — la misura del contesto dell'orchestrator, per il monitor.
 
-La regia vive di notifiche del monitor, e ogni notifica è un turno che rilegge
-tutto il contesto: il contesto cresce per ore, e oltre una soglia la regia
-chiude il giro e passa le consegne a una regia nuova. Nessun hook lo misura per
+L'orchestrator vivi di notifiche del monitor, e ogni notifica è un turno che rilegge
+tutto il contesto: il contesto cresce per ore, e oltre una soglia l'orchestrator
+chiude il giro e passa le consegne a un orchestrator nuovo. Nessun hook lo misura per
 lei: il restamp scatta solo sui prompt umani, e le notifiche non lo sono.
 
-La misura sta nel transcript della regia. Ogni risposta del modello porta
+La misura sta nel transcript dell'orchestrator. Ogni risposta del modello porta
 `message.usage`, e `input_tokens + cache_read_input_tokens +
 cache_creation_input_tokens` è la dimensione del contesto in quel momento. La
 dimensione della finestra di contesto non sta nel transcript, solo nel payload
-della statusLine: la soglia è quindi in token assoluti, e la passa la regia
+della statusLine: la soglia è quindi in token assoluti, e la passa l'orchestrator
 all'armo del monitor (`--context-threshold`).
 
 I gradini sono il 20, 40, 60, 80, 100 e 120% della soglia: il 120% è il secondo
-tetto, oltre il quale la regia passa le consegne anche coi cicli aperti. Un
+tetto, oltre il quale l'orchestrator passa le consegne anche coi cicli aperti. Un
 gradino si dice una volta. Quando una misura ne supera più d'uno insieme — al
-primo armo, che trova una regia nata già sopra i primi gradini, o dopo una
+primo armo, che trova un orchestrator nato già sopra i primi gradini, o dopo una
 risposta molto lunga — esce un evento solo, col gradino più alto, e gli altri
-contano come detti: ogni evento costa alla regia un turno.
+contano come detti: ogni evento costa all'orchestrator un turno.
 
 I gradini detti valgono per un `sessionId`, e stanno nello stato del monitor:
-un riarmo della stessa regia non li ripete. La regia che riceve le consegne
+un riarmo dello stesso orchestrator non li ripete. L'orchestrator che riceve le consegne
 riarma il monitor sullo stesso file di stato col proprio `sessionId`, e i suoi
 gradini ripartono da zero: con gradini globali troverebbe il 100% già detto e
-non riceverebbe più nessun evento. Lo stesso vale per un `/clear` della regia,
+non riceverebbe più nessun evento. Lo stesso vale per un `/clear` dell'orchestrator,
 che apre un transcript nuovo e un contesto nuovo.
 """
 
@@ -58,7 +58,7 @@ def read_usage(path, offset):
     """L'ultima misura scritta nel transcript dopo `offset`, e l'offset nuovo.
 
     Legge solo righe complete: un record a metà si rilegge al giro dopo. Il
-    filtro sul testo viene prima del parse, perché il transcript di una regia
+    filtro sul testo viene prima del parse, perché il transcript di un orchestrator
     pesa megabyte e la prima lettura lo attraversa tutto. Un file più corto
     dell'offset è stato riscritto: si rilegge da capo."""
     try:
@@ -104,8 +104,8 @@ def thousands(number):
 
 def step_line(step, tokens, threshold):
     """La riga dell'evento: il gradino in testa, poi la misura. Al 100% e al
-    120% dice anche cosa vuol dire per la regia."""
-    line = f"regia 🧠 contesto al {step}% della soglia: {thousands(tokens)} token su {thousands(threshold)}"
+    120% dice anche cosa vuol dire per l'orchestrator."""
+    line = f"orchestrator 🧠 contesto al {step}% della soglia: {thousands(tokens)} token su {thousands(threshold)}"
     if step == 100:
         line += " — giro in chiusura: passa le consegne a giro chiuso"
     elif step > 100:
@@ -114,11 +114,11 @@ def step_line(step, tokens, threshold):
 
 
 def measure(entry, session_id, transcript, threshold):
-    """Una misura del contesto della regia: l'entry dello stato aggiornata e la
+    """Una misura del contesto dell'orchestrator: l'entry dello stato aggiornata e la
     riga da emettere, o `None`.
 
     L'entry vale per un `sessionId` e una soglia: con un `sessionId` diverso —
-    la regia che riceve le consegne, un `/clear` — o con un'altra soglia si
+    l'orchestrator che riceve le consegne, un `/clear` — o con un'altra soglia si
     riparte da zero, transcript riletto dall'inizio e nessun gradino detto."""
     if (not isinstance(entry, dict) or entry.get("session_id") != session_id
             or entry.get("threshold") != threshold):

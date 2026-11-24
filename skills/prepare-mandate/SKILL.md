@@ -1,6 +1,6 @@
 ---
 name: prepare-mandate
-description: Prepara il perimetro di una regia prima che parta — crea un mandato (task `Size: Mandate`) da una lista di id o da una descrizione, lo modifica aggiungendo o togliendo membri, oppure scrive l'analisi del perimetro dentro un'epica. L'analisi delle dipendenze e delle collisioni fra i membri ha una metà meccanica (`mandate.py tree`) e una del modello, che legge i task file dei membri. Presidiata — lista e analisi le conferma l'utente prima del commit — e non tocca mai i task file dei membri. Usa quando l'utente dice «prepara un mandato con T52, T61 e T64», «fammi un mandato con tutte le task di front-end», «aggiungi T70 al mandato T230, togli T52», «scrivi l'analisi del perimetro di T40».
+description: Prepara il perimetro di un orchestrator prima che parta — crea un mandato (task `Size: Mandate`) da una lista di id o da una descrizione, lo modifica aggiungendo o togliendo membri, oppure scrive l'analisi del perimetro dentro un'epica. L'analisi delle dipendenze e delle collisioni fra i membri ha una metà meccanica (`mandate.py tree`) e una del modello, che legge i task file dei membri. Presidiata — lista e analisi le conferma l'utente prima del commit — e non tocca mai i task file dei membri. Usa quando l'utente dice «prepara un mandato con T52, T61 e T64», «fammi un mandato con tutte le task di front-end», «aggiungi T70 al mandato T230, togli T52», «scrivi l'analisi del perimetro di T40».
 argument-hint: "<Txx Tyy …> | <descrizione> | <mandato> [aggiungi Txx] [togli Tyy] | <epica>"
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, AskUserQuestion
 ---
@@ -20,9 +20,9 @@ $ARGUMENTS
 
 ## Il ruolo
 
-Un **perimetro** è l'insieme di task che una regia porta avanti insieme: le figlie di un'epica, oppure i membri di un **mandato**, cioè una task `Size: Mandate` che elenca nel proprio file task di epiche diverse e orfane. Il formato del task file è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`: leggilo per intero prima di scrivere qualunque file.
+Un **perimetro** è l'insieme di task che un orchestrator porta avanti insieme: le figlie di un'epica, oppure i membri di un **mandato**, cioè una task `Size: Mandate` che elenca nel proprio file task di epiche diverse e orfane. Il formato del task file è `${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`: leggilo per intero prima di scrivere qualunque file.
 
-Questa skill costruisce il perimetro **prima** che la regia parta, e ne scrive l'analisi: quali coppie di membri non possono girare insieme, e su cosa. Tre modi:
+Questa skill costruisce il perimetro **prima** che l'orchestrator parta, e ne scrive l'analisi: quali coppie di membri non possono girare insieme, e su cosa. Tre modi:
 
 | Modo | Cosa scrive | Chi committa |
 |---|---|---|
@@ -30,7 +30,7 @@ Questa skill costruisce il perimetro **prima** che la regia parta, e ne scrive l
 | modifica (§4) | `## Membri`, `## Preferenze d'ordine` e `## Analisi del perimetro` di un mandato che esiste, la Description se chiesta, la voce 🎬 se manca | la skill, il solo file del mandato |
 | epica (§5) | `## Analisi del perimetro` di un'epica, e la voce 🎬 se manca | la skill, il solo file dell'epica |
 
-In tutti e tre i modi il perimetro porta in `## Materiale` la voce 🎬, il puntatore allo stato della regia (§7).
+In tutti e tre i modi il perimetro porta in `## Materiale` la voce 🎬, il puntatore allo stato dell'orchestrator (§7).
 
 Confini, in ogni modo:
 
@@ -47,7 +47,7 @@ for candidate in python3 python; do "$candidate" -c 'import sys; sys.exit(sys.ve
 
 L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo all'utente e fermati: senza Python la metà meccanica dell'analisi non si calcola.
 
-Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (lo chiamiamo `PY`) e la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/regia`. Ogni script si lancia con `"PY" -B -I "R/<script>"`: `-I` lo isola dalla cartella corrente, `-B` non scrive bytecode nella cache del plugin.
+Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (lo chiamiamo `PY`) e la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator`. Ogni script si lancia con `"PY" -B -I "R/<script>"`: `-I` lo isola dalla cartella corrente, `-B` non scrive bytecode nella cache del plugin.
 
 ## 1. Il modo
 
@@ -85,8 +85,8 @@ Prima di proseguire dichiara il modo in una riga: `🧭 Modo: creazione da lista
 Per ogni id nominato, nell'ordine in cui l'utente lo nomina:
 
 - **Nessun task file** (`resolve-task.sh` esce non-zero) → resta fuori dalla lista. Lo dici alla conferma: un id sbagliato non deve diventare un membro senza file.
-- **Prog ✔️** → entra, con un avviso alla conferma: una task chiusa non dà lavoro alla regia.
-- **`Size: Epic` o `Size: Mandate`** → entra come riga sola (`mandate-format.md` §Membri: il lettore non la espande). La conferma dice che la regia non lancerà i suoi membri: la tratterà come un perimetro da orchestrare a parte.
+- **Prog ✔️** → entra, con un avviso alla conferma: una task chiusa non dà lavoro all'orchestrator.
+- **`Size: Epic` o `Size: Mandate`** → entra come riga sola (`mandate-format.md` §Membri: il lettore non la espande). La conferma dice che l'orchestrator non lancerà i suoi membri: la tratterà come un perimetro da orchestrare a parte.
 - **«le figlie di T40»** → le leggi da `resolve-task.sh T40 --members` e scrivi le aperte (Prog diversa da ✔️) una per una, nell'ordine del lettore. Una figlia nata dopo non entra da sola: lo dici alla conferma.
 
 Da una lista di id non c'è una fermata qui: la lista la conferma l'utente insieme alla bozza e all'analisi, in una fermata sola (§3).
@@ -164,9 +164,9 @@ Il task file del mandato si scrive **prima** dell'analisi e **non si committa** 
    <scritta al §2d>
 
    ## Materiale
-   *📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato della regia; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
+   *📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato dell'orchestrator; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
 
-   - 🎬 `.claude/loom/regia/<id>.md` — seguire il giro della regia: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
+   - 🎬 `.claude/loom/orchestrator/<id>.md` — seguire il giro dell'orchestrator: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
    ```
 
 Le regole del file:
@@ -303,19 +303,19 @@ In breve, le due metà:
 
 Le note che l'analisi produce oltre alla tabella vanno alla conferma, mai nel file: le dipendenze aperte verso task fuori dal perimetro, le dipendenze non dichiarate, i punti ciechi.
 
-## 7. La voce 🎬 — il puntatore allo stato della regia
+## 7. La voce 🎬 — il puntatore allo stato dell'orchestrator
 
-La regia di un perimetro tiene il suo stato in `.claude/loom/regia/<id>.md` del progetto, ignorata da git: conversazioni, fatti del perimetro, proposte in sospeso (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-mandate/SKILL.md` §0f). Il perimetro lo punta da `## Materiale` con una voce sola:
+L'orchestrator di un perimetro tiene il suo stato in `.claude/loom/orchestrator/<id>.md` del progetto, ignorata da git: conversazioni, fatti del perimetro, proposte in sospeso (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-mandate/SKILL.md` §0f). Il perimetro lo punta da `## Materiale` con una voce sola:
 
 ```markdown
-- 🎬 `.claude/loom/regia/<id>.md` — seguire il giro della regia: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
+- 🎬 `.claude/loom/orchestrator/<id>.md` — seguire il giro dell'orchestrator: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
 ```
 
-- **È un puntatore per chi legge il task file**, e nient'altro. La regia e `checkpoint-mandate` ricavano il path dall'id del perimetro e non leggono la voce: un perimetro preparato prima che la voce esistesse viene seguito lo stesso. Il file può non esserci ancora — la regia lo crea al primo lancio — e la voce resta valida.
-- **La scrive questa skill**, l'unica che prepara il perimetro: la regia non scrive nei task file.
+- **È un puntatore per chi legge il task file**, e nient'altro. L'orchestrator e `checkpoint-mandate` ricavano il path dall'id del perimetro e non leggono la voce: un perimetro preparato prima che la voce esistesse viene seguito lo stesso. Il file può non esserci ancora — l'orchestrator lo crea al primo lancio — e la voce resta valida.
+- **La scrive questa skill**, l'unica che prepara il perimetro: l'orchestrator non scrive nei task file.
 - **Una sola volta.** Una voce 🎬 già presente in `## Materiale` non si riscrive e non si ripete.
 - **Dove.** In un mandato nuovo la sezione `## Materiale` sta in coda, dopo `## Analisi del perimetro` (§2c). In un file che la sezione non la porta — un mandato preparato prima, un'epica senza `## Materiale` — la crei con la legenda del template, prima del primo heading fra `## Decisions`, `## Implementation Notes`, `## Testing Notes`, `## Doc Impact`, `## Prod Validation` e `## Progress Log`; in coda se il file non ne porta nessuno. È il punto in cui il task template mette `## Materiale`.
-- **Non è una collisione.** `mandate.py tree` salta le voci 🎬: nessun membro scrive lo stato della regia.
+- **Non è una collisione.** `mandate.py tree` salta le voci 🎬: nessun membro scrive lo stato dell'orchestrator.
 
 ## Convenzione TTS
 

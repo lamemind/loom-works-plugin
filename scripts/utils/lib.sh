@@ -265,7 +265,7 @@ lw_task_children() {   # <task-id>
 #     `T<numero>` della riga (stessa tolleranza di `**Parent Task**`)
 #   - ogni altra task             -> le figlie, da lw_task_children
 #
-# Un lettore solo perche' regia, checkpoint e recap contano gli stessi membri:
+# Un lettore solo perche' orchestrator, checkpoint e recap contano gli stessi membri:
 # due letture scritte a mano divergerebbero al primo task file con una forma
 # inattesa, come il grep di `Parent Task` senza ancora di fine-token.
 #

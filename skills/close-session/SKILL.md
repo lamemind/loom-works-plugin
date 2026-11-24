@@ -1,6 +1,6 @@
 ---
 name: close-session
-description: Chiede al deck acceso sul progetto di chiudere una conversazione viva che una richiesta spawn-task ha aperto, o la regia che ha passato le consegne alla successora — il processo claude termina, la tab si chiude, il transcript resta e la conversazione si riprende dal deck. Una conversazione per invocazione, per sessionId, nessuna domanda e nessuna conferma. Usa quando una conversazione che orchestra ha finito con una conversazione aperta da lei, per esempio la regia di un'epica a ciclo chiuso: «chiudi la conversazione 0a1b2c3d».
+description: Chiede al deck acceso sul progetto di chiudere una conversazione viva che una richiesta spawn-task ha aperto, o l'orchestrator che ha passato le consegne al successore — il processo claude termina, la tab si chiude, il transcript resta e la conversazione si riprende dal deck. Una conversazione per invocazione, per sessionId, nessuna domanda e nessuna conferma. Usa quando una conversazione che orchestra ha finito con una conversazione aperta da lei, per esempio l'orchestrator di un'epica a ciclo chiuso: «chiudi la conversazione 0a1b2c3d».
 argument-hint: "<sessionId>"
 ---
 
@@ -13,7 +13,7 @@ $ARGUMENTS
 
 La chiusura resta del **deck**: la skill è un client, gemella di `spawn-task`. Il deck acceso sul progetto ascolta lo stesso endpoint locale dello spawn — named pipe su Windows, socket Unix su Linux, un indirizzo per progetto — e chiude la conversazione terminando il suo processo `claude`: la tab si chiude da sé, il transcript resta su disco, e la conversazione si riprende dal deck come ogni altra chiusa. Il deck risponde dopo aver verificato la fine del processo.
 
-Il deck chiude solo una conversazione **viva**, **del progetto**, **aperta da una richiesta `spawn-task`** e **ferma** — senza un turno in corso né un comando in esecuzione. Fa eccezione la **regia che ha passato le consegne**: anche aperta a mano, il deck l'ha marcata `origin: regia` quando ha aperto la successora (`spawn-task <perimetro> regia`), e la successora la chiude. Rifiuta, col motivo, la conversazione che chiede la chiusura e ogni altra conversazione aperta a mano: quelle le chiude l'utente.
+Il deck chiude solo una conversazione **viva**, **del progetto**, **aperta da una richiesta `spawn-task`** e **ferma** — senza un turno in corso né un comando in esecuzione. Fa eccezione l'**orchestrator che ha passato le consegne**: anche aperto a mano, il deck l'ha marcato `origin: orchestrator` quando ha aperto il successore (`spawn-task <perimetro> orchestrator`), e il successore lo chiude. Rifiuta, col motivo, la conversazione che chiede la chiusura e ogni altra conversazione aperta a mano: quelle le chiude l'utente.
 
 **Un'invocazione, una chiusura.** Più chiusure sono più invocazioni. La skill non pone domande, non chiede conferme e non sceglie il bersaglio: la decisione è già avvenuta nella conversazione che la invoca.
 

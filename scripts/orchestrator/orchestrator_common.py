@@ -1,8 +1,8 @@
 """
-regia_common — le letture condivise dagli script della regia.
+orchestrator_common — le letture condivise dagli script dell'orchestrator.
 
-`watch_sessions.py` (il monitor), `sessions.py` (list, tail, regie, find),
-`mandate.py` e `regia_state.py` leggono le stesse fonti: la radice del progetto,
+`watch_sessions.py` (il monitor), `sessions.py` (list, tail, orchestrators, find),
+`mandate.py` e `orchestrator_state.py` leggono le stesse fonti: la radice del progetto,
 la sua docs-root, i task file, il registro delle sessioni vive. Stanno qui, in
 un posto solo, perché due copie della stessa lettura divergono alla prima
 correzione.
@@ -276,7 +276,7 @@ def process_is_alive(pid, proc_start):
 
 
 class LiveSession:
-    """Una entry viva del registro, ridotta a ciò che la regia legge."""
+    """Una entry viva del registro, ridotta a ciò che l'orchestrator legge."""
 
     def __init__(self, pid, entry, alive, headless=False):
         self.pid = pid

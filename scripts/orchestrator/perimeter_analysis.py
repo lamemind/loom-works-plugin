@@ -7,11 +7,11 @@ La sezione `## Analisi del perimetro` di un'epica o di un mandato ha due metà
   - le righe `dichiarata` e `materiale`, che si ricalcolano dai file: sono le
     righe `CONFLICT` di `mandate.py tree`, e qui si confrontano con loro;
   - le righe `modello`, che vengono da una lettura dei task file dei membri e
-    nessun calcolo rifà: qui si restituiscono, perché la regia le conti come
+    nessun calcolo rifà: qui si restituiscono, perché l'orchestrator le conti come
     le `CONFLICT` quando decide chi parte insieme.
 
 Poi la storia: il commit da cui l'analisi vale e i membri il cui task file è
-cambiato dopo, gli unici che la regia rilegge al lancio.
+cambiato dopo, gli unici che l'orchestrator rilegge al lancio.
 
 Il modulo non importa `mandate.py`: riceve lo stato già calcolato da `snapshot`
 (un dict) e le righe del task file, e restituisce dati. La dipendenza va in un

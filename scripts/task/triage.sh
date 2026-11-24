@@ -33,7 +33,7 @@
 # della prima sessione che lo tocca, record altrui compresi.
 #
 # LA SEGNALAZIONE ARRIVA SU STDIN, riga 1; le righe dopo sono le parole di chi
-# decide — l'umano, o la regia su delega: il perché sullo scarto,
+# decide — l'umano, o l'orchestrator su delega: il perché sullo scarto,
 # l'approfondimento sulle altre uscite. Una
 # grammatica sola per tutte e quattro: chi scrive non sceglie il canale a seconda
 # dell'uscita. Un heredoc col delimitatore fra apici e' l'unico canale che porta
@@ -64,11 +64,11 @@
 # ripristina con un diff, uno scarto sbagliato e' un segnale perso. L'ignora
 # dell'agente e' una segnalazione non stampata, e l'agente riporta tutto.
 #
-# DELEGA — il terzo autore: la regia che decide una segnalazione su una delega
-# che l'utente le ha dato nella sua chat. Non e' l'umano, che non ha letto la
+# DELEGA — il terzo autore: l'orchestrator che decide una segnalazione su una delega
+# che l'utente gli ha dato nella sua chat. Non e' l'umano, che non ha letto la
 # segnalazione, e non e' l'agente che decide da se': mescolarla a uno dei due
 # falserebbe la raccolta che `Chi` separa. Tiene le regole dell'umano, uscita per
-# uscita — quattro uscite, approfondimento ammesso (le parole della regia), ancore
+# uscita — quattro uscite, approfondimento ammesso (le parole dell'orchestrator), ancore
 # obbligatorie sull'ignora, perché obbligatorio sullo scarto — e in piu' vuole le
 # parole con cui l'utente ha dato la delega, alla lettera e su una riga
 # (--delega): sono cio' che rende la decisione riconducibile all'umano che l'ha
@@ -190,7 +190,7 @@ cmd_scenario() {
     esac
     case "$chi" in
         umano|agente|delega) ;;
-        "") fail 1 "--chi obbligatorio (umano|agente|delega) — senza default: separa il corpus dell'umano, il campione delle decisioni dell'agente e le decisioni della regia su delega" ;;
+        "") fail 1 "--chi obbligatorio (umano|agente|delega) — senza default: separa il corpus dell'umano, il campione delle decisioni dell'agente e le decisioni dell'orchestrator su delega" ;;
         *)  fail 1 "--chi deve essere umano|agente|delega (ricevuto: '${chi}')" ;;
     esac
     if [[ "$uscita" == scarto && "$chi" == agente ]]; then
@@ -276,7 +276,7 @@ cmd_scenario() {
     while [[ "$approfondimento" == *$'\n' ]]; do approfondimento="${approfondimento%$'\n'}"; done
 
     # --- approfondimento ------------------------------------------------------
-    # Le parole di chi decide — l'umano, o la regia su delega —, alla lettera e su
+    # Le parole di chi decide — l'umano, o l'orchestrator su delega —, alla lettera e su
     # una riga. Un valore accettato dove il record non lo scrive si perderebbe in
     # silenzio: sullo scarto le parole sono il perché, con --chi agente non c'e'
     # ancora nessuna risposta.
@@ -286,7 +286,7 @@ cmd_scenario() {
         [[ "$uscita" == scarto ]] \
             && fail 1 "sullo scarto le parole di chi decide sono il perché e stanno nel record dello scarto: passale come perché (righe di stdin dopo la segnalazione, o --perche), non come approfondimento"
         [[ "$chi" == agente ]] \
-            && fail 1 "l'approfondimento porta le parole di chi risponde, l'umano o la regia su delega: con --chi agente non c'e' ancora nessuna risposta da citare"
+            && fail 1 "l'approfondimento porta le parole di chi risponde, l'umano o l'orchestrator su delega: con --chi agente non c'e' ancora nessuna risposta da citare"
         [[ "$approfondimento" == *$'\n'* ]] \
             && fail 1 "l'approfondimento sta su UNA riga: e' un campo di header, e una riga in piu' potrebbe essere letta come un campo"
     fi
@@ -449,8 +449,8 @@ cmd_scenario() {
 # somma le due righe.
 #
 # L'autore delega ha righe sue — `delega`, le quattro `<uscita>.delega`,
-# `approfondimento.delega` — e non entra in nessuna riga di prima: le parole della
-# regia non sono il criterio dell'umano, e chi legge una cella per nome deve
+# `approfondimento.delega` — e non entra in nessuna riga di prima: le parole
+# dell'orchestrator non sono il criterio dell'umano, e chi legge una cella per nome deve
 # trovarle col significato che avevano. Un record `delega` e' valido solo col
 # campo Delega, e un campo Delega su un altro autore lo rende malformato: e' la
 # stessa regola con cui lo scenario si scrive.

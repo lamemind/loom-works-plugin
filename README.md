@@ -86,12 +86,12 @@ Skills read the blocks with `scripts/config/project-config.sh`. Contract — res
 
 ## Runtime dependencies
 
-Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception, Python with the standard library only. Two skills, the regia and `drive-task`, also need a command from the deck package.
+Everything under `scripts/` is bash and needs nothing beyond a POSIX shell, `git` and `jq` — with one exception, Python with the standard library only. Two skills, the orchestrator and `drive-task`, also need a command from the deck package.
 
 | Dependency | Required by | Without it |
 |---|---|---|
-| `python3` (or `python` on Windows) | `scripts/regia/watch_sessions.py`, `scripts/regia/sessions.py` — the monitor that follows the live sessions of a project, and `list`/`tail` on them; `scripts/regia/drive_state.py` — the entry checks of `drive-task` | No monitor for the regia of an epic, no `drive-task`. Whoever launches them reports the missing interpreter. |
-| `loom-deck-headless` (npm `@lamemind/loom-deck`) | `orchestrate-mandate` — opens and continues the members' conversations without a tab | The regia stops at launch: `mandate.py gate` prints `HEADLESS=assente` and closes the gate. |
+| `python3` (or `python` on Windows) | `scripts/orchestrator/watch_sessions.py`, `scripts/orchestrator/sessions.py` — the monitor that follows the live sessions of a project, and `list`/`tail` on them; `scripts/orchestrator/drive_state.py` — the entry checks of `drive-task` | No monitor for the orchestrator of an epic, no `drive-task`. Whoever launches them reports the missing interpreter. |
+| `loom-deck-headless` (npm `@lamemind/loom-deck`) | `orchestrate-mandate` — opens and continues the members' conversations without a tab | The orchestrator stops at launch: `mandate.py gate` prints `HEADLESS=assente` and closes the gate. |
 | `loom-deck-headless` ≥ 0.99.0, with `open --context` | `drive-task` — opens the step with the conversation's context in its user notes | `drive-task` stops at launch: `drive_state.py check` prints `HEADLESS_CONTEXT=no` (or `HEADLESS=assente`). |
 
 ## TTS support

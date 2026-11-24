@@ -35,7 +35,7 @@
 # segnalazione che nessuno ha scartato.
 #
 # adr.sh, nella stessa cartella, e' il nome di prima: inoltra qui argomenti ed
-# exit, perche' la regia lo chiama per nome.
+# exit, perche' l'orchestrator lo chiama per nome.
 #
 # MIGRAZIONE — un progetto nato col registro in adr/ tiene li' i suoi scarti, e
 # `cerca` non li vede: risponde «nessun record» come su un registro vuoto vero, e
@@ -50,7 +50,7 @@
 # esiste gia' (exit 2). Uno scarto superato si marca con un record NUOVO che
 # nomina il vecchio in `Supera`; il vecchio resta leggibile dov'e'.
 #
-# DELEGA — il terzo autore: la regia che scarta su una delega che l'utente le ha
+# DELEGA — il terzo autore: l'orchestrator che scarta su una delega che l'utente gli ha
 # dato nella sua chat. Vuole le parole della delega, alla lettera e su una riga
 # (--delega), e le scrive nel campo `Delega` subito dopo `Chi`; senza, l'autore
 # e' un rifiuto, e --delega con un altro autore pure. Le porta il record e non

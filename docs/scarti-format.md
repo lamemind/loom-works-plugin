@@ -53,7 +53,7 @@ eviterebbe è sotto la soglia di percezione: si rivaluta se il repo supera le 30
 
 **`Chi` non ha default**, ed è la scelta che rende il registro campionabile: lo scarto deciso da un agente è esattamente ciò che l'umano vuole poter rileggere a campione. Un default lo renderebbe indistinguibile da uno deciso da una persona.
 
-**`delega` è lo scarto che la regia di un perimetro decide su una delega dell'utente**, data nella chat della regia. Non è dell'umano, che non ha letto la segnalazione, né dell'agente che decide da sé, e scritto come uno dei due falserebbe chi campiona l'uno o l'altro. Il record porta in `Delega` le parole con cui l'utente ha dato la delega, e senza è un rifiuto: sono ciò che riconduce lo scarto all'umano che l'ha affidato. Le porta il record e non solo lo scenario di triage dello stesso scarto, perché `scarti.sh scarta` si chiama anche da solo, senza scenario, e un record non si riscrive — il campo che manca alla nascita non si aggiunge più. Su un altro autore `Delega` è un rifiuto, perché il record non ha dove scriverlo.
+**`delega` è lo scarto che l'orchestrator di un perimetro decide su una delega dell'utente**, data nella chat dell'orchestrator. Non è dell'umano, che non ha letto la segnalazione, né dell'agente che decide da sé, e scritto come uno dei due falserebbe chi campiona l'uno o l'altro. Il record porta in `Delega` le parole con cui l'utente ha dato la delega, e senza è un rifiuto: sono ciò che riconduce lo scarto all'umano che l'ha affidato. Le porta il record e non solo lo scenario di triage dello stesso scarto, perché `scarti.sh scarta` si chiama anche da solo, senza scenario, e un record non si riscrive — il campo che manca alla nascita non si aggiunge più. Su un altro autore `Delega` è un rifiuto, perché il record non ha dove scriverlo.
 
 **`Ancore` porta solo path**, verificati sul filesystem con `test -e`. Keyword e id task non hanno un campo proprio: la query fa match testuale sul record intero, e stanno già nella segnalazione e nel perché. Un campo tipizzato in più sarebbe una seconda sorgente per la stessa ricerca, e le due divergerebbero. Il path si verifica sul filesystem e non su `git ls-files` perché è ciò che un futuro rilevatore «path modificato dopo la data del record» leggerà, accoppiando `test -e` a `git log --since`.
 
@@ -97,7 +97,7 @@ scarti.sh migra
 
 **`scarta` committa da sé** il solo file del record, con pathspec e senza push. Il chiamante tipico è il modello in chat, in una sessione detached dove nessun altro commit nominerà quel file: un record non committato è uno scarto che può ancora sparire. Chi batcha — una skill che chiude con un commit suo — passa `--no-commit`.
 
-**`adr.sh`, nella stessa cartella, è il nome di prima** e inoltra a `scarti.sh` argomenti, stdin ed exit. Resta perché la regia lo chiama per nome: senza, la sua ricerca fallirebbe senza un errore visibile, e la regia riporterebbe segnalazioni già scartate.
+**`adr.sh`, nella stessa cartella, è il nome di prima** e inoltra a `scarti.sh` argomenti, stdin ed exit. Resta perché l'orchestrator lo chiama per nome: senza, la sua ricerca fallirebbe senza un errore visibile, e l'orchestrator riporterebbe segnalazioni già scartate.
 
 ## La sede di prima e la migrazione
 

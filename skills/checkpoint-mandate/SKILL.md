@@ -1,6 +1,6 @@
 ---
 name: checkpoint-mandate
-description: Checkpoint di un perimetro — un'epica (`Size: Epic`) o un mandato (`Size: Mandate`). Riallinea il task file del perimetro a ciò che i membri hanno fatto e scoperto dall'ultimo avanzamento — legge membri e stato, il diff dei loro task file e i fatti del perimetro che la regia ha raccolto nel suo stato su disco, porta nella prosa del perimetro bloccanti, collegate, decisioni aperte e regole cambiate, riverifica l'analisi del perimetro e la riscrive se un membro l'ha smentita, toglie le copie di stato e di cifre. Poi aggiorna la Prog e committa il solo file del perimetro con `tasks.md`. Nessuna fase doc, nessuna domanda, nessun task file dei membri toccato. La lancia `checkpoint-task` quando la task è un'epica o un mandato; si invoca anche a mano.
+description: Checkpoint di un perimetro — un'epica (`Size: Epic`) o un mandato (`Size: Mandate`). Riallinea il task file del perimetro a ciò che i membri hanno fatto e scoperto dall'ultimo avanzamento — legge membri e stato, il diff dei loro task file e i fatti del perimetro che l'orchestrator ha raccolto nel suo stato su disco, porta nella prosa del perimetro bloccanti, collegate, decisioni aperte e regole cambiate, riverifica l'analisi del perimetro e la riscrive se un membro l'ha smentita, toglie le copie di stato e di cifre. Poi aggiorna la Prog e committa il solo file del perimetro con `tasks.md`. Nessuna fase doc, nessuna domanda, nessun task file dei membri toccato. La lancia `checkpoint-task` quando la task è un'epica o un mandato; si invoca anche a mano.
 argument-hint: "<epica|mandato> [chiudi]"
 allowed-tools: Bash(*), Read, Edit, Grep, Glob, Skill
 ---
@@ -24,13 +24,13 @@ Da qui si leggono due cose: l'**id del perimetro** (`T<numero>`) e la parola **�
 
 Un **perimetro** è il task file di un'epica, che ha per membri le figlie, o di un mandato, che li elenca in `## Membri` (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). Il perimetro non ha lavoro proprio: il lavoro e le scoperte stanno nei membri. La sua prosa però parla dei membri — chi blocca chi, quali task fuori dal perimetro contano, quali decisioni restano aperte — e resta indietro appena i membri lavorano.
 
-**Questa skill è l'unico proprietario di quella prosa.** Nessun altro attore la scrive: la regia per contratto non scrive task file; il checkpoint di un membro aggiorna il proprio task file, la propria riga in `tasks.md` e la propria checkbox nell'Acceptance del padre, e lascia apposta il resto del cappello; la prosa del cappello la scriverebbe solo una sessione sul cappello, e durante una regia non ne gira nessuna.
+**Questa skill è l'unico proprietario di quella prosa.** Nessun altro attore la scrive: l'orchestrator per contratto non scrive task file; il checkpoint di un membro aggiorna il proprio task file, la propria riga in `tasks.md` e la propria checkbox nell'Acceptance del padre, e lascia apposta il resto del cappello; la prosa del cappello la scriverebbe solo una sessione sul cappello, e durante un orchestrator non ne gira nessuna.
 
 Confini:
 
 - **I task file dei membri non si toccano mai**, nemmeno per correggere un difetto che il giro trova: il difetto va nelle Segnalazioni, e lo corregge chi lavora su quel membro.
 - **Nessuna fase doc.** Un perimetro non rilascia niente, e la doc segue il rilascio dei membri: niente riesame, niente trasloco, niente `drainable`. Le voci del `## Doc Impact` del perimetro restano dove sono e vanno nelle Segnalazioni.
-- **Nessuna domanda.** Il comportamento è lo stesso chiunque lanci la skill — l'utente a mano, la regia a fine giro, il deck —, perché l'unico input oltre all'id è la parola «chiudi», che la regia non passa mai. Un caso incerto non si chiede: va nelle Segnalazioni.
+- **Nessuna domanda.** Il comportamento è lo stesso chiunque lanci la skill — l'utente a mano, l'orchestrator a fine giro, il deck —, perché l'unico input oltre all'id è la parola «chiudi», che l'orchestrator non passa mai. Un caso incerto non si chiede: va nelle Segnalazioni.
 - **Il commit porta il solo file del perimetro e `tasks.md`**, più il file del padre quando si chiude un'epica che ne ha uno (§7).
 - **Nessuna copia di stato o di cifre** nel file del perimetro (`mandate-format.md` §Nessuna copia): il giro le toglie, non le aggiorna.
 
@@ -48,7 +48,7 @@ for candidate in python3 python; do "$candidate" -c 'import sys; sys.exit(sys.ve
 - `Epic` o `Mandate` → avanti.
 - qualunque altro → stampa `T<id> non è un perimetro: il checkpoint lo fa /loom-works:checkpoint-task T<id>` e fermati. Non invocarla da qui: `checkpoint-task` passa i perimetri a questa skill, e un rimando automatico all'indietro diventa un ciclo al primo `Size` letto male.
 
-L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo e fermati: senza Python `mandate.py tree` non gira, e lo stato dei membri e la metà meccanica dell'analisi non si leggono. Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (`PY`) e la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/regia`, e lancia ogni script Python con `"PY" -B -I "R/<script>"`.
+L'interprete è il primo fra `python3` e `python` che risponde con Python 3: su Windows `python3` può essere l'alias del Microsoft Store, che esiste ma non risponde. Nessuno dei due → dillo e fermati: senza Python `mandate.py tree` non gira, e lo stato dei membri e la metà meccanica dell'analisi non si leggono. Lo stato della shell non passa da una chiamata Bash all'altra: d'ora in poi scrivi per esteso il path dell'interprete (`PY`) e la cartella `R` = `${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator`, e lancia ogni script Python con `"PY" -B -I "R/<script>"`.
 
 **Il file del perimetro è pulito:**
 
@@ -100,12 +100,12 @@ Per ogni membro che lo `--stat` nomina leggi il suo diff (`git diff <partenza>..
 
 Non è un fatto del perimetro il lavoro interno di un membro — DLV spuntati, misure, file toccati —: vive nel membro, e il perimetro al massimo lo punta.
 
-### I fatti dallo stato della regia
+### I fatti dallo stato dell'orchestrator
 
-Una regia sul perimetro raccoglie fatti del perimetro dai report e dai messaggi delle sessioni, e alcuni nessun membro li scrive nel suo task file. Li tiene nel suo stato su disco, in `.claude/loom/regia/T<id>.md` del progetto, fuori da git:
+Un orchestrator sul perimetro raccoglie fatti del perimetro dai report e dai messaggi delle sessioni, e alcuni nessun membro li scrive nel suo task file. Li tiene nel suo stato su disco, in `.claude/loom/orchestrator/T<id>.md` del progetto, fuori da git:
 
 ```bash
-"PY" -B -I "R/regia_state.py" facts <id>
+"PY" -B -I "R/orchestrator_state.py" facts <id>
 ```
 
 Il path si ricava dall'id del perimetro, non dalla voce 🎬 di `## Materiale`: un perimetro preparato prima che la voce esistesse ha lo stesso uno stato. Lo script legge la testa dello stato — l'identità, `Perimetro: T<id> · Created on <data>`, contro il `Created on` del file del perimetro — e la sola sezione `## Fatti del perimetro`:
@@ -113,13 +113,13 @@ Il path si ricava dall'id del perimetro, non dalla voce 🎬 di `## Materiale`: 
 | `STATE` | Cosa vuol dire | Cosa fai |
 |---|---|---|
 | `presente` | lo stato di questo perimetro: una riga `FATTO\|<fatto>` per fatto, poi `FATTI=<n>` | i fatti entrano nel riallineamento (§3) |
-| `assente` | nessuna regia su questo perimetro, su questa macchina | niente: il giro legge i soli membri |
+| `assente` | nessun orchestrator su questo perimetro, su questa macchina | niente: il giro legge i soli membri |
 | `altro` | lo stato di un perimetro passato con lo stesso id: il `Created on` è un altro | niente, e una riga nel report |
 | `illeggibile` | il file c'è, la testa non si legge | niente, e una segnalazione |
 
 Un fatto ha la forma `T<n> · <il fatto> · <dove l'ha detto> [· superato: <cosa lo chiude>]`: il membro da cui viene, il fatto, la fonte — report di un run, messaggio, preflight —, e per un fatto chiuso la parola che lo chiude. I fatti dello stato non hanno una finestra: si leggono tutti a ogni giro, aperti e superati, e un fatto già portato si riconosce dal contenuto della prosa (§3).
 
-Lo stato lo scrive solo la regia, e lo riscrive intero a ogni cambio. **Questa skill non lo scrive mai**, nemmeno per segnare un fatto come portato: una marca la cancellerebbe la riscrittura successiva della regia. È un file a un path noto, non un messaggio della regia, quindi il giro si comporta uguale chiunque lo lanci. `.claude/loom/` è locale alla macchina: una regia girata su un'altra macchina qui non lascia fatti.
+Lo stato lo scrive solo l'orchestrator, e lo riscrive intero a ogni cambio. **Questa skill non lo scrive mai**, nemmeno per segnare un fatto come portato: una marca la cancellerebbe la riscrittura successiva dell'orchestrator. È un file a un path noto, non un messaggio dell'orchestrator, quindi il giro si comporta uguale chiunque lo lanci. `.claude/loom/` è locale alla macchina: un orchestrator girata su un'altra macchina qui non lascia fatti.
 
 ## 3. Il riallineamento della prosa
 
@@ -139,7 +139,7 @@ Il perimetro si riallinea in queste sezioni, e solo in queste:
 
 **Una frase che il diff smentisce si riscrive**: la Description dice che un membro dipende da un altro solo, e le sue `## Dependencies` ne nominano tre; una decisione aperta che un membro ha preso esce dal paragrafo delle decisioni aperte. La frase si confronta coi membri cambiati nella finestra: la prosa sugli altri l'ha già riallineata il giro precedente, o l'ha scritta un umano dopo.
 
-**I fatti dallo stato della regia** (§2) entrano con le stesse regole, più tre:
+**I fatti dallo stato dell'orchestrator** (§2) entrano con le stesse regole, più tre:
 
 - **Un fatto aperto entra se la prosa non lo porta già.** Lo stesso blocco, la stessa decisione aperta, scritti con parole diverse, sono lo stesso fatto e non si riscrivono: è ciò che tiene senza effetti un secondo giro sullo stesso stato. Il puntatore va al membro da cui viene il fatto, e la fonte è quella che la riga dello stato nomina.
 - **Un fatto superato chiude e basta.** Se la prosa porta la frase del fatto aperto, la riscrive o la toglie: il blocco caduto esce dal paragrafo che lo porta, la decisione presa esce da `**Decisioni aperte.**`. Se la prosa non la porta, un blocco nato e caduto fra due checkpoint non scrive niente; una decisione presa o una regola cambiata entrano come stato presente, senza dire che prima erano aperte.
@@ -197,7 +197,7 @@ Una riga `[x]` su una figlia che non è ✔️ — una figlia riaperta — resta
 | epica | tutta `## Acceptance Criteria` è `[x]` dopo il §6, oppure le Note utente portano «chiudi» |
 | mandato | solo quando le Note utente portano «chiudi», anche con tutti i membri ✔️ |
 
-`## Prod Validation` non conta. Un mandato non si chiude da sé perché la sua chiusura non deriva dai membri: dice che il giro per cui è nato è finito, e lo decide chi l'ha aperto. La regia non passa parole al checkpoint, quindi non chiude mai un perimetro.
+`## Prod Validation` non conta. Un mandato non si chiude da sé perché la sua chiusura non deriva dai membri: dice che il giro per cui è nato è finito, e lo decide chi l'ha aperto. L'orchestrator non passa parole al checkpoint, quindi non chiude mai un perimetro.
 
 La cella Prog si legge e si scrive con le primitive di `lib.sh`, che trovano la colonna dall'header della Tasks Overview e non toccano le tabelle sotto:
 
@@ -228,14 +228,14 @@ Se il giro ha cambiato il file del perimetro, **o** la finestra del §2 non era 
 
 ```markdown
 ### Avanzamento <N>
-- Descrizione: <cosa il giro ha portato nel file — fatti nuovi col membro da cui vengono e la fonte (diff del membro o stato della regia), frasi riscritte, copie tolte, checkbox spuntate, analisi confermata o riscritta, Prog — oppure «nessun fatto del perimetro» sulla finestra letta>
+- Descrizione: <cosa il giro ha portato nel file — fatti nuovi col membro da cui vengono e la fonte (diff del membro o stato dell'orchestrator), frasi riscritte, copie tolte, checkbox spuntate, analisi confermata o riscritta, Prog — oppure «nessun fatto del perimetro» sulla finestra letta>
 ```
 
 `<N>` = il massimo dei `### Avanzamento` esistenti più uno. L'header non è cosmetico: è l'ancora della finestra del giro dopo (§2), e scritto in un'altra forma la riporta alla nascita del file.
 
 L'avanzamento si scrive anche quando la finestra non porta fatti del perimetro: sposta la partenza in avanti, così il giro dopo non rilegge lo stesso diff.
 
-**Finestra vuota e file intatto → nessun avanzamento e nessun commit.** Il giro non ha letto niente di nuovo e non ha cambiato niente: è il secondo giro sullo stesso perimetro senza lavoro dei membri in mezzo, e deve restare un no-op, chiunque lo lanci. I fatti dello stato della regia che la prosa porta già non cambiano il file; un fatto nuovo dallo stato, con la finestra vuota, lo cambia, e l'avanzamento si scrive.
+**Finestra vuota e file intatto → nessun avanzamento e nessun commit.** Il giro non ha letto niente di nuovo e non ha cambiato niente: è il secondo giro sullo stesso perimetro senza lavoro dei membri in mezzo, e deve restare un no-op, chiunque lo lanci. I fatti dello stato dell'orchestrator che la prosa porta già non cambiano il file; un fatto nuovo dallo stato, con la finestra vuota, lo cambia, e l'avanzamento si scrive.
 
 ## 9. Commit e push
 
@@ -273,8 +273,8 @@ Un hook non riapre niente: commit e push sono già avvenuti. Una skill che non e
 In quest'ordine:
 
 - `🧭 Perimetro: <id> — epica|mandato, <n> membri`, i membri senza task file se ci sono, la finestra (`<partenza corta>..HEAD`) e i membri cambiati dentro;
-- lo **stato della regia**: `presente, <n> fatti` · `assente` · `altro (Created on <data>)` · `illeggibile`;
-- i **fatti portati nel file**, uno per riga: il fatto, il membro da cui viene, la fonte (diff del membro o stato della regia), la sezione dove è entrato;
+- lo **stato dell'orchestrator**: `presente, <n> fatti` · `assente` · `altro (Created on <data>)` · `illeggibile`;
+- i **fatti portati nel file**, uno per riga: il fatto, il membro da cui viene, la fonte (diff del membro o stato dell'orchestrator), la sezione dove è entrato;
 - le **frasi riscritte** e le **copie tolte**;
 - l'**analisi**: confermata, riscritta (la differenza riga per riga e le note del metodo), o assente col rimando;
 - le **checkbox** spuntate, in un'epica;
@@ -307,7 +307,7 @@ Il contratto completo — forma, sede degli scenari, risposta, uscite, uscita in
 - **Prima di stampare interroga il registro ADR** su ogni segnalazione (`adr.sh cerca`, regola in contesto): exit `0` vuol dire già scartata con un motivo, e non la riporti.
 - **Tu non scarti e non ignori**: ogni segnalazione esce con le quattro uscite.
 - **Ogni voce di `## Doc Impact` del perimetro è una segnalazione**, una per voce: `**S{N}** — voce di Doc Impact del perimetro, «<la nozione in breve>»: la rilascia T<n> (<maniglia>)`. Il membro che la rilascia è quello il cui lavoro rende vero il fatto: lo trovi confrontando l'ancora della voce coi DLV e col `## Materiale` dei membri. Se nessun membro la rilascia, la riga dice `nessun membro la rilascia`. La voce resta nel file: spostarla è una decisione dell'umano.
-- Sono segnalazioni anche: un caso incerto che il giro non ha deciso (un fatto che non sai dove scrivere, una frase che non sai se il diff smentisce, un fatto dello stato della regia che i file forse smentiscono); uno stato della regia `illeggibile`; un difetto nel task file di un membro (una dipendenza non dichiarata, una copia di stato); una copia o una checkbox in una sezione che il giro non scrive; una figlia `[x]` non chiusa; un hook `taskDone` fallito (§9).
+- Sono segnalazioni anche: un caso incerto che il giro non ha deciso (un fatto che non sai dove scrivere, una frase che non sai se il diff smentisce, un fatto dello stato dell'orchestrator che i file forse smentiscono); uno stato dell'orchestrator `illeggibile`; un difetto nel task file di un membro (una dipendenza non dichiarata, una copia di stato); una copia o una checkbox in una sezione che il giro non scrive; una figlia `[x]` non chiusa; un hook `taskDone` fallito (§9).
 - Il giro non corregge niente di sua iniziativa fuori dalle sezioni che possiede, quindi non stampa righe `☑ subito (agente)`.
 
 **La risposta dell'umano** è prosa libera, e la leggi nel turno dopo. Prima di scrivere il primo scenario apri `triage-format.md` per intero: le regole della risposta — nessun default, l'approfondimento alla lettera, «subito» e «task» operativi, lo scarto col perché, l'ignora con l'ancora, l'uscita in un altro progetto — sono quelle, identiche a `run-task` e `checkpoint-task`. Ogni scenario:
@@ -320,7 +320,7 @@ Il contratto completo — forma, sede degli scenari, risposta, uscite, uscita in
 SCENARIO
 ```
 
-**Una risposta firmata «decise dalla regia di T<perimetro> su delega dell'utente»** porta sotto la firma le parole con cui l'umano ha delegato la regia, alla lettera: ogni scenario si scrive con `--chi delega` e quelle parole intere in `--delega`, con le regole dell'umano per il resto (`triage-format.md` §La decisione su delega). Firma senza le parole → nessuno scenario, e lo dici nel testo finale: non ripieghi su `umano` né su `agente`.
+**Una risposta firmata «decise dall'orchestrator di T<perimetro> su delega dell'utente»** porta sotto la firma le parole con cui l'umano ha delegato l'orchestrator, alla lettera: ogni scenario si scrive con `--chi delega` e quelle parole intere in `--delega`, con le regole dell'umano per il resto (`triage-format.md` §La decisione su delega). Firma senza le parole → nessuno scenario, e lo dici nel testo finale: non ripieghi su `umano` né su `agente`.
 
 ```bash
 DELEGA="$(cat <<'DELEGA'
@@ -330,7 +330,7 @@ DELEGA
 "${CLAUDE_PLUGIN_ROOT}/scripts/task/triage.sh" scenario --slug <slug> --uscita subito|task|scarto|ignora --chi delega \
   --delega "$DELEGA" --momento flusso --skill checkpoint-mandate [--ancora <path>]... --no-commit <<'SCENARIO'
 <la segnalazione, identica al testo della riga S{N}>
-<le parole della regia su quella segnalazione>
+<le parole dell'orchestrator su quella segnalazione>
 SCENARIO
 ```
 

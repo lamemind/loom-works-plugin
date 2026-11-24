@@ -1,44 +1,44 @@
 """
-regia_state — lo stato su disco della regia di un perimetro: dove sta, di chi è.
+orchestrator_state — lo stato su disco dell'orchestrator di un perimetro: dove sta, di chi è.
 
-  check   al lancio della regia: i tre path, la cartella creata, il controllo
-          che git la ignori, e il verdetto su ciò che la regia trova — un giro
+  check   al lancio dell'orchestrator: i tre path, la cartella creata, il controllo
+          che git la ignori, e il verdetto su ciò che l'orchestrator trova — un giro
           nuovo, una ripresa, o una ragione per fermarsi
   facts   per `checkpoint-mandate`: la sezione `## Fatti del perimetro` dello
           stato, se lo stato è di questo perimetro
 
-I quattro file stanno in `<radice>/.claude/loom/regia/`, col nome ricavato
+I quattro file stanno in `<radice>/.claude/loom/orchestrator/`, col nome ricavato
 dall'id del perimetro:
 
-  T<id>.md           lo stato della regia, scritto dalla regia col tool `Write`
+  T<id>.md           lo stato dell'orchestrator, scritto dall'orchestrator col tool `Write`
   T<id>-prima.json   le cifre di partenza, scritte da `mandate.py tree --save`
   T<id>-watch.json   il punto da cui riparte il monitor, scritto da
                      `watch_sessions.py --state`
-  T<id>-filter.json  whitelist e blacklist del monitor, scritte dalla regia col
+  T<id>-filter.json  whitelist e blacklist del monitor, scritte dall'orchestrator col
                      tool `Write` e lette da `watch_sessions.py --filter`
 
 Non nella scratchpad della conversazione: sta nella temp di sistema, e un
 reboot o una pulizia la svuotano a giro aperto. Non nella task folder del
 perimetro: è tracciata, e il `git add -A` di un `checkpoint-task` linked
 porterebbe nel commit lo stato a metà giro. `.claude/loom/` è ignorata da git
-dove il progetto la ignora, e `check` lo verifica: dove non la ignora la regia si
+dove il progetto la ignora, e `check` lo verifica: dove non la ignora l'orchestrator si
 ferma, perché `init` non scrive la regola.
 
 La testa dello stato, le prime righe prima del primo heading:
 
-  Stato: attiva · <sessionId>       una regia in corso, e la sessione che la tiene
-  Stato: in passaggio · <sessionId> la regia ha chiesto la successora e
+  Stato: attiva · <sessionId>       un orchestrator in corso, e la sessione che lo tiene
+  Stato: in passaggio · <sessionId> l'orchestrator ha chiesto il successore e
                                     aspetta che nasca: il passaggio di consegne
-                                    è cominciato, e chi lo tiene è ancora lei
+                                    è cominciato, e chi lo tiene è ancora lui
   Stato: passata a <nuova> · da <vecchia>
-                                    consegne passate: la successora e la regia
-                                    che le ha passate, che la successora chiude
-  Stato: ferma · <sessionId>        la regia si è fermata allo stop
+                                    consegne passate: il successore e l'orchestrator
+                                    che le ha passate, che il successore chiude
+  Stato: ferma · <sessionId>        l'orchestrator si è fermato allo stop
   Perimetro: T<id> · Created on <data del task file del perimetro>
 
-`in passaggio` esiste perché il `sessionId` della successora si conosce solo
-dopo lo spawn: senza la riga intermedia, una successora che legge lo stato
-prima che la regia vecchia scriva `passata a` troverebbe `attiva` di una
+`in passaggio` esiste perché il `sessionId` del successore si conosce solo
+dopo lo spawn: senza la riga intermedia, un successore che legge lo stato
+prima che l'orchestrator vecchio scriva `passata a` troverebbe `attiva` di una
 sessione viva, e si fermerebbe.
 
 La riga `Perimetro` è l'identità. Un id non identifica un perimetro per sempre:
@@ -46,30 +46,30 @@ La riga `Perimetro` è l'identità. Un id non identifica un perimetro per sempre
 `tasks.md`, quindi l'id di un perimetro purgato torna a una task nuova se era il
 più alto, e lo stato vecchio resterebbe col suo nome. Uno stato il cui
 `Created on` non è quello del task file vale come assente. Nessuno script
-cancella lo stato: la regia allo stop toglierebbe i fatti prima che un
+cancella lo stato: l'orchestrator allo stop toglierebbe i fatti prima che un
 `checkpoint-mandate` lanciato a mano li legga.
 
 Verdetti di `check` (riga `STATE=`):
 
   assente      nessuno stato: giro nuovo                               exit 0
   altro        lo stato di un perimetro passato con lo stesso id:
-               giro nuovo, la regia lo sovrascrive                     exit 0
-  ferma        una regia fermata: giro nuovo che eredita i fatti       exit 0
+               giro nuovo, l'orchestrator lo sovrascrive                     exit 0
+  ferma        un orchestrator fermato: giro nuovo che eredita i fatti       exit 0
   mia          `attiva` o `in passaggio` scritta da questa sessione:
                ripresa                                                 exit 0
-  consegne     `passata a` questa sessione: la ripresa della
-               successora, delega compresa (`STATE_FROM` = la regia
+  consegne     `passata a` questa sessione: la ripresa del
+               successore, delega compresa (`STATE_FROM` = l'orchestrator
                che ha passato le consegne)                             exit 0
   morta        `attiva`, `in passaggio` o `passata a` di una sessione
                che non è più viva: ripresa, senza la delega            exit 0
   viva         `attiva` o `passata a` di un'altra sessione viva        exit 2
   in passaggio `in passaggio` di un'altra sessione viva, anche dopo
-               l'attesa di --wait: la regia vecchia non ha finito      exit 2
+               l'attesa di --wait: l'orchestrator vecchio non ha finito      exit 2
   illeggibile  il file c'è, ma la testa non si legge                   exit 2
 
 Con --wait <secondi>, su `in passaggio` di un'altra sessione viva `check`
-rilegge lo stato ogni WAIT_POLL_S secondi, fino al tetto: è l'attesa della
-successora mentre la regia vecchia chiude il passaggio.
+rilegge lo stato ogni WAIT_POLL_S secondi, fino al tetto: è l'attesa del
+successore mentre l'orchestrator vecchio chiude il passaggio.
 
 Un giro nuovo toglie `-watch.json` (il monitor darebbe come eventi tutto ciò
 che è cambiato dallo stop precedente) e `-filter.json` (le conversazioni che
@@ -78,11 +78,11 @@ riscrivere `-prima.json`; una ripresa li tiene, e riscrive le cifre solo se
 mancano.
 
 Uso:
-  python -I regia_state.py [--project-root <radice>] check <perimetro> --own-session <session id> [--wait <secondi>]
-  python -I regia_state.py [--project-root <radice>] facts <perimetro>
+  python -I orchestrator_state.py [--project-root <radice>] check <perimetro> --own-session <session id> [--wait <secondi>]
+  python -I orchestrator_state.py [--project-root <radice>] facts <perimetro>
 
 Exit: 0 avanti · 1 id malformato, task file del perimetro mancante, registro
-delle sessioni illeggibile · 2 la regia si ferma: cartella non ignorata da git,
+delle sessioni illeggibile · 2 l'orchestrator si ferma: cartella non ignorata da git,
 o uno dei verdetti sopra.
 """
 
@@ -99,10 +99,10 @@ import time
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import orchestrator_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
 
 TASK_ID_PATTERN = re.compile(r"^T\d+$")
-STATE_DIR = os.path.join(".claude", "loom", "regia")
+STATE_DIR = os.path.join(".claude", "loom", "orchestrator")
 GITIGNORE_RULE = ".claude/loom/"
 
 STATE_LINE = re.compile(r"^Stato:\s*(attiva|ferma|in passaggio)\s*·\s*(\S+)\s*$")
@@ -130,11 +130,11 @@ def state_paths(project_root, perimeter):
 def perimeter_created_on(project_root, perimeter):
     """Il `Created on` del task file del perimetro: `None` se il file non c'è,
     stringa vuota se il campo manca."""
-    path = regia_common.find_task_file(project_root, regia_common.docs_root(project_root), perimeter)
+    path = orchestrator_common.find_task_file(project_root, orchestrator_common.docs_root(project_root), perimeter)
     if path is None:
         return None
     with open(path, encoding="utf-8", errors="replace") as task_handle:
-        return regia_common.header_field(task_handle.read().splitlines(), "Created on")
+        return orchestrator_common.header_field(task_handle.read().splitlines(), "Created on")
 
 
 def read_head(state_path):
@@ -142,7 +142,7 @@ def read_head(state_path):
     `from` su `passata a … · da …`, oppure `None` se manca la riga `Stato:` o
     la riga `Perimetro:`.
 
-    La testa sono le righe prima del primo heading: la regia la scrive in cima
+    La testa sono le righe prima del primo heading: l'orchestrator la scrive in cima
     e riscrive il file intero a ogni cambio."""
     head = {}
     with open(state_path, encoding="utf-8", errors="replace") as state_handle:
@@ -168,7 +168,7 @@ def read_head(state_path):
 
 def same_session(first, second):
     """Due session id sono la stessa sessione: uguali, o uno prefisso dell'altro
-    (la regia può scrivere l'id corto)."""
+    (l'orchestrator può scrivere l'id corto)."""
     return bool(first and second) and (first.startswith(second) or second.startswith(first))
 
 
@@ -214,7 +214,7 @@ def read_verdict(project_root, paths, perimeter, created_on, own_session):
     head = read_head(paths["state"])
     live_session_ids = []
     if head is not None and head["kind"] != "ferma":
-        registry = regia_common.read_registry(project_root)
+        registry = orchestrator_common.read_registry(project_root)
         if not registry.readable:
             return None
         live_session_ids = [session.session_id for session in registry.sessions]
@@ -332,13 +332,13 @@ def command_facts(project_root, perimeter):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Lo stato su disco della regia di un perimetro")
+    parser = argparse.ArgumentParser(description="Lo stato su disco dell'orchestrator di un perimetro")
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     subcommands = parser.add_subparsers(dest="command", required=True)
     check_parser = subcommands.add_parser("check")
     check_parser.add_argument("perimeter", help="l'id del perimetro: un'epica o un mandato")
-    check_parser.add_argument("--own-session", required=True, help="session id della regia che chiede")
+    check_parser.add_argument("--own-session", required=True, help="session id dell'orchestrator che chiede")
     check_parser.add_argument("--wait", type=int, default=0,
                               help="secondi di attesa su `in passaggio` di un'altra sessione viva")
     facts_parser = subcommands.add_parser("facts")
@@ -347,13 +347,13 @@ def parse_arguments():
 
 
 def main():
-    regia_common.setup_stdout()
+    orchestrator_common.setup_stdout()
     arguments = parse_arguments()
     if not TASK_ID_PATTERN.match(arguments.perimeter):
         print(f"ERROR: id task malformato: '{arguments.perimeter}' (atteso T<numero>)", file=sys.stderr)
         return 1
     project_root = os.path.abspath(arguments.project_root) if arguments.project_root \
-        else regia_common.find_project_root(os.getcwd())
+        else orchestrator_common.find_project_root(os.getcwd())
     if arguments.command == "check":
         return command_check(project_root, arguments.perimeter, arguments.own_session, arguments.wait)
     return command_facts(project_root, arguments.perimeter)

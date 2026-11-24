@@ -18,7 +18,7 @@ Con --filter le righe passano da whitelist e blacklist prima di uscire
 escono sempre. Senza --filter escono tutte.
 
 Con --context-threshold il monitor misura anche il contesto della sessione che
-lo lancia, la regia, dal suo transcript (watch_context.py): una riga `regia 🧠`
+lo lancia, l'orchestrator, dal suo transcript (watch_context.py): una riga `orchestrator 🧠`
 al 20, 40, 60, 80, 100 e 120% della soglia, una volta per gradino. Come le righe
 `monitor`, escono sempre.
 
@@ -30,13 +30,13 @@ ricava dal suo `cwd`. La chiave di una sessione è il processo (pid +
 Lo stato sta in un file JSON (--state): un monitor riarmato con lo stesso file
 non ripete gli eventi già detti e non perde quelli capitati nel cambio. Il primo
 giro registra lo stato attuale e non emette niente sul passato, tranne il
-contesto della regia: la regia deve sapere subito se è già oltre un gradino.
+contesto dell'orchestrator: l'orchestrator deve sapere subito se è già oltre un gradino.
 
-Uso (lo lancia la skill della regia, dalla cache del plugin):
+Uso (lo lancia la skill dell'orchestrator, dalla cache del plugin):
   python -u -I watch_sessions.py --project-root <radice del progetto> \\
       --own-session <id della sessione che lancia il monitor> \\
-      --state <radice>/.claude/loom/regia/T<perimetro>-watch.json \\
-      [--filter <radice>/.claude/loom/regia/T<perimetro>-filter.json] \\
+      --state <radice>/.claude/loom/orchestrator/T<perimetro>-watch.json \\
+      [--filter <radice>/.claude/loom/orchestrator/T<perimetro>-filter.json] \\
       [--context-threshold <token>] \\
       [--repo nome=path-relativo-alla-radice]...
 """
@@ -57,7 +57,7 @@ import time
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import regia_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import orchestrator_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
 import watch_context  # noqa: E402
 import watch_filter  # noqa: E402
 
@@ -67,7 +67,7 @@ CHECKBOX_PATTERN = re.compile(r"^- \[([ x])\]")
 # assegna `main`; lo legge `emit_event`, il punto da cui esce ogni evento.
 filter_source = None
 
-# La sessione della regia vista nell'ultimo giro del registro (`sessionId`,
+# La sessione dell'orchestrator vista nell'ultimo giro del registro (`sessionId`,
 # `cwd`), o None: la scrive `scan_sessions`, la legge `scan_context`.
 own_live = None
 
@@ -86,7 +86,7 @@ def parse_arguments():
     parser.add_argument("--stall-minutes", type=float, default=10,
                         help="una sessione busy col transcript fermo da più tempo produce un evento")
     parser.add_argument("--context-threshold", type=int, default=0,
-                        help="soglia di contesto della regia in token: eventi 🧠 ai gradini; 0 = nessuna misura")
+                        help="soglia di contesto dell'orchestrator in token: eventi 🧠 ai gradini; 0 = nessuna misura")
     parser.add_argument("--once", action="store_true",
                         help="un giro solo: legge, salva lo stato ed esce")
     return parser.parse_args()
@@ -152,12 +152,12 @@ def handle_transcript_record(record, process, label):
         # leggerebbero come due turni.
         if process.get("headless"):
             return
-        summary = regia_common.first_meaningful_line(process.get("last_text", ""))
+        summary = orchestrator_common.first_meaningful_line(process.get("last_text", ""))
         emit_session(process, f"{label} ⏸ turno finito, aspetta l'utente: {summary[:160]}")
         return
-    prompt = regia_common.user_prompt_text(record)
+    prompt = orchestrator_common.user_prompt_text(record)
     if prompt is not None:
-        emit_session(process, f"{label} ✍ prompt utente: {regia_common.describe_prompt(prompt)[:140]}")
+        emit_session(process, f"{label} ✍ prompt utente: {orchestrator_common.describe_prompt(prompt)[:140]}")
         return
     content = (record.get("message") or {}).get("content")
     if record_type != "assistant" or record.get("isSidechain") or not isinstance(content, list):
@@ -206,7 +206,7 @@ def read_new_records(process):
         if not isinstance(record, dict):
             continue
         if not process.get("transcript_task"):
-            match = regia_common.TASK_PHRASE_PATTERN.search(decoded_line)
+            match = orchestrator_common.TASK_PHRASE_PATTERN.search(decoded_line)
             if match:
                 process["transcript_task"] = match.group(1)
                 refresh_label(process)
@@ -227,7 +227,7 @@ def start_offset(path, since):
         return 0  # nessun record ancora: quando arriva si legge tutto
     if since is None:
         return size
-    born = regia_common.first_record_time(path)
+    born = orchestrator_common.first_record_time(path)
     if born is None or born >= since - 5:
         return 0
     return size
@@ -304,7 +304,7 @@ def short_id(session_id):
 def refresh_label(process):
     """L'etichetta della sessione, a cascata: il sidecar del deck (segue le
     riassegnazioni), la frase dell'hook SessionStart nel transcript, `?`."""
-    process["label"] = regia_common.session_label(
+    process["label"] = orchestrator_common.session_label(
         process["session_id"], process.get("sidecar_task"), process.get("transcript_task"))
 
 
@@ -320,7 +320,7 @@ def announce_label_change(process, old_label):
         return
     session = short_id(process["session_id"])
     # L'evento porta la task vecchia e la nuova: passa una whitelist che ne
-    # ammette una, così la regia vede entrare e uscire una sessione dal mandato.
+    # ammette una, così l'orchestrator vede entrare e uscire una sessione dal mandato.
     tasks = {label for label in (old_label, new_label) if not label.startswith("?")}
     session_ids = process_session_ids(process)
     if old_label.startswith("?"):
@@ -339,7 +339,7 @@ def new_process(session, transcript, offset):
         "cwd": session.cwd,
         "transcript": transcript,
         "offset": offset,
-        "transcript_task": regia_common.task_of_transcript(transcript),
+        "transcript_task": orchestrator_common.task_of_transcript(transcript),
         "sidecar_task": None,
         "label": "",
         "last_text": "",
@@ -366,11 +366,11 @@ def announce_start(process):
 def announce_end(process):
     """L'evento di un processo sparito dal registro. Per un turno headless è
     la fine del turno, con la prima riga dell'ultimo testo: se il turno finisce
-    su una domanda lo legge la regia dal testo, non un riconoscimento a pattern
+    su una domanda lo legge l'orchestrator dal testo, non un riconoscimento a pattern
     qui."""
     session = short_id(process["session_id"])
     if process.get("headless"):
-        summary = regia_common.first_meaningful_line(process.get("last_text", ""))
+        summary = orchestrator_common.first_meaningful_line(process.get("last_text", ""))
         emit_session(process, f"{process['label']} ⏹ turno headless finito {session}"
                      + (f": {summary[:160]}" if summary else ""))
     else:
@@ -379,12 +379,12 @@ def announce_end(process):
 
 def is_own(session, state, settings):
     """La sessione che lancia il monitor non si segue: riporterebbe i propri
-    turni. Il processo si ricorda, così un /clear della regia, che cambia il
+    turni. Il processo si ricorda, così un /clear dell'orchestrator, che cambia il
     suo sessionId, non la fa ricomparire.
 
     Il processo che risponde a --own-session è anche quello di cui si misura il
-    contesto (`own_key`). Gli altri processi della lista sono regie di prima
-    sullo stesso file di stato, come quella che ha passato le consegne: non si
+    contesto (`own_key`). Gli altri processi della lista sono orchestrator di prima
+    sullo stesso file di stato, come quello che ha passato le consegne: non si
     seguono, e non si misurano."""
     if settings.own_session and session.session_id.startswith(settings.own_session):
         state["own_key"] = session.key
@@ -400,11 +400,11 @@ def scan_sessions(state, settings):
     now = time.time()
     initialized = state.get("initialized")
     since = state.get("last_scan") if initialized else None
-    registry = regia_common.read_registry(settings.project_root)
+    registry = orchestrator_common.read_registry(settings.project_root)
     if not registry.readable:
         emit("monitor ⚠ registro delle sessioni illeggibile: ~/.claude/sessions")
         return
-    bindings = regia_common.load_task_bindings(settings.project_root)
+    bindings = orchestrator_common.load_task_bindings(settings.project_root)
     seen = set()
     for session in registry.sessions:
         if is_own(session, state, settings):
@@ -413,7 +413,7 @@ def scan_sessions(state, settings):
             continue
         seen.add(session.key)
         process = state["processes"].get(session.key)
-        transcript = regia_common.transcript_path(session.cwd, session.session_id)
+        transcript = orchestrator_common.transcript_path(session.cwd, session.session_id)
         old_label = None
         if process is None:
             process = new_process(session, transcript, start_offset(transcript, since))
@@ -427,7 +427,7 @@ def scan_sessions(state, settings):
             process.update(session_id=session.session_id, transcript=transcript,
                            session_ids=process_session_ids(process) + [session.session_id],
                            offset=start_offset(transcript, since),
-                           transcript_task=regia_common.task_of_transcript(transcript),
+                           transcript_task=orchestrator_common.task_of_transcript(transcript),
                            sidecar_task=bindings.get(session.session_id))
             refresh_label(process)
             if initialized:
@@ -458,12 +458,12 @@ def scan_sessions(state, settings):
 
 
 def scan_context(state, settings):
-    """Il contesto della regia, dal suo transcript: un evento `🧠` per gradino
-    nuovo. Anche al primo armo, a differenza delle altre fonti: la regia deve
+    """Il contesto dell'orchestrator, dal suo transcript: un evento `🧠` per gradino
+    nuovo. Anche al primo armo, a differenza delle altre fonti: l'orchestrator deve
     sapere subito se è già oltre un gradino."""
     if settings.context_threshold <= 0 or own_live is None:
         return
-    transcript = regia_common.transcript_path(own_live["cwd"], own_live["session_id"])
+    transcript = orchestrator_common.transcript_path(own_live["cwd"], own_live["session_id"])
     state["context"], line = watch_context.measure(
         state.get("context"), own_live["session_id"], transcript, settings.context_threshold)
     if line:
@@ -473,7 +473,7 @@ def scan_context(state, settings):
 def relative_cwd(cwd, settings):
     """` [loom-deck]` per una sessione nata in una sottocartella, niente per
     una nata nella radice."""
-    location = regia_common.relative_location(cwd, settings.project_root)
+    location = orchestrator_common.relative_location(cwd, settings.project_root)
     return f" [{location}]" if location else ""
 
 
@@ -619,12 +619,12 @@ def scan_git(state, settings):
 def parent_task(settings, task_id):
     """La task del campo `Parent Task` del task file di `task_id`, `None` se il
     file o il campo mancano. Il campo può portare una maniglia dopo l'id."""
-    path = regia_common.find_task_file(settings.project_root, settings.docs_root, task_id)
+    path = orchestrator_common.find_task_file(settings.project_root, settings.docs_root, task_id)
     if path is None:
         return None
     try:
         with open(path, encoding="utf-8", errors="replace") as task_handle:
-            value = regia_common.header_field(task_handle.read().splitlines(), "Parent Task")
+            value = orchestrator_common.header_field(task_handle.read().splitlines(), "Parent Task")
     except OSError:
         return None
     match = re.match(r"(T\d+)\b", value)
@@ -635,7 +635,7 @@ def submodule_paths(project_root):
     """I path dei submodule dichiarati in `.gitmodules`, relativi alla radice.
 
     Il registro dei submodule è il file, non una lista a mano: un submodule
-    aggiunto entra nel monitor senza toccare il comando della regia. Stessa
+    aggiunto entra nel monitor senza toccare il comando dell'orchestrator. Stessa
     fonte di `pull-repos`.
     """
     try:
@@ -648,8 +648,8 @@ def submodule_paths(project_root):
 
 def build_settings(arguments):
     arguments.project_root = os.path.abspath(
-        arguments.project_root or regia_common.find_project_root(os.getcwd()))
-    arguments.docs_root = regia_common.docs_root(arguments.project_root)
+        arguments.project_root or orchestrator_common.find_project_root(os.getcwd()))
+    arguments.docs_root = orchestrator_common.docs_root(arguments.project_root)
     arguments.docs_path = os.path.join(arguments.project_root, arguments.docs_root)
     repos = {"root": arguments.project_root}
     for relative_path in submodule_paths(arguments.project_root):
@@ -694,7 +694,7 @@ def refresh_filter(state):
 
 def main():
     global filter_source
-    regia_common.setup_stdout()
+    orchestrator_common.setup_stdout()
     settings = build_settings(parse_arguments())
     state = load_state(settings.state)
     if settings.filter:

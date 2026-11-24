@@ -18,7 +18,7 @@ Un mandato non ha lavoro eseguibile proprio, come un'epica: `run-task` dichiara 
 L'header è quello del task template, con `Size: Mandate`. Dopo `## Description` vengono tre sezioni proprie, in quest'ordine:
 
 ```markdown
-# Task: Mandato: convention e regia insieme
+# Task: Mandato: convention e orchestrator insieme
 
 - **ID**: T230
 - **Size**: Mandate
@@ -34,7 +34,7 @@ Perché questo perimetro esiste e cosa vuole ottenere.
 
 - T52 (lettore unico delle convention)
 - T61 (gate del deck sulle convention)
-- T64 (regia headless)
+- T64 (orchestrator headless)
 
 ## Preferenze d'ordine
 
@@ -49,9 +49,9 @@ Perché questo perimetro esiste e cosa vuole ottenere.
 | T61 · T64 | collide | entrambe riscrivono il poll del deck | modello |
 
 ## Materiale
-*📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato della regia; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
+*📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato dell'orchestrator; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
 
-- 🎬 `.claude/loom/regia/T230.md` — seguire il giro della regia: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
+- 🎬 `.claude/loom/orchestrator/T230.md` — seguire il giro dell'orchestrator: conversazioni, fatti del perimetro, proposte in sospeso (fuori da git)
 ```
 
 `## Materiale` non è una sezione propria del mandato: è quella del task template, e in un perimetro porta la voce 🎬 (§La voce 🎬).
@@ -82,21 +82,21 @@ Le relazioni fra coppie di membri sull'intero perimetro. Ha **lo stesso nome e l
 | `Su cosa` | il dato, il file o il comportamento su cui la relazione morde |
 | `Fonte` | `dichiarata` · `materiale` · `modello` |
 
-- **`dichiarata`** — una dipendenza che un membro dichiara in `## Dependencies` o che il grafo di `tasks.md` porta: le righe `DEPS` di `scripts/regia/mandate.py tree`.
-- **`materiale`** — due membri aperti che nominano path sovrapposti in `## Materiale`, e almeno uno dei due non come 📖 fonte: le righe `CONFLICT` di `mandate.py tree`. Due letture dello stesso file non si scontrano, e una voce 🎬 non conta: punta allo stato della regia, che nessun membro scrive.
+- **`dichiarata`** — una dipendenza che un membro dichiara in `## Dependencies` o che il grafo di `tasks.md` porta: le righe `DEPS` di `scripts/orchestrator/mandate.py tree`.
+- **`materiale`** — due membri aperti che nominano path sovrapposti in `## Materiale`, e almeno uno dei due non come 📖 fonte: le righe `CONFLICT` di `mandate.py tree`. Due letture dello stesso file non si scontrano, e una voce 🎬 non conta: punta allo stato dell'orchestrator, che nessun membro scrive.
 - **`modello`** — una collisione che nessun campo dichiara, trovata leggendo i DLV dei membri.
 
-Le righe `dichiarata` e `materiale` si ricalcolano dai file, quindi un confronto meccanico le verifica contro lo stato attuale: `scripts/regia/mandate.py verify`. Le righe `modello` vengono da una lettura, e si riesaminano quando un membro cambia. La sezione non porta sha né data: il commit da cui l'analisi vale si ricava dalla storia, ed è il più recente fra l'ultimo che ha cambiato le righe della sezione e l'ultimo `### Avanzamento` del perimetro.
+Le righe `dichiarata` e `materiale` si ricalcolano dai file, quindi un confronto meccanico le verifica contro lo stato attuale: `scripts/orchestrator/mandate.py verify`. Le righe `modello` vengono da una lettura, e si riesaminano quando un membro cambia. La sezione non porta sha né data: il commit da cui l'analisi vale si ricava dalla storia, ed è il più recente fra l'ultimo che ha cambiato le righe della sezione e l'ultimo `### Avanzamento` del perimetro.
 
 Il metodo con cui la sezione si scrive e si riscrive — trascrizione delle righe di `tree`, lettura dei membri, rianalisi — è `mandate-analysis.md`.
 
 ### La voce 🎬
 
-Il glifo 🎬, **stato della regia**, marca in `## Materiale` di un perimetro — mandato o epica — la voce che punta al file in cui la regia tiene il suo giro: `.claude/loom/regia/T<id>.md`, sotto la project root, ignorato da git. Il file porta conversazioni, fatti del perimetro e proposte in sospeso, e `checkpoint-mandate` ne porta i fatti nella prosa del perimetro.
+Il glifo 🎬, **stato dell'orchestrator**, marca in `## Materiale` di un perimetro — mandato o epica — la voce che punta al file in cui l'orchestrator tiene il suo giro: `.claude/loom/orchestrator/T<id>.md`, sotto la project root, ignorato da git. Il file porta conversazioni, fatti del perimetro e proposte in sospeso, e `checkpoint-mandate` ne porta i fatti nella prosa del perimetro.
 
-- La scrive `prepare-mandate`, una volta sola; la regia non scrive nei task file.
-- È un puntatore per chi legge il task file. La regia e `checkpoint-mandate` ricavano il path dall'id del perimetro, quindi un perimetro senza la voce viene seguito lo stesso.
-- Il file può non esserci ancora: nasce al primo lancio della regia.
+- La scrive `prepare-mandate`, una volta sola; l'orchestrator non scrive nei task file.
+- È un puntatore per chi legge il task file. L'orchestrator e `checkpoint-mandate` ricavano il path dall'id del perimetro, quindi un perimetro senza la voce viene seguito lo stesso.
+- Il file può non esserci ancora: nasce al primo lancio dell'orchestrator.
 
 ### Acceptance e Deliverables
 
@@ -109,7 +109,7 @@ Facoltativi: il formato non prescrive né `## Acceptance Criteria` né `## Deliv
 - niente colonna di stato dei membri: la Prog sta in `tasks.md`;
 - niente cifre ricopiate da un membro (DLV spuntati, misure, conteggi): si scrive il puntatore al membro che le produce.
 
-Una copia scritta a mano resta indietro alla prima modifica, chiunque sia il proprietario. Su un progetto reale, dopo una regia, quattro dei sei disallineamenti del cappello erano copie: lo stato delle figlie, lo stato di una task collegata, una cifra ricopiata da una figlia, un componente chiuso non segnato nello schema.
+Una copia scritta a mano resta indietro alla prima modifica, chiunque sia il proprietario. Su un progetto reale, dopo un orchestrator, quattro dei sei disallineamenti del cappello erano copie: lo stato delle figlie, lo stato di una task collegata, una cifra ricopiata da una figlia, un componente chiuso non segnato nello schema.
 
 L'analisi del perimetro non è una copia: descrive relazioni fra membri, non il loro stato, e dichiara la fonte da cui si ricontrolla.
 
