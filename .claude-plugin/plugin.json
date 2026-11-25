@@ -1,7 +1,7 @@
 {
   "name": "loom-works",
   "description": "Task management with coupled documentation lifecycle",
-  "version": "15.1.0",
+  "version": "15.1.1",
   "settings": {
     "permissions": {
       "allow": [
