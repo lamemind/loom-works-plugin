@@ -1,6 +1,6 @@
 ---
 name: checkpoint-task
-description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nella loro sede e toglie quelle che il codice ha smentito), trasloco nell'inbox della task e accensione di drainable alla chiusura. Su un'epica o un mandato passa a checkpoint-mandate.
+description: Checkpoint task progress: analyze changes, commit, update tasks.md. Fase doc v2: riesame (rilegge le nozioni vive nella loro sede e toglie quelle che il codice ha smentito), trasloco nell'inbox della task e accensione di drainable alla chiusura. Su un'epica o una lista custom passa a checkpoint-perimeter.
 allowed-tools: Bash(*), Edit, Read, Write, AskUserQuestion, Skill
 ---
 
@@ -38,13 +38,13 @@ Da qui in avanti `${taskId}` = il `TASK_ID` **risolto** dallo script, non l'argo
 - `**Folder**:` — se popolato, mostralo in output prefixato con 📁 (solo informativo).
 - `**Branch**:` — il branch su cui la task sviluppa; **assente o vuoto = `main`**. Governa i marker del trasloco (step 6).
 
-## Epica e mandato — passa a `checkpoint-mandate`
+## Epica e lista custom — passa a `checkpoint-perimeter`
 
-Prima di ogni step del flusso, leggi `Size` dall'header di `TASK_FILE`. Su `Size: Epic` o `Size: Mandate` la task è un **perimetro**: non ha codice né DLV propri, e il lavoro sta nei membri. Il checkpoint di un perimetro è un altro flusso — riallinea la prosa del perimetro a ciò che i membri hanno scritto, senza analisi del diff, senza DLV e senza fase doc — e lo fa `checkpoint-mandate`.
+Prima di ogni step del flusso, leggi `Size` dall'header di `TASK_FILE`. Su `Size: Epic`, `Size: Custom` o `Size: Mandate` (il nome di prima) la task è un **perimetro orchestrabile**: non ha codice né DLV propri, e il lavoro sta nei membri. Il checkpoint di un perimetro orchestrabile è un altro flusso — riallinea la sua prosa a ciò che i membri hanno scritto, senza analisi del diff, senza DLV e senza fase doc — e lo fa `checkpoint-perimeter`.
 
-Stampa una riga sola, `→ checkpoint-mandate ${taskId}`, poi invoca il tool `Skill` con `skill` = `loom-works:checkpoint-mandate` e `args` = le Note utente **verbatim**: la parola «chiudi», se c'è, decide la chiusura del perimetro, e un riassunto la perderebbe. Senza un id nelle Note utente passa `${taskId}` davanti, perché la sotto-skill risolva lo stesso perimetro. Poi fermati: nessuno degli step sotto gira, nessun commit, nessun ping TTS — il report, il commit e le Segnalazioni li fa la sotto-skill.
+Stampa una riga sola, `→ checkpoint-perimeter ${taskId}`, poi invoca il tool `Skill` con `skill` = `loom-works:checkpoint-perimeter` e `args` = le Note utente **verbatim**: la parola «chiudi», se c'è, decide la chiusura del perimetro orchestrabile, e un riassunto la perderebbe. Senza un id nelle Note utente passa `${taskId}` davanti, perché la sotto-skill risolva lo stesso perimetro orchestrabile. Poi fermati: nessuno degli step sotto gira, nessun commit, nessun ping TTS — il report, il commit e le Segnalazioni li fa la sotto-skill.
 
-Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre un perimetro, quindi un'epica non produce mai codice da committare qui.
+Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre un perimetro orchestrabile, quindi un'epica non produce mai codice da committare qui.
 
 ## Flusso checkpoint
 
@@ -72,7 +72,7 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
       ### Avanzamento ${id_incrementale}
       - Descrizione: ${sintesi_delle_modifiche}
       ```
-      Scrivi l'header `### Avanzamento N` in questa forma, la stessa di tutta la famiglia: su un perimetro (epica o mandato) `checkpoint-mandate` deriva la finestra di diff dal commit che ha introdotto l'ultimo header di questa forma (`lw_task_baseline_sha`), e un header in altro formato allarga la finestra fino alla nascita del file.
+      Scrivi l'header `### Avanzamento N` in questa forma, la stessa di tutta la famiglia: su un perimetro orchestrabile (epica o lista custom) `checkpoint-perimeter` deriva la finestra di diff dal commit che ha introdotto l'ultimo header di questa forma (`lw_task_baseline_sha`), e un header in altro formato allarga la finestra fino alla nascita del file.
 
 4. **Task completata?**
    Se tutti gli item in `## Deliverables Checklist` **e** in `## Acceptance Criteria` sono `[x]` (la sezione `## Prod Validation` NON conta):
@@ -296,7 +296,7 @@ SCENARIO
 - **La conferma e il ribaltamento valgono uguale.** Sulla segnalazione che avevi marcato `☑ subito (agente)`, «ok» è uno scenario `subito` e «fanne una task» uno scenario `task`, entrambi `--chi umano`, accanto al tuo: non si riscrive niente, i due record sono il dato.
 - **Detta a posteriori, la stessa parola è un esito e non un'azione.** Chi rilegge il report da un'altra sessione registra con `--momento posteriori` e non esegue niente.
 
-**Una risposta firmata «su delega» è dell'orchestrator, non dell'umano.** Un messaggio che apre con `Risposte alle segnalazioni di T<id> — decise dall'orchestrator di T<perimetro> su delega dell'utente.` arriva dall'orchestrator del perimetro, che decide al posto dell'umano perché l'umano gliel'ha delegato; la riga sotto la firma porta le parole con cui l'ha delegato, alla lettera. Ogni scenario di quella risposta si scrive con `--chi delega` e quelle parole intere in `--delega`, senza ritaglio: le legge prima una variabile da un heredoc fra apici, così backtick e apostrofi restano testo.
+**Una risposta firmata «su delega» è dell'orchestrator, non dell'umano.** Un messaggio che apre con `Risposte alle segnalazioni di T<id> — decise dall'orchestrator di T<id del perimetro orchestrabile> su delega dell'utente.` arriva dall'orchestrator del perimetro orchestrabile, che decide al posto dell'umano perché l'umano gliel'ha delegato; la riga sotto la firma porta le parole con cui l'ha delegato, alla lettera. Ogni scenario di quella risposta si scrive con `--chi delega` e quelle parole intere in `--delega`, senza ritaglio: le legge prima una variabile da un heredoc fra apici, così backtick e apostrofi restano testo.
 
 ```bash
 DELEGA="$(cat <<'DELEGA'

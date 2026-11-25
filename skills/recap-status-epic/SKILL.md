@@ -1,6 +1,6 @@
 ---
 name: recap-status-epic
-description: Recap di un'epica o di un mandato — stato del perimetro a zoom alto, poi i membri (le figlie di un'epica, la lista di un mandato) con cifre DLV/AC e stato del preflight, interdipendenze, e un punto d'ingresso a due livelli (quale membro, quale voce).
+description: Recap di un'epica o di una lista custom — stato del perimetro orchestrabile a zoom alto, poi i membri (le figlie di un'epica, quelli elencati da una lista custom) con cifre DLV/AC e stato del preflight, interdipendenze, e un punto d'ingresso a due livelli (quale membro, quale voce).
 allowed-tools: Bash(*), Read, Glob
 ---
 
@@ -17,15 +17,15 @@ Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa 
 $ARGUMENTS
 ~~~
 
-Recap di un **perimetro di lavoro** — una task cappello (`Size: Epic`) e le sue figlie, oppure un mandato (`Size: Mandate`) e i membri che elenca — per rientrare in un lavoro a più fasi sapendo da quale ripartire. **Read-only**: non scrive né modifica nessun file.
+Recap di un **perimetro orchestrabile** — una task cappello (`Size: Epic`) e le sue figlie, oppure una lista custom (`Size: Custom`) e i membri che elenca — per rientrare in un lavoro a più fasi sapendo da quale ripartire. **Read-only**: non scrive né modifica nessun file.
 
-Epica e mandato differiscono solo nel punto da cui si leggono i membri: le figlie da `Parent Task`, oppure la lista `## Membri` del mandato. Formato del mandato: `${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`. Sotto, **membri** vale per entrambi; dove il caso cambia, il testo lo dice.
+Epica e lista custom differiscono solo nel punto da cui si leggono i membri: le figlie da `Parent Task`, oppure la sezione `## Membri` della lista custom. Formato della lista custom: `${CLAUDE_PLUGIN_ROOT}/docs/perimeter-format.md`. Sotto, **membri** vale per entrambi; dove il caso cambia, il testo lo dice.
 
-## Grado di competenza — `K1` sul perimetro e sui membri
+## Grado di competenza — `K1` sul perimetro orchestrabile e sui membri
 
 Chi chiede un recap dichiara, con l'atto stesso, di non avere la bussola della situazione. Scrivi quindi a **`K1`** su un perimetro dichiarato:
 
-- **cosa** — il perimetro intero e i suoi membri: cosa vuole ottenere l'epica o il mandato, dove è arrivato ogni membro
+- **cosa** — il perimetro orchestrabile intero e i suoi membri: cosa vuole ottenere l'epica o la lista custom, dove è arrivato ogni membro
 - **dove** — il dominio dell'epica (il sottosistema che rifà, il perimetro su cui interviene)
 
 `K1` significa: termini comuni nudi, termini specialistici glossati alla prima occorrenza, implicazioni sempre esplicitate, nessuna ancora al mondo di tutti i giorni. La scala `K0`-`K3` non la ridefinisci — vive nell'output style; qui dichiari solo a che grado leggerla dentro il perimetro.
@@ -36,7 +36,7 @@ Chi chiede un recap dichiara, con l'atto stesso, di non avere la bussola della s
 
 **Le coordinate opache restano opache a ogni grado.** Con N membri il testo è fatto di id, ed è precisamente il punto in cui una riga come «catena bloccante: T06 → T15 → T16» smette di essere leggibile. Ogni id porta la sua maniglia verbo+oggetto a **ogni** citazione — `T107 (fusione delle sezioni doc)` — salvo quelli che l'utente ha nominato lui nel prompt.
 
-## 1. Risolvi il perimetro e i membri
+## 1. Risolvi il perimetro orchestrabile e i membri
 
 Se le Note utente nominano un ID (`/loom-works:recap-status-epic T74`), passalo come argomento; altrimenti omettilo e lascia lavorare la cascata.
 
@@ -47,23 +47,23 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --members
 Cascata di famiglia `arg → $LOOM_TASK`, poi il lettore unico dei membri:
 
 - `TASK_MEMBERS_SRC=parent` — un'epica, o una task qualunque: i membri sono le figlie, in ordine numerico
-- `TASK_MEMBERS_SRC=list` — un mandato: i membri sono la lista `## Membri`, nell'ordine del file
+- `TASK_MEMBERS_SRC=list` — una lista custom: i membri sono quelli di `## Membri`, nell'ordine del file
 - `TASK_MEMBERS_COUNT=<n>` e una riga `TASK_MEMBER=<id> <path>` per membro
-- `TASK_MEMBER_MISSING=<id>` — un membro dichiarato dal mandato senza task file, fuori dal conteggio
+- `TASK_MEMBER_MISSING=<id>` — un membro dichiarato dalla lista custom senza task file, fuori dal conteggio
 
 Non riscrivere la lettura a mano: il word boundary sull'id e le regole della lista vivono nello script, e `T7` matcherebbe `T74`.
 
 Fai `Read` di `TASK_FILE` per intero, e poi di ogni task file membro.
 
-**Il piano del perimetro**: `schedule.md` nella task folder del perimetro, il campo `**Folder**` del suo task file (`${CLAUDE_PLUGIN_ROOT}/docs/schedule-format.md`). Se c'è, `Read` per intero: la prosa porta l'analisi delle relazioni fra i membri e le preferenze d'ordine del giro, il blocco JSON le decisioni che lo script del flusso esegue. Un perimetro senza folder, o con la folder senza piano, non ha un piano: lo dici dove pesa (§3b).
+**Il piano del perimetro orchestrabile**: `orchestration-schedule.md` nella sua task folder, il campo `**Folder**` del suo task file, o `schedule.md` in un perimetro orchestrabile preparato prima del rename (`${CLAUDE_PLUGIN_ROOT}/docs/orchestration-schedule-format.md`). Se c'è, `Read` per intero: la prosa porta l'analisi delle relazioni fra i membri e le preferenze d'ordine del giro, il blocco JSON le decisioni che lo script del flusso esegue. Un perimetro orchestrabile senza folder, o con la folder senza piano, non ha un piano: lo dici dove pesa (§3b).
 
 **Casi fuori competenza — dichiara e procedi**, non fallire:
 
 - `TASK_MEMBERS_SRC=parent` e `TASK_MEMBERS_COUNT=0` → nessuna figlia. Può essere un'epica appena aperta, oppure una task normale su cui questa skill è stata invocata a mano. Dillo in una riga, indica `/loom-works:recap-status-task ${TASK_ID}`, e fai comunque il recap del solo file risolto.
-- `TASK_MEMBERS_SRC=list` e `TASK_MEMBERS_COUNT=0` → un mandato che non dichiara ancora membri. Dillo in una riga e fai il recap del solo file.
+- `TASK_MEMBERS_SRC=list` e `TASK_MEMBERS_COUNT=0` → una lista custom che non dichiara ancora membri. Dillo in una riga e fai il recap del solo file.
 - la task risolta **non** ha `Size: Epic` ma ha figlie → è un cappello che non si è ancora dichiarato tale. Segnalalo come incongruenza da correggere nel file, e procedi normalmente.
-- `TASK_MEMBER_MISSING=<id>` → il mandato elenca una task che non ha più un task file: purgata da `clean-tasks` dopo la chiusura, o mai creata. Mostrala fra i membri come tale, con la riga di `tasks.md` se c'è ancora, e procedi.
-- un membro `Size: Epic` o `Size: Mandate` → è un perimetro a sé, e il lettore non lo espande. Mostralo come una riga, con la sua Prog, e indica il suo recap (`/loom-works:recap-status-epic T{N}`): i suoi membri non entrano in questo recap.
+- `TASK_MEMBER_MISSING=<id>` → la lista custom elenca una task che non ha più un task file: purgata da `clean-tasks` dopo la chiusura, o mai creata. Mostrala fra i membri come tale, con la riga di `tasks.md` se c'è ancora, e procedi.
+- un membro `Size: Epic`, `Size: Custom` o `Size: Mandate` (il nome di prima) → è un perimetro orchestrabile a sé, e il lettore non lo espande. Mostralo come una riga, con la sua Prog, e indica il suo recap (`/loom-works:recap-status-epic T{N}`): i suoi membri non entrano in questo recap.
 
 ## 2. Raccogli il contesto reale
 
@@ -71,9 +71,9 @@ Fai `Read` di `TASK_FILE` per intero, e poi di ogni task file membro.
 ${CLAUDE_PLUGIN_ROOT}/scripts/recap-git-status.sh
 ```
 
-Più `{docs_root}/tasks.md` per la Prog di ogni membro e per l'Execution Plan, se il perimetro vi ha una catena.
+Più `{docs_root}/tasks.md` per la Prog di ogni membro e per l'Execution Plan, se il perimetro orchestrabile vi ha una catena.
 
-**Lo stato dei membri si legge da `tasks.md` e dai loro task file, mai dal file del perimetro.** Un'epica o un mandato che porta una colonna di stato o una cifra ricopiata da un membro viola il formato (`mandate-format.md` §Nessuna copia): la copia resta indietro alla prima modifica. Se ne trovi una, segnala la divergenza come incongruenza da correggere nel file, e scrivi il recap col dato vero.
+**Lo stato dei membri si legge da `tasks.md` e dai loro task file, mai dal file del perimetro orchestrabile.** Un'epica o una lista custom che porta una colonna di stato o una cifra ricopiata da un membro viola il formato (`perimeter-format.md` §Nessuna copia): la copia resta indietro alla prima modifica. Se ne trovi una, segnala la divergenza come incongruenza da correggere nel file, e scrivi il recap col dato vero.
 
 **La Prog di `tasks.md` non basta** a dire dove sta un membro. Il glifo `🟢 Ready` distingue ormai il preflight fatto dall'intatta, ma lo scrive solo `preflight-task`, e solo dalle esecuzioni successive al suo rilascio: una figlia preflightata prima resta `🔵` senza che niente lo segnali. Il verdetto sullo stato lo dà quindi il task file — blocco `### Preflight` in `## Decisions` — con la Prog come conferma, non come fonte.
 
@@ -81,20 +81,20 @@ Più `{docs_root}/tasks.md` per la Prog di ogni membro e per l'Execution Plan, s
 
 L'ordine non è cosmetico: una proposta emessa prima delle dipendenze non ha i dati per essere quella giusta.
 
-**Apri con la sostanza.** Docs-root risolta, cascata che ha risolto il perimetro, conteggio dei membri, nome degli script girati: sono passi di lavoro tuoi, non contenuto per chi legge. Niente riga di intestazione tecnica prima del quadro — se un dato di risoluzione conta davvero (membri zero, cappello senza `Size: Epic`, membro senza task file), dillo dentro il blocco dove pesa.
+**Apri con la sostanza.** Docs-root risolta, cascata che ha risolto il perimetro orchestrabile, conteggio dei membri, nome degli script girati: sono passi di lavoro tuoi, non contenuto per chi legge. Niente riga di intestazione tecnica prima del quadro — se un dato di risoluzione conta davvero (membri zero, cappello senza `Size: Epic`, membro senza task file), dillo dentro il blocco dove pesa.
 
-**3a. Il perimetro, a zoom alto.** Cosa vuole ottenere l'epica o il mandato, dove è arrivato nel suo insieme, cosa resta. Prima i membri non si nominano nemmeno: chi legge deve avere il quadro, non ricostruirlo da un elenco.
+**3a. Il perimetro orchestrabile, a zoom alto.** Cosa vuole ottenere l'epica o la lista custom, dove è arrivata nel suo insieme, cosa resta. Prima i membri non si nominano nemmeno: chi legge deve avere il quadro, non ricostruirlo da un elenco.
 
-Distingui lo **stato del perimetro** da quello dei membri: i DLV e gli AC propri del file (compresa la checkbox per figlia nell'Acceptance di un'epica) sono cose sue, e possono essere aperti mentre i membri corrono. Un mandato può non averne affatto: il formato non li prescrive.
+Distingui lo **stato del perimetro orchestrabile** da quello dei membri: i DLV e gli AC propri del file (compresa la checkbox per figlia nell'Acceptance di un'epica) sono cose sue, e possono essere aperti mentre i membri corrono. Una lista custom può non averne affatto: il formato non li prescrive.
 
-**3b. La catena delle fasi — o, per un mandato, il perimetro dichiarato.**
+**3b. La catena delle fasi — o, per una lista custom, il perimetro orchestrabile dichiarato.**
 
 - **Epica**: le figlie in ordine, con la loro Prog, come catena leggibile — non una tabella di id nudi.
-- **Mandato**: al posto della catena, i **membri** dal file del mandato, nell'ordine della lista, ognuno con la sua maniglia, la sua Prog da `tasks.md` e l'epica a cui appartiene (`Parent Task`) o «orfana».
+- **Lista custom**: al posto della catena, i **membri** dal file della lista custom, nell'ordine della lista, ognuno con la sua maniglia, la sua Prog da `tasks.md` e l'epica a cui appartiene (`Parent Task`) o «orfana».
 
-Poi, per l'una e per l'altro, il **piano** (`schedule.md`), in due blocchi. L'**analisi**: le relazioni fra i membri della prosa, riga per riga, con la loro fonte — le collisioni che nessun campo dichiara vengono da una lettura dei task file, e se un membro è cambiato dopo possono essere vecchie. L'**ordine del giro**: le preferenze e le risorse della prosa, e dal blocco JSON i membri che segue l'utente (`umano`), quelli che aspettano tutti gli altri (`"*"`) e i perimetri di DLV (`dlv`), detti come valgono — solo per questo perimetro, e solo per lo script del flusso. Un piano assente si dichiara in una riga: l'orchestrator non parte senza, e lo scrive `/loom-works:prepare-mandate <perimetro>`.
+Poi, per l'una e per l'altra, il **piano** (`orchestration-schedule.md`), in due blocchi. L'**analisi**: le relazioni fra i membri della prosa, riga per riga, con la loro fonte — le collisioni che nessun campo dichiara vengono da una lettura dei task file, e se un membro è cambiato dopo possono essere vecchie. L'**ordine del giro**: le preferenze e le risorse della prosa, e dal blocco JSON i membri che segue l'utente (`umano`), quelli che aspettano tutti gli altri (`"*"`) e i perimetri eseguibili (`dlv`), detti come valgono — solo per questo perimetro orchestrabile, e solo per lo script del flusso. Un piano assente si dichiara in una riga: l'orchestrator non parte senza, e lo scrive `/loom-works:prepare-perimeter <id del perimetro orchestrabile>`.
 
-Un perimetro preparato prima del piano può portare nel task file le sezioni `## Analisi del perimetro` e `## Preferenze d'ordine`. Riportale come stanno, e di' che sono fuori formato: il loro posto è il piano, e `prepare-mandate` le sposta.
+Un perimetro orchestrabile preparato prima del piano può portare nel task file le sezioni `## Analisi del perimetro` e `## Preferenze d'ordine`. Riportale come stanno, e di' che sono fuori formato: il loro posto è il piano, e `prepare-perimeter` le sposta.
 
 **3c. I membri, uno per uno, con una cifra.** «In corso» da solo non dice se un membro è a un passo dalla chiusura o appena aperto. Per ognuno:
 

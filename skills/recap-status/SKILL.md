@@ -35,10 +35,10 @@ Cascata di famiglia `arg → $LOOM_TASK`. Exit non-zero significa «nessuna task
 |---|---|
 | exit non-zero — nessuna task risolta | nessuna: stampa `nessuna task` e termina |
 | task risolta con `Size: Epic` | `loom-works:recap-status-epic` |
-| task risolta con `Size: Mandate` | `loom-works:recap-status-epic` |
+| task risolta con `Size: Custom` o `Size: Mandate` (il nome di prima) | `loom-works:recap-status-epic` |
 | task risolta con qualunque altro `Size` | `loom-works:recap-status-task` |
 
-Un mandato va a `recap-status-epic` come un'epica: i due perimetri differiscono solo nel punto da cui si leggono i membri, e la sotto-skill li legge col lettore unico (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`).
+Una lista custom va a `recap-status-epic` come un'epica: le due forme del perimetro orchestrabile differiscono solo nel punto da cui si leggono i membri, e la sotto-skill li legge col lettore unico (`${CLAUDE_PLUGIN_ROOT}/docs/perimeter-format.md`).
 
 Senza task risolta non c'è un recap da produrre: stampi la riga `nessuna task`, nient'altro, e non invochi nessuna skill. Il recap del progetto intero non esiste più.
 

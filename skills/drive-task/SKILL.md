@@ -1,6 +1,6 @@
 ---
 name: drive-task
-description: Fa avanzare una task di un passo, guidato dalla conversazione che lo chiede — lancia un preflight headless, senza tab, col contesto che la conversazione ha costruito con l'utente, aspetta la fine del turno, porta in chat le domande del preflight e gli manda le risposte, col via dell'utente o da sé sotto una delega che l'utente dà («con delega»). Un passo su una task, non un perimetro. Tiene chi guida il passo in `.claude/loom/drive/` del progetto, ignorata da git, e lo riprende al rilancio. Non scrive mai nei task file né in un file tracciato. Usa quando l'utente dice «lancia il preflight di T66 e rispondi tu», «drive-task T66 preflight», «fai il preflight di T220 con delega».
+description: Fa avanzare una task di un passo, guidato dalla conversazione che lo chiede — lancia un preflight headless, senza tab, col contesto che la conversazione ha costruito con l'utente, aspetta la fine del turno, porta in chat le domande del preflight e gli manda le risposte, col via dell'utente o da sé sotto una delega che l'utente dà («con delega»). Un passo su una task, non un perimetro orchestrabile. Tiene chi guida il passo in `.claude/loom/drive/` del progetto, ignorata da git, e lo riprende al rilancio. Non scrive mai nei task file né in un file tracciato. Usa quando l'utente dice «lancia il preflight di T66 e rispondi tu», «drive-task T66 preflight», «fai il preflight di T220 con delega».
 argument-hint: "<TaskID> preflight [con delega]"
 allowed-tools: Bash(*), Read, Write, PushNotification
 ---
@@ -14,11 +14,11 @@ $ARGUMENTS
 
 Una conversazione che ha ragionato con l'utente su un tema ha in mano un contesto che una task può usare: le decisioni già prese, le parole dell'utente, i rimandi ai file giusti. `drive-task` usa quel contesto per far avanzare la task di **un passo**: lo lancia **headless** — un processo `claude -p` senza tab, con `loom-deck-headless` —, aspetta che il turno finisca e porta qui le domande del passo, invece che in una tab che nessuno guarda. Le risposte partono da qui.
 
-- **Un passo, una task.** In questa versione il passo è uno solo: `preflight`. Un perimetro di più task, un'epica o un mandato, si porta avanti con `orchestrate-mandate`.
+- **Un passo, una task.** In questa versione il passo è uno solo: `preflight`. Un perimetro orchestrabile di più task, un'epica o una lista custom, si porta avanti con `orchestrate-perimeter`.
 - **Non risponde da sé**, salvo delega: prepara la risposta e la manda col via dell'utente (§5). Con la delega manda da sé le risposte che le parole dell'utente coprono, e scala le altre.
 - **Non scrive mai nei task file né in un file tracciato.** Il preflight scrive le decisioni nel task file e committa; questa conversazione scrive solo il proprio stato, in `.claude/loom/drive/T<id>.md`, ignorata da git (§Lo stato su disco).
 
-Le regole su firma, delega e azioni che restano all'utente sono quelle dell'orchestrator (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-mandate/SKILL.md` §3), applicate a un passo solo: niente monitor, niente perimetro, niente checkpoint.
+Le regole su firma, delega e azioni che restano all'utente sono quelle dell'orchestrator (`${CLAUDE_PLUGIN_ROOT}/skills/orchestrate-perimeter/SKILL.md` §3), applicate a un passo solo: niente monitor, niente perimetro orchestrabile, niente checkpoint.
 
 ## 0. Gli argomenti
 
@@ -54,8 +54,8 @@ Il `sessionId` di questa conversazione lo legge lo script da `CLAUDE_CODE_SESSIO
 | `STATE_FILE=` · `CREATED_ON=` · `IGNORED=` | lo stato su disco del passo e la sua identità, e se git lo ignora |
 | `STATE=` · `STATE_HOLDER=` · `STEP_SESSION=` · `STEP_KIND=` · `STEP_LIVE=` | il verdetto sullo stato (§Lo stato su disco) e, in una ripresa, il passo aperto |
 | `VIVA\|<sessionId>\|tab\|headless\|<stato>` | un'altra conversazione viva sulla task |
-| `ORCHESTRATOR_PASSO\|<sessionId>\|<perimetro>\|<stato>` | un turno headless su questa task aperto da un orchestrator che non è fermo |
-| `ORCHESTRATOR\|<sessionId>\|<perimetro>\|<etichetta>` | un altro orchestrator vivo sul progetto, da confrontare coi membri (sotto) |
+| `ORCHESTRATOR_PASSO\|<sessionId>\|<id del perimetro orchestrabile>\|<stato>` | un turno headless su questa task aperto da un orchestrator che non è fermo |
+| `ORCHESTRATOR\|<sessionId>\|<id del perimetro orchestrabile>\|<etichetta>` | un altro orchestrator vivo sul progetto, da confrontare coi membri (sotto) |
 | `ROUND=nuovo\|ripresa` · `STOP\|<motivo>` · `CHECK=ok\|stop` | il giro, una riga per ogni ragione di fermarsi, il verdetto |
 
 **`CHECK=stop`** (exit `2`) → **fermati senza lanciare niente**, e di' all'utente ogni riga `STOP` col suo rimedio:
@@ -71,13 +71,13 @@ Il `sessionId` di questa conversazione lo legge lo script da `CLAUDE_CODE_SESSIO
 
 Exit `1` → il motivo da stderr (task file mancante, registro delle sessioni illeggibile), e fermati.
 
-**Gli orchestrator vivi.** Con `CHECK=ok`, per ogni riga `ORCHESTRATOR` leggi i membri del suo perimetro col lettore unico:
+**Gli orchestrator vivi.** Con `CHECK=ok`, per ogni riga `ORCHESTRATOR` leggi i membri del suo perimetro orchestrabile col lettore unico:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <perimetro> --members
+"${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh" <id del perimetro orchestrabile> --members
 ```
 
-Se la task è fra le righe `TASK_MEMBER=` o è il perimetro stesso, **fermati**: l'orchestrator `<sessionId corto>` di `<perimetro>` la porterebbe avanti accanto a te. Si sblocca fermando quell'orchestrator.
+Se la task è fra le righe `TASK_MEMBER=` o è il perimetro orchestrabile stesso, **fermati**: l'orchestrator `<sessionId corto>` di `<id del perimetro orchestrabile>` la porterebbe avanti accanto a te. Si sblocca fermando quell'orchestrator.
 
 **Avvisi, non rifiuti.** Il passo lo chiede l'utente, per nome: quello che segue si dice in una riga e si lancia lo stesso.
 
@@ -148,7 +148,7 @@ L'uscita del comando d'attesa è quella di `status`, e il suo stdout porta l'esi
 A turno chiuso con domande, scrivi in chat:
 
 - **le domande che scalano**, intere: la domanda, le strade che il preflight vede, e il pezzo di recap che serve a deciderle;
-- **le domande coperte**, con la risposta che proponi — o che hai mandato, sotto delega — e il perché;
+- **le domande coperte**, con la risposta che proponi — o che hai inviato, sotto delega — e il perché;
 - **le proposte `P{N}` del preflight**, tutte, una riga l'una con la scelta.
 
 Il resto del recap non si ricopia: sta nella conversazione del passo, che l'utente apre dal deck con ⏎. Il silenzio accetta una proposta solo se chi può smentirla l'ha vista, e l'output di `status` lo legge questa conversazione, non l'utente: per questo le proposte arrivano in chat tutte.
@@ -226,7 +226,7 @@ D2 → D2.B: <testo> — perché: risposta dell'utente: «<sue parole>»
 - **Una `P{N}` smentita** dall'utente entra come riga sua: `P3 → smentita: <le parole dell'utente>`.
 - **La firma «approvate dall'utente» è vera solo dopo il via dato in questa chat**: mai su un testo che l'utente non ha visto. Il classificatore di auto mode blocca un messaggio che dichiara un'approvazione mai data, ed è giusto così.
 
-Uscita `0` → togli le domande mandate da `## Domande in sospeso`, scrivi la riga in `## Risposte mandate`, e riarma l'attesa (§4). Uscita `1` con un processo vivo nel motivo → l'utente ha ripreso il passo in una tab dal deck: il passo è suo, lì. Diglielo, e non mandare niente. Ogni altro rifiuto → riportalo, nessun ritento.
+Uscita `0` → togli le domande inviate da `## Domande in sospeso`, scrivi la riga in `## Risposte mandate`, e riarma l'attesa (§4). Uscita `1` con un processo vivo nel motivo → l'utente ha ripreso il passo in una tab dal deck: il passo è suo, lì. Diglielo, e non mandare niente. Ogni altro rifiuto → riportalo, nessun ritento.
 
 ## 6. La fine del passo, e lasciarlo
 

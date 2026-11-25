@@ -46,7 +46,7 @@ Cascata di famiglia `arg → $LOOM_TASK`. Exit non-zero = nessuna task risolvibi
 
 Fai **sempre** `Read` di `TASK_FILE`, per intero. Non lavorare su ciò che l'iniezione ha portato in contesto: il fill del budget si ferma alla prima sezione che non entra, quindi una sezione può mancare dal contesto senza mancare dal file.
 
-**Se la task ha `Size: Epic` o `Size: Mandate`** sei sul caso sbagliato — è un cappello o un mandato, e il suo stato vero sta nei membri. Dichiaralo in una riga, indica `/loom-works:recap-status-epic ${TASK_ID}`, e **procedi comunque** col recap del solo cappello: fermarsi sarebbe peggio che consegnare un quadro parziale dichiarato tale.
+**Se la task ha `Size: Epic`, `Size: Custom` o `Size: Mandate`** (il nome di prima) sei sul caso sbagliato — è un cappello o una lista custom, e il suo stato vero sta nei membri. Dichiaralo in una riga, indica `/loom-works:recap-status-epic ${TASK_ID}`, e **procedi comunque** col recap del solo cappello: fermarsi sarebbe peggio che consegnare un quadro parziale dichiarato tale.
 
 ## 2. Raccogli il contesto reale
 
@@ -62,7 +62,7 @@ Poi, se il campo `**Folder**:` è popolato, lista la task folder (`ls -la`) — 
 
 Il materiale prodotto è **parte dello stato della task**, non un allegato: su una task di progettazione le sole checkbox misurano zero avanzamento mentre il lavoro prodotto è tutto testo.
 
-**Se `## Materiale` è popolata**, è la fonte: onora i glifi (`📖` fonte · `🔬` analisi · `📤` prodotto · `🎬` stato dell'orchestrator, in un perimetro · `💎` da non eliminare, accanto al glifo di ruolo) e risolvi la radice `📁/` contro il campo `**Folder**:`. Riporta le voci con la loro maniglia, non i path nudi.
+**Se `## Materiale` è popolata**, è la fonte: onora i glifi (`📖` fonte · `🔬` analisi · `📤` prodotto · `🎬` stato dell'orchestrator, in un perimetro orchestrabile · `💎` da non eliminare, accanto al glifo di ruolo) e risolvi la radice `📁/` contro il campo `**Folder**:`. Riporta le voci con la loro maniglia, non i path nudi.
 
 **Se manca o è vuota**, ricostruisci l'insieme da due sedi:
 

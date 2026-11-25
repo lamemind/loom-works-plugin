@@ -51,14 +51,14 @@ Ciclo di vita: `🔵 → 🟢 preflight fatto → 🟡 → ✔️`. Tabella e gr
 ## Task
 
 - `/loom-works:create-task {id} {name}` — crea task
-- `/loom-works:run-task [{id}] [perimetro]` — esegue i DLV (perimetro `1,3-5`; nudo = tutti gli aperti), promuove a 🟡, un commit leggero per DLV chiuso
+- `/loom-works:run-task [{id}] [perimetro eseguibile]` — esegue i DLV (perimetro eseguibile `1,3-5`; nudo = tutti gli aperti), promuove a 🟡, un commit leggero per DLV chiuso
 - `/loom-works:checkpoint-task [{id}]` — checkpoint, commit (file task + docs/tasks.md)
 
 Flusso: `create-task → preflight-task → run-task ⇄ checkpoint-task`; il preflight è obbligatorio a Size L, alle altre Size serve quando emergono dubbi di design. Più task in parallelo nello stesso worktree: §Detached.
 
 **Parentela fra task**: il campo `**Parent Task**: T{N}` si scrive a mano nella figlia, e il parent porta `- [ ] T{N} (<maniglia>) chiusa` in Acceptance. Alla chiusura della figlia il suo `checkpoint-task` flagga indietro quella checkbox — matchando l'id, non la frase.
 
-**Epiche (task cappello)**: `Size: Epic` marca il cappello. Serve un marker: la parentela la scrive la **figlia**, il padre non sa di averne. Nel cappello: visione, ordine delle fasi, una checkbox per figlia in Acceptance; nelle figlie il lavoro eseguibile. Un **mandato** (`Size: Mandate`) elenca nel suo file membri anche di epiche diverse. Nessuno dei due copia stato o cifre dei membri, e `run-task` non li esegue. Membri: `resolve-task.sh <id> --members`; formato: `mandate-format.md`.
+**Epiche (task cappello)**: `Size: Epic` marca il cappello. Serve un marker: la parentela la scrive la **figlia**, il padre non sa di averne. Nel cappello: visione, ordine delle fasi, una checkbox per figlia in Acceptance; nelle figlie il lavoro eseguibile. Una **lista custom** (`Size: Custom`; `Size: Mandate` è il nome di prima, letto uguale) elenca nel suo file membri anche di epiche diverse: epica e lista custom sono i due **perimetri orchestrabili**. Nessuna delle due copia stato o cifre dei membri, e `run-task` non le esegue. Membri: `resolve-task.sh <id> --members`; formato: `perimeter-format.md`.
 
 **Materiale della task**: la sezione `## Materiale` dichiara i file di **alto rilievo**, non l'inventario della folder. Voce = glifo + path + maniglia verbo+oggetto. 📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato dell'orchestrator · `📁/` = radice della task folder (campo `Folder`). 💎 marca un oggetto da non eliminare: è un flag dopo il glifo di ruolo (`📤💎`), non un ruolo (§Task Folder).
 

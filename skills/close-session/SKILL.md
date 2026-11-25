@@ -13,7 +13,7 @@ $ARGUMENTS
 
 La chiusura resta del **deck**: la skill è un client, gemella di `spawn-task`. Il deck acceso sul progetto ascolta lo stesso endpoint locale dello spawn — named pipe su Windows, socket Unix su Linux, un indirizzo per progetto — e chiude la conversazione terminando il suo processo `claude`: la tab si chiude da sé, il transcript resta su disco, e la conversazione si riprende dal deck come ogni altra chiusa. Il deck risponde dopo aver verificato la fine del processo.
 
-Il deck chiude solo una conversazione **viva**, **del progetto**, **aperta da una richiesta `spawn-task`** e **ferma** — senza un turno in corso né un comando in esecuzione. Fa eccezione l'**orchestrator che ha passato le consegne**: anche aperto a mano, il deck l'ha marcato `origin: orchestrator` quando ha aperto il successore (`spawn-task <perimetro> orchestrator`), e il successore lo chiude. Rifiuta, col motivo, la conversazione che chiede la chiusura e ogni altra conversazione aperta a mano: quelle le chiude l'utente.
+Il deck chiude solo una conversazione **viva**, **del progetto**, **aperta da una richiesta `spawn-task`** e **ferma** — senza un turno in corso né un comando in esecuzione. Fa eccezione l'**orchestrator che ha passato le consegne**: anche aperto a mano, il deck l'ha marcato `origin: orchestrator` quando ha aperto il successore (`spawn-task <id del perimetro orchestrabile> orchestrator`), e il successore lo chiude. Rifiuta, col motivo, la conversazione che chiede la chiusura e ogni altra conversazione aperta a mano: quelle le chiude l'utente.
 
 **Un'invocazione, una chiusura.** Più chiusure sono più invocazioni. La skill non pone domande, non chiede conferme e non sceglie il bersaglio: la decisione è già avvenuta nella conversazione che la invoca.
 
