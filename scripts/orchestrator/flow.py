@@ -181,8 +181,17 @@ def command_start(project_root, head, arguments):
         options = {"stdin": subprocess.DEVNULL, "stdout": log_handle, "stderr": log_handle, "close_fds": True,
                    "cwd": project_root}
         if orchestrator_common.IS_WINDOWS:
-            options["creationflags"] = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-                                        | subprocess.CREATE_NO_WINDOW)
+            # Una console propria e nascosta, che i figli del giro ereditano:
+            # `git`, `bash` e lo shim `cmd` di `loom-deck-headless` partono a
+            # ogni giro senza flag, e un padre senza console farebbe aprire a
+            # ognuno una console nuova, cioè una finestra del terminale
+            # predefinito (Windows Terminal) per la durata del comando.
+            # `DETACHED_PROCESS` qui non va: Windows ignora `CREATE_NO_WINDOW`
+            # quando c'è anche lui, e il processo nascerebbe senza console.
+            # Senza `DETACHED_PROCESS` il processo non condivide la console di
+            # chi lo lancia, perché `CREATE_NO_WINDOW` gliene crea una nuova,
+            # quindi sopravvive alla chiusura della tab dell'orchestrator.
+            options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
         else:
             options["start_new_session"] = True
         child = subprocess.Popen(command, **options)
