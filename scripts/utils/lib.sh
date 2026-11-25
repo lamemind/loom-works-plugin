@@ -255,23 +255,27 @@ lw_task_children() {   # <task-id>
     done
 }
 
-# ---- Membri di un perimetro: epica o mandato ---------------------------------
+# ---- Membri di un perimetro orchestrabile: epica o lista custom --------------
 #
-# Un perimetro di lavoro vive in un task file in due forme, e le due differiscono
-# solo nel punto da cui si leggono i membri (contratto: docs/mandate-format.md):
+# Un perimetro orchestrabile vive in un task file in due forme, e le due
+# differiscono solo nel punto da cui si leggono i membri (contratto:
+# docs/perimeter-format.md):
 #
-#   - `Size: Mandate` nell'header -> la lista `## Membri` del file, nell'ordine
+#   - `Size: Custom` nell'header  -> la lista `## Membri` del file, nell'ordine
 #     del file: una riga a colonna zero che comincia con `- `, vale il primo
-#     `T<numero>` della riga (stessa tolleranza di `**Parent Task**`)
+#     `T<numero>` della riga (stessa tolleranza di `**Parent Task**`).
+#     `Size: Mandate`, il nome di prima della lista custom, vale uguale e senza
+#     scadenza: lo riscrive prepare-perimeter quando passa sul file
 #   - ogni altra task             -> le figlie, da lw_task_children
 #
 # Un lettore solo perche' orchestrator, checkpoint e recap contano gli stessi membri:
 # due letture scritte a mano divergerebbero al primo task file con una forma
 # inattesa, come il grep di `Parent Task` senza ancora di fine-token.
 #
-# Un membro epica o mandato resta una riga sola, mai espanso nei suoi membri:
-# chi consuma lo orchestra a parte, e un ciclo fra mandati non puo' nascere qui.
-# Un id ripetuto conta alla prima riga; il mandato che elenca se' stesso no.
+# Un membro epica o lista custom resta una riga sola, mai espanso nei suoi
+# membri: chi consuma lo orchestra a parte, e un ciclo fra liste custom non puo'
+# nascere qui. Un id ripetuto conta alla prima riga; la lista custom che elenca
+# se' stessa no.
 #
 # Stampa:
 #
@@ -283,8 +287,8 @@ lw_task_children() {   # <task-id>
 #
 # TASK_MEMBER_MISSING e' un membro dichiarato senza task file: fuori dal
 # conteggio, e non ferma il lettore — una task purgata da clean-tasks e' un caso
-# normale, chi consuma decide. Un mandato senza `## Membri` da' zero membri: non
-# ripiega sulle figlie, i membri di un mandato sono la sua lista.
+# normale, chi consuma decide. Una lista custom senza `## Membri` da' zero
+# membri: non ripiega sulle figlie, i membri di una lista custom sono la lista.
 #
 # Nessun sottoprocesso per riga o per membro: su Git Bash ognuno costa ~150 ms.
 # Exit: 0 = ok · 1 = id malformato · 2 = task file assente
@@ -310,7 +314,7 @@ lw_task_members() {   # <task-id>
     fi
 
     # Size si legge solo nell'header, prima del primo `## `: la prosa di una
-    # Description puo' nominare `Size: Mandate` senza esserlo.
+    # Description puo' nominare `Size: Custom` senza esserlo.
     while IFS= read -r line || [[ -n "$line" ]]; do
         line="${line%$'\r'}"
         [[ "$line" == "## "* ]] && break
@@ -320,7 +324,7 @@ lw_task_members() {   # <task-id>
         fi
     done < "$file"
 
-    if [[ "$size" != "mandate" ]]; then
+    if [[ "$size" != "custom" && "$size" != "mandate" ]]; then
         local children
         children="$(lw_task_children "$id")" || return 1
         echo "TASK_MEMBERS_SRC=parent"
@@ -428,8 +432,8 @@ lw_tasks_md_prog_set() {   # <tasks-file> <task-id> <glifo>
 
 # ---- Baseline del diff di checkpoint -----------------------------------------
 #
-# Da dove parte la finestra <base>..HEAD di un checkpoint: il lavoro su un perimetro
-# dall'ultimo avanzamento (checkpoint-mandate).
+# Da dove parte la finestra <base>..HEAD di un checkpoint: il lavoro su una task,
+# o su un perimetro orchestrabile (checkpoint-perimeter), dall'ultimo avanzamento.
 # NON e' un campo scritto nel task file: quello era un chicken-egg — il SHA si
 # conosce solo DOPO il commit, ma scriverlo dentro il file appena committato lo
 # modifica di nuovo, quindi il sed girava post-commit e lasciava il working tree
@@ -442,7 +446,7 @@ lw_tasks_md_prog_set() {   # <tasks-file> <task-id> <glifo>
 # '### Avanzamento N' PRIMA del commit, quindi sul working tree il pickaxe
 # cercherebbe in history un header non ancora committato e uscirebbe vuoto.
 #
-# L'ancoraggio all'avanzamento rende il baseline il perimetro di cio' che si sta
+# L'ancoraggio all'avanzamento fa del baseline il confine di cio' che si sta
 # consolidando: un commit che sweep-a il task file per altro (una checkbox, le
 # Decisions di preflight-task) non lo sposta piu'. In piu' l'hash esce sempre
 # vivo dalla history, mentre un SHA storato puo' danglare dopo un rebase.
@@ -509,7 +513,7 @@ lw_git_add() {
 # protegge niente: `git commit -m` SENZA pathspec committa l'intero indice, quindi
 # un `lw_git_add <path>` seguito da un commit nudo portava dentro anche cio' che
 # altre sessioni avevano lasciato in stage (un `git mv` stagia da se'). L'indice
-# e' una zona comune del worktree: il perimetro lo fissa il COMMIT, non l'add.
+# e' una zona comune del worktree: quali file entrano lo fissa il COMMIT, non l'add.
 #
 # La pathspec e' obbligatoria: senza path la funzione rifiuta, perche' la forma
 # senza path e' esattamente quella che produceva il guasto.
@@ -695,7 +699,7 @@ lw_folder_declarers() {  # <tasks_dir> [<excluded task file>...]
 # delete. One root-relative path per line, in file order; empty when nothing
 # marked is at risk. The caller decides whether the folder leaves in this
 # invocation: a folder that stays puts nothing at risk, and is not asked about.
-# Entry grammar, the one mandate.py reads: a line at column zero starting with
+# Entry grammar, the one perimeter.py reads: a line at column zero starting with
 # `- `, glyphs, then the path in backticks. 💎 is a flag next to the role glyph
 # (`📤💎`), so it is looked for anywhere before the first backtick.
 # Path forms: `📁/…` resolved on <rel_folder>; an explicit path with `./` and

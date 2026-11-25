@@ -22,14 +22,14 @@
 #   TASK_CHILDREN_COUNT=3
 #   TASK_CHILD=T76 /abs/path/runtime/tasks/T76-slug.md
 #
-# Con --members aggiunge i membri del perimetro, epica o mandato — lettore unico
-# `lw_task_members`, contratto in docs/mandate-format.md. Stessa forma, non
-# %q-quotata:
+# Con --members aggiunge i membri del perimetro orchestrabile, epica o lista
+# custom — lettore unico `lw_task_members`, contratto in docs/perimeter-format.md.
+# Stessa forma, non %q-quotata:
 #   TASK_MEMBERS_SRC=list|parent
 #   TASK_MEMBERS_COUNT=2
 #   TASK_MEMBER=T52 /abs/path/runtime/tasks/T52-slug.md
 #   TASK_MEMBER_MISSING=T58
-# --children resta com'era, anche su un mandato: le figlie da `Parent Task`.
+# --children resta com'era, anche su una lista custom: le figlie da `Parent Task`.
 #
 # Env: PROJECT_ROOT, LOOM_TASK, LOOM_DOCS_ROOT
 # Exit: 0 = risolta · 1 = nessuna fonte · 2 = id noto ma task file assente
