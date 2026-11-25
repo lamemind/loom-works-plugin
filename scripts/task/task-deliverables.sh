@@ -8,13 +8,13 @@
 #        task-deliverables.sh [--docs-root D] <task-id> --show <n>
 # Env:   PROJECT_ROOT (default: $PWD)
 #
-# Tre verbi sullo stesso oggetto, un parser solo: risolvere il perimetro,
+# Tre verbi sullo stesso oggetto, un parser solo: risolvere il perimetro eseguibile,
 # spuntare una voce e leggerla contano i DLV nello stesso identico modo, e due
 # copie del conteggio divergerebbero al primo task file con una forma inattesa.
 #
 # --show <n> legge una voce in qualunque stato, senza toccare il file:
 #   DLV|<n>|open|done|<testo>
-# Serve a chi deve citare un DLV gia' chiuso — il perimetro rifiuta un DLV
+# Serve a chi deve citare un DLV gia' chiuso — il perimetro eseguibile rifiuta un DLV
 # [x], e --check su un DLV [x] non ne stampa il testo. Lo usa il lettore degli
 # hook di progetto (scripts/config/project-config.sh) per comporre gli argomenti
 # di deliverableDone. Indice fuori range -> exit 1.
@@ -25,32 +25,33 @@
 # numerazione di tutto cio' che segue. La posizione non e' scritta da nessuna
 # parte nel file — si conta, e chi conta deve contare uguale.
 #
-# PERIMETRO — spec "UI di stampante": `1,2,6` (lista), `3-8` (range),
+# PERIMETRO ESEGUIBILE — l'insieme di DLV che un run-task esegue. Spec "UI di
+# stampante": `1,2,6` (lista), `3-8` (range),
 # combinabili (`1,3-5,9`). Normalizzato crescente e deduplicato: l'ordine di
 # esecuzione e' quello del file, non quello in cui l'utente ha battuto i numeri.
 # Nessuna spec = tutti i DLV ancora aperti.
 #
-# ERRORE SECCO, mai degradazione — un perimetro che non si risolve ferma la
+# ERRORE SECCO, mai degradazione — un perimetro eseguibile che non si risolve ferma la
 # skill invece di eseguire "quello che si e' capito": un run-task che lavora su
 # un insieme diverso da quello dichiarato in apertura e' indistinguibile a
 # valle da uno corretto.
 #   - indice fuori range          -> exit 1
-#   - DLV gia' [x] nel perimetro  -> exit 1 (non si ri-esegue MAI cio' che e'
+#   - DLV gia' [x] nella spec     -> exit 1 (non si ri-esegue MAI cio' che e'
 #     fatto; per rifarlo davvero si toglie la spunta a mano, che e' un gesto
 #     deliberato e visibile nel diff)
-#   - perimetro vuoto             -> exit 1 (niente da eseguire non e' un
+#   - perimetro eseguibile vuoto  -> exit 1 (niente da eseguire non e' un
 #     successo silenzioso)
 #
-# Output (modo perimetro), il testo SEMPRE ultimo campo perche' puo' contenere `|`:
+# Output (modo perimetro eseguibile), il testo SEMPRE ultimo campo perche' puo' contenere `|`:
 #   TASK=T125
 #   TASK_FILE=/abs/path/T125-slug.md
 #   SCOPE_SPEC=3,5-6
 #   DLV|1|done|out|**Referto sul regime attuale** — ...
-#   DLV|3|open|in|**Modello del perimetro** — ...
+#   DLV|3|open|in|**Modello del regime** — ...
 #   SCOPE_RESOLVED=3,5,6
 #   SCOPE_COUNT=3
 #
-# Exit: 0 = ok · 1 = perimetro/sezione non risolvibili · 2 = task non risolvibile
+# Exit: 0 = ok · 1 = perimetro eseguibile o sezione non risolvibili · 2 = task non risolvibile
 # =============================================================================
 
 SCOPE_SPEC=""
@@ -143,14 +144,14 @@ if [[ -n "$CHECK_N" ]]; then
     exit 0
 fi
 
-# --- Modo perimetro: risoluzione e validazione --------------------------------
+# --- Modo perimetro eseguibile: risoluzione e validazione ----------------------
 declare -A IN_SCOPE=()
 SCOPE_LIST=()
 
 if [[ -n "$SCOPE_SPEC" ]]; then
     NORM="${SCOPE_SPEC// /}"
     if [[ ! "$NORM" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]]; then
-        echo "ERROR: perimetro malformato: '${SCOPE_SPEC}'" >&2
+        echo "ERROR: perimetro eseguibile malformato: '${SCOPE_SPEC}'" >&2
         echo "       Attesa una lista di indici e range: 1,2,6 · 3-8 · 1,3-5,9" >&2
         exit 1
     fi
@@ -159,7 +160,7 @@ if [[ -n "$SCOPE_SPEC" ]]; then
         if [[ "$part" == *-* ]]; then
             from="${part%%-*}"; to="${part##*-}"
             if (( from > to )); then
-                echo "ERROR: range invertito nel perimetro: '${part}'" >&2
+                echo "ERROR: range invertito nel perimetro eseguibile: '${part}'" >&2
                 exit 1
             fi
         else
@@ -176,7 +177,7 @@ if [[ -n "$SCOPE_SPEC" ]]; then
     for (( n = 1; n <= TOTAL; n++ )); do
         [[ -n "${IN_SCOPE[$n]:-}" ]] || continue
         if [[ "$(dlv_field "$n" 2)" == "done" ]]; then
-            echo "ERROR: DLV${n} e' gia' [x] e il perimetro lo include: $(dlv_field "$n" 3)" >&2
+            echo "ERROR: DLV${n} e' gia' [x] e il perimetro eseguibile lo include: $(dlv_field "$n" 3)" >&2
             echo "       Un deliverable fatto non si ri-esegue. Per rifarlo davvero, togli la spunta nel task file e rilancia." >&2
             exit 1
         fi

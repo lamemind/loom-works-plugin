@@ -1,6 +1,6 @@
 ---
 name: run-task
-description: Esegue i deliverable di una task — perimetro dichiarabile sui DLV, un commit per DLV chiuso, rito di validazione scelto da Size.
+description: Esegue i deliverable di una task — perimetro eseguibile dichiarabile sui DLV, un commit per DLV chiuso, rito di validazione scelto da Size.
 allowed-tools: Bash(*), Task, Read, Edit, Write, Glob, Grep, TodoWrite, Skill
 ---
 
@@ -17,7 +17,7 @@ Stampa la docs-root di **questo** progetto (es. `runtime`; default `docs`). Usa 
 $ARGUMENTS
 ~~~
 
-Da qui si leggono due cose, e due sole: l'**ID della task** (es. `T310`) e il **perimetro dei DLV**, in qualunque forma l'utente lo scriva — `solo DLV5`, `1,2,6`, `dal 3 all'8`, `fermati al 4`. Traducilo nella spec dello script (§2). Tutto il resto è istruzione libera, e vale quanto qualunque altra riga del prompt.
+Da qui si leggono due cose, e due sole: l'**ID della task** (es. `T310`) e il **perimetro eseguibile**, cioè i DLV da eseguire, in qualunque forma l'utente lo scriva — `solo DLV5`, `1,2,6`, `dal 3 all'8`, `fermati al 4`. Traducilo nella spec dello script (§2). Tutto il resto è istruzione libera, e vale quanto qualunque altra riga del prompt.
 
 ## 0. Presenta la task
 
@@ -31,19 +31,19 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId}
 
 Fai **sempre** `Read` di `TASK_FILE`: in contesto può non esserci affatto (invocazione on-the-fly) o esserci troncato (budget dell'hook di iniezione).
 
-## 1. Gate `Size: Epic` e `Size: Mandate` — dichiara e fermati
+## 1. Gate `Size: Epic` e `Size: Custom` — dichiara e fermati
 
-Prima di ogni altra cosa, e prima del fallback su Size assente, o un'epica o un mandato verrebbe eseguito come una task media. Un perimetro di DLV dichiarato nelle Note utente **non** apre il gate.
+Prima di ogni altra cosa, e prima del fallback su Size assente, o un'epica o una lista custom verrebbe eseguita come una task media. Un perimetro eseguibile dichiarato nelle Note utente **non** apre il gate.
 
-Una task `Size: Epic` è un cappello: il suo lavoro sta tutto nelle figlie. Una task `Size: Mandate` è il perimetro di un orchestrator: elenca nel proprio file task di epiche diverse e orfane, e il lavoro sta tutto nei membri (`${CLAUDE_PLUGIN_ROOT}/docs/mandate-format.md`). Nessuna delle due ha lavoro eseguibile proprio. Non aprire nessun deliverable, non scrivere codice. Stampa invece:
+Una task `Size: Epic` è un cappello: il suo lavoro sta tutto nelle figlie. Una task `Size: Custom` è una lista custom, il perimetro orchestrabile che elenca nel proprio file task di epiche diverse e orfane, e il lavoro sta tutto nei membri (`${CLAUDE_PLUGIN_ROOT}/docs/perimeter-format.md`); `Size: Mandate`, il nome di prima, vale uguale. Nessuna delle due ha lavoro eseguibile proprio. Non aprire nessun deliverable, non scrivere codice. Stampa invece:
 
-- che `${taskId}` è un'epica, o un mandato, e che `run-task` non la esegue
-- l'elenco dei membri con la loro Prog, da `${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --members` — le figlie per un'epica, la lista `## Membri` per un mandato; un `TASK_MEMBER_MISSING=<id>` è un membro dichiarato senza task file, e va nell'elenco come tale
+- che `${taskId}` è un'epica, o una lista custom, e che `run-task` non la esegue
+- l'elenco dei membri con la loro Prog, da `${CLAUDE_PLUGIN_ROOT}/scripts/task/resolve-task.sh ${taskId} --members` — le figlie per un'epica, la lista `## Membri` per una lista custom; un `TASK_MEMBER_MISSING=<id>` è un membro dichiarato senza task file, e va nell'elenco come tale
 - l'invito a eseguire un membro (`/loom-works:run-task T{N}`) o a chiedere il quadro con `/loom-works:recap-status-epic ${taskId}`
 
 Poi termina. Nessuna promozione, nessun ping TTS, nessuna fase Doc Impact: non è stato fatto lavoro.
 
-## 2. Perimetro — quali DLV entrano
+## 2. Perimetro eseguibile — quali DLV entrano
 
 I deliverable sono **oggetti indirizzabili**, numerati **posizionalmente 1-based** sulle checkbox a colonna zero di `## Deliverables Checklist`. Il conteggio non lo fai a occhio: lo fa lo script, che è anche quello che spunta (§6) — due conteggi diversi divergerebbero al primo task file con una forma inattesa.
 
@@ -51,21 +51,21 @@ I deliverable sono **oggetti indirizzabili**, numerati **posizionalmente 1-based
 ${CLAUDE_PLUGIN_ROOT}/scripts/task/task-deliverables.sh ${taskId} [--scope "1,3-5"]
 ```
 
-- **Nessun perimetro nelle Note utente** → invoca senza `--scope`: il perimetro è **tutti i DLV ancora `[ ]`**, in ordine di file.
-- **Perimetro dichiarato** → traducilo in spec: lista `1,2,6`, range `3-8`, combinabili `1,3-5,9`. «Fermati al 4» su una task ai primi DLV è `1-4`.
+- **Nessun perimetro eseguibile nelle Note utente** → invoca senza `--scope`: il perimetro eseguibile è **tutti i DLV ancora `[ ]`**, in ordine di file.
+- **Perimetro eseguibile dichiarato** → traducilo in spec: lista `1,2,6`, range `3-8`, combinabili `1,3-5,9`. «Fermati al 4» su una task ai primi DLV è `1-4`.
 
 Output: una riga per deliverable — `DLV|<n>|open⎪done|in⎪out|<testo>` — più `SCOPE_RESOLVED` e `SCOPE_COUNT`. Il testo è sempre l'ultimo campo perché può contenere `|`.
 
-**Exit non-zero = fermati e riporta l'errore all'utente.** Lo script rifiuta un indice fuori range, una spec malformata, un perimetro vuoto e un DLV già `[x]` nominato esplicitamente — un deliverable fatto non si ri-esegue mai, nemmeno chiesto da solo; per rifarlo davvero l'utente toglie la spunta a mano. Non ripiegare su «eseguo quello che ho capito»: un run-task che lavora su un insieme diverso da quello annunciato è indistinguibile a valle da uno corretto.
+**Exit non-zero = fermati e riporta l'errore all'utente.** Lo script rifiuta un indice fuori range, una spec malformata, un perimetro eseguibile vuoto e un DLV già `[x]` nominato esplicitamente — un deliverable fatto non si ri-esegue mai, nemmeno chiesto da solo; per rifarlo davvero l'utente toglie la spunta a mano. Non ripiegare su «eseguo quello che ho capito»: un run-task che lavora su un insieme diverso da quello annunciato è indistinguibile a valle da uno corretto.
 
-**Dichiara il perimetro in apertura**, prima di aprire qualunque file di lavoro — è il contratto con chi ti ha invocato:
+**Dichiara il perimetro eseguibile in apertura**, prima di aprire qualunque file di lavoro — è il contratto con chi ti ha invocato:
 
 ```
-🎯 Perimetro: DLV 3, 5, 6 di 8
+🎯 Perimetro eseguibile: DLV 3, 5, 6 di 8
    ▶ DLV3 <maniglia>
    ▶ DLV5 <maniglia>
    ▶ DLV6 <maniglia>
-   ⏸ fuori perimetro: DLV1, 2, 4, 7, 8
+   ⏸ fuori dal perimetro eseguibile: DLV1, 2, 4, 7, 8
    ✔️ già chiusi: (nessuno)
 ```
 
@@ -82,7 +82,7 @@ Il piano dev'essere chiaro **prima** di scrivere codice. Chi congela le aspettat
 
 ## 4. Rito di validazione — lo sceglie `Size`
 
-`Size` e perimetro sono **ortogonali**: Size decide quanta validazione e pianificazione precedono il codice, il perimetro su quali DLV si lavora.
+`Size` e perimetro eseguibile sono **ortogonali**: Size decide quanta validazione e pianificazione precedono il codice, il perimetro eseguibile su quali DLV si lavora.
 
 | Size | Rito |
 |------|------|
@@ -92,7 +92,7 @@ Il piano dev'essere chiaro **prima** di scrivere codice. Chi congela le aspettat
 
 Size assente → tratta come **M**.
 
-Nessun checkpoint di feedback, a nessun Size: il punto di fermo è il commit per-DLV di §6, e una task L può chiudersi in un'unica mandata. Esecuzione unsupervised — qualità e correttezza vincono su velocità, l'utente controllerà ogni riga.
+Nessun checkpoint di feedback, a nessun Size: il punto di fermo è il commit per-DLV di §6, e una task L può chiudersi in un'unica passata. Esecuzione unsupervised — qualità e correttezza vincono su velocità, l'utente controllerà ogni riga.
 
 ## 5. Promozione a 🟡 — subito prima di scrivere codice
 
@@ -108,7 +108,7 @@ Il commit è dedicato e immediato perché `tasks.md` è condiviso: una promozion
 
 ## 6. Il ciclo — un DLV alla volta
 
-Per ogni DLV del perimetro, **in ordine**:
+Per ogni DLV del perimetro eseguibile, **in ordine**:
 
 1. **Lavora** il deliverable fino a chiuderlo davvero: implementa, testa, builda.
 2. **Spunta** la voce: `${CLAUDE_PLUGIN_ROOT}/scripts/task/task-deliverables.sh ${taskId} --check <n>`
@@ -138,7 +138,7 @@ Per ogni DLV del perimetro, **in ordine**:
 
    **Un hook non ferma mai il ciclo.** Il DLV è già committato e pushato, e l'hook non lo riapre. Una skill che non esiste, che dà errore o che dichiara un esito di fallimento produce un avviso in linea — `⚠ hook <skill> fallito su DLV<n>: <motivo>` — e una riga in §8; le skill successive della lista e i DLV successivi girano comunque. Nessun secondo tentativo: un hook fallito a metà ha già potuto scrivere fuori dal repo (un commento sulla issue), e lo scriverebbe due volte. Un exit non-zero dello script vale uguale: `⚠ hook deliverableDone non invocati su DLV<n>: <messaggio>`, e una riga sola in §8 anche se si ripete a ogni DLV.
 
-   Il body di una skill hook entra nel contesto a ogni invocazione e vale per quell'hook soltanto. Quando la skill ha dichiarato l'esito riprendono le regole di questo ciclo: prossimo DLV del perimetro, commit leggero, nessuna fase doc. Ciò che la skill hook fa resta suo: non si spunta e non entra nel commit di nessun DLV.
+   Il body di una skill hook entra nel contesto a ogni invocazione e vale per quell'hook soltanto. Quando la skill ha dichiarato l'esito riprendono le regole di questo ciclo: prossimo DLV del perimetro eseguibile, commit leggero, nessuna fase doc. Ciò che la skill hook fa resta suo: non si spunta e non entra nel commit di nessun DLV.
 
 Il commit è **leggero**: codice + spunta, niente `Prog`, niente Progress Log, niente inbox. Il tracking e la doc restano di `checkpoint-task`, che è l'unico a chiudere la task (✔️, `Done at`, trasloco delle nozioni). Non fare qui il suo mestiere.
 
@@ -219,7 +219,7 @@ SCENARIO
 - **La conferma e il ribaltamento valgono uguale.** Sulla segnalazione che avevi marcato `☑ subito (agente)`, «ok» è uno scenario `subito` e «fanne una task» uno scenario `task`, entrambi `--chi umano`, accanto al tuo: non si riscrive niente, i due record sono il dato.
 - **Detta a posteriori, la stessa parola è un esito e non un'azione.** Chi rilegge il report da un'altra sessione registra con `--momento posteriori` e non esegue niente.
 
-**Una risposta firmata «su delega» è dell'orchestrator, non dell'umano.** Un messaggio che apre con `Risposte alle segnalazioni di T<id> — decise dall'orchestrator di T<perimetro> su delega dell'utente.` arriva dall'orchestrator del perimetro, che decide al posto dell'umano perché l'umano gliel'ha delegato; la riga sotto la firma porta le parole con cui l'ha delegato, alla lettera. Ogni scenario di quella risposta si scrive con `--chi delega` e quelle parole intere in `--delega`, senza ritaglio: le legge prima una variabile da un heredoc fra apici, così backtick e apostrofi restano testo.
+**Una risposta firmata «su delega» è dell'orchestrator, non dell'umano.** Un messaggio che apre con `Risposte alle segnalazioni di T<id> — decise dall'orchestrator di T<id del perimetro orchestrabile> su delega dell'utente.` arriva dall'orchestrator del perimetro orchestrabile, che decide al posto dell'umano perché l'umano gliel'ha delegato; la riga sotto la firma porta le parole con cui l'ha delegato, alla lettera. Ogni scenario di quella risposta si scrive con `--chi delega` e quelle parole intere in `--delega`, senza ritaglio: le legge prima una variabile da un heredoc fra apici, così backtick e apostrofi restano testo.
 
 ```bash
 DELEGA="$(cat <<'DELEGA'

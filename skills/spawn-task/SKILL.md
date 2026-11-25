@@ -1,7 +1,7 @@
 ---
 name: spawn-task
-description: Chiede al deck acceso sul progetto di aprire una conversazione nuova su una task — preflight, run di tutti i DLV o di un perimetro, recap, checkpoint, l'orchestrator successore di un passaggio di consegne — come se l'utente premesse il tasto nel deck. Una task per invocazione, nessuna domanda e nessuna conferma. Usa quando una conversazione ha un piano già approvato da lanciare, per esempio quella di un'epica: «lancia il preflight di T12», «apri il run dei DLV 1-3 di T14».
-argument-hint: "<TaskID> <kind> [perimetro] [--model <alias>] [--note <testo>] [--orchestrator <perimetro>]"
+description: Chiede al deck acceso sul progetto di aprire una conversazione nuova su una task — preflight, run di tutti i DLV o di un perimetro eseguibile, recap, checkpoint, l'orchestrator successore di un passaggio di consegne — come se l'utente premesse il tasto nel deck. Una task per invocazione, nessuna domanda e nessuna conferma. Usa quando una conversazione ha un piano già approvato da lanciare, per esempio quella di un'epica: «lancia il preflight di T12», «apri il run dei DLV 1-3 di T14».
+argument-hint: "<TaskID> <kind> [perimetro eseguibile] [--model <alias>] [--note <testo>] [--orchestrator <id del perimetro orchestrabile>]"
 ---
 
 Argomenti:
@@ -21,34 +21,34 @@ Dagli argomenti ricavi, nell'ordine:
 
 - **`<TaskID>`** — `T` più il numero.
 - **`<kind>`** — uno di `preflight` · `run` · `recap` · `recap-task` · `recap-epic` · `checkpoint` · `none` (`none` apre la task senza prompt) · `orchestrator`, solo per il passaggio di consegne (§Il kind `orchestrator`).
-- **`[perimetro]`** — solo con `run`: i DLV nella grammatica di `run-task`, **un token solo** senza spazi (`2`, `1,3-5`). Assente = tutti i DLV aperti. «DLV da 1 a 3» diventa `1-3`.
+- **`[perimetro eseguibile]`** — solo con `run`: i DLV nella grammatica di `run-task`, **un token solo** senza spazi (`2`, `1,3-5`). Assente = tutti i DLV aperti. «DLV da 1 a 3» diventa `1-3`.
 - **`--model <alias>`** — `fable` · `opus` · `sonnet` · `haiku`, solo se l'utente lo nomina. Assente = il modello che il deck userebbe col tasto.
 - **`--note <testo>`** — la nota del titolo della tab, solo se l'utente la detta. Assente = il titolo dell'azione.
-- **`--orchestrator <perimetro>`** — l'id dell'epica o del mandato dell'orchestrator che chiede lo spawn, solo quando chi invoca è un orchestrator (`orchestrate-mandate`) e lo dichiara. Assente = nessun orchestrator. Mai col kind `orchestrator`: la conversazione che si apre è a sua volta un orchestrator, e il deck scarterebbe la dichiarazione.
+- **`--orchestrator <id del perimetro orchestrabile>`** — l'id dell'epica o della lista custom dell'orchestrator che chiede lo spawn, solo quando chi invoca è un orchestrator (`orchestrate-perimeter`) e lo dichiara. Assente = nessun orchestrator. Mai col kind `orchestrator`: la conversazione che si apre è a sua volta un orchestrator, e il deck scarterebbe la dichiarazione.
 
-Argomenti che non si traducono in questa forma (un kind fuori elenco, un perimetro con un kind diverso da `run`, un prompt libero) → riporta cosa manca ed esci, senza invocare niente: la skill non ha un prompt libero, e un'interpretazione tua aprirebbe una conversazione diversa da quella chiesta.
+Argomenti che non si traducono in questa forma (un kind fuori elenco, un perimetro eseguibile con un kind diverso da `run`, un prompt libero) → riporta cosa manca ed esci, senza invocare niente: la skill non ha un prompt libero, e un'interpretazione tua aprirebbe una conversazione diversa da quella chiesta.
 
 ### Il kind `orchestrator`
 
-Apre un **orchestrator nuovo** sul perimetro — un'epica o un mandato — come il tasto `direct` del deck: la tab lancia `orchestrate-mandate <perimetro>` col modello dell'azione `orchestrator` del catalogo. Lo chiede solo un orchestrator che passa le consegne al successore (`orchestrate-mandate`, §Il passaggio di consegne), dalla propria conversazione:
+Apre un **orchestrator nuovo** sul perimetro orchestrabile — un'epica o una lista custom — come il tasto `direct` del deck: la tab lancia l'orchestrator (`orchestrate-perimeter <id>`, o `orchestrate-mandate <id>`, il nome di prima, da un deck installato prima del rename) col modello dell'azione `orchestrator` del catalogo. Lo chiede solo un orchestrator che passa le consegne al successore (`orchestrate-perimeter`, §Il passaggio di consegne), dalla propria conversazione:
 
 ```bash
-loom-deck-spawn <perimetro> orchestrator
+loom-deck-spawn <id del perimetro orchestrabile> orchestrator
 ```
 
-Nessun perimetro di DLV, nessun `--orchestrator`. La richiesta porta il `sessionId` della conversazione che chiede, che `loom-deck-spawn` legge dal proprio ambiente (`CLAUDE_CODE_SESSION_ID`) e non si passa: il deck, a successore annunciato, scrive su quel `sessionId` la marca `origin: orchestrator` nel suo sidecar. È la marca che rende l'orchestrator che chiede chiudibile con `close-session` dal successore, anche se l'utente l'aveva aperto a mano: una conversazione marca solo sé stessa. Il deck rifiuta il kind su una task che non è un perimetro, e una richiesta senza il `sessionId` di chi chiede; `loom-deck-spawn` esce `2` se l'ambiente non lo porta.
+Nessun perimetro eseguibile, nessun `--orchestrator`. La richiesta porta il `sessionId` della conversazione che chiede, che `loom-deck-spawn` legge dal proprio ambiente (`CLAUDE_CODE_SESSION_ID`) e non si passa: il deck, a successore annunciato, scrive su quel `sessionId` la marca `origin: orchestrator` nel suo sidecar. È la marca che rende l'orchestrator che chiede chiudibile con `close-session` dal successore, anche se l'utente l'aveva aperto a mano: una conversazione marca solo sé stessa. Il deck rifiuta il kind su una task che non è un perimetro orchestrabile, e una richiesta senza il `sessionId` di chi chiede; `loom-deck-spawn` esce `2` se l'ambiente non lo porta.
 
 ## 2. Chiedi lo spawn
 
 Dalla project root, una chiamata sola:
 
 ```bash
-loom-deck-spawn <TaskID> <kind> [perimetro] [--model <alias>] [--note '<testo>'] [--orchestrator <perimetro>]
+loom-deck-spawn <TaskID> <kind> [perimetro eseguibile] [--model <alias>] [--note '<testo>'] [--orchestrator <id del perimetro orchestrabile>]
 ```
 
 La nota fra apici singoli.
 
-**`--orchestrator`** dà alla conversazione la sua posizione nell'organigramma: nasce con `LOOM_ORCHESTRATOR=<perimetro>` nell'ambiente, l'hook `SessionStart` le dice che le domande vanno in chat a fine turno, dove l'orchestrator le legge, e un hook `PreToolUse` le nega `AskUserQuestion`, che l'orchestrator non può chiudere. Il sidecar del deck registra il perimetro e la sessione dell'orchestrator: la sessione la legge `loom-deck-spawn` dal proprio ambiente, non si passa. Il deck rifiuta un orchestrator che non è un'epica né un mandato del progetto. Nessuna regola di permesso accompagna il comando: fuori da auto mode Claude Code chiede conferma a ogni spawn, ed è voluto — lo spawn apre una sessione col `permissionMode` del progetto e col prompt del catalogo, `run` compreso.
+**`--orchestrator`** dà alla conversazione la sua posizione nell'organigramma: nasce con `LOOM_ORCHESTRATOR=<id del perimetro orchestrabile>` nell'ambiente, l'hook `SessionStart` le dice che le domande vanno in chat a fine turno, dove l'orchestrator le legge, e un hook `PreToolUse` le nega `AskUserQuestion`, che l'orchestrator non può chiudere. Il sidecar del deck registra l'id del perimetro orchestrabile e la sessione dell'orchestrator: la sessione la legge `loom-deck-spawn` dal proprio ambiente, non si passa. Il deck rifiuta un orchestrator che non è un'epica né una lista custom del progetto. Nessuna regola di permesso accompagna il comando: fuori da auto mode Claude Code chiede conferma a ogni spawn, ed è voluto — lo spawn apre una sessione col `permissionMode` del progetto e col prompt del catalogo, `run` compreso.
 
 ## 3. Riporta l'esito
 
