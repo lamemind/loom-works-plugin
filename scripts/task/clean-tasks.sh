@@ -15,6 +15,9 @@
 # per task. NON filtra per stato ne' per eta': pota qualunque ID indicato.
 # La folder resta, e il dry-run lo dice, se un'altra task fuori dall'invocazione
 # la dichiara o se il campo Folder non ha la forma .YY-MM-DD-slug.
+# Una task con materiale 💎 nella folder (## Materiale) non parte: resta intera,
+# le altre partono. Exit: 0 tutte eliminate · 1 errore · 2 gate --ignored-files ·
+# 3 almeno una task rifiutata per il materiale 💎.
 #
 # La POLICY di conferma (chiedere quando ci sono NON-Done) vive nella skill, non
 # qui. Per cleanup per ETA' (Done > N giorni) usa cleanup-done-tasks.sh.
@@ -195,6 +198,31 @@ if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
     done
 fi
 
+# ---- Materiale 💎: la task che lo porta non parte ----------------------------
+# Una voce di `## Materiale` con 💎 marca un oggetto da non eliminare. Se l'oggetto
+# sta nella folder e la folder partirebbe qui, la task e' rifiutata: task file,
+# folder e riga restano, le altre task partono. Una task rifiutata resta, quindi
+# tiene in vita la folder anche per le task che la condividono e partono.
+# Nessun flag la scavalca: si sblocca spostando l'oggetto o togliendo 💎.
+declare -A PROTECTED=()   # id -> oggetti marcati a rischio, separati da ", "
+declare -A HELD=()        # folder -> task rifiutate che la dichiarano
+if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
+    for c in "${CANDIDATES[@]}"; do
+        id="${c%%|*}"; rest="${c#*|}"; rest="${rest#*|}"; tf="${rest%%|*}"; rf="${rest#*|}"
+        [[ -n "$rf" && -z "${FOLDER_STAYS[$id]:-}" ]] || continue
+        marked=""
+        while IFS= read -r p; do marked+="${marked:+, }${p}"; done < <(lw_folder_protected "$tf" "$rf")
+        [[ -n "$marked" ]] || continue
+        PROTECTED[$id]="$marked"
+        HELD[$rf]="${HELD[$rf]:+${HELD[$rf]}, }${id}"
+    done
+    for c in "${CANDIDATES[@]}"; do
+        id="${c%%|*}"; rf="${c##*|}"
+        [[ -n "$rf" && -z "${PROTECTED[$id]:-}" && -z "${FOLDER_STAYS[$id]:-}" && -n "${HELD[$rf]:-}" ]] || continue
+        FOLDER_STAYS[$id]="condivisa con ${HELD[$rf]}"
+    done
+fi
+
 # ---- Report ------------------------------------------------------------------
 
 non_done=0
@@ -206,7 +234,9 @@ if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
         tag="[Done]"
         if [[ "$st" == "open" ]]; then tag="[NOT Done]"; non_done=$((non_done+1)); fi
         folder_info=""
-        if [[ -n "${FOLDER_STAYS[$id]:-}" ]]; then
+        if [[ -n "${PROTECTED[$id]:-}" ]]; then
+            folder_info=" · protetta: 💎 ${PROTECTED[$id]}"
+        elif [[ -n "${FOLDER_STAYS[$id]:-}" ]]; then
             folder_info=" · folder ${rf} resta (${FOLDER_STAYS[$id]})"
         elif [[ -n "$rf" ]]; then
             folder_info=" + folder ${rf}"
@@ -229,7 +259,7 @@ for mid in "${MISSING[@]:-}"; do
 done
 
 echo ""
-echo "SUMMARY candidates=${#CANDIDATES[@]} non_done=${non_done} orphans=${#ORPHANS[@]} missing=${#MISSING[@]}"
+echo "SUMMARY candidates=${#CANDIDATES[@]} non_done=${non_done} orphans=${#ORPHANS[@]} missing=${#MISSING[@]} protected=${#PROTECTED[@]}"
 
 if [[ ${#CANDIDATES[@]} -eq 0 && ${#ORPHANS[@]} -eq 0 ]]; then
     echo "-> niente da rimuovere"
@@ -238,6 +268,9 @@ fi
 
 if [[ $APPLY -eq 0 ]]; then
     echo ""
+    if [[ ${#PROTECTED[@]} -gt 0 ]]; then
+        echo "-> ${#PROTECTED[@]} task protette da materiale 💎 nella folder: con --apply restano intere (exit 3)"
+    fi
     echo "-> dry-run: nessuna modifica (aggiungi --apply per eseguire)"
     exit 0
 fi
@@ -252,7 +285,7 @@ if [[ -z "$IGNORED_MODE" ]]; then
     gate_hit=0
     for c in "${CANDIDATES[@]}"; do
         id="${c%%|*}"; rf="${c##*|}"
-        [[ -n "$rf" && -z "${FOLDER_STAYS[$id]:-}" && -e "${PROJECT_ROOT}/${rf}" ]] || continue
+        [[ -n "$rf" && -z "${FOLDER_STAYS[$id]:-}" && -z "${PROTECTED[$id]:-}" && -e "${PROJECT_ROOT}/${rf}" ]] || continue
         surv="$(lw_folder_survivors "$rf")"
         [[ -n "$surv" ]] || continue
         if [[ $gate_hit -eq 0 ]]; then
@@ -287,6 +320,14 @@ for c in "${CANDIDATES[@]}"; do
     id="${c%%|*}"; rest="${c#*|}"; st="${rest%%|*}"; rest="${rest#*|}"; tf="${rest%%|*}"; rf="${rest#*|}"
     slug=$(basename "$tf" .md); slug="${slug#${id}-}"
     stays="${FOLDER_STAYS[$id]:-}"
+
+    if [[ -n "${PROTECTED[$id]:-}" ]]; then
+        echo ""
+        echo "--- rifiuto ${id} (${st}) ---"
+        echo "-> protetta: 💎 ${PROTECTED[$id]} — task file, folder ${rf}/ e riga restano"
+        echo "   per eliminarla: sposta l'oggetto fuori dalla folder, o togli 💎 dalla sua voce di ## Materiale"
+        continue
+    fi
 
     echo ""
     echo "--- purge ${id} (${st}) ---"
@@ -364,5 +405,14 @@ Folder kept: ${rf}/ (${stays})"
     echo "-> commit: ${subject}"
 done
 
+refused=""
+for c in "${CANDIDATES[@]}"; do
+    id="${c%%|*}"
+    [[ -n "${PROTECTED[$id]:-}" ]] && refused+="${refused:+, }${id}"
+done
 echo ""
-echo "-> completato: ${#CANDIDATES[@]} task purgate, ${#ORPHANS[@]} righe orfane riconciliate"
+echo "-> completato: $(( ${#CANDIDATES[@]} - ${#PROTECTED[@]} )) task purgate, ${#ORPHANS[@]} righe orfane riconciliate"
+if [[ -n "$refused" ]]; then
+    echo "-> rifiutate: ${refused} — materiale 💎 nella folder"
+    exit 3
+fi

@@ -673,6 +673,43 @@ lw_folder_declarers() {  # <tasks_dir> [<excluded task file>...]
     ' "${files[@]}" | LC_ALL=C sort -t "$(printf '\t')" -k2,2V
 }
 
+# Marked material of a task: the `## Materiale` entries that carry 💎 before
+# their path — the user's "do not delete" — kept only when the path falls inside
+# <rel_folder> and exists on disk, that is what a purge of that folder would
+# delete. One root-relative path per line, in file order; empty when nothing
+# marked is at risk. The caller decides whether the folder leaves in this
+# invocation: a folder that stays puts nothing at risk, and is not asked about.
+# Entry grammar, the one mandate.py reads: a line at column zero starting with
+# `- `, glyphs, then the path in backticks. 💎 is a flag next to the role glyph
+# (`📤💎`), so it is looked for anywhere before the first backtick.
+# Path forms: `📁/…` resolved on <rel_folder>; an explicit path with `./` and
+# `🏠/` dropped, inside when it is the folder or starts with `<folder>/`. A path
+# with a `..` component is skipped: it can point outside the folder.
+# One awk pass for the section: in Git Bash a process costs ~150 ms.
+lw_folder_protected() {  # <task_file> <rel_folder>
+    local tf="$1" rel="$2" root p
+    [[ -n "$rel" && -f "$tf" ]] || return 0
+    root="$(lw_find_project_root)"
+    while IFS= read -r p; do
+        [[ "$p" == "📁/"* ]] && p="${rel}/${p#📁/}"
+        while [[ "$p" == ./* || "$p" == "🏠/"* ]]; do p="${p#./}"; p="${p#🏠/}"; done
+        [[ "/${p}/" == */../* ]] && continue
+        [[ "$p" == "$rel" || "$p" == "$rel"/* ]] || continue
+        [[ -e "${root}/${p}" ]] || continue
+        printf '%s\n' "$p"
+    done < <(LC_ALL=C awk '
+        /^## / { in_s = ($0 ~ /^## [Mm]ateriale/); next }
+        in_s && /^- / {
+            i = index($0, "`"); if (!i) next
+            if (!index(substr($0, 1, i - 1), "💎")) next
+            rest = substr($0, i + 1); j = index(rest, "`"); if (!j) next
+            p = substr(rest, 1, j - 1)
+            gsub(/^[ \t]+|[ \t]+$/, "", p)
+            if (p != "") print p
+        }
+    ' "$tf")
+}
+
 # Removes from disk and index a task folder that leaves together with its task.
 # `git rm` runs with --ignore-unmatch: on a folder with no tracked file — empty,
 # or holding only untracked files under `--ignored-files purge` — a plain
