@@ -21,8 +21,9 @@ flusso — sono di `flow_log.py`, e il giro nuovo li archivia con `flow.py start
 
 Non nella scratchpad della conversazione: sta nella temp di sistema, e un
 reboot o una pulizia la svuotano a giro aperto. Non nella task folder del
-perimetro orchestrabile: è tracciata, e il `git add -A` di un `checkpoint-task` linked
-porterebbe nel commit lo stato a metà giro. `.claude/loom/` è ignorata da git
+perimetro orchestrabile: è tracciata, quindi lo stato riscritto a ogni giro
+terrebbe sporco il worktree, e un commit che nomina la cartella intera nella sua
+pathspec porterebbe nel commit lo stato a metà giro. `.claude/loom/` è ignorata da git
 dove il progetto la ignora, e `check` lo verifica: dove non la ignora l'orchestrator si
 ferma, perché `init` non scrive la regola.
 
