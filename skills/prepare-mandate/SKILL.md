@@ -166,7 +166,7 @@ Il task file del mandato si scrive **prima** del piano e **non si committa** fin
    - T61 (gate del deck sulle convention)
 
    ## Materiale
-   *📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato dell'orchestrator; 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
+   *📖 fonte · 🔬 analisi · 📤 prodotto · 🎬 stato dell'orchestrator · 💎 da non eliminare, accanto al glifo di ruolo (📤💎); 📁/ = task folder. Solo materiale di alto rilievo, non l'inventario della folder.*
 
    - 🔬 `📁/schedule.md` — eseguire il giro: analisi del perimetro e piano dello script
    - 🎬 `.claude/loom/orchestrator/<id>.md` — seguire il giro dell'orchestrator: fatti del perimetro, proposte in sospeso, delega (fuori da git)
