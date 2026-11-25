@@ -183,18 +183,26 @@ done
 # resta sul disco e in git: parte la task, non il materiale. Resta anche fuori dal
 # gate e da --ignored-files, che decidono dei file che una folder in partenza
 # lascerebbe: keep metterebbe in git i suoi ignorati, purge la cancellerebbe.
+# Il confronto e' per prefisso di path (lw_folder_overlaps): una task che resta
+# con `.26-x/sub` tiene in vita `.26-x`, che `git rm -rf` porterebbe via intera.
 # Una folder condivisa solo fra task che partono qui si toglie con la prima.
 if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
     leaving=()
     for c in "${CANDIDATES[@]}"; do rest="${c#*|}"; rest="${rest#*|}"; leaving+=("${rest%%|*}"); done
-    declare -A KEEPERS=()   # folder -> task che restano e la dichiarano
+    decl_folders=(); decl_ids=()   # folder dichiarate dalle task che restano, e chi
     while IFS=$'\t' read -r kfolder kfile; do
-        KEEPERS[$kfolder]="${KEEPERS[$kfolder]:+${KEEPERS[$kfolder]}, }${kfile%%-*}"
+        decl_folders+=("$kfolder"); decl_ids+=("${kfile%%-*}")
     done < <(lw_folder_declarers "$TASKS_DIR" "${leaving[@]}")
     for c in "${CANDIDATES[@]}"; do
         id="${c%%|*}"; rf="${c##*|}"
-        [[ -n "$rf" && -z "${FOLDER_STAYS[$id]:-}" && -n "${KEEPERS[$rf]:-}" ]] || continue
-        FOLDER_STAYS[$id]="condivisa con ${KEEPERS[$rf]}"
+        [[ -n "$rf" && -z "${FOLDER_STAYS[$id]:-}" ]] || continue
+        keepers=""
+        for i in "${!decl_folders[@]}"; do
+            if lw_folder_overlaps "$rf" "${decl_folders[$i]}"; then
+                keepers+="${keepers:+, }${decl_ids[$i]}"
+            fi
+        done
+        if [[ -n "$keepers" ]]; then FOLDER_STAYS[$id]="condivisa con ${keepers}"; fi
     done
 fi
 

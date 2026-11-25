@@ -635,15 +635,31 @@ lw_safe_rmrf() {  # <path>
 # any existing directory would count as a folder — `Folder: .` resolves to the
 # project root and the apply would run `git rm -rf .`, `Folder: docs` would take
 # the doc away. <rel_folder> is already normalized (no leading `./`, no trailing `/`).
+# The match runs in the C locale: under a UTF-8 locale such as `it_IT.UTF-8`
+# the range `[A-Za-z]` also takes `é`, under `LC_ALL=C` it does not, and the
+# same folder would leave or stay depending on who runs the purge. In C a name
+# outside ASCII is out of shape and stays on disk — the conservative outcome,
+# the same for everyone. `local` puts the caller's locale back on return.
 lw_folder_shape_ok() {  # <rel_folder>
+    local LC_ALL=C
     local re='^\.[0-9]{2}-[0-9]{2}-[0-9]{2}-[A-Za-z0-9][A-Za-z0-9._-]*$'
     [[ "$1" =~ $re ]]
+}
+
+# Two normalized folders overlap when they are the same or one contains the
+# other: `git rm -rf` on either takes away the other, or part of it. Compared by
+# path prefix on whole components — `.26-x` contains `.26-x/sub`, not `.26-xy`.
+# A leaving folder stays when a task that stays declares an overlapping one.
+lw_folder_overlaps() {  # <rel_a> <rel_b>
+    [[ "$1" == "$2" || "$1" == "$2"/* || "$2" == "$1"/* ]]
 }
 
 # Who declares which task folder: one line `<folder>\t<task file basename>` for
 # every task file in <tasks_dir> with a non-empty `Folder` field, minus the task
 # files passed after <tasks_dir> — the tasks leaving in the same invocation — so
 # the output names the tasks that keep a folder alive. Ordered by task id.
+# The caller matches a leaving folder against these with lw_folder_overlaps,
+# not by equality: a task that stays with `.26-x/sub` keeps `.26-x` alive.
 # The read is the one of read_field in the two purge scripts (first
 # `- **Folder**:` line, first token of the value, so an annotation after the
 # path does not spoil it), plus the normalization the scripts apply to their own
