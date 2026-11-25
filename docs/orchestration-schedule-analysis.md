@@ -1,32 +1,32 @@
-# L'analisi del perimetro e il piano — il metodo
+# L'analisi del perimetro orchestrabile e il piano — il metodo
 
-Metodo per chi **scrive** `schedule.md`, il piano di un perimetro: `prepare-mandate` lo scrive prima del giro, da zero o rifacendo un piano che c'è già, e l'orchestrator lo riscrive durante il giro quando entra un membro o scopre una collisione. Forma del file, campi del blocco JSON e controlli di `verify`: `schedule-format.md`.
+Metodo per chi **scrive** `orchestration-schedule.md`, il piano di un perimetro orchestrabile: `prepare-perimeter` lo scrive prima del giro, da zero o rifacendo un piano che c'è già, e l'orchestrator lo riscrive durante il giro quando entra un membro o scopre una collisione. Forma del file, campi del blocco JSON e controlli di `verify`: `orchestration-schedule-format.md`.
 
 Il lavoro ha due tempi. Prima le **relazioni** fra i membri — chi dipende da chi, chi tocca gli stessi file —, che vanno nella prosa con la loro fonte. Poi le **decisioni** che ne discendono, che vanno nel blocco JSON: lo script del flusso legge solo il blocco, e una relazione che non diventa un campo per lo script non esiste.
 
 Le relazioni hanno due metà, e servono entrambe:
 
-- la **metà meccanica** viene da `mandate.py tree`, che legge i campi dichiarati dei membri: le dipendenze di `## Dependencies` e del grafo di `tasks.md`, e i path in comune nei `## Materiale`. Di `## Dependencies` conta il primo id di ogni voce a colonna zero, e una voce che comincia con «Nessuna» non dichiara niente anche se poi nomina una task («Nessuna. Non parte insieme a T211»): un vincolo «non insieme» è una collisione, e lo trova la metà del modello;
+- la **metà meccanica** viene da `perimeter.py tree`, che legge i campi dichiarati dei membri: le dipendenze di `## Dependencies` e del grafo di `tasks.md`, e i path in comune nei `## Materiale`. Di `## Dependencies` conta il primo id di ogni voce a colonna zero, e una voce che comincia con «Nessuna» non dichiara niente anche se poi nomina una task («Nessuna. Non parte insieme a T211»): un vincolo «non insieme» è una collisione, e lo trova la metà del modello;
 - la **metà del modello** trova le collisioni che nessun campo dichiara, per esempio due task spot che toccano lo stesso codice senza scriverlo nel `## Materiale`. Su quelle `tree` tace, e senza una risorsa nel piano lo script lancerebbe le due task in parallelo.
 
 ## L'ingresso
 
-- **la testa** — l'id del perimetro, mandato o epica. Il suo task file deve esistere su disco, col campo `**Folder**`: `tree` senza file esce 1 (`ERROR: task file di T<n> non trovato`), e `verify` senza folder non trova il piano. Non serve che sia committato.
-- **i membri** — quelli del lettore unico, `resolve-task.sh <testa> --members`: per un mandato la lista di `## Membri` già scritta sul disco, per un'epica le figlie. `verify` confronta il piano con quella lettura, quindi la lista va scritta nel task file prima del controllo.
-- **le parole dell'utente** per questo giro: un ordine, un membro che segue lui, un perimetro di DLV (§Le preferenze dell'utente).
-- **il piano vecchio**, quando c'è; oppure, in un perimetro preparato prima del piano, le sezioni `## Analisi del perimetro` e `## Preferenze d'ordine` del suo task file (§La rianalisi).
+- **la testa** — l'id del perimetro orchestrabile, lista custom o epica. Il suo task file deve esistere su disco, col campo `**Folder**`: `tree` senza file esce 1 (`ERROR: task file di T<n> non trovato`), e `verify` senza folder non trova il piano. Non serve che sia committato.
+- **i membri** — quelli del lettore unico, `resolve-task.sh <testa> --members`: per una lista custom la sua `## Membri` già scritta sul disco, per un'epica le figlie. `verify` confronta il piano con quella lettura, quindi la lista va scritta nel task file prima del controllo.
+- **le parole dell'utente** per questo giro: un ordine, un membro che segue lui, un perimetro eseguibile (§Le preferenze dell'utente).
+- **il piano vecchio**, quando c'è; oppure, in un perimetro orchestrabile preparato prima del piano, le sezioni `## Analisi del perimetro` e `## Preferenze d'ordine` del suo task file (§La rianalisi).
 
-## La metà meccanica — da `mandate.py tree`
+## La metà meccanica — da `perimeter.py tree`
 
 ```bash
-"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/mandate.py" tree <testa> --children <membri…>
+"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/perimeter.py" tree <testa> --children <membri…>
 ```
 
 `PY` è il primo fra `python3` e `python` che risponde con Python 3. Le righe che servono:
 
 | Riga | Cosa dà all'analisi |
 |---|---|
-| `TASK\|<id>\|…\|next=…\|blocked=…\|…` | `next=chiusa` → membro chiuso. `blocked=` → le dipendenze aperte del membro, dentro e fuori dal perimetro |
+| `TASK\|<id>\|…\|next=…\|blocked=…\|…` | `next=chiusa` → membro chiuso. `blocked=` → le dipendenze aperte del membro, dentro e fuori dal perimetro orchestrabile |
 | `DEPS\|<id>\|T52 🟢 (deps) · T40 ✔ (grafo)` | il verso di ogni dipendenza, e da dove viene |
 | `CONFLICT\|<a>\|<b>\|dipendenza` | una dipendenza fra due membri aperti |
 | `CONFLICT\|<a>\|<b>\|materiale: <path>, …` | un path in comune fra due membri aperti, che almeno uno dei due scrive |
@@ -39,11 +39,11 @@ Le relazioni hanno due metà, e servono entrambe:
 - **Due membri che si dichiarano a vicenda** sono un ciclo, e nessun piano lo scioglie: `verify` vuole i due `dopo`, e lo script terrebbe fermi tutti e due. La prosa lo scrive, e alla conferma è un difetto dei due task file da correggere prima del giro.
 - **`materiale: <path>`** → la prosa: ``- T52 e T64 scrivono `scripts/utils/lib.sh` (## Materiale dei due)``; se uno dei due dichiara il path come 📖 fonte, la riga lo dice. Il blocco: una risorsa in comune, col nome del path, nei due membri. Un `dopo` fra i due già scritto, per una dipendenza o una preferenza, basta da solo: due membri in fila non girano mai insieme.
 - **Una dipendenza verso una task chiusa** non scrive niente.
-- **Una dipendenza aperta verso una task fuori dal perimetro** — un id in `blocked=` che non è fra i membri — scrive una riga di prosa, `- T61 aspetta T70, fuori dal perimetro (## Dependencies di T61)`, e niente nel blocco: lo script la legge da `tree` e ferma il membro finché T70 non chiude. Se la voce nomina dei DLV di T70, il `dopo` può portare `"T70:2"`, e il membro parte quando quei DLV sono spuntati. Alla conferma si offre di aggiungere T70 ai membri; in un'epica l'offerta non c'è, perché le figlie le decide il `Parent Task` della figlia, e si dice che per seguirla insieme serve un mandato.
+- **Una dipendenza aperta verso una task fuori dal perimetro orchestrabile** — un id in `blocked=` che non è fra i membri — scrive una riga di prosa, `- T61 aspetta T70, fuori dal perimetro orchestrabile (## Dependencies di T61)`, e niente nel blocco: lo script la legge da `tree` e ferma il membro finché T70 non chiude. Se la voce nomina dei DLV di T70, il `dopo` può portare `"T70:2"`, e il membro parte quando quei DLV sono spuntati. Alla conferma si offre di aggiungere T70 ai membri; in un'epica l'offerta non c'è, perché le figlie le decide il `Parent Task` della figlia, e si dice che per seguirla insieme serve una lista custom.
 
 ## La metà del modello — le collisioni non dichiarate
 
-**Cosa legge**: il task file di ogni membro aperto, **per intero** — Description, Deliverables, `## Materiale`, Decisions, Implementation Notes. Non legge i membri chiusi, che non ripartono, né i membri di un membro epica o mandato: quello è un perimetro a sé, e il lettore non lo espande.
+**Cosa legge**: il task file di ogni membro aperto, **per intero** — Description, Deliverables, `## Materiale`, Decisions, Implementation Notes. Non legge i membri chiusi, che non ripartono, né i membri di un membro epica o lista custom: quello è un perimetro orchestrabile a sé, e il lettore non lo espande.
 
 **Il procedimento:**
 
@@ -57,7 +57,7 @@ Le relazioni hanno due metà, e servono entrambe:
    Se il file trovato è il path dell'altro membro, la collisione è su quel file. Due simboli diversi si cercano allo stesso modo, per vedere se cadono nello stesso file.
 3. **Lo stesso comportamento** riscritto da tutti e due, detto in prosa → collisione sul comportamento.
 
-La ricerca nel repo si fa **solo sui path e sui simboli che due membri nominano**. Il codice non si esplora per i membri che non nominano file: la ricerca resta proporzionata al perimetro, e il prezzo è un punto cieco dichiarato (sotto).
+La ricerca nel repo si fa **solo sui path e sui simboli che due membri nominano**. Il codice non si esplora per i membri che non nominano file: la ricerca resta proporzionata al perimetro orchestrabile, e il prezzo è un punto cieco dichiarato (sotto).
 
 **Lo stesso file basta, anche su righe lontane.** Due sessioni nello stesso worktree che toccano lo stesso file si rubano le modifiche al commit: la pathspec del commit prende il file intero, e chi committa per primo porta con sé il lavoro a metà dell'altra.
 
@@ -115,16 +115,16 @@ Le preferenze d'ordine valgono **solo per questo giro** e le dice l'utente. Ognu
 ```
 ````
 
-- **La prosa dell'analisi**, in quest'ordine: le dipendenze dichiarate, i path in comune, le collisioni del modello, le dipendenze aperte fuori dal perimetro; dentro ogni gruppo, per posizione nella lista del primo membro nominato. Nessuna relazione → una riga sola: `Nessuna relazione fra i membri aperti.`
+- **La prosa dell'analisi**, in quest'ordine: le dipendenze dichiarate, i path in comune, le collisioni del modello, le dipendenze aperte fuori dal perimetro orchestrabile; dentro ogni gruppo, per posizione nella lista del primo membro nominato. Nessuna relazione → una riga sola: `Nessuna relazione fra i membri aperti.`
 - **`## Ordine`** c'è solo se c'è una preferenza o una risorsa da spiegare.
-- **Il blocco** porta una voce per ogni membro del lettore, nell'ordine scelto: i membri chiusi, i membri epica o mandato e i `TASK_MEMBER_MISSING` compresi, con il solo `id`. `verify` li conta, e lo script non lancia niente su di loro.
+- **Il blocco** porta una voce per ogni membro del lettore, nell'ordine scelto: i membri chiusi, i membri epica o lista custom e i `TASK_MEMBER_MISSING` compresi, con il solo `id`. `verify` li conta, e lo script non lancia niente su di loro.
 - **Niente sha, niente data, niente Prog, niente cifre**: il piano descrive relazioni e decisioni, non lo stato dei membri.
 - **Si riscrive intero** a ogni rianalisi.
 
 Scritto il file, il controllo:
 
 ```bash
-"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/schedule.py" verify <testa> --bozza
+"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/orchestration_schedule.py" verify <testa> --bozza
 ```
 
 `VERIFY=ok` → il piano copre ogni relazione meccanica. Un `ERRORE` è un blocco scritto male; un `DIFF` è una relazione che non è diventata un campo: si corregge il piano e si rilancia, prima di mostrarlo a nessuno. Un `AVVISO` su un `passo` vuol dire che i file lo hanno già superato: il campo si toglie.
@@ -139,7 +139,7 @@ Quando un piano c'è già, il piano si rifà **intero**, col vecchio in ingresso
 - un `dlv` resta se i suoi DLV sono ancora aperti; un `passo` resta se `verify --bozza` non lo dà superato;
 - le coppie nuove, quelle di un membro aggiunto, passano dalla metà del modello da zero.
 
-**Un perimetro preparato prima del piano** porta nel task file la tabella `## Analisi del perimetro` e, in un mandato, `## Preferenze d'ordine`. Le righe con fonte `modello` della tabella sono le collisioni del modello vecchie da confermare, riscrivere o togliere; quelle `dichiarata` e `materiale` si ricalcolano; ogni voce delle preferenze diventa una preferenza. Le due sezioni escono dal task file nello stesso commit che scrive il piano: due copie resterebbero disallineate alla prima modifica.
+**Un perimetro orchestrabile preparato prima del piano** porta nel task file la tabella `## Analisi del perimetro` e, in una lista custom, `## Preferenze d'ordine`. Le righe con fonte `modello` della tabella sono le collisioni del modello vecchie da confermare, riscrivere o togliere; quelle `dichiarata` e `materiale` si ricalcolano; ogni voce delle preferenze diventa una preferenza. Le due sezioni escono dal task file nello stesso commit che scrive il piano: due copie resterebbero disallineate alla prima modifica.
 
 Alla conferma la differenza si mostra riga per riga, sulla prosa e sul blocco:
 
@@ -156,4 +156,4 @@ Alla conferma la differenza si mostra riga per riga, sulla prosa e sul blocco:
 Si dicono alla conferma, mai nel piano:
 
 - i membri aperti che non nominano nessun file: una loro collisione resta invisibile anche dopo l'analisi;
-- i membri epica o mandato: le collisioni dei loro membri non sono analizzate qui.
+- i membri epica o lista custom: le collisioni dei loro membri non sono analizzate qui.

@@ -14,7 +14,7 @@
 # silenziosa. Fill greedy per priorita', stop al primo che non entra:
 #   - cappello + filepath + Description: sempre presenti. Una Description che da
 #     sola sfora il budget si tronca a riga intera, e nient'altro entra: un'epica
-#     o un mandato riscritti dai checkpoint crescono fin li', e senza il taglio
+#     o una lista custom riscritte dai checkpoint crescono fin li', e senza il taglio
 #     il payload intero oltre il cap arriverebbe mutilato al modello (e
 #     check-injection-budget.sh fermerebbe ogni publish del plugin)
 #   - sezioni canoniche in ordine di priorita' finche' il totale sta nel budget

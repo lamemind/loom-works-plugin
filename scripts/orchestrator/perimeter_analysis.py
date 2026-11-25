@@ -1,15 +1,16 @@
 """
-perimeter_analysis — il piano di un perimetro contro git.
+perimeter_analysis — il piano di un perimetro orchestrabile contro git.
 
-Le letture di git che `schedule.py verify` fa sul piano (`schedule.md`,
-contratto `docs/schedule-format.md`): la radice del repo, il path relativo di
+Le letture di git che `orchestration_schedule.py verify` fa sul piano
+(`orchestration-schedule.md`, contratto `docs/orchestration-schedule-format.md`):
+la radice del repo, il path relativo di
 un file, e i membri aperti il cui task file è cambiato dopo il commit del
 piano, gli unici che l'orchestrator rilegge al lancio. L'analisi delle relazioni
 fra i membri sta nella prosa del piano, e nessuno script la confronta: il
-confronto con i file lo fa `schedule.py` sui campi del blocco JSON.
+confronto con i file lo fa `orchestration_schedule.py` sui campi del blocco JSON.
 
 Il modulo non importa niente del plugin: la dipendenza va in un verso solo,
-da `schedule.py` a qui.
+da `orchestration_schedule.py` a qui.
 """
 
 import os

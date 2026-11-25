@@ -108,7 +108,7 @@ def classify(step_kind, genre, last_genre, outcome_class, text, facts):
     turno letto sullo stesso passo, che decide come si legge una risposta;
     `outcome_class` la classe dell'esito di `loom-deck-headless status`;
     `facts` le prove su disco: `preflight` (`ok`, `none`, `decaduta`),
-    `scope_done` (i DLV del perimetro del run tutti spuntati),
+    `scope_done` (i DLV del perimetro eseguibile del run tutti spuntati),
     `progress_grew` (un `### Avanzamento` in più dal checkpoint chiesto)."""
     if outcome_class == "errore":
         return wake("errore")

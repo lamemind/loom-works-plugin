@@ -7,7 +7,7 @@
 #
 # Il registro degli scarti si chiamava registro ADR e stava in adr/ della
 # docs-root. Il comando vero e' scarti.sh, nella stessa cartella; questo file
-# resta perche' l'orchestrator (checkpoint-mandate) chiama `adr.sh cerca` per nome e
+# resta perche' l'orchestrator (checkpoint-perimeter) chiama `adr.sh cerca` per nome e
 # l'orchestrator non si modifica. Senza questo file l'orchestrator non troverebbe il comando,
 # leggerebbe un exit diverso da 0 come «nessuno scarto» e riporterebbe
 # segnalazioni gia' scartate, senza un errore visibile.

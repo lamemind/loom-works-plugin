@@ -14,7 +14,7 @@ l'orchestrator solo quando serve un giudizio.
             checkpoint; con `--dal` anche le righe dopo quel `seq`, per membro
   stop      ferma il processo del flusso
   prosegui | abbandona | tieni
-            un ordine dell'orchestrator allo script, su un membro (o sul perimetro)
+            un ordine dell'orchestrator allo script, su un membro (o sul perimetro orchestrabile)
   run       il processo del flusso: lo lancia `start`, staccato
 
 Il contratto — righe, motivi di risveglio, ordini, uscite — è
@@ -22,12 +22,12 @@ Il contratto — righe, motivi di risveglio, ordini, uscite — è
 progetto, ignorata da git (`flow_log.py`).
 
 Uso:
-  python -I flow.py [--project-root <radice>] start <perimetro> [--nuovo] [--context-threshold <token>] [--poll-seconds <s>]
-  python -I flow.py [--project-root <radice>] status <perimetro>
-  python -I flow.py [--project-root <radice>] wait <perimetro> --dopo <seq>
-  python -I flow.py [--project-root <radice>] recap <perimetro> [--dal <seq>] [--testi]
-  python -I flow.py [--project-root <radice>] stop <perimetro>
-  python -I flow.py [--project-root <radice>] prosegui|abbandona|tieni <perimetro> <membro>
+  python -I flow.py [--project-root <radice>] start <id del perimetro orchestrabile> [--nuovo] [--context-threshold <token>] [--poll-seconds <s>]
+  python -I flow.py [--project-root <radice>] status <id del perimetro orchestrabile>
+  python -I flow.py [--project-root <radice>] wait <id del perimetro orchestrabile> --dopo <seq>
+  python -I flow.py [--project-root <radice>] recap <id del perimetro orchestrabile> [--dal <seq>] [--testi]
+  python -I flow.py [--project-root <radice>] stop <id del perimetro orchestrabile>
+  python -I flow.py [--project-root <radice>] prosegui|abbandona|tieni <id del perimetro orchestrabile> <membro>
 
 Exit: 0 ok · 1 errore (id malformato, processo che non parte) · 2 un altro
 processo tiene il giro, flusso assente · 3 processo del flusso non vivo
@@ -91,7 +91,7 @@ def liveness(paths, head):
 
 
 class Lock:
-    """Il lock del giro: un solo processo del flusso per perimetro, anche con
+    """Il lock del giro: un solo processo del flusso per perimetro orchestrabile, anche con
     due `start` insieme. Tenuto aperto per la vita del processo."""
 
     def __init__(self, path):
@@ -341,7 +341,7 @@ def print_recap(project_root, head, after=None, texts=False):
     else:
         print("PIANO=non letto")
     print(checkpoint_line(state))
-    print(f"CICLI={state.closed_cycles} chiusi · {state.cycles} dall'ultimo checkpoint del perimetro")
+    print(f"CICLI={state.closed_cycles} chiusi · {state.cycles} dall'ultimo checkpoint del perimetro orchestrabile")
     members = list(plan.get("membri") or [])
     for member in sorted(set(state.steps) | set(state.held), key=lambda task_id: int(task_id[1:])):
         if member not in members:
@@ -402,7 +402,7 @@ def parse_arguments():
     subcommands = parser.add_subparsers(dest="command", required=True)
     for name in ("start", "run"):
         sub = subcommands.add_parser(name)
-        sub.add_argument("head", help="il perimetro: un'epica o un mandato")
+        sub.add_argument("head", help="il perimetro orchestrabile: un'epica o una lista custom")
         sub.add_argument("--context-threshold", type=int, default=0,
                          help="soglia di contesto dell'orchestrator in token; 0 = nessuna misura")
         sub.add_argument("--poll-seconds", type=float, default=15)

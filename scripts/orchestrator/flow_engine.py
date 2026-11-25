@@ -6,16 +6,16 @@ A ogni giro di `--poll-seconds`, in quest'ordine:
   1. l'orchestrator: la testa di `T<id>.md` dice chi è (`Stato: attiva · <sid>`,
      `passata a <sid>`), e il registro dei vivi se è vivo. `ferma` chiude il
      processo: l'orchestrator si è fermato;
-  2. il piano: riletto quando il file cambia, e verificato (`schedule.check`);
+  2. il piano: riletto quando il file cambia, e verificato (`orchestration_schedule.check`);
   3. gli scanner del monitor (`watch_sessions.py`), col loro stato in
-     `T<id>-watch.json`: ogni evento del perimetro diventa una riga del flusso;
+     `T<id>-watch.json`: ogni evento del perimetro orchestrabile diventa una riga del flusso;
   4. gli ordini dell'orchestrator (`T<id>-ordini.jsonl`);
   5. i passi aperti: l'esito di ogni turno headless finito, classificato a
      lista bianca (`flow_turns`), e il passo successivo dello stesso ciclo —
      la richiesta di checkpoint dopo un run pulito;
   6. i passi nuovi: i membri pronti secondo il piano — `dopo`, risorse, nessuna
      conversazione viva sulla task, un checkpoint alla volta —, poi il
-     checkpoint del perimetro a fine giro;
+     checkpoint del perimetro orchestrabile a fine giro;
   7. il keep-alive della cache dell'orchestrator.
 
 Ogni decisione che chiede un giudizio diventa una riga `risveglio`: domande,
@@ -28,7 +28,7 @@ Senza un orchestrator vivo lo script non apre passi e non manda messaggi: i
 turni in corso finiscono, il loro esito si scrive, e i risvegli aspettano chi si
 riattacca. Dal gradino del 100% della soglia di contesto il giro è in chiusura:
 nessun passo nuovo, ma i cicli aperti arrivano al checkpoint, e il checkpoint
-del perimetro parte a fine giro.
+del perimetro orchestrabile parte a fine giro.
 """
 
 import os
@@ -38,10 +38,10 @@ import types
 import flow_deck
 import flow_log
 import flow_turns
-import mandate
+import perimeter
 import orchestrator_common
 import orchestrator_state
-import schedule
+import orchestration_schedule
 import watch_sessions
 
 REVERIFY_S = 600
@@ -52,15 +52,15 @@ KEEPALIVE_MAX = 25
 TAB_WAKE_KINDS = ("turno", "domanda", "permesso", "fine", "ferma")
 STEP_FIELDS = ("membro", "passo", "fase", "sessione", "titolo", "dlv", "turno", "genere", "corrente",
                "atteso", "avanzamenti", "motivo_checkpoint", "dettaglio")
-NOT_RUNNABLE = schedule.NOT_RUNNABLE
-CLOSED = schedule.CLOSED
+NOT_RUNNABLE = orchestration_schedule.NOT_RUNNABLE
+CLOSED = orchestration_schedule.CLOSED
 
 CHECKPOINT_MESSAGE = """Checkpoint del ciclo: lancia /loom-works:checkpoint-task {member} — richiesta automatica del flusso dell'orchestrator di {head}.
 
 {why} Il ciclo passa quindi al checkpoint in questa conversazione, che ha il contesto del run."""
 CHECKPOINT_WHY = {
-    "run": "Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna» e con tutti i DLV del suo perimetro spuntati.",
-    "risposta": "Le risposte alle segnalazioni del tuo run sono registrate, e i DLV del suo perimetro sono spuntati.",
+    "run": "Il tuo run si è chiuso con «🚦 Segnalazioni — nessuna» e con tutti i DLV del suo perimetro eseguibile spuntati.",
+    "risposta": "Le risposte alle segnalazioni del tuo run sono registrate, e i DLV del suo perimetro eseguibile sono spuntati.",
     "ordine": "L'orchestrator ha letto il tuo ultimo turno e lascia proseguire il ciclo.",
 }
 
@@ -161,7 +161,7 @@ class Engine:
     # ------------------------------------------------------------- il piano
 
     def refresh_plan(self):
-        path, reason = schedule.plan_path(self.root, self.head)
+        path, reason = orchestration_schedule.plan_path(self.root, self.head)
         try:
             info = os.stat(path) if path else None
             signature = (info.st_mtime_ns, info.st_size) if info else None
@@ -176,8 +176,8 @@ class Engine:
         self.verify_due = False
         self.last_verify = time.time()
         try:
-            result = schedule.check(self.root, self.head, history=False)
-        except schedule.PlanError as error:
+            result = orchestration_schedule.check(self.root, self.head, history=False)
+        except orchestration_schedule.PlanError as error:
             self.write("guasto", dove="verify", errore=str(error))
             return
         if result.plan is not None:
@@ -199,10 +199,10 @@ class Engine:
 
     def refresh_snapshot(self):
         members = self.members or (self.plan.ids if self.plan else [])
-        self.snapshot = mandate.snapshot(self.root, self.head, members)
+        self.snapshot = perimeter.snapshot(self.root, self.head, members)
         if self.round.before is None and self.plan_ok:
             figures = {task_id: {key: self.snapshot["tasks"][task_id][key] for key in ("prog", "dlv", "ac", "title")}
-                       for task_id in [self.head] + self.snapshot["mandate"]}
+                       for task_id in [self.head] + self.snapshot["members"]}
             self.write("prima", cifre=figures)
 
     def task(self, task_id):
@@ -213,7 +213,7 @@ class Engine:
         if task is not None:
             return task.get("next") == "chiusa" or task.get("prog") == CLOSED
         overview = (self.snapshot or {}).get("overview", {})
-        return mandate.normalize_glyph(overview.get(task_id, ("", ""))[0]) == CLOSED
+        return perimeter.normalize_glyph(overview.get(task_id, ("", ""))[0]) == CLOSED
 
     # ----------------------------------------------------------- gli scanner
 
@@ -405,7 +405,7 @@ class Engine:
 
     def checkpoint_holder(self):
         """Il membro che tiene il checkpoint, o `None`: un checkpoint alla volta
-        in tutto il perimetro, perché due insieme fanno gara su `tasks.md` e su
+        in tutto il perimetro orchestrabile, perché due insieme fanno gara su `tasks.md` e su
         git. Lo tiene un passo di checkpoint aperto, una richiesta di
         checkpoint in corso, un turno di checkpoint in corso, un checkpoint con
         segnalazioni che aspetta le risposte."""
@@ -447,7 +447,7 @@ class Engine:
                 return "preflight"
             if member.step == "run" and open_dlv and not (
                     task["next"] == "preflight" and (task["preflight"] == "decaduta"
-                                                     or mandate.is_size_large(task["size"]))):
+                                                     or perimeter.is_size_large(task["size"]))):
                 return "run"
             if member.step == "checkpoint":
                 return "checkpoint"
@@ -472,7 +472,7 @@ class Engine:
     def after_ok(self, member):
         """Il `dopo` del membro: ogni voce soddisfatta."""
         for dependency in member.after:
-            if dependency.target == schedule.ALL_OTHERS:
+            if dependency.target == orchestration_schedule.ALL_OTHERS:
                 others = [other.id for other in self.plan.members if other.id != member.id]
                 if not all(self.is_closed(other) for other in others):
                     return False
@@ -489,7 +489,7 @@ class Engine:
         return True
 
     def outside_ok(self, member, task):
-        """Le dipendenze aperte verso task fuori dal perimetro fermano il
+        """Le dipendenze aperte verso task fuori dal perimetro orchestrabile fermano il
         membro, salvo una voce del `dopo` per DLV sulla stessa task."""
         by_dlv = {dependency.target for dependency in member.after if dependency.dlv}
         for dependency in task.get("open_dependencies", []):
@@ -550,7 +550,7 @@ class Engine:
             open_dlv = sorted(number for number, done in marks.items() if not done)
             chosen = [number for number in (member.dlv or []) if number in open_dlv]
             dlv = chosen or open_dlv
-            spec = schedule.format_dlv(chosen) if chosen else None
+            spec = orchestration_schedule.format_dlv(chosen) if chosen else None
         step = self.write("passo", membro=member.id, passo=kind, fase="in apertura", dlv=dlv,
                           avanzamenti=flow_deck.progress_entries(self.root, member.id))
         return self.launch(step, spec)
@@ -568,8 +568,8 @@ class Engine:
 
     def round_end(self):
         """Niente di lanciabile: con passi aperti si aspetta; con un ciclo
-        chiuso dall'ultimo checkpoint del perimetro parte il checkpoint del
-        perimetro; altrimenti l'orchestrator si sveglia, una volta per stato."""
+        chiuso dall'ultimo checkpoint del perimetro orchestrabile ne parte un
+        altro; altrimenti l'orchestrator si sveglia, una volta per stato."""
         if self.round.open_steps():
             return
         remaining = [member.id for member in self.plan.members
@@ -598,7 +598,7 @@ class Engine:
             return "giro in chiusura"
         if member is not None and not self.after_ok(member):
             return "aspetta " + ", ".join(dependency.text for dependency in member.after)
-        return "dipendenza aperta fuori dal perimetro"
+        return "dipendenza aperta fuori dal perimetro orchestrabile"
 
     # ------------------------------------------------------------- keep-alive
 
@@ -641,7 +641,7 @@ class Engine:
         if self.verify_due or time.time() - self.last_verify > REVERIFY_S:
             self.verify()
         self.scan()
-        if self.verify_due:  # un task file del perimetro è cambiato in questo giro
+        if self.verify_due:  # un task file del perimetro orchestrabile è cambiato in questo giro
             self.verify()
         self.refresh_snapshot()
         self.apply_orders()

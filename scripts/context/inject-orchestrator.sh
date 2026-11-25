@@ -18,8 +18,9 @@
 # nessun figlio la eredita dal processo padre. Senza la variabile lo script non
 # stampa niente: una conversazione aperta a mano non riceve nessuna riga.
 #
-# IL VALORE E' IL PERIMETRO E BASTA (`T197`), non la sessione dell'orchestrator: la
-# sessione che fa da orchestrator cambia a un passaggio di consegne, il perimetro no. Un
+# IL VALORE E' L'ID DEL PERIMETRO ORCHESTRABILE E BASTA (`T197`), non la sessione
+# dell'orchestrator: la sessione che fa da orchestrator cambia a un passaggio di
+# consegne, l'id no. Un
 # valore fuori dalla forma `T<numero>` non stampa niente: il testo entra nel
 # contesto, e un valore arbitrario non deve diventare una riga che il modello legge
 # come istruzione.

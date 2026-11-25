@@ -1,12 +1,12 @@
 # Lo script del flusso — `flow.py`
 
-Contratto per chi **lancia, legge e comanda** lo script del flusso di un giro: l'orchestrator, che lo lancia staccato e si sveglia sulle sue righe di risveglio, e chi rilegge un giro dopo. Lo script porta il flusso meccanico del piano (`schedule-format.md`) — apre i passi, legge gli esiti, chiede i checkpoint, lancia il checkpoint del perimetro — e sveglia l'orchestrator solo quando serve un giudizio.
+Contratto per chi **lancia, legge e comanda** lo script del flusso di un giro: l'orchestrator, che lo lancia staccato e si sveglia sulle sue righe di risveglio, e chi rilegge un giro dopo. Lo script porta il flusso meccanico del piano (`orchestration-schedule-format.md`) — apre i passi, legge gli esiti, chiede i checkpoint, lancia il checkpoint del perimetro orchestrabile — e sveglia l'orchestrator solo quando serve un giudizio.
 
 Il costo di un turno dell'orchestrator dipende dalla dimensione del suo contesto, non dal lavoro che fa: ogni risveglio rilegge tutto il contesto dalla cache. Lo script esiste per togliere i risvegli che non chiedono un giudizio.
 
 ## Il processo e i file
 
-Un processo per perimetro, staccato dalla conversazione che lo lancia: sopravvive alla chiamata Bash, e non gira sotto il tool `Monitor`, che lo ucciderebbe entro trenta minuti. Un lock impedisce un secondo processo sullo stesso perimetro.
+Un processo per perimetro orchestrabile, staccato dalla conversazione che lo lancia: sopravvive alla chiamata Bash, e non gira sotto il tool `Monitor`, che lo ucciderebbe entro trenta minuti. Un lock impedisce un secondo processo sullo stesso perimetro orchestrabile.
 
 I file stanno in `.claude/loom/orchestrator/` del progetto, che git ignora. Ognuno ha un solo scrittore:
 
@@ -23,7 +23,7 @@ Lo stato del giro non sta in nessun file: si ricava rileggendo il flusso dall'in
 ## I comandi
 
 ```bash
-"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/flow.py" <comando> <perimetro> …
+"PY" -B -I "${CLAUDE_PLUGIN_ROOT}/scripts/orchestrator/flow.py" <comando> <id del perimetro orchestrabile> …
 ```
 
 | Comando | Cosa fa | Uscite |
@@ -44,7 +44,7 @@ FLOW=vivo · pid 4242 · avviato 2026-11-24T14:00:00.000Z
 SEQ=187
 PIANO=valido · 87149e9c6a6c
 CHECKPOINT=libero | T71 00000003
-CICLI=3 chiusi · 1 dall'ultimo checkpoint del perimetro
+CICLI=3 chiusi · 1 dall'ultimo checkpoint del perimetro orchestrabile
 MEMBRO|T71|run attesa|dlv=2|sessione=00000003|titolo=…
 MEMBRO|T74|nessun passo|fermo=premessa decaduta
 RISVEGLIO|183|segnalazioni|T71|00000003|<prima riga del testo finale>
@@ -62,8 +62,8 @@ RISVEGLIO|183|segnalazioni|T71|00000003|<prima riga del testo finale>
 A ogni giro, ogni `--poll-seconds` (15 di default):
 
 1. **L'orchestrator.** La testa di `T<id>.md` dice chi è: `Stato: attiva · <sid>`, `in passaggio · <sid>`, `passata a <sid>`. Il registro dei vivi dice se è vivo. `Stato: ferma` chiude il processo.
-2. **Il piano**, riletto quando il file cambia, e verificato come fa `schedule.py verify`, senza la storia: un `ERRORE` o un `DIFF` mettono in pausa i passi nuovi e svegliano l'orchestrator. La verifica riparte anche quando cambia il task file del perimetro o di un membro.
-3. **Gli scanner del monitor** (`watch_sessions.py`): ogni evento del perimetro e dei suoi membri diventa una riga `evento`. Nessun evento sveglia l'orchestrator da solo, tranne quelli di §I risvegli.
+2. **Il piano**, riletto quando il file cambia, e verificato come fa `orchestration_schedule.py verify`, senza la storia: un `ERRORE` o un `DIFF` mettono in pausa i passi nuovi e svegliano l'orchestrator. La verifica riparte anche quando cambia il task file del perimetro orchestrabile o di un membro.
+3. **Gli scanner del monitor** (`watch_sessions.py`): ogni evento del perimetro orchestrabile e dei suoi membri diventa una riga `evento`. Nessun evento sveglia l'orchestrator da solo, tranne quelli di §I risvegli.
 4. **Gli ordini** nuovi dell'orchestrator.
 5. **I passi aperti**: l'esito di ogni turno headless finito, letto da `loom-deck-headless status`, e la sua classificazione (§La lettura di un turno).
 6. **I passi nuovi**, poi la fine del giro.
@@ -74,24 +74,24 @@ A ogni giro, ogni `--poll-seconds` (15 di default):
 Niente parte senza un piano valido e un orchestrator vivo. Un membro riceve un passo nuovo solo se valgono tutte:
 
 - non lo segue l'umano, non è fermo, non ha un passo aperto, e nessuna conversazione viva — tab o turno headless — è legata alla sua task;
-- il suo `dopo` è soddisfatto, e nessuna sua dipendenza aperta verso una task fuori dal perimetro lo ferma;
+- il suo `dopo` è soddisfatto, e nessuna sua dipendenza aperta verso una task fuori dal perimetro orchestrabile lo ferma;
 - per un ciclo di lavoro, nessuna delle sue risorse è occupata da un altro ciclo aperto;
-- per un checkpoint, nessun altro checkpoint è in corso nel perimetro.
+- per un checkpoint, nessun altro checkpoint è in corso nel perimetro orchestrabile.
 
-Fra i membri pronti parte prima quello che più membri nominano nel loro `dopo`, poi l'ordine del piano. **Il passo** è il `passo` del piano se il membro non ne ha ancora fatto uno nel giro e i file lo permettono, altrimenti quello dei file (`next` di `mandate.py tree`). Un preflight a premessa decaduta non parte mai da solo: il membro si ferma e l'orchestrator si sveglia. Lo stesso per un membro coi DLV tutti spuntati e la Prog non ✔️: il checkpoint in una conversazione nuova non ha il contesto del run.
+Fra i membri pronti parte prima quello che più membri nominano nel loro `dopo`, poi l'ordine del piano. **Il passo** è il `passo` del piano se il membro non ne ha ancora fatto uno nel giro e i file lo permettono, altrimenti quello dei file (`next` di `perimeter.py tree`). Un preflight a premessa decaduta non parte mai da solo: il membro si ferma e l'orchestrator si sveglia. Lo stesso per un membro coi DLV tutti spuntati e la Prog non ✔️: il checkpoint in una conversazione nuova non ha il contesto del run.
 
-Ogni passo è una conversazione headless (`loom-deck-headless open … --orchestrator T<perimetro>`), con la sessione dell'orchestrator di adesso nel sidecar. Un run usa i DLV del campo `dlv` ancora aperti; senza, tutti gli aperti.
+Ogni passo è una conversazione headless (`loom-deck-headless open … --orchestrator <id del perimetro orchestrabile>`), con la sessione dell'orchestrator di adesso nel sidecar. Un run usa i DLV del campo `dlv` ancora aperti; senza, tutti gli aperti.
 
 **Il ciclo di lavoro** è run → checkpoint nella stessa conversazione. A run pulito lo script manda da sé la richiesta di checkpoint, l'unico messaggio che parte senza l'orchestrator, e la sua prima riga dice chi lo manda. Il ciclo è chiuso quando il checkpoint è pulito.
 
-**Il checkpoint del perimetro** parte quando niente è lanciabile, nessun passo è aperto, nessun checkpoint è in corso e almeno un ciclo si è chiuso dall'ultimo. Lo si legge come ogni checkpoint, sul task file del perimetro.
+**Il checkpoint del perimetro orchestrabile** parte quando niente è lanciabile, nessun passo è aperto, nessun checkpoint è in corso e almeno un ciclo si è chiuso dall'ultimo. Lo si legge come ogni checkpoint, sul task file del perimetro orchestrabile.
 
-**A giro chiuso** — niente aperto, niente lanciabile, nessun ciclo da portare nel perimetro — lo script sveglia l'orchestrator: `fine giro` se i membri sono chiusi, `fermo` coi membri che restano e perché. Una volta per stato.
+**A giro chiuso** — niente aperto, niente lanciabile, nessun ciclo da portare nel perimetro orchestrabile — lo script sveglia l'orchestrator: `fine giro` se i membri sono chiusi, `fermo` coi membri che restano e perché. Una volta per stato.
 
 ### Senza orchestrator, e col giro in chiusura
 
 - **Orchestrator non vivo**: nessun passo nuovo e nessun messaggio. I turni in corso finiscono, il loro esito si scrive, e i risvegli aspettano l'orchestrator che si riattacca: il successore di un passaggio di consegne riscrive la testa di `T<id>.md`, e lo script lo segue.
-- **Giro in chiusura** — il contesto dell'orchestrator di adesso ha passato il 100% di `--context-threshold`: nessun passo nuovo, ma i cicli aperti arrivano al checkpoint e il checkpoint del perimetro parte a fine giro.
+- **Giro in chiusura** — il contesto dell'orchestrator di adesso ha passato il 100% di `--context-threshold`: nessun passo nuovo, ma i cicli aperti arrivano al checkpoint e il checkpoint del perimetro orchestrabile parte a fine giro.
 
 ## La lettura di un turno
 
@@ -100,7 +100,7 @@ Ogni passo è una conversazione headless (`loom-deck-headless open … --orchest
 | Passo | Chiuso quando | Prova su disco |
 |---|---|---|
 | preflight | `✅ Preflight completato` o `🛫 Nessuna ambiguità rilevata` | un blocco datato in `## Decisions`, non a premessa decaduta |
-| run | `🚦 Segnalazioni — nessuna` → lo script chiede il checkpoint | tutti i DLV del perimetro del run spuntati |
+| run | `🚦 Segnalazioni — nessuna` → lo script chiede il checkpoint | tutti i DLV del perimetro eseguibile del run spuntati |
 | checkpoint | `🚦 Segnalazioni — nessuna` | un `### Avanzamento` in più dal checkpoint chiesto |
 
 Le due righe che la riga dell'organigramma chiede a ogni conversazione aperta dall'orchestrator:
@@ -121,7 +121,7 @@ Una riga `risveglio` porta il motivo, il membro, la sessione e la prima riga del
 | `domande` · `proposte` | un preflight chiude con delle `D{N}`, o con sole `P{N}` | passo in attesa |
 | `segnalazioni` | un report chiude con delle `S{N}` | passo in attesa; un checkpoint con segnalazioni tiene il posto del checkpoint |
 | `domanda` | la riga `❓ Domanda per l'orchestrator` | passo in attesa |
-| `dlv aperti` | un run chiude con la riga fissa e un DLV del suo perimetro aperto | passo in attesa |
+| `dlv aperti` | un run chiude con la riga fissa e un DLV del suo perimetro eseguibile aperto | passo in attesa |
 | `non classificato` | nessuna riga fissa, o la riga senza la prova su disco | passo in attesa |
 | `errore` · `permesso negato` | l'esito del turno | passo in attesa |
 | `premessa decaduta` | il membro ha un preflight a premessa decaduta | fermo |
@@ -151,7 +151,7 @@ La cache della conversazione dell'orchestrator dura un'ora, e ogni lettura ne fa
 Un processo rilanciato rilegge il flusso e riparte dal suo stato, senza ripetere e senza perdere passi:
 
 - un turno finito mentre il processo era morto si legge al primo giro: l'esito sta nello stato del deck;
-- prima di ogni `open` lo script scrive il passo `in apertura`. Se il processo muore prima di registrarne il sessionId, alla ripresa cerca fra gli stati headless del deck una conversazione aperta su quella task, con quell'azione e dall'orchestrator del perimetro dopo quella riga: se c'è la adotta, altrimenti l'apertura non è avvenuta e il passo riparte;
+- prima di ogni `open` lo script scrive il passo `in apertura`. Se il processo muore prima di registrarne il sessionId, alla ripresa cerca fra gli stati headless del deck una conversazione aperta su quella task, con quell'azione e dall'orchestrator del perimetro orchestrabile dopo quella riga: se c'è la adotta, altrimenti l'apertura non è avvenuta e il passo riparte;
 - una richiesta di checkpoint registra il numero del turno che attende. Il deck numera i turni prima di lanciarli: un numero più basso alla ripresa vuol dire che la richiesta non è partita, e si manda.
 
 ## Le righe del flusso

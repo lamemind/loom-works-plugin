@@ -2,7 +2,7 @@
 orchestrator_common — le letture condivise dagli script dell'orchestrator.
 
 `watch_sessions.py` (il monitor), `sessions.py` (list, tail, orchestrators, find),
-`mandate.py` e `orchestrator_state.py` leggono le stesse fonti: la radice del progetto,
+`perimeter.py` e `orchestrator_state.py` leggono le stesse fonti: la radice del progetto,
 la sua docs-root, i task file, il registro delle sessioni vive. Stanno qui, in
 un posto solo, perché due copie della stessa lettura divergono alla prima
 correzione.
@@ -573,7 +573,7 @@ def load_task_bindings(project_root):
 
 
 def load_orchestrator_marks(project_root):
-    """sessionId → perimetro dell'orchestrator che ha aperto la conversazione,
+    """sessionId → id del perimetro orchestrabile dell'orchestrator che ha aperto la conversazione,
     dal campo `orchestrator` del sidecar: il deck lo scrive allo spawn di una
     conversazione chiesta con `--orchestrator`, tab o headless. Last-wins come
     il legame con la task; un record senza il campo non lo tocca."""

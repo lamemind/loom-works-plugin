@@ -1,5 +1,6 @@
 """
-mandate — le letture dell'orchestrator sul perimetro: gate, albero, cifre prima → dopo.
+perimeter — le letture dell'orchestrator sul perimetro orchestrabile: gate, albero,
+cifre prima → dopo.
 
   gate    se l'orchestrator può partire: il permission mode della sessione che lo
           lancia, letto dal suo transcript, e quello del progetto, letto da
@@ -8,7 +9,7 @@ mandate — le letture dell'orchestrator sul perimetro: gate, albero, cifre prim
           in una versione che conosce `--orchestrator`. Dice anche, senza chiudere
           il gate, se `loom-deck-spawn` sa aprire l'orchestrator successore di un
           passaggio di consegne (`HANDOFF`)
-  tree    lo stato del perimetro dai file: per ogni membro Prog, Size,
+  tree    lo stato del perimetro orchestrabile dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
           `## Materiale`; poi le coppie di membri che non possono girare insieme
   recap   le cifre di oggi accanto a quelle di partenza del giro, la riga `prima`
@@ -21,17 +22,18 @@ dal task file, mai dai glifi del grafo: fra la promozione e il checkpoint i
 glifi del grafo restano indietro. Il grafo dà solo le frecce, cioè chi dipende
 da chi.
 
-Il perimetro è un id solo, un'epica o un mandato (`Size: Mandate`). I suoi
-membri non li cerca questo script: le figlie di un'epica e la lista di un
-mandato le legge il lettore unico, `resolve-task.sh <id> --members`, e la skill
-le passa dopo `--children`. Una regola sola per contare i membri. `--children`
-è obbligatoria per `tree`: senza, lo script non legge il perimetro come vuoto,
-esce 2 e rimanda al lettore.
+Il perimetro orchestrabile è un id solo, un'epica o una lista custom
+(`Size: Custom`, o `Size: Mandate`, il nome di prima). I suoi membri non li
+cerca questo script: le figlie di un'epica e la lista di una lista custom le
+legge il lettore unico, `resolve-task.sh <id> --members`, e la skill le passa
+dopo `--children`. Una regola sola per contare i membri. `--children` è
+obbligatoria per `tree`: senza, lo script non legge i membri come zero, esce 2
+e rimanda al lettore.
 
 Uso:
-  python -I mandate.py [--project-root <radice>] gate --own-session <session id>
-  python -I mandate.py [--project-root <radice>] tree <perimetro> --children [T1 T2 …]
-  python -I mandate.py [--project-root <radice>] recap <perimetro>
+  python -I perimeter.py [--project-root <radice>] gate --own-session <session id>
+  python -I perimeter.py [--project-root <radice>] tree <id del perimetro orchestrabile> --children [T1 T2 …]
+  python -I perimeter.py [--project-root <radice>] recap <id del perimetro orchestrabile>
 
 Exit: 0 ok · 1 id malformato o file mancante · 2 gate chiuso, e ogni errore di
 argparse — un'opzione ignota, `--children` mancante a `tree`.
@@ -274,7 +276,7 @@ def declared_dependencies(lines):
     indentata è prosa della voce sopra. Una voce che comincia con «Nessuna» non
     dichiara niente anche quando poi nomina una task («Nessuna. Non parte
     insieme a T211»): un vincolo «non insieme» è una collisione, e sta
-    nel piano del perimetro, come risorsa. Le voci con prosa prima dell'id restano lette:
+    nel piano del perimetro orchestrabile, come risorsa. Le voci con prosa prima dell'id restano lette:
     una dipendenza vera scritta in prosa e non letta farebbe partire una task
     prima della sua base, l'errore che costa di più.
     """
@@ -298,7 +300,7 @@ def materiale_paths(lines, folder):
     glifo non ci entra.
 
     Una voce 🎬 non è un path della task: punta allo stato dell'orchestrator del
-    perimetro, in `.claude/loom/orchestrator/`, che scrive solo l'orchestrator. Non entra
+    perimetro orchestrabile, in `.claude/loom/orchestrator/`, che scrive solo l'orchestrator. Non entra
     nella lista, e non si confronta con nessun membro."""
     # Solo il prefisso `./`: la folder stessa comincia con un punto
     # (`./.26-11-16-slug`), e uno strip dei caratteri lo mangerebbe.
@@ -369,10 +371,11 @@ def next_step(task):
         return "assente"
     if task["prog"] == normalize_glyph("✔️"):
         return "chiusa"
-    # Un'epica o un mandato fra i membri è un perimetro a sé: non si lancia,
-    # si orchestra a parte (docs/mandate-format.md), e i suoi membri non
-    # entrano in questo albero.
-    if task["size"].lower().startswith(("epic", "mandate")):
+    # Un'epica o una lista custom fra i membri è un perimetro orchestrabile a
+    # sé: non si lancia, si orchestra a parte (docs/perimeter-format.md), e i
+    # suoi membri non entrano in questo albero. `mandate` è il nome di prima di
+    # `custom`, letto uguale.
+    if task["size"].lower().startswith(("epic", "custom", "mandate")):
         return "epica"
     if task["preflight"] == "decaduta":
         return "preflight"
@@ -390,7 +393,7 @@ STARTED = (normalize_glyph("🟢"), normalize_glyph("🟡"))
 
 def is_size_large(size):
     """Vero per `Size: L`, la sola Size su cui `run-task` pretende il preflight.
-    Un'epica e un mandato non arrivano qui: `next_step` li ferma prima."""
+    Un'epica e una lista custom non arrivano qui: `next_step` le ferma prima."""
     words = size.split()
     return bool(words) and words[0].upper() == "L"
 
@@ -410,16 +413,17 @@ def snapshot(project_root, head, members):
     except OSError:
         tasks_md_lines = []
     overview = overview_rows(tasks_md_lines)
-    mandate = []
+    unique_members = []
     for task_id in members:
-        if task_id not in mandate and task_id != head:
-            mandate.append(task_id)
-    tasks = {task_id: read_task(project_root, docs, task_id, overview) for task_id in [head] + mandate}
-    # Un membro che nomina il proprio perimetro fra le dipendenze non aspetta
-    # niente: il perimetro si chiude dopo i membri, e contarlo terrebbe il
-    # membro fermo per sempre. Vale per la figlia che nomina la sua epica.
-    dependencies = {task_id: [] for task_id in mandate}
-    for task_id in mandate:
+        if task_id not in unique_members and task_id != head:
+            unique_members.append(task_id)
+    tasks = {task_id: read_task(project_root, docs, task_id, overview) for task_id in [head] + unique_members}
+    # Un membro che nomina il proprio perimetro orchestrabile fra le dipendenze
+    # non aspetta niente: il perimetro orchestrabile si chiude dopo i membri, e
+    # contarlo terrebbe il membro fermo per sempre. Vale per la figlia che nomina
+    # la sua epica.
+    dependencies = {task_id: [] for task_id in unique_members}
+    for task_id in unique_members:
         for dependency in tasks[task_id]["deps"]:
             if dependency != head:
                 dependencies[task_id].append((dependency, "deps"))
@@ -427,7 +431,7 @@ def snapshot(project_root, head, members):
         if task_id in dependencies and dependency not in (task_id, head):
             dependencies[task_id].append((dependency, source))
     closed = normalize_glyph("✔️")
-    for task_id in mandate:
+    for task_id in unique_members:
         unique = []
         for dependency, source in dependencies[task_id]:
             if all(dependency != seen for seen, _, _ in unique):
@@ -442,7 +446,7 @@ def snapshot(project_root, head, members):
     # Le coppie che non possono girare insieme, fra le sole task ancora aperte:
     # una task chiusa non riparte, e un suo conflitto non ferma nessuno.
     conflicts = []
-    still_open = [task_id for task_id in mandate if tasks[task_id]["next"] != "chiusa"]
+    still_open = [task_id for task_id in unique_members if tasks[task_id]["next"] != "chiusa"]
     for index, first in enumerate(still_open):
         for second in still_open[index + 1:]:
             linked = any(item["id"] == second for item in tasks[first]["dependencies"]) or \
@@ -457,7 +461,7 @@ def snapshot(project_root, head, members):
                              and not (path in tasks[first]["read_only"] and other in tasks[second]["read_only"])})
             if shared:
                 conflicts.append({"tasks": [first, second], "reason": "materiale: " + ", ".join(shared)})
-    return {"head": head, "mandate": mandate, "tasks": tasks, "conflicts": conflicts, "overview": overview}
+    return {"head": head, "members": unique_members, "tasks": tasks, "conflicts": conflicts, "overview": overview}
 
 
 def figures(task):
@@ -467,7 +471,7 @@ def figures(task):
 def print_tree(state):
     head = state["tasks"][state["head"]]
     print(f"PERIMETRO|{head['id']}|prog={head['prog']}|size={head['size']}|{figures(head)}|title={head['title']}")
-    for task_id in state["mandate"]:
+    for task_id in state["members"]:
         task = state["tasks"][task_id]
         print(f"TASK|{task_id}|prog={task['prog']}|size={task['size']}"
               f"|preflight={task['preflight']}|{figures(task)}|next={task['next']}"
@@ -521,13 +525,13 @@ def command_recap(project_root, head):
     return 0
 
 
-MEMBERS_HINT = ("i membri del perimetro li legge il lettore unico, "
-                "resolve-task.sh <perimetro> --members, e si passano dopo --children")
+MEMBERS_HINT = ("i membri del perimetro orchestrabile li legge il lettore unico, "
+                "resolve-task.sh <id> --members, e si passano dopo --children")
 
 
 class SubcommandParser(argparse.ArgumentParser):
     """Il parser dei sottocomandi: a un `--children` mancante aggiunge dove si
-    leggono i membri. Senza i membri `tree` vedrebbe un perimetro vuoto, e
+    leggono i membri. Senza i membri `tree` vedrebbe un perimetro orchestrabile vuoto, e
     argparse da solo dice che manca l'opzione, non dove si prendono i valori."""
 
     def error(self, message):
@@ -537,18 +541,18 @@ class SubcommandParser(argparse.ArgumentParser):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Letture dell'orchestrator sul mandato")
+    parser = argparse.ArgumentParser(description="Letture dell'orchestrator sul perimetro orchestrabile")
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     subcommands = parser.add_subparsers(dest="command", required=True, parser_class=SubcommandParser)
     gate_parser = subcommands.add_parser("gate")
     gate_parser.add_argument("--own-session", required=True, help="session id della sessione dell'orchestrator")
     tree_parser = subcommands.add_parser("tree")
-    tree_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
+    tree_parser.add_argument("head", help="il perimetro orchestrabile: un'epica o una lista custom")
     tree_parser.add_argument("--children", nargs="*", required=True,
                              help="i membri, dal lettore unico resolve-task.sh --members")
     recap_parser = subcommands.add_parser("recap")
-    recap_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
+    recap_parser.add_argument("head", help="il perimetro orchestrabile: un'epica o una lista custom")
     return parser.parse_args()
 
 

@@ -19,7 +19,7 @@ o riprendere il passo, `check` dice in un colpo solo se si può:
     stesso: due conversazioni sulla stessa task lavorano sugli stessi file;
   - gli orchestrator: i turni headless aperti da un orchestrator su questa task, finché
     l'orchestrator non è fermo, e gli orchestrator vivi, che la skill confronta coi membri del
-    loro perimetro col lettore unico (`resolve-task.sh --members`).
+    loro perimetro orchestrabile col lettore unico (`resolve-task.sh --members`).
 
 La testa dello stato, le prime righe prima del primo heading, le scrive la
 skill col tool `Write`:
@@ -78,7 +78,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import mandate  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import perimeter  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
 import orchestrator_common  # noqa: E402
 import orchestrator_state  # noqa: E402
 import sessions  # noqa: E402
@@ -193,23 +193,23 @@ def orchestrator_state_kind(project_root, orchestrator):
 def task_lines(project_root, docs, task_id, overview, tasks_md_lines):
     """La riga `TASK|…` e le righe `DEP|…` della task, con le dipendenze ancora
     aperte: quelle di `## Dependencies` e quelle del grafo, lette con le regole
-    di `mandate.py tree`."""
-    task = mandate.read_task(project_root, docs, task_id, overview)
+    di `perimeter.py tree`."""
+    task = perimeter.read_task(project_root, docs, task_id, overview)
     if task["file"] is None:
         return None, [], 0
     head = (f"TASK|{task_id}|prog={task['prog']}|size={task['size']}|preflight={task['preflight']}"
             f"|title={task['title']}")
     dependencies = [(dependency, "deps") for dependency in task["deps"] if dependency != task_id]
-    for dependent, dependency, source in mandate.graph_edges(tasks_md_lines):
+    for dependent, dependency, source in perimeter.graph_edges(tasks_md_lines):
         if dependent == task_id and dependency != task_id:
             dependencies.append((dependency, source))
-    closed = mandate.normalize_glyph("✔️")
+    closed = perimeter.normalize_glyph("✔️")
     lines, seen, open_count = [], set(), 0
     for dependency, source in dependencies:
         if dependency in seen:
             continue
         seen.add(dependency)
-        progress = mandate.normalize_glyph(overview.get(dependency, ("?", ""))[0]) or "?"
+        progress = perimeter.normalize_glyph(overview.get(dependency, ("?", ""))[0]) or "?"
         if progress != closed:
             open_count += 1
             lines.append(f"DEP|{dependency}|{progress}|{source}")
@@ -224,7 +224,7 @@ def command_check(project_root, task_id, own_session):
             tasks_md_lines = tasks_handle.read().splitlines()
     except OSError:
         tasks_md_lines = []
-    overview = mandate.overview_rows(tasks_md_lines)
+    overview = perimeter.overview_rows(tasks_md_lines)
     head, dependency_lines, open_dependencies = task_lines(project_root, docs, task_id, overview, tasks_md_lines)
     if head is None:
         print(f"ERROR: task file di {task_id} non trovato", file=sys.stderr)
@@ -236,15 +236,15 @@ def command_check(project_root, task_id, own_session):
         print(line)
     print(f"DEPS_OPEN={open_dependencies}")
 
-    headless = shutil.which(mandate.HEADLESS_COMMAND)
+    headless = shutil.which(perimeter.HEADLESS_COMMAND)
     print(f"HEADLESS={headless or 'assente'}")
-    knows_context = headless is not None and HEADLESS_CONTEXT_FLAG in mandate.command_usage(headless)
+    knows_context = headless is not None and HEADLESS_CONTEXT_FLAG in perimeter.command_usage(headless)
     print(f"HEADLESS_CONTEXT={'sì' if knows_context else ('no' if headless else '-')}")
     if headless is None:
         stops.append("loom-deck-headless non è sul PATH")
     elif not knows_context:
         stops.append("loom-deck-headless non conosce --context: il deck installato è più vecchio")
-    project_mode = mandate.project_permission_mode(project_root)
+    project_mode = perimeter.project_permission_mode(project_root)
     print(f"PROJECT_MODE={project_mode}")
     if project_mode != "auto":
         stops.append(f"permissionMode del progetto {project_mode}: il passo headless non ha nessuno che approva")
@@ -308,11 +308,11 @@ def command_check(project_root, task_id, own_session):
     for session in sorted(registry.sessions, key=lambda live: live.session_id):
         if orchestrator_state.same_session(session.session_id, own_session):
             continue
-        perimeter, stopped = sessions.orchestrator_of_transcript(
+        orchestrated, stopped = sessions.orchestrator_of_transcript(
             orchestrator_common.transcript_path(session.cwd, session.session_id))
-        if perimeter is None or stopped:
+        if orchestrated is None or stopped:
             continue
-        print(f"ORCHESTRATOR|{session.session_id}|{perimeter}|{task_of_session(project_root, session, bindings) or '?'}")
+        print(f"ORCHESTRATOR|{session.session_id}|{orchestrated}|{task_of_session(project_root, session, bindings) or '?'}")
 
     if verdict in NEW_STEP:
         print("ROUND=nuovo")

@@ -17,7 +17,7 @@
 # - Entry dinamica (inject-task.sh): sweep su TUTTI i task file del progetto --project
 #   (default: cwd se contiene runtime/tasks o docs/tasks), una run per LOOM_TASK.
 # - Entry dell'orchestrator (inject-orchestrator.sh): senza LOOM_ORCHESTRATOR non stampa niente, e la
-#   misura a vuoto direbbe 0. Si misura con un perimetro dall'id piu' lungo che un
+#   misura a vuoto direbbe 0. Si misura con un perimetro orchestrabile dall'id piu' lungo che un
 #   progetto plausibile porta (ORCHESTRATOR_PROBE), cioe' col testo che arriva davvero.
 #
 # Exit: 0 = tutte le entry sotto soglia · 1 = almeno una sfora · 2 = errore uso.
@@ -49,7 +49,7 @@ HOOKS="$ROOT/hooks/hooks.json"
 [ -f "$HOOKS" ] || { echo "hooks.json non trovato: $HOOKS" >&2; exit 2; }
 command -v jq >/dev/null || { echo "jq richiesto" >&2; exit 2; }
 
-# T220 — il perimetro con cui si misura la riga dell'organigramma: sei cifre sono
+# T220 — l'id del perimetro orchestrabile con cui si misura la riga dell'organigramma: sei cifre sono
 # oltre ogni contatore di task di un progetto.
 ORCHESTRATOR_PROBE="T999999"
 

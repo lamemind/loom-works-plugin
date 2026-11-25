@@ -25,7 +25,7 @@
 # In un turno headless (`claude -p`) AskUserQuestion non esiste, e questo hook non
 # scatta mai: li' lavora solo la riga dell'organigramma.
 #
-# Il perimetro entra nel motivo solo nella forma `T<numero>`: il motivo e' JSON
+# L'id del perimetro orchestrabile entra nel motivo solo nella forma `T<numero>`: il motivo e' JSON
 # scritto a mano, e un valore arbitrario lo romperebbe. Un valore fuori forma nega
 # lo stesso, senza nominare l'orchestrator.
 #

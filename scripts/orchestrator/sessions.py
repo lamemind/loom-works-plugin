@@ -9,7 +9,7 @@ sessions — legge le altre sessioni Claude Code di un progetto loom-works.
          prefisso fra le vive, poi fra i transcript del progetto: una sessione
          chiusa si rilegge anche dopo il suo ciclo
   orchestrators
-         gli altri orchestrator vivi sul progetto, su questa macchina, col perimetro
+         gli altri orchestrator vivi sul progetto, su questa macchina, col perimetro orchestrabile
          che ognuno porta avanti: la guardia al lancio di un orchestrator
   find   le sessioni vive il cui sessionId comincia col prefisso, col sessionId
          intero: l'orchestrator sa così se una sessione che aspetta — il
@@ -164,20 +164,24 @@ def command_tail(project_root, session_prefix, chars, prompt_count):
 
 
 # Un orchestrator si riconosce dal suo transcript: l'invocazione della skill — uno
-# slash command dell'utente, o una chiamata al tool Skill del modello — col
-# perimetro come primo id degli argomenti.
-ORCHESTRATOR_SKILL = re.compile(r"(?:^|[/:])orchestrate-mandate$")
+# slash command dell'utente, o una chiamata al tool Skill del modello — con l'id
+# del perimetro orchestrabile come primo id degli argomenti. I pattern accettano
+# anche i nomi di prima del rename, `orchestrate-mandate` e `mandate.py`: una
+# conversazione lanciata prima, o da un deck di prima, porta quei nomi nel
+# transcript, e senza il secondo ramo sparirebbe dal radar senza nessun errore.
+ORCHESTRATOR_SKILL = re.compile(r"(?:^|[/:])orchestrate-(?:perimeter|mandate)$")
 TASK_ID = re.compile(r"\bT\d+\b")
 # Il passo 2 dello stop dell'orchestrator, e nessun altro passo usa `recap`.
-RECAP_COMMAND = re.compile(r"mandate\.py[\"']?\s+(?:--project-root\s+\S+\s+)?recap\b")
+RECAP_COMMAND = re.compile(r"(?:perimeter|mandate)\.py[\"']?\s+(?:--project-root\s+\S+\s+)?recap\b")
 COMMAND_NAME = re.compile(r"<command-name>(.*?)</command-name>")
 COMMAND_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.S)
 
 
 def orchestrator_invocation(prompt):
-    """Il perimetro di uno slash command dell'orchestrator scritto in un prompt, o
-    `None`. Il comando arriva incartato nei tag `<command-name>`; un turno
-    `claude -p` può portarlo nudo, `/loom-works:orchestrate-mandate T214`."""
+    """L'id del perimetro orchestrabile di uno slash command dell'orchestrator
+    scritto in un prompt, o `None`. Il comando arriva incartato nei tag
+    `<command-name>`; un turno `claude -p` può portarlo nudo,
+    `/loom-works:orchestrate-perimeter T214`."""
     name = COMMAND_NAME.search(prompt)
     if name:
         if not ORCHESTRATOR_SKILL.search(name.group(1).strip()):
@@ -193,13 +197,14 @@ def orchestrator_invocation(prompt):
 
 
 def orchestrator_of_transcript(path):
-    """`(perimetro, ferma)` dell'ultimo orchestrator lanciato nel transcript,
+    """`(id del perimetro orchestrabile, ferma)` dell'ultimo orchestrator lanciato nel transcript,
     `(None, False)` se il transcript non ne lancia nessuna.
 
     Un orchestrator è fermo quando, dopo la sua invocazione, la sessione ha lanciato
-    `mandate.py recap`: è il passo 2 dello stop. Una compattazione del
-    contesto non cambia transcript, quindi l'invocazione resta leggibile; un
-    `/clear` apre un transcript nuovo, e la sessione da lì non è più un orchestrator.
+    `perimeter.py recap` (o `mandate.py recap`, il nome di prima): è il passo 2
+    dello stop. Una compattazione del contesto non cambia transcript, quindi
+    l'invocazione resta leggibile; un `/clear` apre un transcript nuovo, e la
+    sessione da lì non è più un orchestrator.
 
     Il filtro sul testo della riga viene prima del parse: il transcript di un
     orchestrator dura ore, e solo poche righe nominano la skill o lo script.
@@ -208,7 +213,7 @@ def orchestrator_of_transcript(path):
     try:
         with open(path, encoding="utf-8", errors="replace") as transcript_handle:
             for line in transcript_handle:
-                if "orchestrate-" not in line and "mandate.py" not in line:
+                if "orchestrate-" not in line and "perimeter.py" not in line and "mandate.py" not in line:
                     continue
                 try:
                     record = json.loads(line)

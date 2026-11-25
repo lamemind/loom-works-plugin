@@ -1,14 +1,15 @@
 """
-orchestrator_state — lo stato su disco dell'orchestrator di un perimetro: dove sta, di chi è.
+orchestrator_state — lo stato su disco dell'orchestrator di un perimetro orchestrabile:
+dove sta, di chi è.
 
   check   al lancio dell'orchestrator: i path, la cartella creata, il controllo
           che git la ignori, e il verdetto su ciò che l'orchestrator trova — un giro
           nuovo, una ripresa, o una ragione per fermarsi
-  facts   per `checkpoint-mandate`: la sezione `## Fatti del perimetro` dello
-          stato, se lo stato è di questo perimetro
+  facts   per `checkpoint-perimeter`: la sezione `## Fatti del perimetro` dello
+          stato, se lo stato è di questo perimetro orchestrabile
 
 I file stanno in `<radice>/.claude/loom/orchestrator/`, col nome ricavato
-dall'id del perimetro. Due li tocca questo script:
+dall'id del perimetro orchestrabile. Due li tocca questo script:
 
   T<id>.md           lo stato dell'orchestrator, scritto dall'orchestrator col tool `Write`
   T<id>-watch.json   il punto di lettura degli scanner del monitor, scritto
@@ -20,7 +21,7 @@ flusso — sono di `flow_log.py`, e il giro nuovo li archivia con `flow.py start
 
 Non nella scratchpad della conversazione: sta nella temp di sistema, e un
 reboot o una pulizia la svuotano a giro aperto. Non nella task folder del
-perimetro: è tracciata, e il `git add -A` di un `checkpoint-task` linked
+perimetro orchestrabile: è tracciata, e il `git add -A` di un `checkpoint-task` linked
 porterebbe nel commit lo stato a metà giro. `.claude/loom/` è ignorata da git
 dove il progetto la ignora, e `check` lo verifica: dove non la ignora l'orchestrator si
 ferma, perché `init` non scrive la regola.
@@ -35,25 +36,26 @@ La testa dello stato, le prime righe prima del primo heading:
                                     consegne passate: il successore e l'orchestrator
                                     che le ha passate, che il successore chiude
   Stato: ferma · <sessionId>        l'orchestrator si è fermato allo stop
-  Perimetro: T<id> · Created on <data del task file del perimetro>
+  Perimetro: T<id> · Created on <data del task file del perimetro orchestrabile>
 
 `in passaggio` esiste perché il `sessionId` del successore si conosce solo
 dopo lo spawn: senza la riga intermedia, un successore che legge lo stato
 prima che l'orchestrator vecchio scriva `passata a` troverebbe `attiva` di una
 sessione viva, e si fermerebbe.
 
-La riga `Perimetro` è l'identità. Un id non identifica un perimetro per sempre:
-`get-next-task-id.sh` dà il massimo più uno fra i task file e le righe di
-`tasks.md`, quindi l'id di un perimetro purgato torna a una task nuova se era il
+La riga `Perimetro` è l'identità. Un id non identifica un perimetro orchestrabile
+per sempre: `get-next-task-id.sh` dà il massimo più uno fra i task file e le righe
+di `tasks.md`, quindi l'id di un perimetro orchestrabile purgato torna a una task
+nuova se era il
 più alto, e lo stato vecchio resterebbe col suo nome. Uno stato il cui
 `Created on` non è quello del task file vale come assente. Nessuno script
 cancella lo stato: l'orchestrator allo stop toglierebbe i fatti prima che un
-`checkpoint-mandate` lanciato a mano li legga.
+`checkpoint-perimeter` lanciato a mano li legga.
 
 Verdetti di `check` (riga `STATE=`):
 
   assente      nessuno stato: giro nuovo                               exit 0
-  altro        lo stato di un perimetro passato con lo stesso id:
+  altro        lo stato di un perimetro orchestrabile passato con lo stesso id:
                giro nuovo, l'orchestrator lo sovrascrive                     exit 0
   ferma        un orchestrator fermato: giro nuovo che eredita i fatti       exit 0
   mia          `attiva` o `in passaggio` scritta da questa sessione:
@@ -77,10 +79,10 @@ darebbero come eventi tutto ciò che è cambiato dallo stop precedente. Una
 ripresa lo tiene, e gli scanner ripartono dal punto in cui erano.
 
 Uso:
-  python -I orchestrator_state.py [--project-root <radice>] check <perimetro> --own-session <session id> [--wait <secondi>]
-  python -I orchestrator_state.py [--project-root <radice>] facts <perimetro>
+  python -I orchestrator_state.py [--project-root <radice>] check <id del perimetro orchestrabile> --own-session <session id> [--wait <secondi>]
+  python -I orchestrator_state.py [--project-root <radice>] facts <id del perimetro orchestrabile>
 
-Exit: 0 avanti · 1 id malformato, task file del perimetro mancante, registro
+Exit: 0 avanti · 1 id malformato, task file del perimetro orchestrabile mancante, registro
 delle sessioni illeggibile · 2 l'orchestrator si ferma: cartella non ignorata da git,
 o uno dei verdetti sopra.
 """
@@ -125,7 +127,7 @@ def state_paths(project_root, perimeter):
 
 
 def perimeter_created_on(project_root, perimeter):
-    """Il `Created on` del task file del perimetro: `None` se il file non c'è,
+    """Il `Created on` del task file del perimetro orchestrabile: `None` se il file non c'è,
     stringa vuota se il campo manca."""
     path = orchestrator_common.find_task_file(project_root, orchestrator_common.docs_root(project_root), perimeter)
     if path is None:
@@ -323,17 +325,17 @@ def command_facts(project_root, perimeter):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Lo stato su disco dell'orchestrator di un perimetro")
+    parser = argparse.ArgumentParser(description="Lo stato su disco dell'orchestrator di un perimetro orchestrabile")
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     subcommands = parser.add_subparsers(dest="command", required=True)
     check_parser = subcommands.add_parser("check")
-    check_parser.add_argument("perimeter", help="l'id del perimetro: un'epica o un mandato")
+    check_parser.add_argument("perimeter", help="l'id del perimetro orchestrabile: un'epica o una lista custom")
     check_parser.add_argument("--own-session", required=True, help="session id dell'orchestrator che chiede")
     check_parser.add_argument("--wait", type=int, default=0,
                               help="secondi di attesa su `in passaggio` di un'altra sessione viva")
     facts_parser = subcommands.add_parser("facts")
-    facts_parser.add_argument("perimeter", help="l'id del perimetro: un'epica o un mandato")
+    facts_parser.add_argument("perimeter", help="l'id del perimetro orchestrabile: un'epica o una lista custom")
     return parser.parse_args()
 
 

@@ -1,37 +1,39 @@
 """
-schedule — il piano di un perimetro: `schedule.md` nella task folder del perimetro.
+orchestration_schedule — il piano di un perimetro orchestrabile:
+`orchestration-schedule.md` nella sua task folder (`schedule.md`, il nome di
+prima, letto quando il nuovo manca).
 
   verify  il piano contro i file del progetto: un blocco ```json solo e valido,
           i membri uguali a quelli del lettore unico, ogni dipendenza dichiarata
           fra membri aperti nel «Dopo», ogni path in comune fra due membri aperti
-          coperto da una risorsa o da un «Dopo», i perimetri di DLV dentro il
+          coperto da una risorsa o da un «Dopo», i perimetri eseguibili dentro il
           numero dei DLV; poi il commit del piano e i membri cambiati dopo.
           Con `--bozza` i soli controlli sui file, senza il commit: è la
           verifica di chi scrive il piano prima di committarlo
   show    il piano letto e normalizzato, una riga per membro
 
 Il contratto del file — dove sta, la prosa, il blocco JSON, i campi e il loro
-significato — è `docs/schedule-format.md`. Qui il parser, che è anche lo schema
+significato — è `docs/orchestration-schedule-format.md`. Qui il parser, che è anche lo schema
 eseguibile: una chiave ignota, un tipo sbagliato o un valore fuori dominio sono
 un errore, mai un default. Un campo letto col significato sbagliato non dà
 errore: lascia partire un membro troppo presto, e nessuno lo vede.
 
 Il modulo serve tre lettori. La skill dell'orchestrator lancia `verify` prima di
-partire, e lo stop la ferma. `prepare-mandate` lancia `verify --bozza` sul piano
+partire, e lo stop la ferma. `prepare-perimeter` lancia `verify --bozza` sul piano
 appena scritto, prima della conferma e del commit. Lo script del flusso (`flow.py`) importa il parser e
 `check`, e rilancia il controllo quando un task file di un membro cambia: lì
 conta la sola parte strutturale (`Result.blocking`), perché a giro avviato i
 membri cambiano di continuo e il commit del piano lo scrive l'orchestrator.
 
-I membri li legge il lettore unico, `resolve-task.sh <perimetro> --members`:
+I membri li legge il lettore unico, `resolve-task.sh <id> --members`:
 una regola sola per contare i membri, anche quando chi chiede è un processo
 Python staccato che nessuna skill imbocca.
 
 Uso:
-  python -I schedule.py [--project-root <radice>] verify <perimetro> [--bozza]
-  python -I schedule.py [--project-root <radice>] show <perimetro>
+  python -I orchestration_schedule.py [--project-root <radice>] verify <id del perimetro orchestrabile> [--bozza]
+  python -I orchestration_schedule.py [--project-root <radice>] show <id del perimetro orchestrabile>
 
-Exit: 0 ok · 1 id malformato, task file del perimetro mancante, lettore dei
+Exit: 0 ok · 1 id malformato, task file del perimetro orchestrabile mancante, lettore dei
 membri che non risponde · 2 piano che non vale (verify: stop; show: piano
 assente o non valido).
 """
@@ -50,11 +52,15 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import mandate  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
-import orchestrator_common  # noqa: E402
+import orchestrator_common  # noqa: E402  (dopo l'aggiunta della cartella a sys.path)
+import perimeter  # noqa: E402
 import perimeter_analysis  # noqa: E402
 
-PLAN_NAME = "schedule.md"
+# Il nome del piano, e quello di prima: un piano nato prima del rename resta
+# `schedule.md` finché `prepare-perimeter` non ci passa, e un giro vivo su di lui
+# gira con uno script del flusso che conosce solo quel nome.
+PLAN_NAME = "orchestration-schedule.md"
+PLAN_NAME_BEFORE = "schedule.md"
 TASK_ID_PATTERN = re.compile(r"^T\d+$")
 DEP_PATTERN = re.compile(r"^(T\d+)(?::(.+))?$")
 FENCE_OPEN = re.compile(r"^```json\s*$")
@@ -63,9 +69,9 @@ STEPS = ("preflight", "run", "checkpoint")
 TOP_KEYS = ("perimetro", "membri")
 MEMBER_KEYS = ("id", "passo", "dopo", "risorse", "dlv", "umano")
 ALL_OTHERS = "*"
-CLOSED = mandate.normalize_glyph("✔️")
+CLOSED = perimeter.normalize_glyph("✔️")
 # I membri su cui l'orchestrator non lancia niente: chiusi, assenti, o un
-# perimetro a sé fra i membri.
+# perimetro orchestrabile a sé fra i membri.
 NOT_RUNNABLE = ("chiusa", "epica", "assente")
 RESOLVE_TIMEOUT_S = 30
 
@@ -75,7 +81,7 @@ class PlanError(ValueError):
 
 
 # ---------------------------------------------------------------------------
-# Il perimetro di DLV: la stessa grammatica di `task-deliverables.sh --scope`
+# Il perimetro eseguibile: la stessa grammatica di `task-deliverables.sh --scope`
 # ---------------------------------------------------------------------------
 
 
@@ -84,17 +90,17 @@ def parse_dlv_spec(spec):
     pezzo vuoto, un numero non positivo o un intervallo rovesciato: la stessa
     spec che `run-task` rifiuterebbe."""
     if not isinstance(spec, str) or not spec.strip():
-        raise PlanError("perimetro di DLV vuoto")
+        raise PlanError("perimetro eseguibile vuoto")
     numbers = set()
     for piece in spec.split(","):
         piece = piece.strip()
         match = re.fullmatch(r"(\d+)(?:-(\d+))?", piece)
         if not match:
-            raise PlanError(f"perimetro di DLV «{spec}» malformato (forma 1,3-5)")
+            raise PlanError(f"perimetro eseguibile «{spec}» malformato (forma 1,3-5)")
         first = int(match.group(1))
         last = int(match.group(2)) if match.group(2) else first
         if first < 1 or last < first:
-            raise PlanError(f"perimetro di DLV «{spec}»: «{piece}» non è un intervallo valido")
+            raise PlanError(f"perimetro eseguibile «{spec}»: «{piece}» non è un intervallo valido")
         numbers.update(range(first, last + 1))
     return sorted(numbers)
 
@@ -190,7 +196,7 @@ class Plan:
 
     def __init__(self, data):
         if not isinstance(data, dict):
-            raise PlanError("atteso un oggetto JSON con perimetro e membri")
+            raise PlanError("atteso un oggetto JSON con «perimetro» e «membri»")
         unknown = sorted(key for key in data if key not in TOP_KEYS)
         if unknown:
             raise PlanError(f"chiave ignota «{unknown[0]}» (attese {', '.join(TOP_KEYS)})")
@@ -204,7 +210,7 @@ class Plan:
         self.by_id = {}
         for member in self.members:
             if member.id == self.head:
-                raise PlanError(f"membro {member.id}: il perimetro non è un membro di sé stesso")
+                raise PlanError(f"membro {member.id}: il perimetro orchestrabile non è un membro di sé stesso")
             if member.id in self.by_id:
                 raise PlanError(f"membro {member.id} ripetuto")
             self.by_id[member.id] = member
@@ -241,7 +247,7 @@ def extract_json(text):
 
 
 def parse_plan_text(text):
-    """Il piano dal testo di `schedule.md`; `PlanError` col motivo."""
+    """Il piano dal testo del suo file; `PlanError` col motivo."""
     try:
         data = json.loads(extract_json(text))
     except ValueError as error:
@@ -252,9 +258,11 @@ def parse_plan_text(text):
 
 
 def plan_path(project_root, head):
-    """(path, motivo): il piano sta nella task folder del perimetro, il campo
-    `Folder` del suo task file. `path` è `None` quando il task file manca o il
-    campo è vuoto, e il motivo lo dice."""
+    """(path, motivo): il piano sta nella task folder del perimetro orchestrabile,
+    il campo `Folder` del suo task file. Il nome nuovo vince; il
+    nome di prima vale quando il nuovo non c'è; senza nessuno dei due il path è
+    quello nuovo, e chi lo legge trova il piano assente. `path` è `None` quando
+    il task file manca o il campo è vuoto, e il motivo lo dice."""
     task_file = orchestrator_common.find_task_file(project_root, orchestrator_common.docs_root(project_root), head)
     if task_file is None:
         return None, f"task file di {head} non trovato"
@@ -265,7 +273,11 @@ def plan_path(project_root, head):
     folder = folder.strip().rstrip("/")
     if not folder:
         return None, f"{head} non ha una task folder (campo Folder vuoto)"
-    return os.path.join(project_root, folder, PLAN_NAME), ""
+    path = os.path.join(project_root, folder, PLAN_NAME)
+    before = os.path.join(project_root, folder, PLAN_NAME_BEFORE)
+    if not os.path.isfile(path) and os.path.isfile(before):
+        return before, ""
+    return path, ""
 
 
 def load_plan(path):
@@ -292,7 +304,7 @@ def resolver_script():
 
 def read_members(project_root, head):
     """(membri, mancanti): le righe `TASK_MEMBER` e `TASK_MEMBER_MISSING` di
-    `resolve-task.sh <perimetro> --members`, nell'ordine del lettore.
+    `resolve-task.sh <id> --members`, nell'ordine del lettore.
 
     `PROJECT_ROOT` fissa la radice e `LOOM_TASK` si toglie: il lettore non deve
     risolvere una task diversa da quella chiesta. `bash` c'è su Linux e, su
@@ -356,10 +368,10 @@ def check_members(plan, members, missing, result):
     declared = members + missing
     for task_id in declared:
         if task_id not in plan.by_id:
-            result.diffs.append(("membri", task_id, "membro del perimetro senza voce nel piano"))
+            result.diffs.append(("membri", task_id, "membro del perimetro orchestrabile senza voce nel piano"))
     for task_id in plan.ids:
         if task_id not in declared:
-            result.diffs.append(("membri", task_id, "voce del piano che non è un membro del perimetro"))
+            result.diffs.append(("membri", task_id, "voce del piano che non è un membro del perimetro orchestrabile"))
 
 
 def is_open(state, task_id):
@@ -373,7 +385,7 @@ def known_task(state, task_id):
 
 
 def check_after(plan, state, result):
-    """Le voci di «Dopo»: una task che esiste, un perimetro di DLV dentro il
+    """Le voci di «Dopo»: una task che esiste, un perimetro eseguibile dentro il
     numero dei DLV del membro che nomina. Poi P4: ogni dipendenza che un membro
     aperto dichiara verso un altro membro aperto sta nel suo «Dopo» — lo script
     legge l'ordine solo dal piano, e una dipendenza aggiunta dopo la stesura
@@ -403,7 +415,7 @@ def check_after(plan, state, result):
 
 def check_materials(plan, state, result):
     """Ogni coppia di membri aperti con un path in comune che almeno uno dei
-    due scrive (`CONFLICT … materiale` di `mandate.py tree`) ha una risorsa in
+    due scrive (`CONFLICT … materiale` di `perimeter.py tree`) ha una risorsa in
     comune o un «Dopo» fra i due: senza, lo script li lancerebbe insieme."""
     for conflict in state["conflicts"]:
         if not conflict["reason"].startswith("materiale: "):
@@ -419,7 +431,7 @@ def check_materials(plan, state, result):
 
 
 def check_steps(plan, state, result):
-    """Il perimetro di DLV dentro il numero dei DLV; e il passo di partenza
+    """Il perimetro eseguibile dentro il numero dei DLV; e il passo di partenza
     contro i file, come avviso: un passo che non vale più non ferma niente,
     perché lo script parte dal passo che i file dicono."""
     for member in plan.members:
@@ -436,7 +448,7 @@ def check_steps(plan, state, result):
         elif member.step == "run" and done >= total:
             result.warnings.append(("passo", member.id, "nessun DLV aperto: il primo passo sarà quello dei file"))
         elif member.step == "run" and task["next"] == "preflight" and \
-                (task["preflight"] == "decaduta" or mandate.is_size_large(task["size"])):
+                (task["preflight"] == "decaduta" or perimeter.is_size_large(task["size"])):
             result.diffs.append(("passo", member.id, "run-task rifiuta il run senza un preflight valido"))
         elif member.step == "checkpoint" and task["next"] == "preflight":
             result.diffs.append(("passo", member.id, "checkpoint su un membro senza preflight valido"))
@@ -485,7 +497,7 @@ def check(project_root, head, history=True):
         return result
     if result.plan.head != head:
         result.diffs.append(("perimetro", result.plan.head, f"il piano è di {result.plan.head}, non di {head}"))
-    state = mandate.snapshot(project_root, head, result.members)
+    state = perimeter.snapshot(project_root, head, result.members)
     state["project_root"] = project_root
     state["docs"] = orchestrator_common.docs_root(project_root)
     result.state = state
@@ -524,7 +536,8 @@ def command_verify(project_root, head, draft=False):
     task_file = orchestrator_common.find_task_file(project_root, orchestrator_common.docs_root(project_root), head)
     with open(task_file, encoding="utf-8", errors="replace") as task_handle:
         size = orchestrator_common.header_field(task_handle.read().splitlines(), "Size") or "?"
-    form = "mandato" if size.lower().startswith("mandate") else "epica"
+    # `mandate` è il nome di prima di `custom`, letto uguale.
+    form = "custom" if size.lower().startswith(("custom", "mandate")) else "epica"
     print(f"PERIMETRO={head}|{form}")
     print(f"PLAN={relative(project_root, result.path) if result.path else 'assente'}")
     print(f"MEMBRI={len(result.members)}" + (f" (senza task file: {', '.join(result.missing)})" if result.missing else ""))
@@ -564,15 +577,15 @@ def command_show(project_root, head):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Il piano di un perimetro: schedule.md")
+    parser = argparse.ArgumentParser(description="Il piano di un perimetro orchestrabile: orchestration-schedule.md")
     parser.add_argument("--project-root", default="",
                         help="default: la prima cartella sopra la corrente con .claude/loom-works.json")
     subcommands = parser.add_subparsers(dest="command", required=True)
     verify_parser = subcommands.add_parser("verify")
-    verify_parser.add_argument("head", help="il perimetro: un'epica o un mandato")
+    verify_parser.add_argument("head", help="il perimetro orchestrabile: un'epica o una lista custom")
     verify_parser.add_argument("--bozza", action="store_true",
                                help="il piano non ancora committato: i soli controlli sui file, senza il commit")
-    subcommands.add_parser("show").add_argument("head", help="il perimetro: un'epica o un mandato")
+    subcommands.add_parser("show").add_argument("head", help="il perimetro orchestrabile: un'epica o una lista custom")
     return parser.parse_args()
 
 

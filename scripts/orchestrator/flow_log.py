@@ -133,7 +133,7 @@ class Round:
     - `last_step_seq`: il `seq` dell'ultimo cambio di un passo o di un fermo,
       che fa da generazione ai risvegli del giro;
     - `wakes`: le righe `risveglio`, in ordine;
-    - `cycles`: i cicli chiusi dall'ultimo checkpoint del perimetro;
+    - `cycles`: i cicli chiusi dall'ultimo checkpoint del perimetro orchestrabile;
     - `orders_done`: l'ultimo numero d'ordine applicato;
     - `start`: l'ultima riga `avvio`; `before`: la riga `prima`;
     - `plan`: l'ultima riga `piano`; `last_seq`: l'ultimo `seq`.

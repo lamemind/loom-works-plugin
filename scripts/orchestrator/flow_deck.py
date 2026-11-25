@@ -20,7 +20,7 @@ import shutil
 import subprocess
 
 import flow_log
-import mandate
+import perimeter
 import orchestrator_common
 
 HEADLESS_COMMAND = "loom-deck-headless"
@@ -173,7 +173,7 @@ def dlv_marks(project_root, task_id):
     lines = task_lines(project_root, task_id)
     if lines is None:
         return None
-    marks = [mandate.CHECKBOX.match(line) for line in mandate.section_lines(lines, "Deliverables Checklist")]
+    marks = [perimeter.CHECKBOX.match(line) for line in perimeter.section_lines(lines, "Deliverables Checklist")]
     return {index + 1: match.group(1) in "xX" for index, match in enumerate(item for item in marks if item)}
 
 

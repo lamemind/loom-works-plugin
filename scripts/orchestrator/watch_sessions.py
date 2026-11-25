@@ -16,7 +16,7 @@ Ogni riga su stdout è un evento per il tool Monitor di Claude Code:
 Gli scanner servono soprattutto allo script del flusso (`flow_engine.py`), che
 li chiama dal proprio processo: assegna `sink`, e ogni evento gli arriva come
 dict — genere, testo, task, sessioni — invece di uscire su stdout. Il flusso
-sceglie da sé quali eventi tenere: quelli del perimetro e dei suoi membri.
+sceglie da sé quali eventi tenere: quelli del perimetro orchestrabile e dei suoi membri.
 
 Con --context-threshold il monitor misura anche il contesto della sessione che
 lo lancia, l'orchestrator, dal suo transcript (watch_context.py): una riga `orchestrator 🧠`
@@ -336,7 +336,7 @@ def announce_label_change(process, old_label):
     if new_label == old_label:
         return
     session = short_id(process["session_id"])
-    # L'evento porta la task vecchia e la nuova: il flusso di un perimetro che
+    # L'evento porta la task vecchia e la nuova: il flusso di un perimetro orchestrabile che
     # ne contiene una vede entrare e uscire la sessione dai suoi membri.
     tasks = {label for label in (old_label, new_label) if not label.startswith("?")}
     session_ids = process_session_ids(process)
@@ -642,7 +642,7 @@ def commit_tasks(subject, parent_of):
     scope, ogni id del soggetto. Il commit di creazione `task(T<n>): create`
     prende anche la task del campo `Parent Task` del file appena nato
     (`parent_of`): è così che la figlia nuova di un'epica arriva al flusso del
-    suo perimetro, e la creazione di una task estranea no. Un commit senza id
+    suo perimetro orchestrabile, e la creazione di una task estranea no. Un commit senza id
     non ha task.
     """
     scope = COMMIT_SCOPE_PATTERN.match(subject)
