@@ -6,8 +6,17 @@
 _LOOM_SAY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 _LOOM_SAY_BIN="${_LOOM_SAY_ROOT}/scripts/say-it"
 
+# Muto in un turno headless (`claude -p`): nessuno sta davanti alla
+# conversazione, e chi la segue legge l'esito, non lo ascolta. Il CLI esporta
+# `CLAUDE_CODE_ENTRYPOINT=sdk-cli` ai figli di un `-p` (Bash del modello e hook),
+# anche quando il processo eredita `cli` da chi lo lancia; una tab porta `cli`.
+_loom_say_headless() {
+    [[ "${CLAUDE_CODE_ENTRYPOINT:-}" == "sdk-cli" ]]
+}
+
 _say_core() {
     local model="$1" text="$2"
+    _loom_say_headless && return 0
     [[ -x "$_LOOM_SAY_BIN" ]] || return 0
     [[ -f "$model" ]] || return 0
     SAY_IT_MODEL="$model" "$_LOOM_SAY_BIN" "$text" 2>/dev/null || true

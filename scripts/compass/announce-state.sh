@@ -40,6 +40,14 @@ state="${1:-}"
 # della tab.
 LIVE_DIR="${HOME}/.claude/sessions"
 
+# Turno headless (`claude -p`): nessuno sta davanti alla conversazione, quindi
+# nessun suono — né il ding della conversazione marcata né quello di progetto di
+# compass. Il CLI esporta `CLAUDE_CODE_ENTRYPOINT=sdk-cli` agli hook di un `-p`,
+# anche quando il processo eredita `cli` da chi lo lancia; una tab porta `cli`.
+_headless() {
+    [ "${CLAUDE_CODE_ENTRYPOINT:-}" = "sdk-cli" ]
+}
+
 # Tipi di notifica che NON significano «qualcuno ti aspetta».
 #
 # L'hook `Notification` è più largo del suo nome: il CLI lo emette anche per
@@ -193,6 +201,11 @@ _notify_priority() {
         *)        return 0 ;;
     esac
 
+    # Il banner va via insieme al ding: GNOME può suonare anche per la sola
+    # notifica, e un banner di una conversazione senza tab non porta da nessuna
+    # parte.
+    _headless && return 0
+
     sid="${CLAUDE_CODE_SESSION_ID:-}"
     root="${CLAUDE_PROJECT_DIR:-}"
     [ -n "$sid" ] && [ -n "$root" ] || return 0
@@ -230,8 +243,18 @@ _notify_priority() {
 
 _notify_priority "$state"
 
+# In headless lo stato arriva a compass SENZA profilo: compass lo tiene per la
+# sola sessione, ridisegna il menu coi turni headless in corso e non suona. Con
+# il profilo cambierebbe lo stato del PROGETTO — `done` suona, `end` cancella
+# l'`ask` di una tab vera. I lanciatori headless lo tolgono già dall'ambiente;
+# qui lo si toglie anche a un `claude -p` lanciato a mano da una tab, che lo
+# eredita. La chiamata non si salta: senza, il menu resterebbe fermo.
 if command -v compass >/dev/null 2>&1; then
-    compass "$state" >/dev/null 2>&1 || true
+    if _headless; then
+        PTYXIS_PROFILE='' compass "$state" >/dev/null 2>&1 || true
+    else
+        compass "$state" >/dev/null 2>&1 || true
+    fi
 fi
 
 exit 0
