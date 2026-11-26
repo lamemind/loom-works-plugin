@@ -30,7 +30,7 @@ Argomenti che non si traducono in questa forma (un kind fuori elenco, un perimet
 
 ### Il kind `orchestrator`
 
-Apre un **orchestrator nuovo** sul perimetro orchestrabile — un'epica o una lista custom — come il tasto `direct` del deck: la tab lancia l'orchestrator (`orchestrate-perimeter <id>`, o `orchestrate-mandate <id>`, il nome di prima, da un deck installato prima del rename) col modello dell'azione `orchestrator` del catalogo. Lo chiede solo un orchestrator che passa le consegne al successore (`orchestrate-perimeter`, §Il passaggio di consegne), dalla propria conversazione:
+Apre un **orchestrator nuovo** sul perimetro orchestrabile — un'epica o una lista custom — come il tasto `direct` del deck: la tab lancia l'orchestrator (`orchestrate-perimeter <id>`) col modello dell'azione `orchestrator` del catalogo. Lo chiede solo un orchestrator che passa le consegne al successore (`orchestrate-perimeter`, §Il passaggio di consegne), dalla propria conversazione:
 
 ```bash
 loom-deck-spawn <id del perimetro orchestrabile> orchestrator

@@ -57,8 +57,6 @@ Then bootstrap the project structure:
 | `/loom-works:scratch-new` | Create a scratch folder for ad-hoc investigations |
 | `/loom-works:set-task-folder` | Attach a task folder to an existing task |
 
-`orchestrate-mandate`, `prepare-mandate` and `checkpoint-mandate` remain as forwarders to the new names, for callers from before the rename: an installed deck opens the orchestrator by the old name.
-
 ## Configuration
 
 The plugin declares no user options (`userConfig`). Every setting is per-project and lives in the project file `.claude/loom-works.json`.
