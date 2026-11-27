@@ -7,7 +7,8 @@ prima, letto quando il nuovo manca).
           i membri uguali a quelli del lettore unico, ogni dipendenza dichiarata
           fra membri aperti nel «Dopo», ogni path in comune fra due membri aperti
           coperto da una risorsa o da un «Dopo», i perimetri eseguibili dentro il
-          numero dei DLV; poi il commit del piano e i membri cambiati dopo.
+          numero dei DLV, e come avviso le dipendenze verso un id che il progetto
+          non conosce; poi il commit del piano e i membri cambiati dopo.
           Con `--bozza` i soli controlli sui file, senza il commit: è la
           verifica di chi scrive il piano prima di committarlo
   show    il piano letto e normalizzato, una riga per membro
@@ -413,6 +414,21 @@ def check_after(plan, state, result):
                                      f"dipende da {item['id']} ({source}), che manca dal suo «dopo»"))
 
 
+def check_unknown(state, result):
+    """Le dipendenze di un membro aperto verso un id che il progetto non
+    conosce (`WARN` di `perimeter.py tree`), come avviso: il membro resta fermo
+    e lo script fa partire il giro sugli altri. Fermare il lancio vorrebbe dire
+    fermare tutto il perimetro orchestrabile per un riferimento vecchio, il
+    caso più frequente: una task potata, che resta nominata nelle
+    `## Dependencies` di chi la aspettava."""
+    for task_id in state["members"]:
+        if not is_open(state, task_id):
+            continue
+        for item in state["tasks"][task_id].get("unknown_dependencies", []):
+            result.warnings.append(("dipendenza", task_id,
+                                    f"{item['id']}: {item['cause']} — il membro non parte"))
+
+
 def check_materials(plan, state, result):
     """Ogni coppia di membri aperti con un path in comune che almeno uno dei
     due scrive (`CONFLICT … materiale` di `perimeter.py tree`) ha una risorsa in
@@ -503,6 +519,7 @@ def check(project_root, head, history=True):
     result.state = state
     check_members(result.plan, result.members, result.missing, result)
     check_after(result.plan, state, result)
+    check_unknown(state, result)
     check_materials(result.plan, state, result)
     check_steps(result.plan, state, result)
     if history:

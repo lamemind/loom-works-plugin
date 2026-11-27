@@ -11,6 +11,7 @@ cifre prima → dopo.
           passaggio di consegne (`HANDOFF`)
   tree    lo stato del perimetro orchestrabile dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
+          dipendenze verso un id che il progetto non conosce (`WARN`),
           `## Materiale`; poi le coppie di membri che non possono girare insieme
   recap   le cifre di oggi accanto a quelle di partenza del giro, la riga `prima`
           che lo script del flusso scrive al primo avvio del giro
@@ -398,6 +399,26 @@ def is_size_large(size):
     return bool(words) and words[0].upper() == "L"
 
 
+# Le cause di una dipendenza con Prog `?`: la stessa attesa senza fine, due
+# rimedi diversi — correggere la voce, o aggiungere la riga in tasks.md.
+UNKNOWN_ID = "id assente nel progetto"
+MISSING_ROW = "task file senza riga in tasks.md"
+
+
+def unknown_cause(project_root, docs, task_id, tasks, overview):
+    """Perché il progetto non dà una Prog a `task_id`, la dipendenza di un
+    membro; `None` quando la riga in tasks.md c'è. Un id con Prog `?` non vale
+    ✔️, quindi resta in `blocked=` e tiene fermo il membro: la causa è ciò che
+    chi legge l'albero deve correggere."""
+    if task_id in overview:
+        return None
+    if task_id in tasks:
+        has_file = tasks[task_id]["file"] is not None
+    else:
+        has_file = orchestrator_common.find_task_file(project_root, docs, task_id) is not None
+    return MISSING_ROW if has_file else UNKNOWN_ID
+
+
 def paths_overlap(first, second):
     if first == second:
         return True
@@ -442,6 +463,14 @@ def snapshot(project_root, head, members):
             {"id": dependency, "source": source, "prog": progress} for dependency, source, progress in unique]
         tasks[task_id]["open_dependencies"] = [
             dependency for dependency, _, progress in unique if progress != closed]
+        # Una dipendenza che il progetto non conosce resta aperta: può essere la
+        # base mancante del membro, e partire senza costa più che aspettare.
+        unknown = []
+        for dependency, _, progress in unique:
+            cause = unknown_cause(project_root, docs, dependency, tasks, overview) if progress == "?" else None
+            if cause:
+                unknown.append({"id": dependency, "cause": cause})
+        tasks[task_id]["unknown_dependencies"] = unknown
         tasks[task_id]["next"] = next_step(tasks[task_id])
     # Le coppie che non possono girare insieme, fra le sole task ancora aperte:
     # una task chiusa non riparte, e un suo conflitto non ferma nessuno.
@@ -479,6 +508,8 @@ def print_tree(state):
         if task["dependencies"]:
             listed = " · ".join(f"{item['id']} {item['prog']} ({item['source']})" for item in task["dependencies"])
             print(f"DEPS|{task_id}|{listed}")
+        for item in task["unknown_dependencies"]:
+            print(f"WARN|{task_id}|{item['id']}|{item['cause']}")
         if task["materiale"]:
             print(f"MATERIALE|{task_id}|{' · '.join(task['materiale'])}")
     for conflict in state["conflicts"]:

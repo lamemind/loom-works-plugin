@@ -598,6 +598,9 @@ class Engine:
             return "giro in chiusura"
         if member is not None and not self.after_ok(member):
             return "aspetta " + ", ".join(dependency.text for dependency in member.after)
+        unknown = [f"{item['id']}, {item['cause']}" for item in (self.task(task_id) or {}).get("unknown_dependencies", [])]
+        if unknown:
+            return "dipendenza verso un id che il progetto non conosce: " + "; ".join(unknown)
         return "dipendenza aperta fuori dal perimetro orchestrabile"
 
     # ------------------------------------------------------------- keep-alive
