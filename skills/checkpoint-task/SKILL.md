@@ -179,10 +179,21 @@ Vale anche su un'epica con DLV propri ancora aperti: `run-task` rifiuta sempre u
    Sopra soglia riporta la riga in output e **prosegui**: non tagli, non splitti, non apri una task. È un dato per chi legge il checkpoint, non un cancello — la soglia vive in `lib-doc.sh` e l'avviso dichiara il numero contro cui ha misurato.
 
 7. **Aggiorna {docs_root}/tasks.md**
-   1. Nella tabella Tasks Overview trova la riga `| {taskId} |`
-   2. Aggiorna la colonna Prog: `✔️` se completata (step 4), altrimenti `🟡`
-   3. Se la task appare nel grafo Execution Plan, allinea l'emoji davanti all'ID
-   4. L'ordine fra questo step e la fase doc è **libero**: la Prog in `tasks.md` non è un cancello per niente — a governare le sezioni dell'indice è il marker dentro il file inbox, che il 6.4 accende alla chiusura.
+   1. Cella Prog della Tasks Overview e glifo dei nodi nel grafo dell'Execution Plan li scrivono le stesse due funzioni di `promote-ready` e `promote-wip`, mai tu a mano. `G` vale `✔️` se la task si è chiusa allo step 4, altrimenti `🟡`:
+
+      ```bash
+      source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
+      G="✔️"   # 🟡 se la task non si è chiusa allo step 4
+      if lw_tasks_md_prog_set "{docs_root}/tasks.md" "${taskId}" "$G"; then
+          echo "-> tasks.md aggiornato: ${taskId} $G"
+      else
+          echo "WARN: nessuna riga ${taskId} sotto un header con colonna Prog — Prog NON aggiornata" >&2
+      fi
+      lw_tasks_md_graph_set "{docs_root}/tasks.md" "${taskId}" "$G"
+      ```
+
+   2. `lw_tasks_md_graph_set` stampa da sé i nodi riscritti, e un `WARN` per ogni riga che porta l'id con un altro glifo in una posizione che non riconosce come nodo. Exit 1 senza nessuna riga è la task assente dal grafo, il caso normale di una task spot. Ogni `WARN` dei due comandi va nelle Segnalazioni: non correggi il grafo a mano, e non togli il 🔒 ai dipendenti — lo sblocco richiede di leggere tutte le dipendenze del dipendente.
+   3. L'ordine fra questo step e la fase doc è **libero**: la Prog in `tasks.md` non è un cancello per niente — a governare le sezioni dell'indice è il marker dentro il file inbox, che il 6.4 accende alla chiusura.
 
 8. **Commit e push — fase tracking e doc**
 
