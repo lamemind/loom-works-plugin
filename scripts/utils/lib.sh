@@ -377,8 +377,9 @@ lw_task_members() {   # <task-id>
 # ---- Cella Prog della Tasks Overview -----------------------------------------
 #
 # Lettura e riscrittura della cella Prog di una riga `| T<n> | … |` in tasks.md,
-# per gli script che promuovono (promote-wip, promote-ready): un awk solo, invece
-# di una copia per chiamante che divergerebbe alla prima correzione.
+# per chi cambia lo stato di una task (promote-wip, promote-ready, lo step 7 di
+# checkpoint-task): un awk solo, invece di una copia per chiamante che
+# divergerebbe alla prima correzione.
 #
 # La colonna Prog si localizza dall'HEADER (`| ID | Pri | Prog | … |`), mai per
 # posizione: un indice cablato smette di matchare al primo cambio di forma della
@@ -429,6 +430,133 @@ lw_tasks_md_prog_set() {   # <tasks-file> <task-id> <glifo>
     rm -f "$tmp"
     return 1
 }
+
+# ---- Glifo di una task nel grafo dell'Execution Plan --------------------------
+#
+# Riscrive il glifo di stato davanti a ogni nodo <task-id> nella sezione
+# `## Execution Plan` di tasks.md, per gli stessi chiamanti della cella Prog:
+# il glifo del grafo e la cella Prog cambiano insieme, e una regola sola vale
+# dalla promozione alla chiusura.
+#
+# La forma del grafo non e' fissa fra i progetti: catene con etichetta libera
+# (`Epica T21 (…), spot su main:   …`), righe di continuazione indentate, nodi
+# separati da `·` oltre che da `→`, nodi a inizio catena. Lo stesso id compare
+# anche dove NON e' un nodo: nell'etichetta (`Epica T21 (`), nella prosa di una
+# cella (`D1 del preflight di T36`), nella colonna Parent. Il nodo si riconosce
+# quindi dal separatore che lo precede — whitelist, non blacklist delle menzioni —
+# e l'id finisce davanti a un carattere che non e' di parola (`T36` non e' `T360`):
+#
+#   - riga di catena: inizio riga piu' indentazione · `→` o `·` piu' spazio ·
+#     `:` piu' due o piu' spazi (la fine dell'etichetta)
+#   - tabella Cross-deps, colonne trovate dall'header: la cella `Task` · nella
+#     cella `Cross Deps` a inizio cella o dopo `, ` (la riga dice da sola perche'
+#     una task e' bloccata) · la colonna `Parent` mai
+#
+# Il glifo esistente si sostituisce qualunque sia, su tutte le occorrenze della
+# riga: un nodo gia' col glifo di arrivo si riscrive identico, mai raddoppiato.
+# Perl gira in UTF-8 (-CSDA): letto a byte, un quantificatore dopo un'emoji
+# (`🟢?`) si applica al solo ultimo byte, e il nodo senza glifo diventa un no-op
+# muto. Il glifo e' un carattere \p{So} con il VS16 opzionale (`✔️`).
+#
+# Nella tabella, un id nudo che prende il glifo consuma fino a 2 spazi di
+# riempimento in coda alla cella (ne resta sempre uno): la tabella e' testo
+# grezzo dentro ```, e il glifo occupa due colonne. Da glifo a glifo la
+# larghezza non cambia.
+#
+# Un token `<altro glifo><task-id>` rimasto nella sezione, fuori dalla colonna
+# Parent, e' un WARN su stderr: un token glifato e' un nodo per costruzione, e
+# un separatore che la regola non conosce e' la classe del guasto che questa
+# funzione sostituisce. Una task assente dal grafo e' il caso normale delle task
+# spot: nessuna riga, exit 1, e il chiamante tace.
+#
+# Stdout: `-> grafo aggiornato: <id> <glifo> (<n> nodi)` quando trova nodi.
+# Exit: 0 = almeno un nodo riscritto · 1 = nessun nodo (file intatto) ·
+#       2 = argomenti o file invalidi
+lw_tasks_md_graph_set() {   # <tasks-file> <task-id> <glifo>
+    perl -CSDA -e "${_LW_TASKS_MD_GRAPH_PL}" -- "$@"
+}
+
+_LW_TASKS_MD_GRAPH_PL='
+    use strict; use warnings;
+    my ($file, $id, $glyph) = @ARGV;
+    my $G = qr/\p{So}\x{FE0F}?/;
+    sub fail { print STDERR "ERROR: lw_tasks_md_graph_set: $_[0]\n"; exit 2 }
+    defined $glyph or fail(q{uso: <tasks-file> <task-id> <glifo>});
+    $id =~ /^[A-Za-z]*[0-9]+$/ or fail(qq{id non valido: $id});
+    $glyph =~ /^$G$/ or fail(qq{glifo non valido: $glyph});
+    open(my $in, q{<}, $file) or fail(qq{$file: $!});
+    my @lines = <$in>;
+    close $in;
+
+    sub bare { (my $s = shift) =~ s/\x{FE0F}//g; return $s }
+    # Toglie fino a <want> spazi di coda alla cella, lasciandone sempre uno.
+    sub shrink {
+        my ($cell, $want) = @_;
+        return $cell unless $want && $cell =~ /( +)$/;
+        my $cut = length($1) - 1;
+        $cut = $want if $want < $cut;
+        substr($cell, -$cut) = q{} if $cut > 0;
+        return $cell;
+    }
+
+    my ($plan, $cols, $nodes, @residue) = (0, undef, 0);
+    my $k = 0;
+    for my $line (@lines) {
+        $k++;
+        if ($line =~ /^#{1,2}[ \t]/) {
+            $plan = $line =~ /^##[ \t]+Execution Plan\b/ ? 1 : 0;
+            $cols = undef;
+            next;
+        }
+        next unless $plan;
+        my $scan = $line;
+        if ($line =~ /^[ \t]*\|/) {
+            my @c = split /\|/, $line, -1;
+            my %h;
+            for my $j (1 .. $#c - 1) {
+                (my $t = $c[$j]) =~ s/^\s+|\s+$//g;
+                $h{$t} = $j;
+            }
+            if (exists $h{Task}) { $cols = \%h; next; }
+            next if $line =~ /^[ \t]*\|[-:| \t\r]*$/;
+            if ($cols) {
+                for my $col (q{Task}, q{Cross Deps}) {
+                    my $j = $cols->{$col};
+                    next unless defined $j && $j < $#c;
+                    my $sep = $col eq q{Task} ? qr/^[ \t]*/ : qr/^[ \t]*|,[ \t]+/;
+                    my $gain = 0;
+                    my $n = ($c[$j] =~ s{($sep)($G)?\Q$id\E(?![0-9A-Za-z_])}{
+                        $gain++ unless defined $2; $1 . $glyph . $id
+                    }ge) || 0;
+                    $nodes += $n;
+                    $c[$j] = shrink($c[$j], 2 * $gain);
+                }
+                $line = join q{|}, @c;
+                my $pj = $cols->{Parent};
+                $scan = join q{|}, map { defined $pj && $_ == $pj ? q{} : $c[$_] } 0 .. $#c;
+            }
+        } else {
+            $cols = undef;
+            $nodes += ($line =~ s{(^[ \t]*|[\x{2192}\x{00B7}][ \t]+|:[ \t]{2,})(?:$G)?\Q$id\E(?![0-9A-Za-z_])}{$1$glyph$id}g) || 0;
+            $scan = $line;
+        }
+        while ($scan =~ /($G)\Q$id\E(?![0-9A-Za-z_])/g) {
+            if (bare($1) ne bare($glyph)) { push @residue, $k; last; }
+        }
+    }
+
+    if ($nodes) {
+        my $tmp = "$file.lw-graph.$$";
+        open(my $out, q{>}, $tmp) or fail(qq{$tmp: $!});
+        print $out @lines;
+        close $out or fail(qq{$tmp: $!});
+        rename($tmp, $file) or fail(qq{$file: $!});
+    }
+    print STDERR "WARN: $id glifata a riga $_ non riconosciuta come nodo\n" for @residue;
+    printf "-> grafo aggiornato: %s %s (%d %s)\n", $id, $glyph, $nodes, $nodes == 1 ? q{nodo} : q{nodi}
+        if $nodes;
+    exit($nodes ? 0 : 1);
+'
 
 # ---- Baseline del diff di checkpoint -----------------------------------------
 #
