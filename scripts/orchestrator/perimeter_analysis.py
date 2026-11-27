@@ -40,7 +40,13 @@ def repository_top(project_root):
 
 
 def relative_to(top, path):
-    return os.path.relpath(os.path.abspath(path), top).replace(os.sep, "/")
+    """Il path relativo alla radice del repo, con le due radici normalizzate
+    prima del confronto. Git stampa la radice risolta: su Windows col nome
+    lungo anche quando la radice del progetto arriva col nome breve 8.3
+    (`ENRICO~1`), su Linux coi symlink sciolti. Senza la normalizzazione il
+    path relativo esce dal repo, `git show HEAD:<path>` non trova niente e
+    un piano committato risulta non committato."""
+    return os.path.relpath(os.path.realpath(path), os.path.realpath(top)).replace(os.sep, "/")
 
 
 def changed_members(top, tasks_rel, commit, open_members):
