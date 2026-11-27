@@ -78,10 +78,11 @@ else
     exit 0
 fi
 
-# Il prefisso 🟢 e' opzionale: preflight-task puo' aver gia' promosso il nodo, e
-# senza prevederlo la sostituzione non aggancerebbe — il verde resterebbe sul
-# grafo a task avviata, senza che nessun errore lo segnali.
-perl -i -pe "s/→ 🟢?${TASK_ID}(?![0-9])/→ 🟡${TASK_ID}/ if /^Lane/" "$TASKS_FILE"
+# Glifo dei nodi nel grafo, stessa regola di promote-ready e checkpoint-task
+# (`lw_tasks_md_graph_set` in lib.sh): il glifo di partenza, 🟢 o nessuno, si
+# sostituisce comunque. Exit 1 = task assente dal grafo, il caso normale di una
+# task spot: silenzio.
+lw_tasks_md_graph_set "$TASKS_FILE" "$TASK_ID" "🟡" || true
 
 TASK_FILE=$(find "$TASKS_DIR" -maxdepth 1 -name "${TASK_ID}-*.md" 2>/dev/null | head -1)
 if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then

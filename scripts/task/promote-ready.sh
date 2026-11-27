@@ -60,8 +60,10 @@ else
     exit 0
 fi
 
-# Grafo lane: il nodo e' senza emoji finche' nessuno lo promuove.
-perl -i -pe "s/→ ${TASK_ID}(?![0-9])/→ 🟢${TASK_ID}/ if /^Lane/" "$TASKS_FILE"
+# Glifo dei nodi nel grafo, stessa regola di promote-wip e checkpoint-task
+# (`lw_tasks_md_graph_set` in lib.sh): stampa da se' i nodi riscritti e i WARN.
+# Exit 1 = task assente dal grafo, il caso normale di una task spot: silenzio.
+lw_tasks_md_graph_set "$TASKS_FILE" "$TASK_ID" "🟢" || true
 
 TASK_FILE=$(find "$TASKS_DIR" -maxdepth 1 -name "${TASK_ID}-*.md" 2>/dev/null | head -1)
 if [[ -n "$TASK_FILE" && -f "$TASK_FILE" ]]; then
