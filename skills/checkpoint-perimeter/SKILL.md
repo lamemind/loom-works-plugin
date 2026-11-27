@@ -69,7 +69,7 @@ Output vuoto → avanti. Altrimenti fermati e dillo: il file ha modifiche non co
 
 I membri vengono dal lettore — le figlie di un'epica, quelli elencati da una lista custom —, mai da una lettura a mano. `TASK_MEMBER_MISSING=<id>` è un membro dichiarato senza task file: va nel report come tale, e la lista non si corregge da qui (in una lista custom è di `prepare-perimeter`, in un'epica del `Parent Task` della figlia).
 
-Da `tree` leggi per ogni membro la Prog (`prog=`), il passo successivo (`next=`), le dipendenze aperte (`blocked=`), le righe `DEPS` e le righe `CONFLICT`. Lo stato viene dalla cella Prog della tabella Tasks Overview, che `tree` legge, **mai dai glifi del grafo**: fra la promozione e il checkpoint i glifi del grafo restano indietro.
+Da `tree` leggi per ogni membro la Prog (`prog=`), il passo successivo (`next=`), le dipendenze aperte (`blocked=`), le righe `DEPS` e le righe `CONFLICT`. Lo stato viene dalla cella Prog della tabella Tasks Overview, che `tree` legge, **mai dai glifi del grafo**: `promote-ready`, `promote-wip` e `checkpoint-task` riscrivono il glifo del grafo insieme alla cella, ma il grafo resta una copia, che manca per una task assente dal grafo e resta indietro su un nodo in una forma che `lw_tasks_md_graph_set` non riconosce.
 
 Un membro che è a sua volta un'epica o una lista custom resta una riga sola: i suoi membri non si leggono qui, è un perimetro orchestrabile a sé col proprio checkpoint.
 
