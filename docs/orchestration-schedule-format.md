@@ -118,7 +118,9 @@ I membri li legge da sé col lettore unico, `resolve-task.sh <id del perimetro o
 5. **Le risorse**: due membri aperti con un path in comune che almeno uno dei due scrive — le righe `CONFLICT … materiale` di `perimeter.py tree` — hanno una risorsa in comune o un `dopo` fra loro.
 6. **Il `dlv`** di un membro non supera il numero dei suoi DLV.
 7. **Il `passo`**: un `run` che `run-task` rifiuterebbe, o un `checkpoint` su un membro senza preflight valido, fermano; un passo che i file hanno superato è un avviso.
-8. **Il commit**: il piano è committato, e il file nel working tree è quello del commit.
+8. **I cicli**: nessun gruppo di membri aperti che si aspettano a vicenda, direttamente o attraverso gli altri. Gli archi vengono da `## Dependencies` e dal grafo di `tasks.md` — gli stessi delle righe `CYCLE` di `perimeter.py tree` — e dal `dopo` del piano, dove `*` è un arco verso ogni altro membro aperto, e una voce `T<n>:<dlv>` conta finché quei DLV restano aperti. In un ciclo lo script non lancia nessun membro, e il giro non finisce; un membro chiuso rompe il ciclo. Un `DIFF` per gruppo, con le fonti degli archi.
+9. **Le dipendenze verso un id che il progetto non conosce**: una dipendenza di un membro aperto verso un id senza riga in `tasks.md` — le righe `WARN` di `perimeter.py tree` — è un avviso. La dipendenza resta aperta e il membro non parte; lo script fa partire il giro sugli altri membri, e quando non resta altro da lanciare sveglia l'orchestrator con `fermo`, che nomina l'id.
+10. **Il commit**: il piano è committato, e il file nel working tree è quello del commit.
 
 Le righe:
 
@@ -127,14 +129,16 @@ Le righe:
 | `PERIMETRO=<id>\|epica\|custom` · `PLAN=<path>\|assente` · `MEMBRI=<n>` | il perimetro orchestrabile, il piano, quanti membri |
 | `ERRORE\|<motivo>` | il piano non si legge: assente, senza folder, blocco mancante o doppio, JSON o campo non validi |
 | `PLAN_COMMIT=<sha>\|? (<motivo>)` | il commit del piano, o perché non c'è |
-| `DIFF\|<tipo>\|<chi>\|<dettaglio>` | un controllo che non passa: `perimetro`, `membri`, `dopo`, `risorse`, `dlv`, `passo` |
+| `DIFF\|<tipo>\|<chi>\|<dettaglio>` | un controllo che non passa: `perimetro`, `membri`, `dopo`, `risorse`, `dlv`, `passo`, `ciclo` |
+| `DIFF\|ciclo\|T06 · T09\|<dettaglio>` | un gruppo di membri aperti che si aspettano a vicenda, nell'ordine dei membri; il dettaglio nomina le fonti degli archi (`Dependencies`, `grafo di tasks.md`, `dopo del piano`) |
 | `AVVISO\|passo\|<id>\|<dettaglio>` | un passo di partenza che i file hanno superato |
+| `AVVISO\|dipendenza\|<id>\|<dipendenza>: <causa> — il membro non parte` | una dipendenza del membro verso un id che il progetto non conosce: `id assente nel progetto`, o `task file senza riga in tasks.md` |
 | `CAMBIATO\|<id>\|modificato\|nuovo` | un membro aperto il cui task file è cambiato dopo il commit del piano, o è nato dopo: chi parte lo rilegge, per una collisione che il piano non ha visto |
 | `VERIFY=ok\|riesame\|stop` | `stop` con un `ERRORE`, un `DIFF` o un piano non committato; `riesame` con un `CAMBIATO`; `ok` altrimenti |
 
 Exit `0` su `ok` e `riesame`, `2` su `stop`, `1` su un id malformato, un task file del perimetro orchestrabile mancante o un lettore dei membri che non risponde.
 
-**`verify <id del perimetro orchestrabile> --bozza`** è il controllo di chi ha appena scritto il piano e non l'ha ancora committato: `prepare-perimeter` prima della conferma, l'orchestrator prima del commit di una riscrittura. Fa i controlli da 1 a 7 sui file come sono sul disco — il task file del perimetro orchestrabile compreso, anche non committato — e salta l'8: niente `PLAN_COMMIT` e niente `CAMBIATO`. `VERIFY=ok` senza `ERRORE` e senza `DIFF`, `stop` altrimenti.
+**`verify <id del perimetro orchestrabile> --bozza`** è il controllo di chi ha appena scritto il piano e non l'ha ancora committato: `prepare-perimeter` prima della conferma, l'orchestrator prima del commit di una riscrittura. Fa i controlli da 1 a 9 sui file come sono sul disco — il task file del perimetro orchestrabile compreso, anche non committato — e salta il 10: niente `PLAN_COMMIT` e niente `CAMBIATO`. `VERIFY=ok` senza `ERRORE` e senza `DIFF`, `stop` altrimenti.
 
 **A giro avviato lo script rilancia lo stesso controllo** quando cambia il piano o il task file di un membro, senza la storia: i membri cambiano di continuo, e il piano lo committa l'orchestrator. Un `ERRORE` o un `DIFF` mettono in pausa i passi nuovi e svegliano l'orchestrator; i passi già aperti finiscono.
 

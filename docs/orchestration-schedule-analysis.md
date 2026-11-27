@@ -6,7 +6,7 @@ Il lavoro ha due tempi. Prima le **relazioni** fra i membri — chi dipende da c
 
 Le relazioni hanno due metà, e servono entrambe:
 
-- la **metà meccanica** viene da `perimeter.py tree`, che legge i campi dichiarati dei membri: le dipendenze di `## Dependencies` e del grafo di `tasks.md`, e i path in comune nei `## Materiale`. Di `## Dependencies` conta il primo id di ogni voce a colonna zero, e una voce che comincia con «Nessuna» non dichiara niente anche se poi nomina una task («Nessuna. Non parte insieme a T211»): un vincolo «non insieme» è una collisione, e lo trova la metà del modello;
+- la **metà meccanica** viene da `perimeter.py tree`, che legge i campi dichiarati dei membri: le dipendenze di `## Dependencies` e del grafo di `tasks.md`, e i path in comune nei `## Materiale`. Di `## Dependencies` conta il primo riferimento di ogni voce a colonna zero, e una voce che comincia con «Nessuna» non dichiara niente anche se poi nomina una task («Nessuna. Non parte insieme a T211»): un vincolo «non insieme» è una collisione, e lo trova la metà del modello. Una voce che comincia con un rimando a una task di un altro repo (`factory·T41`, o `factory · T41`) non dichiara niente nel progetto (`perimeter-format.md` §Rimandi fra repo);
 - la **metà del modello** trova le collisioni che nessun campo dichiara, per esempio due task spot che toccano lo stesso codice senza scriverlo nel `## Materiale`. Su quelle `tree` tace, e senza una risorsa nel piano lo script lancerebbe le due task in parallelo.
 
 ## L'ingresso
@@ -28,17 +28,22 @@ Le relazioni hanno due metà, e servono entrambe:
 |---|---|
 | `TASK\|<id>\|…\|next=…\|blocked=…\|…` | `next=chiusa` → membro chiuso. `blocked=` → le dipendenze aperte del membro, dentro e fuori dal perimetro orchestrabile |
 | `DEPS\|<id>\|T52 🟢 (deps) · T40 ✔ (grafo)` | il verso di ogni dipendenza, e da dove viene |
+| `XREF\|<id>\|factory·T41` | una voce di `## Dependencies` saltata come rimando a una task di un altro repo: nessuna dipendenza nel progetto |
+| `WARN\|<id>\|<dipendenza>\|<causa>` | una dipendenza verso un id senza riga in `tasks.md`: `id assente nel progetto` (né task file né riga) o `task file senza riga in tasks.md`. La dipendenza resta in `blocked=`, e il membro non parte |
 | `CONFLICT\|<a>\|<b>\|dipendenza` | una dipendenza fra due membri aperti |
 | `CONFLICT\|<a>\|<b>\|materiale: <path>, …` | un path in comune fra due membri aperti, che almeno uno dei due scrive |
+| `CYCLE\|T06\|T07\|T09` | un gruppo di membri aperti che si aspettano a vicenda, direttamente o attraverso gli altri, nell'ordine della lista dei membri; archi e fonti stanno nelle righe `DEPS` |
 
-`tree` stampa una riga `CONFLICT` solo fra due membri ancora aperti: una task chiusa non riparte, e un suo conflitto non ferma nessuno.
+`tree` stampa una riga `CONFLICT` solo fra due membri ancora aperti: una task chiusa non riparte, e un suo conflitto non ferma nessuno. Per la stessa ragione un membro chiuso non entra in nessuna riga `CYCLE`, e rompe il ciclo che passava da lui.
 
 **Ogni riga `CONFLICT` diventa una riga di prosa e un campo del blocco.** È la proprietà che `verify` controlla: ricalcola le stesse righe dai file e stampa un `DIFF` per ognuna che il blocco non copre.
 
 - **`dipendenza`** → il verso viene da `DEPS`: A dipende da B se le `DEPS` di A nominano B. La prosa: `- T61 dipende da T52: <la voce di ## Dependencies di T61, accorciata> (## Dependencies di T61)`, o `(grafo di tasks.md)` per una freccia che viene solo dal grafo. Il blocco: `"dopo": ["T52"]` in T61. Se la voce nomina dei DLV precisi di B («serve il DLV2 di T52»), il `dopo` è `"T52:2"`, e B prende `"dlv": "2"`: il suo primo ciclo fa solo quei DLV, e A parte prima della fine di B.
-- **Due membri che si dichiarano a vicenda** sono un ciclo, e nessun piano lo scioglie: `verify` vuole i due `dopo`, e lo script terrebbe fermi tutti e due. La prosa lo scrive, e alla conferma è un difetto dei due task file da correggere prima del giro.
+- **Una riga `CYCLE`** è un gruppo di membri che si aspettano a vicenda, e nessun piano la scioglie: `verify` vuole i `dopo` di ogni dipendenza, e un `dopo` a ciclo dà `VERIFY=stop`. La prosa lo scrive, `- T06, T07 e T09 si aspettano a vicenda (righe DEPS)`, e alla conferma è un difetto dei task file da correggere prima del giro. Anche il blocco può creare un ciclo che i task file non hanno: un membro con `"dopo": ["*"]` che un altro membro aspetta, o due `dopo` incrociati, e `verify --bozza` lo ferma.
 - **`materiale: <path>`** → la prosa: ``- T52 e T64 scrivono `scripts/utils/lib.sh` (## Materiale dei due)``; se uno dei due dichiara il path come 📖 fonte, la riga lo dice. Il blocco: una risorsa in comune, col nome del path, nei due membri. Un `dopo` fra i due già scritto, per una dipendenza o una preferenza, basta da solo: due membri in fila non girano mai insieme.
 - **Una dipendenza verso una task chiusa** non scrive niente.
+- **Una riga `WARN`** scrive una riga di prosa, `- T61 aspetta T999, id assente nel progetto (## Dependencies di T61)`, e niente nel blocco: lo script tiene fermo il membro, e alla conferma è una voce da correggere nel task file del membro — un refuso, una task potata, una task di un altro repo scritta senza il nome del repo — o una riga da aggiungere in `tasks.md`.
+- **Una riga `XREF`** non scrive niente, salvo quando il rimando nasconde una dipendenza del progetto scritta con lo spazio (`- parser · T41`, e T41 è una task del progetto): alla conferma è una voce da riscrivere con l'id in testa.
 - **Una dipendenza aperta verso una task fuori dal perimetro orchestrabile** — un id in `blocked=` che non è fra i membri — scrive una riga di prosa, `- T61 aspetta T70, fuori dal perimetro orchestrabile (## Dependencies di T61)`, e niente nel blocco: lo script la legge da `tree` e ferma il membro finché T70 non chiude. Se la voce nomina dei DLV di T70, il `dopo` può portare `"T70:2"`, e il membro parte quando quei DLV sono spuntati. Alla conferma si offre di aggiungere T70 ai membri; in un'epica l'offerta non c'è, perché le figlie le decide il `Parent Task` della figlia, e si dice che per seguirla insieme serve una lista custom.
 
 ## La metà del modello — le collisioni non dichiarate

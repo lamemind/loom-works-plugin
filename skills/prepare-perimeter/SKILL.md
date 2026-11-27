@@ -199,7 +199,7 @@ Scrivi `orchestration-schedule.md` nella task folder col metodo del §6, con l'i
 In chat, prima della domanda:
 
 - la **bozza** del task file intero, e il **piano** intero;
-- le **note** che l'utente deve leggere prima di dire sì: gli id rimasti fuori senza task file, i membri ✔️, i membri epica o lista custom, le dipendenze aperte verso task fuori dal perimetro orchestrabile con l'offerta di aggiungerle (§6), le dipendenze non dichiarate che l'analisi ha trovato e che il piano ripete nel `dopo`, i cicli di dipendenze, i punti ciechi dell'analisi (§6).
+- le **note** che l'utente deve leggere prima di dire sì: gli id rimasti fuori senza task file, i membri ✔️, i membri epica o lista custom, le dipendenze aperte verso task fuori dal perimetro orchestrabile con l'offerta di aggiungerle (§6), le dipendenze verso un id che il progetto non conosce (righe `WARN`), i rimandi fra repo che il parser ha saltato (righe `XREF`), le dipendenze non dichiarate che l'analisi ha trovato e che il piano ripete nel `dopo`, i cicli di dipendenze (righe `CYCLE`), i punti ciechi dell'analisi (§6).
 
 Poi la fermata: `AskUserQuestion` con la domanda «Scrivo la lista custom <id>?» e tre opzioni — scrivi · correggo (lista, descrizione, ordine) · annulla. Le preferenze d'ordine l'utente le aggiunge qui, nella risposta.
 
@@ -274,7 +274,7 @@ In chat, prima della domanda:
 - la descrizione nuova, se cambia;
 - la differenza del piano riga per riga (`=` `+` `-` `~`, §6), o il piano intero se prima non c'era;
 - le sezioni tolte dal task file, la task folder assegnata e le voci di `## Materiale` aggiunte, se ci sono;
-- le note del §3: avvisi sui membri, dipendenze aperte fuori dal perimetro orchestrabile, dipendenze non dichiarate, cicli, punti ciechi.
+- le note del §3: avvisi sui membri, dipendenze aperte fuori dal perimetro orchestrabile, dipendenze verso un id che il progetto non conosce, rimandi fra repo saltati, dipendenze non dichiarate, cicli, punti ciechi.
 
 Poi la fermata: `AskUserQuestion` con la domanda «Aggiorno la lista custom <id>?» e tre opzioni — aggiorna · correggo · annulla.
 
@@ -321,7 +321,7 @@ Il metodo è `${CLAUDE_PLUGIN_ROOT}/docs/orchestration-schedule-analysis.md`: le
 
 In breve:
 
-1. **Le relazioni, metà meccanica** — `tree` con la testa e i membri, e la trascrizione delle sue righe `CONFLICT` in prosa e in campi del blocco:
+1. **Le relazioni, metà meccanica** — `tree` con la testa e i membri, la trascrizione delle sue righe `CONFLICT` in prosa e in campi del blocco, e le righe `WARN`, `XREF` e `CYCLE` in prosa e nelle note della conferma:
 
    ```bash
    "PY" -B -I "R/perimeter.py" tree <testa> --children <membri…>
@@ -337,9 +337,12 @@ In breve:
    "PY" -B -I "R/orchestration_schedule.py" verify <testa> --bozza
    ```
 
-   `VERIFY=ok` → la conferma. Un `ERRORE` o un `DIFF` → correggi il piano e rilancia, prima di mostrarlo: un `DIFF` è una relazione che non è diventata un campo. Un `AVVISO` su un `passo` → togli il campo.
+   `VERIFY=ok` → la conferma. Un `ERRORE` o un `DIFF` → correggi il piano e rilancia, prima di mostrarlo: un `DIFF` è una relazione che non è diventata un campo. Un `AVVISO` su un `passo` → togli il campo. Due righe possono restare, perché il difetto sta nei task file dei membri, che questa skill non tocca:
 
-Le note che l'analisi produce oltre al piano vanno alla conferma, mai nel file: le dipendenze aperte verso task fuori dal perimetro orchestrabile, le dipendenze non dichiarate, i cicli, i punti ciechi.
+   - **`DIFF|ciclo`** → un arco del `dopo` dentro il gruppo che nessuna riga `DEPS` chiede è un errore del piano: cambialo e rilancia. Il ciclo che resta è quello delle righe `CYCLE` di `tree`, e sta nei task file: il piano ripete le dipendenze nel `dopo`, e `verify` resta a `stop`. Alla conferma il ciclo è la prima nota, col verdetto: l'orchestrator non parte finché chi lavora sui membri non corregge le loro `## Dependencies` o il grafo.
+   - **`AVVISO|dipendenza`** → è la riga `WARN` di `tree` vista da `verify`: il membro resta fermo, e alla conferma è una voce da correggere o una riga da aggiungere in `tasks.md`.
+
+Le note che l'analisi produce oltre al piano vanno alla conferma, mai nel file: le dipendenze aperte verso task fuori dal perimetro orchestrabile, le dipendenze verso un id che il progetto non conosce, i rimandi fra repo saltati, le dipendenze non dichiarate, i cicli, i punti ciechi.
 
 ## 7. La task folder e le voci di `## Materiale`
 
