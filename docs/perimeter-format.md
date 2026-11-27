@@ -60,6 +60,22 @@ L'ordine che vale **solo per questo giro** («in questo giro prima le convention
 
 Le dipendenze vere non stanno nemmeno nel piano: stanno in `## Dependencies` dei membri e nel grafo di `tasks.md`, perché valgono per ogni perimetro orchestrabile che contiene quei membri. Una dipendenza vera scritta solo nel piano resta invisibile a chi lavora sulla task fuori dal perimetro orchestrabile. Il piano la ripete per lo script, e `orchestration_schedule.py verify` controlla che la ripeta.
 
+### Rimandi fra repo in `## Dependencies`
+
+Di ogni voce di `## Dependencies` a colonna zero conta il primo riferimento a una task, e il resto è prosa. Una task di un altro repo si scrive **attaccata al nome del repo**, `<repo>·T<n>`: è la forma del grafo di un cappello, e non si confonde con la prosa.
+
+```markdown
+## Dependencies
+
+- factory·T41 (formato del registro): serve il suo DLV2
+- T07 (lettore dei membri)
+```
+
+- **Il rimando non è una dipendenza del progetto.** Il parser di `perimeter.py tree` salta `<repo>·T<n>` e anche la forma con lo spazio, `<parola> · T<n>`, e stampa `XREF|<membro>|<rimando>` per ogni voce saltata. L'orchestrator non aspetta un rimando: l'ordine fra due repo lo segue chi lavora sui due.
+- **Una voce che comincia con un rimando non dichiara nessuna dipendenza**, anche se poi cita un id del progetto: `- factory·T41, lo stesso lavoro di T07 qui` non dà T07. Una dipendenza locale va in una voce sua.
+- **Senza separatore il rimando non si riconosce.** `- factory T41` resta una dipendenza del progetto su T41: se il progetto ha un suo T41, l'orchestrator aspetta la task sbagliata, e nessuna riga lo avvisa.
+- **La forma con lo spazio può nascondere una dipendenza locale.** Una voce come `- parser · T41` è saltata come rimando anche quando T41 è una task del progetto: la riga `XREF` lo mostra a chi conferma il piano, e la correzione è riscrivere la voce con l'id in testa.
+
 ### La voce 🎬
 
 Il glifo 🎬, **stato dell'orchestrator**, marca in `## Materiale` di un perimetro orchestrabile — lista custom o epica — la voce che punta al file in cui l'orchestrator tiene la sua memoria del giro: `.claude/loom/orchestrator/T<id>.md`, sotto la project root, ignorato da git. Il file porta fatti del perimetro, proposte in sospeso, rami fermi e delega, e `checkpoint-perimeter` ne porta i fatti nella prosa del perimetro orchestrabile. I passi e le conversazioni del giro stanno nel flusso dello script, accanto (`flow-format.md`).

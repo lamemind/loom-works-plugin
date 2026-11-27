@@ -78,7 +78,7 @@ Output: ID completo pronto all'uso (es: T319, T320). Prefix `T` hardcoded.
 6. **File critici**
 7. **Acceptance criteria**
 8. **Deliverables**
-9. **Dipendenze**: le task da cui questa dipende, per ID; nessuna se l'utente non ne nomina — vanno nella sezione `## Dependencies` del task file
+9. **Dipendenze**: le task da cui questa dipende, per ID; nessuna se l'utente non ne nomina — vanno nella sezione `## Dependencies` del task file. Una task di un altro repo si scrive attaccata al nome del repo, `- factory·T41 (maniglia)`: scritta `T41` da sola, l'orchestrator aspetterebbe il T41 di questo progetto (`docs/perimeter-format.md` §Rimandi fra repo)
 
 **Una cifra in un AC è contata, non stimata** — vale anche in YOLO. Se la soglia dipende da una misura — byte di un file, occorrenze, righe, tempo — la misura si fa prima di scrivere la riga, e la riga porta il punto di partenza accanto al bersaglio (`da 43.206 a ≤ 26.000`), oppure il bersaglio è relativo a quel punto (`sotto il 60% di oggi`). Una cifra tonda senza la misura accanto è una promessa che il preflight smonterà al primo `wc -c`.
 

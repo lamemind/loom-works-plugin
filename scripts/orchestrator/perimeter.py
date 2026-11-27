@@ -11,7 +11,8 @@ cifre prima → dopo.
           passaggio di consegne (`HANDOFF`)
   tree    lo stato del perimetro orchestrabile dai file: per ogni membro Prog, Size,
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
-          dipendenze verso un id che il progetto non conosce (`WARN`),
+          dipendenze verso un id che il progetto non conosce (`WARN`), rimandi a
+          task di altri repo saltati dal parser (`XREF`),
           `## Materiale`; poi le coppie di membri che non possono girare insieme
   recap   le cifre di oggi accanto a quelle di partenza del giro, la riga `prima`
           che lo script del flusso scrive al primo avvio del giro
@@ -61,6 +62,12 @@ TASK_ID_PATTERN = re.compile(r"^T\d+$")
 # Un id di task nella prosa: `T23`, `✔️T23`, `🟡T23`. Fuori `ks·T22`, l'id di
 # una task di un altro progetto nel grafo di un cappello.
 TASK_REFERENCE = re.compile(r"(?<![A-Za-z0-9·_])T(\d+)(?!\d)")
+# Un rimando a una task di un altro repo in `## Dependencies`: `factory·T41`,
+# la forma attaccata del grafo di un cappello, o `factory · T41`, con lo
+# spazio; anche fra backtick o grassetto. La parola prima del `·` non è un id
+# di task: in `T21 · T22` il punto separa due task del progetto. Solo in
+# `## Dependencies`: nel grafo ` · ` separa i nodi di un lato della freccia.
+CROSS_REPO_REFERENCE = re.compile(r"(?<![\w.-])(\w[\w.-]*)[*`]*[ \t]*·[ \t]*[*`]*T\d+(?!\d)")
 CHECKBOX = re.compile(r"^- \[([ xX])\]")
 DATED_HEADING = re.compile(r"^###\s.*\d{4}-\d{2}-\d{2}")
 BACKTICKED = re.compile(r"`([^`]+)`")
@@ -269,9 +276,25 @@ def preflight_state(lines):
 NO_DEPENDENCY = re.compile(r"^-\s+[*_`]*\s*nessun", re.IGNORECASE)
 
 
+def first_reference(line):
+    """Il primo riferimento a una task nella voce: `("task", "T07")` per una
+    task del progetto, `("rimando", "factory·T41")` per una task di un altro
+    repo, scritto senza backtick e grassetto, `None` se la voce non nomina
+    task."""
+    local = TASK_REFERENCE.search(line)
+    cross = next((match for match in CROSS_REPO_REFERENCE.finditer(line)
+                  if not TASK_ID_PATTERN.match(match.group(1))), None)
+    if cross is not None and (local is None or cross.start() < local.start()):
+        return "rimando", re.sub(r"[*`]", "", cross.group(0))
+    if local is not None:
+        return "task", f"T{local.group(1)}"
+    return None
+
+
 def declared_dependencies(lines):
-    """Le task nominate in `## Dependencies`: il primo id di ogni voce a
-    colonna zero, la stessa regola del lettore dei membri e di `Parent Task`.
+    """Le task nominate in `## Dependencies`, e i rimandi a task di altri repo:
+    il primo riferimento di ogni voce a colonna zero, la stessa regola del
+    lettore dei membri e di `Parent Task`.
 
     Il resto della voce è prosa, e può citare altre task per spiegare. Una riga
     indentata è prosa della voce sopra. Una voce che comincia con «Nessuna» non
@@ -280,15 +303,23 @@ def declared_dependencies(lines):
     nel piano del perimetro orchestrabile, come risorsa. Le voci con prosa prima dell'id restano lette:
     una dipendenza vera scritta in prosa e non letta farebbe partire una task
     prima della sua base, l'errore che costa di più.
+
+    Una voce che comincia con un rimando fra repo non dichiara nessuna
+    dipendenza del progetto, anche se poi cita un id locale: letto come locale,
+    `factory · T41` farebbe aspettare il T41 del progetto, la task sbagliata.
+    Il rimando torna nella seconda lista, perché chi conferma il piano veda
+    cosa il parser ha saltato.
     """
-    dependencies = []
+    dependencies, cross_repo = [], []
     for line in section_lines(lines, "Dependencies"):
         if not line.startswith("-") or NO_DEPENDENCY.match(line):
             continue
-        numbers = TASK_REFERENCE.findall(line)
-        if numbers:
-            dependencies.append(f"T{numbers[0]}")
-    return dependencies
+        reference = first_reference(line)
+        if reference is None:
+            continue
+        kind, text = reference
+        (dependencies if kind == "task" else cross_repo).append(text)
+    return dependencies, cross_repo
 
 
 def materiale_paths(lines, folder):
@@ -338,7 +369,7 @@ def read_task(project_root, docs, task_id, overview):
     progress, title = overview.get(task_id, ("?", ""))
     task = {"id": task_id, "prog": normalize_glyph(progress) or "?", "title": title,
             "file": None, "size": "?", "preflight": "none",
-            "dlv": [0, 0], "ac": [0, 0], "deps": [], "materiale": [], "read_only": set()}
+            "dlv": [0, 0], "ac": [0, 0], "deps": [], "cross_repo": [], "materiale": [], "read_only": set()}
     path = orchestrator_common.find_task_file(project_root, docs, task_id)
     if path is None:
         return task
@@ -351,7 +382,7 @@ def read_task(project_root, docs, task_id, overview):
     task["preflight"] = preflight_state(lines)
     task["dlv"] = list(count_checkboxes(section_lines(lines, "Deliverables Checklist")))
     task["ac"] = list(count_checkboxes(section_lines(lines, "Acceptance Criteria")))
-    task["deps"] = declared_dependencies(lines)
+    task["deps"], task["cross_repo"] = declared_dependencies(lines)
     task["materiale"], task["read_only"] = materiale_paths(lines, orchestrator_common.header_field(lines, "Folder"))
     return task
 
@@ -508,6 +539,8 @@ def print_tree(state):
         if task["dependencies"]:
             listed = " · ".join(f"{item['id']} {item['prog']} ({item['source']})" for item in task["dependencies"])
             print(f"DEPS|{task_id}|{listed}")
+        for reference in task["cross_repo"]:
+            print(f"XREF|{task_id}|{reference}")
         for item in task["unknown_dependencies"]:
             print(f"WARN|{task_id}|{item['id']}|{item['cause']}")
         if task["materiale"]:
