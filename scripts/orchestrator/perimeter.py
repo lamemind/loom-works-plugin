@@ -13,7 +13,8 @@ cifre prima → dopo.
           preflight, cifre di DLV e AC, prossimo passo, dipendenze aperte,
           dipendenze verso un id che il progetto non conosce (`WARN`), rimandi a
           task di altri repo saltati dal parser (`XREF`),
-          `## Materiale`; poi le coppie di membri che non possono girare insieme
+          `## Materiale`; poi le coppie di membri che non possono girare insieme,
+          e i gruppi di membri aperti che si aspettano a vicenda (`CYCLE`)
   recap   le cifre di oggi accanto a quelle di partenza del giro, la riga `prima`
           che lo script del flusso scrive al primo avvio del giro
 
@@ -255,9 +256,16 @@ def graph_edges(tasks_md_lines):
     return edges
 
 
-def count_checkboxes(section):
+def checked_positions(section):
+    """Le posizioni 1-based delle checkbox spuntate, sulle sole checkbox a
+    colonna zero: la numerazione con cui `run-task` indirizza i DLV."""
     marks = [CHECKBOX.match(line).group(1) for line in section if CHECKBOX.match(line)]
-    return sum(1 for mark in marks if mark in "xX"), len(marks)
+    return [position for position, mark in enumerate(marks, 1) if mark in "xX"], len(marks)
+
+
+def count_checkboxes(section):
+    checked, total = checked_positions(section)
+    return len(checked), total
 
 
 def preflight_state(lines):
@@ -369,7 +377,8 @@ def read_task(project_root, docs, task_id, overview):
     progress, title = overview.get(task_id, ("?", ""))
     task = {"id": task_id, "prog": normalize_glyph(progress) or "?", "title": title,
             "file": None, "size": "?", "preflight": "none",
-            "dlv": [0, 0], "ac": [0, 0], "deps": [], "cross_repo": [], "materiale": [], "read_only": set()}
+            "dlv": [0, 0], "dlv_checked": [], "ac": [0, 0], "deps": [], "cross_repo": [],
+            "materiale": [], "read_only": set()}
     path = orchestrator_common.find_task_file(project_root, docs, task_id)
     if path is None:
         return task
@@ -380,7 +389,8 @@ def read_task(project_root, docs, task_id, overview):
         task["title"] = lines[0][len("# Task:"):].strip()
     task["size"] = orchestrator_common.header_field(lines, "Size") or "?"
     task["preflight"] = preflight_state(lines)
-    task["dlv"] = list(count_checkboxes(section_lines(lines, "Deliverables Checklist")))
+    task["dlv_checked"], total = checked_positions(section_lines(lines, "Deliverables Checklist"))
+    task["dlv"] = [len(task["dlv_checked"]), total]
     task["ac"] = list(count_checkboxes(section_lines(lines, "Acceptance Criteria")))
     task["deps"], task["cross_repo"] = declared_dependencies(lines)
     task["materiale"], task["read_only"] = materiale_paths(lines, orchestrator_common.header_field(lines, "Folder"))
@@ -473,11 +483,12 @@ def snapshot(project_root, head, members):
     # Un membro che nomina il proprio perimetro orchestrabile fra le dipendenze
     # non aspetta niente: il perimetro orchestrabile si chiude dopo i membri, e
     # contarlo terrebbe il membro fermo per sempre. Vale per la figlia che nomina
-    # la sua epica.
+    # la sua epica. Né aspetta sé stesso: una task non può aspettare la propria
+    # chiusura, quindi il suo id in `## Dependencies` è prosa, come nel grafo.
     dependencies = {task_id: [] for task_id in unique_members}
     for task_id in unique_members:
         for dependency in tasks[task_id]["deps"]:
-            if dependency != head:
+            if dependency not in (task_id, head):
                 dependencies[task_id].append((dependency, "deps"))
     for task_id, dependency, source in graph_edges(tasks_md_lines):
         if task_id in dependencies and dependency not in (task_id, head):
@@ -521,7 +532,55 @@ def snapshot(project_root, head, members):
                              and not (path in tasks[first]["read_only"] and other in tasks[second]["read_only"])})
             if shared:
                 conflicts.append({"tasks": [first, second], "reason": "materiale: " + ", ".join(shared)})
-    return {"head": head, "members": unique_members, "tasks": tasks, "conflicts": conflicts, "overview": overview}
+    # I cicli fra i membri aperti: un membro chiuso non aspetta niente, e chi lo
+    # aspetta è già libero, quindi rompe il ciclo che passa da lui.
+    waiting = [task_id for task_id in unique_members if tasks[task_id]["prog"] != closed]
+    edges = {task_id: [dependency for dependency in tasks[task_id]["open_dependencies"] if dependency in waiting]
+             for task_id in waiting}
+    return {"head": head, "members": unique_members, "tasks": tasks, "conflicts": conflicts,
+            "cycles": cycle_groups(waiting, edges), "overview": overview}
+
+
+def cycle_groups(nodes, edges):
+    """I gruppi di nodi che si aspettano a vicenda, direttamente o attraverso
+    gli altri: le componenti fortemente connesse del grafo (algoritmo di
+    Tarjan) con almeno due nodi. `edges` va da un nodo ai nodi che aspetta.
+
+    Un gruppo per difetto, non un ciclo elementare per riga: un gruppo con
+    più cicli dentro non ha un ordine unico. I nodi di un gruppo, e i gruppi
+    fra loro, seguono l'ordine di `nodes`: per l'orchestrator, l'ordine della
+    lista dei membri."""
+    position = {node: index for index, node in enumerate(nodes)}
+    visit, lowest, stack, on_stack, groups = {}, {}, [], set(), []
+
+    def explore(node):
+        visit[node] = lowest[node] = len(visit)
+        stack.append(node)
+        on_stack.add(node)
+        for target in edges.get(node, ()):
+            if target not in position:
+                continue
+            if target not in visit:
+                explore(target)
+                lowest[node] = min(lowest[node], lowest[target])
+            elif target in on_stack:
+                lowest[node] = min(lowest[node], visit[target])
+        if lowest[node] != visit[node]:
+            return
+        group = []
+        while True:
+            member = stack.pop()
+            on_stack.discard(member)
+            group.append(member)
+            if member == node:
+                break
+        if len(group) > 1:
+            groups.append(sorted(group, key=position.get))
+
+    for node in nodes:
+        if node not in visit:
+            explore(node)
+    return sorted(groups, key=lambda group: position[group[0]])
 
 
 def figures(task):
@@ -547,6 +606,8 @@ def print_tree(state):
             print(f"MATERIALE|{task_id}|{' · '.join(task['materiale'])}")
     for conflict in state["conflicts"]:
         print(f"CONFLICT|{conflict['tasks'][0]}|{conflict['tasks'][1]}|{conflict['reason']}")
+    for group in state["cycles"]:
+        print("CYCLE|" + "|".join(group))
 
 
 def command_tree(project_root, arguments):

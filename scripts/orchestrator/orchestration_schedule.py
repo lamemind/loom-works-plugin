@@ -7,8 +7,9 @@ prima, letto quando il nuovo manca).
           i membri uguali a quelli del lettore unico, ogni dipendenza dichiarata
           fra membri aperti nel «Dopo», ogni path in comune fra due membri aperti
           coperto da una risorsa o da un «Dopo», i perimetri eseguibili dentro il
-          numero dei DLV, e come avviso le dipendenze verso un id che il progetto
-          non conosce; poi il commit del piano e i membri cambiati dopo.
+          numero dei DLV, nessun ciclo fra i membri aperti, e come avviso le
+          dipendenze verso un id che il progetto non conosce; poi il commit del
+          piano e i membri cambiati dopo.
           Con `--bozza` i soli controlli sui file, senza il commit: è la
           verifica di chi scrive il piano prima di committarlo
   show    il piano letto e normalizzato, una riga per membro
@@ -429,6 +430,55 @@ def check_unknown(state, result):
                                     f"{item['id']}: {item['cause']} — il membro non parte"))
 
 
+# Le fonti di un arco fra due membri, nell'ordine in cui la riga `DIFF` le nomina.
+CYCLE_SOURCES = ("Dependencies", "grafo di tasks.md", "dopo del piano")
+
+
+def dlv_already_checked(state, dependency):
+    """Vero se i DLV che una voce `T<n>:<dlv>` del «dopo» aspetta sono già
+    spuntati: la voce è soddisfatta, e non tiene fermo nessuno."""
+    target = state["tasks"].get(dependency.target)
+    return target is not None and set(dependency.dlv) <= set(target.get("dlv_checked", []))
+
+
+def check_cycles(plan, state, result):
+    """I gruppi di membri aperti che si aspettano a vicenda: lo script non ne
+    lancia nessuno, e il giro non finisce. Gli archi vengono da
+    `## Dependencies`, dal grafo di `tasks.md` (gli stessi delle righe `CYCLE`
+    di `perimeter.py tree`) e dal «dopo» del piano, dove `*` è un arco verso
+    ogni altro membro aperto e una voce per DLV conta finché i suoi DLV restano
+    aperti. Un membro chiuso non aspetta niente e rompe il ciclo."""
+    waiting = [member.id for member in plan.members
+               if member.id in state["tasks"] and state["tasks"][member.id]["prog"] != CLOSED
+               and state["tasks"][member.id].get("next") != "chiusa"]
+    sources = {task_id: {} for task_id in waiting}
+    for task_id in waiting:
+        for item in state["tasks"][task_id].get("dependencies", []):
+            if item["id"] in sources:
+                source = "Dependencies" if item["source"] == "deps" else "grafo di tasks.md"
+                sources[task_id].setdefault(item["id"], set()).add(source)
+        for dependency in plan.by_id[task_id].after:
+            if dependency.target == ALL_OTHERS:
+                targets = [other for other in waiting if other != task_id]
+            elif dependency.dlv and dlv_already_checked(state, dependency):
+                targets = []
+            else:
+                targets = [dependency.target]
+            for target in targets:
+                if target in sources:
+                    sources[task_id].setdefault(target, set()).add("dopo del piano")
+    edges = {task_id: list(targets) for task_id, targets in sources.items()}
+    for group in perimeter.cycle_groups(waiting, edges):
+        found = set()
+        for task_id in group:
+            for target, kinds in sources[task_id].items():
+                if target in group:
+                    found |= kinds
+        named = ", ".join(source for source in CYCLE_SOURCES if source in found)
+        result.diffs.append(("ciclo", " · ".join(group),
+                             f"i membri si aspettano a vicenda e lo script non ne lancia nessuno (archi da {named})"))
+
+
 def check_materials(plan, state, result):
     """Ogni coppia di membri aperti con un path in comune che almeno uno dei
     due scrive (`CONFLICT … materiale` di `perimeter.py tree`) ha una risorsa in
@@ -520,6 +570,7 @@ def check(project_root, head, history=True):
     check_members(result.plan, result.members, result.missing, result)
     check_after(result.plan, state, result)
     check_unknown(state, result)
+    check_cycles(result.plan, state, result)
     check_materials(result.plan, state, result)
     check_steps(result.plan, state, result)
     if history:
