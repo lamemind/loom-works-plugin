@@ -202,21 +202,35 @@ La cella Prog si legge e si scrive con le primitive di `lib.sh`, che trovano la 
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" && lw_tasks_md_prog_get "{docs_root}/tasks.md" <id>
-source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh" && lw_tasks_md_prog_set "{docs_root}/tasks.md" <id> <glifo>
 ```
 
 `lw_tasks_md_prog_get` vuoto → la riga del perimetro orchestrabile non c'è: `tasks.md` non si tocca, e il report lo dice.
 
+Cella Prog e glifo dei nodi nel grafo dell'Execution Plan li scrivono le stesse due funzioni di `checkpoint-task`, mai tu a mano. `G` è il glifo di arrivo, `✔️` alla chiusura e `🟡` quando il lavoro comincia:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/utils/lib.sh"
+G="✔️"   # 🟡 quando il perimetro orchestrabile non si chiude ma il lavoro è cominciato
+if lw_tasks_md_prog_set "{docs_root}/tasks.md" "<id>" "$G"; then
+    echo "-> tasks.md aggiornato: <id> $G"
+else
+    echo "WARN: nessuna riga <id> sotto un header con colonna Prog — Prog NON aggiornata" >&2
+fi
+lw_tasks_md_graph_set "{docs_root}/tasks.md" "<id>" "$G"
+```
+
+`lw_tasks_md_graph_set` stampa da sé i nodi riscritti, e un `WARN` per ogni riga che porta l'id con un altro glifo in una posizione che non riconosce come nodo. Exit 1 senza nessuna riga è il perimetro orchestrabile assente dal grafo, il caso normale. Ogni `WARN` dei due comandi va nel report: non correggi il grafo a mano.
+
 **Alla chiusura**, in quest'ordine:
 
 1. Header del file: `- **Progress**: ✔️ Done`. La data la aggiunge lo script del commit (§9), che riscrive la riga in `✔️ Done at <data>`.
-2. Prog ✔️ in `tasks.md`; se il perimetro orchestrabile compare nel grafo dell'Execution Plan, allinea l'emoji davanti al suo id.
+2. Prog ✔️ in `tasks.md` e nel grafo dell'Execution Plan: lo snippet sopra con `G="✔️"`.
 3. Se il symlink `{docs_root}/current-task.md` risolve a questo file, eliminalo (`rm`). Se punta altrove, o non esiste, non toccarlo: è il binding di un'altra task.
 4. Se l'header porta `**Parent Task**: T<n>`, nel file del padre la checkbox della riga che porta l'id del perimetro orchestrabile passa a `[x]` — matcha sull'id, riscrivi solo il box — e il file del padre entra nella pathspec del §9. È la stessa regola di `checkpoint-task`: alla chiusura di una task il suo checkpoint spunta la riga del padre. Nessuna riga con l'id → un avviso nel report, nessun blocco.
 
 **Senza chiusura**, la Prog dice se il lavoro del perimetro orchestrabile è cominciato:
 
-- Prog 🔵 o 🟢 e almeno un membro 🟡 o ✔️ → 🟡 in `tasks.md` e nel grafo, `- **Progress**: 🟡 In Progress` nell'header.
+- Prog 🔵 o 🟢 e almeno un membro 🟡 o ✔️ → 🟡 in `tasks.md` e nel grafo con lo snippet sopra (`G="🟡"`), `- **Progress**: 🟡 In Progress` nell'header.
 - Prog 🔵 o 🟢 e nessun membro avviato → resta com'è.
 - Prog 🟡 → resta.
 - Prog ✔️ → resta. Un perimetro orchestrabile chiuso non si riapre dal checkpoint: se la condizione di chiusura non vale più — un'epica con una figlia nuova e la sua checkbox `[ ]` — il report lo dice, e la riapertura la decide l'umano.
