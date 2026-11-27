@@ -15,9 +15,11 @@
 #
 # Modello surface (ridisegno T32-reopen):
 #   - TRACKED (rigide): claude, deck → mappa `surfaces` bool. Match finestra + stato.
-#   - LAUNCH (custom): lista `launch` di voci {emoji, label?, command}. Comando shell
-#     arbitrario con cwd=project root; fire-once, niente match/stato. Rimpiazza il
-#     vecchio enum bool codium/idea (non più hardcoded).
+#   - LAUNCH (custom): lista `launch` di voci {emoji, label?, command?, windows?}.
+#     Comando shell arbitrario con cwd=project root; fire-once, niente match/stato.
+#     `command` è il comando di Linux, `windows` quello di Windows (letto dal solo
+#     deck): una voce ne porta almeno uno. Rimpiazza il vecchio enum bool
+#     codium/idea (non più hardcoded).
 #
 # Fornisce:
 #   File:      cfg_file_path, cfg_validate, cfg_field, cfg_enabled_surfaces,
@@ -81,7 +83,8 @@ cfg_validate() {  # <json-file> → 0 valido, 1 invalido (messaggio su stderr)
     [[ -f "$f" ]] || { echo "config non trovato: $f" >&2; return 1; }
     command -v jq >/dev/null 2>&1 || { echo "jq assente (validazione impossibile)" >&2; return 1; }
     # surfaces = mappa TRACKED (claude/deck) → bool. launch (opzionale) = array di
-    # voci custom {emoji(req), label(opt), command(req)}. label opzionale: fallback=command.
+    # voci custom {emoji(req), label(opt), command(opt), windows(opt)}. label
+    # opzionale: fallback=command. command, se c'è, è una stringa non vuota.
     jq -e '
         (.id|type)=="string" and ((.id|length)>0) and
         (.emoji|type)=="string" and
@@ -90,8 +93,22 @@ cfg_validate() {  # <json-file> → 0 valido, 1 invalido (messaggio su stderr)
         (.surfaces|type)=="object" and
         ((.launch // []) | (type=="array") and all(.[];
             ((.emoji|type)=="string") and ((.emoji|length)>0) and
-            ((.command|type)=="string") and ((.command|length)>0)))
+            ((has("command") | not) or (((.command|type)=="string") and ((.command|length)>0)))))
     ' "$f" >/dev/null 2>&1 || { echo "config invalido (schema): $f" >&2; return 1; }
+    # launch: una voce porta almeno un comando, `command` (Linux) o `windows`
+    # (Windows). Check SEPARATO per nominare le voci. Di `windows` conta solo che
+    # sia una stringa non vuota quando manca `command`: il tipo lo controlla il
+    # deck, il solo che lo legge, perché un rifiuto qui per un refuso farebbe
+    # skippare l'intero progetto in refresh.sh.
+    local nocmd
+    nocmd="$(jq -r '[(.launch // []) | to_entries[]
+        | select(((.value.command|type)=="string" and (.value.command|length)>0)
+              or ((.value.windows|type)=="string" and (.value.windows|length)>0) | not)
+        | "launch[\(.key)]"] | join(", ")' "$f")"
+    nocmd="${nocmd%$'\r'}"
+    if [[ -n "$nocmd" ]]; then
+        echo "config invalido: ${nocmd} senza command né windows (serve almeno uno dei due): $f" >&2; return 1
+    fi
     # defaultSurface (opzionale): enum chiuso claude|deck|terminal. Check SEPARATO dal
     # blocco jq sopra per poter nominare il valore incriminato — un typo qui sarebbe
     # altrimenti muto (il consumer degrada a terminal senza dire perché).
@@ -272,22 +289,27 @@ reg_write_surfaces() {  # <id> <kind...> → scrive array GVariant 'as' delle su
     dconf write "$path" "$arr"
 }
 
-# Scrive le surface LAUNCH nel registry come sottoalbero indicizzato launch/<i>/{emoji,label,command}.
+# Scrive le surface LAUNCH nel registry come sottoalbero indicizzato launch/<j>/{emoji,label,command}.
 # Reset del sottoalbero prima di riscrivere → nessuna entry stale se il numero di voci cala.
 # label: fallback a command se assente nel file (default: la voce si chiama come il comando).
+# Una voce senza `command` (solo `windows`) non entra: compass lancia `command` su
+# Linux e non conosce `windows`. Gli indici <j> restano contigui, perché contano le
+# sole voci scritte: compass ordina per indice e non deve vedere buchi.
 reg_write_launch() {  # <id> <json-file>
     local id="$1" f="$2"
     local base; base="$(reg_project_path "$id")/launch"
     dconf reset -f "${base}/" 2>/dev/null || true
-    local n i emoji label command
+    local n i j=0 emoji label command
     n="$(cfg_launch_count "$f")"
     for (( i=0; i<n; i++ )); do
+        command="$(jq -r --argjson i "$i" '.launch[$i].command // empty' "$f")"
+        [[ -n "$command" ]] || continue
         emoji="$(jq -r --argjson i "$i" '.launch[$i].emoji' "$f")"
         label="$(jq -r --argjson i "$i" '.launch[$i].label // .launch[$i].command' "$f")"
-        command="$(jq -r --argjson i "$i" '.launch[$i].command' "$f")"
-        dconf write "${base}/${i}/emoji"   "$(gv_str "$emoji")"
-        dconf write "${base}/${i}/label"   "$(gv_str "$label")"
-        dconf write "${base}/${i}/command" "$(gv_str "$command")"
+        dconf write "${base}/${j}/emoji"   "$(gv_str "$emoji")"
+        dconf write "${base}/${j}/label"   "$(gv_str "$label")"
+        dconf write "${base}/${j}/command" "$(gv_str "$command")"
+        j=$((j+1))
     done
 }
 

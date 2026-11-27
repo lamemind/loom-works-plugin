@@ -38,10 +38,11 @@
     },
     "launch": {
       "type": "array",
-      "description": "Voci LAUNCH custom: comandi shell arbitrari eseguiti con cwd = project root. Senza attributi una voce è un launcher fire-and-forget (apri l'app nel contesto del progetto, niente match finestra né stato); gli attributi opzionali la rendono una voce con esito (capture), lanciata all'avvio del deck (startup) o a scadenza (every), pinnata a una cifra (key), fuori dalla riga launch (header), spenta (enabled), o con gli exit code che non sono un esito (noOutcome). Un tipo solo per entrambe: la differenza fra launcher e script sta in cosa il consumer fa dopo lo spawn, non nella voce. Compass legge solo emoji, label e command dal registry e tratta ogni voce come launcher. Ogni voce ha emoji propria, label leggibile (opzionale, fallback = command) e un command shell.",
+      "description": "Voci LAUNCH custom: comandi shell arbitrari eseguiti con cwd = project root. Senza attributi una voce è un launcher fire-and-forget (apri l'app nel contesto del progetto, niente match finestra né stato); gli attributi opzionali la rendono una voce con esito (capture), lanciata all'avvio del deck (startup) o a scadenza (every), pinnata a una cifra (key), fuori dalla riga launch (header), spenta (enabled), o con gli exit code che non sono un esito (noOutcome). Un tipo solo per entrambe: la differenza fra launcher e script sta in cosa il consumer fa dopo lo spawn, non nella voce. Compass legge solo emoji, label e command dal registry e tratta ogni voce come launcher. Ogni voce ha emoji propria, label leggibile (opzionale, fallback = command, poi windows) e almeno un comando: command per Linux, windows per Windows. Su ogni piattaforma il deck mostra la voce senza il comando di quella piattaforma col marcatore n/d e non la lancia.",
       "items": {
         "type": "object",
-        "required": ["emoji", "command"],
+        "required": ["emoji"],
+        "anyOf": [{ "required": ["command"] }, { "required": ["windows"] }],
         "additionalProperties": false,
         "properties": {
           "emoji": {
@@ -51,12 +52,17 @@
           },
           "label": {
             "type": "string",
-            "description": "Etichetta leggibile della voce. Se assente, il consumer usa 'command' come label."
+            "description": "Etichetta leggibile della voce. Se assente, il consumer usa 'command' come label, e il deck usa 'windows' per una voce senza command."
           },
           "command": {
             "type": "string",
             "minLength": 1,
-            "description": "Comando shell eseguito con cwd = project root. Il deck lo lancia con `bash -lic` (login + interattiva: risolve alias e funzioni di ~/.bashrc), compass con `bash -ic`. Es. 'codium .', 'idea ud-maven-parent', \"git pull --ff-only && git submodule foreach 'git pull --ff-only'\"."
+            "description": "Comando shell di Linux, eseguito con cwd = project root. Il deck lo lancia con `bash -lic` (login + interattiva: risolve alias e funzioni di ~/.bashrc), compass con `bash -ic`. Es. 'codium .', 'idea ud-maven-parent', \"git pull --ff-only && git submodule foreach 'git pull --ff-only'\". Facoltativo quando la voce porta windows: una voce senza command non arriva a compass (reg_write_launch la salta) e il deck su Linux la mostra n/d."
+          },
+          "windows": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comando shell di Windows, eseguito con cwd = project root. Il deck su Windows lo lancia nel bash di Git con `bash -lc`, quindi si scrive nella sintassi di Linux (es. 'code .', 'explorer .', \"git pull --ff-only && git submodule foreach 'git pull --ff-only'\"), e il suo exit code vale per capture e noOutcome come su Linux. Assente → su Windows la voce resta visibile col marcatore n/d e non si lancia. Fuori forma cade con un avviso del deck al mount; cfg_validate non ne controlla il tipo quando la voce porta command. Letto dal SOLO deck."
           },
           "capture": {
             "type": "boolean",
