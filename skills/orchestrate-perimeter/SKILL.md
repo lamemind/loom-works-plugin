@@ -82,7 +82,9 @@ La **soglia di contesto** è un numero di token assoluto: oltre, il giro si chiu
 
 Le righe e i controlli sono in `orchestration-schedule-format.md` §`verify`.
 
-- **`VERIFY=stop`** (exit `2`) → **fermati senza lanciare niente**. Di' all'utente perché, riga per riga — piano assente, senza folder, non committato, ogni `ERRORE` e ogni `DIFF` —, e il rimedio: `/loom-works:prepare-perimeter <id del perimetro orchestrabile>`, che scrive o rifà il piano. Al lancio l'orchestrator non corregge il piano da sé: un piano che non combacia coi file è un piano che l'utente non ha visto.
+- **`VERIFY=stop`** (exit `2`) → **fermati senza lanciare niente**. Di' all'utente perché, riga per riga — piano assente, senza folder, non committato, ogni `ERRORE` e ogni `DIFF` —, e il rimedio: `/loom-works:prepare-perimeter <id del perimetro orchestrabile>`, che scrive o rifà il piano. Al lancio l'orchestrator non corregge il piano da sé: un piano che non combacia coi file è un piano che l'utente non ha visto. Un `DIFF|ciclo` ha due rimedi, e la riga `CYCLE` di `perimeter.py tree` dice quale vale:
+  - **il ciclo sta nei task file dei membri** — `tree` stampa una riga `CYCLE` coi membri del gruppo → il rimedio è correggere le `## Dependencies` dei membri, o il grafo di `tasks.md`, e lo fa l'utente: `prepare-perimeter` non tocca i task file dei membri, e nessun piano scioglie il ciclo;
+  - **il ciclo sta solo nel `dopo` del piano** — nessuna riga `CYCLE` di `tree` porta i membri del gruppo → il rimedio è `prepare-perimeter`, che riscrive il `dopo`.
 - **`VERIFY=riesame`** (exit `0`) → il piano combacia coi file, e i membri `CAMBIATO` sono cambiati dopo il suo commit: leggi il loro task file per intero e, col metodo di `${CLAUDE_PLUGIN_ROOT}/docs/orchestration-schedule-analysis.md` §La metà del modello, controlla le loro coppie con gli altri membri aperti. Una collisione o una dipendenza nuova, che il piano non porta → il piano si riscrive (§4) prima di partire, e lo dici all'utente. Niente di nuovo → avanti. Un membro `nuovo` passa da zero: tutte le sue coppie.
 - **`VERIFY=ok`** (exit `0`) → avanti.
 
